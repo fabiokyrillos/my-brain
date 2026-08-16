@@ -1,7 +1,7 @@
-import { MessageCircleMore } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
@@ -110,9 +110,13 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
           ))}
         </section>
       ) : (
-        <div className="chat-empty">
-          <MessageCircleMore size={32} />
-          <strong>{pt ? "Seu histórico responde junto" : "Your history answers with you"}</strong>
+        <UniversalStateView
+          className="chat-empty"
+          description={pt ? "Pergunte sobre o que você já registrou." : "Ask about what you have already recorded."}
+          locale={locale}
+          state="empty"
+          title={pt ? "Seu histórico responde junto" : "Your history answers with you"}
+        >
           {/*
             `2K-SUGG-003`. The hard-coded example that used to live here named a
             person the user may not have, taught exactly one question shape, and
@@ -122,7 +126,7 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
             invent one".
           */}
           <SuggestionRow locale={locale} suggestions={suggestions} />
-        </div>
+        </UniversalStateView>
       )}
 
       <PaginationLinks locale={locale} path="chat" page={page} hasNext={hasNext} />

@@ -191,6 +191,32 @@
 }
 @media (max-width: 899px) { .ux-state-action { min-height: 44px; width: 100%; text-align: center; } }
 
+/* `2O-RECOVER-002` — the same vocabulary at section density.
+   One section of a populated page saying that one relation is empty is not the
+   page saying it is empty, and the bordered block repeated five times on a
+   project page reads as five failures. Same tone, same `data-ux-state`, no
+   border, no card. */
+.ux-state-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+.ux-state-line-icon { flex: 0 0 auto; color: var(--tone-fg, var(--text-muted)); align-self: center; }
+.ux-state-line-text { min-width: 0; }
+.ux-state-line-action {
+  color: var(--link);
+  font: var(--type-label);
+  text-decoration: underline;
+}
+/* 44px on a phone, where this is a tap target and not just a link
+   (`2O-MOBILE-003` is slice 2O.7's, but a target added here starts compliant). */
+@media (max-width: 899px) {
+  .ux-state-line-action { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
 /* A skeleton that matches the final layout, so nothing reflows on arrival. */
 .ux-skeleton { display: grid; gap: 10px; }
 .ux-skeleton-row { height: 14px; border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--border-divider), var(--border-default), var(--border-divider)); background-size: 200% 100%; }

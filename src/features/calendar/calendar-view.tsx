@@ -29,6 +29,7 @@
 import Link from "next/link";
 import { useId, useMemo, useState } from "react";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import type { Locale } from "@/lib/preferences";
 
 import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
@@ -336,7 +337,7 @@ export function CalendarView({
                 {projection.days.map((day) => (
                   <td key={day.date} data-today={day.isToday ? "true" : undefined}>
                     {day.items.length === 0 ? (
-                      <p className="calendar-empty">{emptyMessage}</p>
+                      <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
                     ) : (
                       <ul className="calendar-day-items">
                         {day.items.map((item) => (
@@ -366,7 +367,7 @@ export function CalendarView({
                 {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
               </h2>
               {day.items.length === 0 ? (
-                <p className="calendar-empty">{emptyMessage}</p>
+                <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
               ) : (
                 <ul className="calendar-day-items">
                   {day.items.map((item) => (

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, LoaderCircle, Sparkles } from "lucide-react";
 import { CaptureReceiptView } from "@/features/daily-cycle/capture-receipt";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import type { CaptureReceipt } from "@/features/daily-cycle/contracts";
 import type { DailyCycleActionFailureCode } from "@/features/daily-cycle/action-result";
 import { recordCaptureStarted } from "@/features/product-analytics/interaction-events";
@@ -88,7 +89,7 @@ export function QuickCaptureForm({
             : "Capture a task, decision, conversation, or idea…"}
           aria-describedby={state.status === "error" ? "capture-error" : undefined}
         />
-        {!online && <p className="capture-error" role="status">{pt ? "Você está offline. O texto permanece nesta tela, mas não será salvo no navegador por segurança." : "You are offline. The text stays on this screen but is not stored in the browser for security."}</p>}
+        {!online && <UniversalStateLine className="capture-error" description={pt ? "Você está offline. O texto permanece nesta tela, mas não será salvo no navegador por segurança." : "You are offline. The text stays on this screen but is not stored in the browser for security."} locale={locale} state="offline" />}
         {state.status === "error" && <p id="capture-error" className="capture-error" role="alert">{state.message}</p>}
         <div className="capture-actions">
           <span><Sparkles size={15} />{pt ? `O ${agentName} organiza sem alterar o original` : `${agentName} organizes without changing the original`}</span>

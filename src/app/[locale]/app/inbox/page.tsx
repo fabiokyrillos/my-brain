@@ -1,7 +1,7 @@
-import { Inbox } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
@@ -258,7 +258,7 @@ export default async function InboxPage({
         ) : (
           <>
             <NeedsAttentionViewed surface="needs_attention" itemCount={0} locale={locale} />
-            <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Nada precisa de você agora" : "Nothing needs you right now"}</strong><p>{pt ? "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." : "When an already-supported decision needs your confirmation, it appears here."}</p></div>
+            <UniversalStateView description={pt ? "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." : "When an already-supported decision needs your confirmation, it appears here."} locale={locale} state="empty" title={pt ? "Nada precisa de você agora" : "Nothing needs you right now"} />
           </>
         )}
       </div>
@@ -304,9 +304,9 @@ export default async function InboxPage({
           caminho." above a "Próxima" link, with a terminal_error on page three —
           a categorical claim that is false, which is worse than saying nothing.
         */
-        <div className="empty-list"><Inbox size={30} /><strong>{copy.emptyPage.title}</strong><p>{copy.emptyPage.body}</p></div>
+        <UniversalStateView description={copy.emptyPage.body} locale={locale} state="empty" title={copy.emptyPage.title} />
       ) : (
-        <div className="empty-list"><Inbox size={30} /><strong>{emptyCopy.title}</strong><p>{emptyCopy.body}</p></div>
+        <UniversalStateView description={emptyCopy.body} locale={locale} state="empty" title={emptyCopy.title} />
       )}
       {/*
         The view has to survive the page change, or page 2 of "falhas" silently

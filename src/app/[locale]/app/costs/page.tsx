@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { UniversalStateLine, UniversalStateView } from "@/features/experience/universal-state";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -283,20 +284,17 @@ export default async function CostsPage({
       )}
 
       {summary === null ? null : summary.allTimeCalls === 0 ? (
-        <section className="cost-empty">
-          <Coins size={29} />
-          <strong>
-            {pt ? "Nenhum custo registrado ainda" : "No recorded cost yet"}
-          </strong>
-          <p>
-            {pt
-              ? `Quando o ${agentName} interpretar uma captura, responder no chat ou analisar um arquivo, o consumo aparecerá aqui.`
-              : `When ${agentName} interprets a capture, answers in chat, or analyzes a file, usage will appear here.`}
-          </p>
-          <Link href={`/${locale}/app/capture`}>
-            {pt ? "Fazer uma captura" : "Capture something"}
-          </Link>
-        </section>
+        <UniversalStateView
+          actionHref={`/${locale}/app/capture`}
+          actionLabel={pt ? "Fazer uma captura" : "Capture something"}
+          className="cost-empty"
+          description={pt
+            ? `Quando o ${agentName} interpretar uma captura, responder no chat ou analisar um arquivo, o consumo aparecerá aqui.`
+            : `When ${agentName} interprets a capture, answers in chat, or analyzes a file, usage will appear here.`}
+          locale={locale}
+          state="empty"
+          title={pt ? "Nenhum custo registrado ainda" : "No recorded cost yet"}
+        />
       ) : (
         <>
           <section
@@ -417,11 +415,18 @@ export default async function CostsPage({
               absence of rows do the talking.
             */}
             {usageUnreadable && (
-              <p className="cost-read-failed" role="status">
-                {pt
+              /* `2O-RECOVER-001`. A read that failed is `error_recoverable`,
+                 not a quieter kind of empty — and the vocabulary's own safety
+                 line ("nothing was changed") is exactly the reassurance this
+                 sentence was written by hand to give. */
+              <UniversalStateLine
+                className="cost-read-failed"
+                description={pt
                   ? "Não foi possível ler as últimas chamadas. A lista abaixo está vazia por falha de leitura, não por ausência de consumo."
                   : "Recent calls could not be read. The list below is empty because the read failed, not because nothing was used."}
-              </p>
+                locale={locale}
+                state="error_recoverable"
+              />
             )}
             <div className="cost-table-wrap">
               <table>
@@ -497,11 +502,14 @@ export default async function CostsPage({
           <small>{pricing[0]?.pricing_version ?? "—"}</small>
         </header>
         {pricingUnreadable && (
-          <p className="cost-read-failed" role="status">
-            {pt
+          <UniversalStateLine
+            className="cost-read-failed"
+            description={pt
               ? "Não foi possível ler o catálogo de preços. Nenhum preço foi inventado para preencher a lacuna."
               : "The pricing catalog could not be read. No price was invented to fill the gap."}
-          </p>
+            locale={locale}
+            state="error_recoverable"
+          />
         )}
         <div className="pricing-grid">
           {pricing.map((price) => (

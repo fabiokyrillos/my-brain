@@ -27,6 +27,7 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
 
@@ -219,10 +220,13 @@ export function CommandPalette({ locale, canCreate = true, onActionChosen }: Com
 
             <div className="palette-results" id={listId} role="listbox" aria-label={text.title}>
               {flat.length === 0 ? (
-                <div className="palette-empty">
-                  <strong>{text.noResults}</strong>
-                  <span>{text.noResultsHint}</span>
-                </div>
+                <UniversalStateView
+                  className="palette-empty"
+                  description={text.noResultsHint}
+                  locale={locale}
+                  state="empty"
+                  title={text.noResults}
+                />
               ) : (
                 grouped.map((group) => (
                   <div key={group.kind} className="palette-group" role="group" aria-label={text.groups[group.kind]}>

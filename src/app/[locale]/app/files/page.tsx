@@ -1,6 +1,8 @@
-import { FileStack, RefreshCw, Search, TriangleAlert } from "lucide-react";
+import { RefreshCw, Search, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+import { UniversalStateView } from "@/features/experience/universal-state";
 import {
   retryAttachmentJob,
   uploadAttachment,
@@ -730,16 +732,17 @@ export default async function FilesPage({
           ))}
         </div>
       ) : (
-        <div className="empty-list">
-          <FileStack size={30} />
-          {/*
-            An empty filtered set is not an empty library, and saying so is what
-            stops a user concluding their files are gone because they clicked a
-            chip.
-          */}
-          <strong>{hasActiveFileFilter(filters) ? copy.emptyFilteredTitle : copy.emptyTitle}</strong>
-          <p>{hasActiveFileFilter(filters) ? copy.emptyFilteredBody : copy.emptyBody}</p>
-        </div>
+        /*
+          An empty filtered set is not an empty library, and saying so is what
+          stops a user concluding their files are gone because they clicked a
+          chip.
+        */
+        <UniversalStateView
+          description={hasActiveFileFilter(filters) ? copy.emptyFilteredBody : copy.emptyBody}
+          locale={locale}
+          state="empty"
+          title={hasActiveFileFilter(filters) ? copy.emptyFilteredTitle : copy.emptyTitle}
+        />
       )}
 
       {/*

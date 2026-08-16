@@ -1,5 +1,5 @@
-import { Workflow } from "lucide-react";
 import { notFound } from "next/navigation";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { getTransparencyCopy } from "@/features/transparency/copy";
 import { DataAiTabs } from "@/features/transparency/data-ai-tabs";
@@ -98,11 +98,12 @@ export default async function JobsPage({
           ))}
         </div>
       ) : (
-        <div className="empty-list">
-          <Workflow size={30} />
-          <strong>{vocabulary.jobsEmptyTitle}</strong>
-          <p>{vocabulary.jobsEmptyBody}</p>
-        </div>
+        <UniversalStateView
+          description={vocabulary.jobsEmptyBody}
+          locale={locale}
+          state="empty"
+          title={vocabulary.jobsEmptyTitle}
+        />
       )}
 
       <PaginationLinks locale={locale} path="jobs" page={page} hasNext={hasNext} />

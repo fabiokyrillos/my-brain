@@ -1,8 +1,8 @@
-import { Layers } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createContext } from "@/features/entities/actions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { loadContexts } from "@/features/entities/contexts";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityCreateForm } from "@/features/entities/entity-create-form";
@@ -74,11 +74,12 @@ export default async function ContextsPage({
           ))}
         </div>
       ) : (
-        <div className="empty-list">
-          <Layers size={30} />
-          <strong>{copy.contextsListEmpty}</strong>
-          <p>{copy.contextsListEmptyHint}</p>
-        </div>
+        <UniversalStateView
+          description={copy.contextsListEmptyHint}
+          locale={locale}
+          state="empty"
+          title={copy.contextsListEmpty}
+        />
       )}
 
       <PaginationLinks hasNext={hasNext} locale={locale} page={page} path="contexts" />

@@ -17,7 +17,14 @@ export type UniversalStateCopy = {
   readonly description: string;
   /** The reassurance, when the state carries one. Null when it cannot. */
   readonly safety: string | null;
-  /** The label of the action out, when there is one. */
+  /**
+   * The label of the action out, when there is one.
+   *
+   * On a `recoverable` state this labels a retry **button**; on a state whose
+   * definition says `offersExit` it labels a **link away**. The vocabulary
+   * decides which, so the two can never be confused by a call site
+   * (`2O-RECOVER-003`).
+   */
   readonly action: string | null;
 };
 
@@ -77,7 +84,10 @@ const copy: Record<ExperienceLocale, ExperienceCopy> = {
         title: "Não é possível continuar",
         description: "Esta ação não pode ser refeita automaticamente.",
         safety: null,
-        action: null,
+        // `2O-RECOVER-003`: a way to LEAVE, never a way to retry. Offering
+        // "tentar de novo" on a state whose definition says it cannot be
+        // retried is a control that can only fail.
+        action: "Voltar para o início",
       },
       offline: {
         title: "Sem conexão",
@@ -131,7 +141,8 @@ const copy: Record<ExperienceLocale, ExperienceCopy> = {
         title: "Cannot continue",
         description: "This action cannot be retried automatically.",
         safety: null,
-        action: null,
+        // `2O-RECOVER-003`: a way to LEAVE, never a way to retry.
+        action: "Go back to the start",
       },
       offline: {
         title: "No connection",

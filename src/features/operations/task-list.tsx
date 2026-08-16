@@ -14,8 +14,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Inbox } from "lucide-react";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
 import { resolveTaskContent } from "@/features/sensitivity/task-derivation";
 import type { DetailControl } from "@/features/task-commands/detail-controls";
@@ -157,7 +157,7 @@ export function TaskList({
   }
 
   if (tasks.length === 0) {
-    return <div className="empty-list"><Inbox size={30} /><strong>{pt ? "Tudo em ordem" : "All clear"}</strong><p>{emptyHint}</p></div>;
+    return <UniversalStateView description={emptyHint} locale={locale} state="empty" title={pt ? "Tudo em ordem" : "All clear"} />;
   }
 
   /*

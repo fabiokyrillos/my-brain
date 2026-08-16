@@ -1,5 +1,7 @@
-import { BellRing, CalendarClock, FileText, History, ListTodo } from "lucide-react";
+import { CalendarClock, FileText, History, ListTodo } from "lucide-react";
 import Link from "next/link";
+
+import { UniversalStateView } from "@/features/experience/universal-state";
 
 import type { Locale } from "@/lib/preferences";
 
@@ -185,12 +187,13 @@ export function ReminderEmptyState({
 }) {
   const copy = getReminderCopy(locale);
   return (
-    <div className="empty-list">
-      <BellRing size={30} />
-      <strong>{copy.emptyTitle}</strong>
-      <p>{view === "pending" || view === "all" ? copy.emptyBody(agentName) : copy.statusHint[
+    <UniversalStateView
+      description={view === "pending" || view === "all" ? copy.emptyBody(agentName) : copy.statusHint[
         view === "cancelled" ? "cancelled" : "sent"
-      ]}</p>
-    </div>
+      ]}
+      locale={locale}
+      state="empty"
+      title={copy.emptyTitle}
+    />
   );
 }

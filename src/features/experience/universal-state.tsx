@@ -14,6 +14,7 @@
  */
 
 import { createElement } from "react";
+import Link from "next/link";
 import {
   Archive,
   CircleCheck,
@@ -82,8 +83,54 @@ export type UniversalStateViewProps = {
   readonly description?: string;
   /** Called when the user takes the action out. The handler owns the write. */
   readonly onAction?: () => void;
+  /**
+   * `2O-RECOVER-003` — the action out, as a destination rather than a handler.
+   *
+   * Two things need this and neither can use `onAction`. A **Server Component**
+   * cannot pass a function across the RSC boundary at all, and most of this
+   * product's empty states are rendered by server-rendered pages; before this
+   * prop, adopting the shared component would have meant turning a page into a
+   * client component to give it an action. And `error_terminal` owes the user
+   * **a way to leave**, which is navigation by definition — a retry handler is
+   * precisely the control that state must not offer.
+   */
+  readonly actionHref?: string;
   readonly actionLabel?: string;
   readonly className?: string;
+  /**
+   * The element the title renders as. `p` by default, so no existing call site
+   * changes.
+   *
+   * A state that occupies the **whole page** — the app error boundary is the
+   * one in this repository — owes a real heading: a screen-reader user
+   * navigates by headings, and a page whose only content is a state would
+   * otherwise have none at all. A state inside a populated page must NOT emit
+   * one, because it would appear in the document outline as a peer of the
+   * page's own sections. The surface is the only thing that knows which it is.
+   */
+  readonly titleAs?: "p" | "h1" | "h2" | "h3";
+  /**
+   * Whether **this instance** is the thing that announces the state.
+   *
+   * The vocabulary decides *how* a state is announced; only the surface knows
+   * whether something else on the page is already announcing it. `AccountMenu`
+   * renders its failure twice on purpose — a visible paragraph and a separate
+   * live region — and making the visible copy a second live region announces
+   * the same sentence to a screen-reader user twice. Slice 2O.2 shipped exactly
+   * that defect once already.
+   */
+  readonly announce?: boolean;
+  /**
+   * Content the surface owns, rendered inside the state.
+   *
+   * Chat's empty state carries up to three suggestions derived from the
+   * reader's own people and projects (`2K-SUGG-003`). That is still an `empty`
+   * state — it says the list has nothing in it — so the alternative to a slot
+   * was leaving one surface outside the vocabulary, which is what
+   * `2O-RECOVER-001` forbids. The slot renders **after** the action, so a
+   * surface cannot use it to smuggle in a second, competing recovery.
+   */
+  readonly children?: React.ReactNode;
 };
 
 export function UniversalStateView({
@@ -92,15 +139,31 @@ export function UniversalStateView({
   title,
   description,
   onAction,
+  actionHref,
   actionLabel,
   className,
+  titleAs = "p",
+  announce = true,
+  children,
 }: UniversalStateViewProps) {
   const definition = UNIVERSAL_STATE_DEFINITIONS[state];
   const text = getExperienceCopy(locale).states[state];
+  const live = announce ? definition.announce : null;
 
-  // An action is offered only when the state is recoverable AND a handler
-  // exists. A retry button on a terminal error is a control that cannot work.
-  const showAction = definition.recoverable && typeof onAction === "function";
+  // A retry is offered only when the state is recoverable AND a handler exists.
+  // A retry button on a terminal error is a control that cannot work.
+  const showRetry = definition.recoverable && typeof onAction === "function";
+  /*
+   * A way out is offered when the state is recoverable (a link is a legitimate
+   * recovery — "go and configure the thing that is missing") or when the
+   * vocabulary says this state owes an exit. `loading` and `interpreting` are
+   * neither, so a caller cannot bolt an action onto a state that is simply
+   * waiting: the guard plants exactly that call and expects nothing rendered.
+   */
+  const showExit =
+    typeof actionHref === "string"
+    && actionHref.length > 0
+    && (definition.recoverable || definition.offersExit);
 
   return (
     <div
@@ -110,14 +173,14 @@ export function UniversalStateView({
       // `announce` is null for `empty`: a list that is empty on arrival is not
       // an event, and announcing it interrupts a screen-reader user who is
       // still hearing the page.
-      role={definition.announce === "assertive" ? "alert" : definition.announce ? "status" : undefined}
-      aria-live={definition.announce ?? undefined}
+      role={live === "assertive" ? "alert" : live ? "status" : undefined}
+      aria-live={live ?? undefined}
       data-ux-state={state}
       data-content-safe={definition.contentIsSafe ? "true" : "false"}
     >
       <ToneIcon tone={definition.tone} size={18} className="ux-state-icon" />
       <div className="ux-state-body">
-        <p className="ux-state-title">{title ?? text.title}</p>
+        {createElement(titleAs, { className: "ux-state-title" }, title ?? text.title)}
         <p className="ux-state-description">{description ?? text.description}</p>
         {/* The reassurance. On `interpreting` this is the most important
             sentence on the screen, so it renders whenever the vocabulary says
@@ -125,13 +188,88 @@ export function UniversalStateView({
         {definition.contentIsSafe && text.safety ? (
           <p className="ux-state-safety">{text.safety}</p>
         ) : null}
-        {showAction ? (
+        {showRetry ? (
           <button type="button" className="ux-state-action" onClick={onAction}>
             {actionLabel ?? text.action}
           </button>
         ) : null}
+        {showExit ? (
+          <Link className="ux-state-action" data-ux-state-exit={definition.offersExit ? "true" : undefined} href={actionHref}>
+            {actionLabel ?? text.action}
+          </Link>
+        ) : null}
+        {children}
       </div>
     </div>
+  );
+}
+
+/**
+ * `2O-RECOVER-001` / `-002` — the same seven states at section density.
+ *
+ * ## Why a second component and not a second implementation
+ *
+ * The census this slice ran found two structurally different things being
+ * called an empty state. A **surface** state is the whole view saying it has
+ * nothing — a page with a list and no rows. A **section** absence is one
+ * section of a populated page saying that one relation is empty, and a project
+ * page has five of them. Rendering the full bordered block five times on a page
+ * that is not empty makes a populated page look broken, which is why those
+ * sections wrote their own muted sentence in the first place.
+ *
+ * Answering that with an exception list would have been the wrong fix: the
+ * state would still be rendered outside the vocabulary, and `2O-RECOVER-001`
+ * says *wherever it is rendered at all*. So the density changes and the
+ * vocabulary does not. Both components emit `data-ux-state`, both take their
+ * tone from `TONE_DEFINITIONS`, and the guard reads the attribute rather than
+ * the component name — so neither can drift from the other.
+ */
+export type UniversalStateLineProps = {
+  readonly state: UniversalState;
+  readonly locale: string;
+  /** The section's own sentence. Sections almost always have one. */
+  readonly description?: string;
+  readonly actionHref?: string;
+  readonly actionLabel?: string;
+  readonly className?: string;
+  /** See `UniversalStateViewProps.announce`. */
+  readonly announce?: boolean;
+};
+
+export function UniversalStateLine({
+  state,
+  locale,
+  description,
+  actionHref,
+  actionLabel,
+  className,
+  announce = true,
+}: UniversalStateLineProps) {
+  const definition = UNIVERSAL_STATE_DEFINITIONS[state];
+  const text = getExperienceCopy(locale).states[state];
+  const live = announce ? definition.announce : null;
+  const showExit =
+    typeof actionHref === "string"
+    && actionHref.length > 0
+    && (definition.recoverable || definition.offersExit);
+
+  return (
+    <p
+      className={["ux-state-line", toneClassName(definition.tone), className].filter(Boolean).join(" ")}
+      role={live === "assertive" ? "alert" : live ? "status" : undefined}
+      aria-live={live ?? undefined}
+      data-ux-state={state}
+      data-ux-density="line"
+      data-content-safe={definition.contentIsSafe ? "true" : "false"}
+    >
+      <ToneIcon tone={definition.tone} size={14} className="ux-state-line-icon" />
+      <span className="ux-state-line-text">{description ?? text.description}</span>
+      {showExit ? (
+        <Link className="ux-state-line-action" href={actionHref}>
+          {actionLabel ?? text.action}
+        </Link>
+      ) : null}
+    </p>
   );
 }
 

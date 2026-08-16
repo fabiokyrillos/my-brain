@@ -1,7 +1,8 @@
-import { BrainCircuit, ChevronRight, Link2 } from "lucide-react";
+import { ChevronRight, Link2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
@@ -190,11 +191,12 @@ export default async function MemoriesPage({
           })}
         </div>
       ) : (
-        <div className="empty-list">
-          <BrainCircuit size={30} />
-          <strong>{copy.emptyTitle}</strong>
-          <p>{copy.emptyBody}</p>
-        </div>
+        <UniversalStateView
+          description={copy.emptyBody}
+          locale={locale}
+          state="empty"
+          title={copy.emptyTitle}
+        />
       )}
 
       <PaginationLinks locale={locale} path="memories" page={page} hasNext={hasNext} />
