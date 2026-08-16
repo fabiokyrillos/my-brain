@@ -1,4 +1,5 @@
 import { ArrowLeft, UserRound } from "lucide-react";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createOrganizationForSubject, updatePerson } from "@/features/entities/actions";
@@ -472,7 +473,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         <p className="section-explainer">{copy.personChangesExplainer}</p>
         {boundedChanges.items.length ? (
           <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <p className="quiet-state">{copy.personChangesEmpty}</p>}
+        ) : <UniversalStateLine description={copy.personChangesEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedChanges} locale={locale} />
       </section>
 
@@ -537,7 +538,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                   );
                 })}
               </div>
-            ) : <p className="quiet-state">{copy.linkedTasksEmpty}</p>}
+            ) : <UniversalStateLine description={copy.linkedTasksEmpty} locale={locale} state="empty" />}
             <BoundedNotice list={boundedTasks} locale={locale} />
           </section>
           <AssociationPanel

@@ -6,6 +6,7 @@ import {
   NeedsAttentionViewed,
   recordAttentionItemResolved,
 } from "@/features/product-analytics/interaction-events";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { presentationFor } from "@/features/sensitivity/contracts";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
@@ -360,7 +361,7 @@ export function NeedsAttentionList({
         this type" directly above a conflict row that was plainly of that type.
       */}
       {visible.length === 0 && visibleConflicts.length === 0 && (items.length > 0 || hasConflicts) ? (
-        <p className="quiet-state">{text.emptyFiltered}</p>
+        <UniversalStateLine description={text.emptyFiltered} locale={locale} state="empty" />
       ) : null}
 
       {visible.map((item) => {
@@ -395,6 +396,21 @@ export function NeedsAttentionList({
       })}
 
       {retryError && <p role="alert" className="form-error">{retryError}</p>}
+      {/*
+        NOT a universal state, and the attempt to make it one is recorded in
+        `state-adoption.ts` with this reason.
+
+        `2O-RECOVER-001` governs what a *surface* is doing. This sentence
+        answers a **click**: the reader pressed "load more" and it failed. That
+        is action feedback, which is why it is `form-error` and why it is
+        `alert` — assertive is correct for the direct result of an action the
+        reader just took, and the vocabulary announces `error_recoverable`
+        politely because most of its uses arrive with a page render.
+
+        It is also the sibling of `retryError` immediately above, which is
+        unambiguously action feedback. Converting one and not the other would
+        have made two identical things answer differently.
+      */}
       {error && <p role="alert" className="form-error needs-attention-error">{error}</p>}
       {hasNext && (
         <button

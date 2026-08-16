@@ -195,6 +195,20 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * and one no undo can reach.
      */
     "src/features/notifications/push-controls.tsx",
+    /*
+     * Added by slice 2O.6, and again by the discovery assertion rather than by
+     * anyone remembering — the fourth time this guard has caught a surface
+     * that would otherwise have shipped unscanned.
+     *
+     * `notification-facts.tsx` renders no control at all, so the ban costs it
+     * nothing. `notification-invitation.tsx` is the one that matters: it sits
+     * on a surface the reader came to for another reason, and a swipe or
+     * long-press route into the permission surface would be an ask the reader
+     * did not choose to see — which is the whole point of `2O-NOTIFY-002`
+     * moving the ask to a moment of demonstrated value in the first place.
+     */
+    "src/features/notifications/notification-facts.tsx",
+    "src/features/notifications/notification-invitation.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

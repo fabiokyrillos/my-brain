@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getWorkCopy } from "@/features/operations/copy";
@@ -251,7 +253,7 @@ export function TaskDetailView({
               <RelationGroup label={copy.relations.dependsOn} items={task.dependsOn ?? []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
             </dl>
           ) : (
-            <p className="quiet-state">{copy.relations.empty}</p>
+            <UniversalStateLine description={copy.relations.empty} locale={locale} state="empty" />
           )}
         </section>
 
@@ -317,7 +319,7 @@ export function TaskDetailView({
               ))}
             </ol>
           ) : (
-            <p className="quiet-state">{copy.history.empty}</p>
+            <UniversalStateLine description={copy.history.empty} locale={locale} state="empty" />
           )}
         </section>
         </div>

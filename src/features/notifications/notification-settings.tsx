@@ -45,7 +45,9 @@ import type {
   NotificationType,
 } from "./consent-contract";
 import { getNotificationSettingsCopy } from "./copy";
+import { NotificationBounds, NotificationFacts } from "./notification-facts";
 import { PushControls } from "./push-controls";
+import { deriveThreeFacts } from "./three-facts";
 
 export function NotificationSettings({
   locale,
@@ -90,6 +92,22 @@ export function NotificationSettings({
         a sighted user perceives to be announced.
       */}
       <p data-consent-state={state} role="status">{copy.states[state]}</p>
+
+      {/*
+        `2O-NOTIFY-004`/`-006`/`-007`. The single sentence above is the state
+        machine's own summary and stays; below it the same situation is broken
+        into the three facts that are genuinely separate. A reader who has
+        granted permission would otherwise conclude alerts work, and on this
+        product's current hardware evidence they may not.
+      */}
+      <NotificationFacts facts={deriveThreeFacts(state)} locale={locale} />
+
+      {/*
+        `2O-NOTIFY-005`. Above the control, not inside the preferences that only
+        appear once consent exists — the requirement's own reason is that these
+        are what BOUND the consent, so they have to be readable before deciding.
+      */}
+      <NotificationBounds locale={locale} />
 
       <p className="quiet-state">{copy.noPromptYet}</p>
 

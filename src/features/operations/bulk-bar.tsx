@@ -30,6 +30,8 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import { detailControlFor } from "@/features/task-commands/detail-controls";
 import { getTaskDetailControlsCopy } from "@/features/task-commands/detail-controls-copy";
 import type { TaskDetailDateBounds, TaskDetailRelationOptions } from "@/features/task-commands/task-detail-controls";
@@ -206,7 +208,7 @@ export function BulkBar({
             ) : null}
             {control?.kind === "relation" && options !== null ? (
               options.length === 0 ? (
-                <p className="quiet-state">{controlCopy.relationEmpty[control.relation!]}</p>
+                <UniversalStateLine description={controlCopy.relationEmpty[control.relation!]} locale={locale} state="empty" />
               ) : (
                 // The **name**, never the id: it is resolved by
                 // `resolve_owned_entity_exact` inside the candidate query, so

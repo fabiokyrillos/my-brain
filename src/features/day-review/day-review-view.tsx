@@ -51,6 +51,8 @@
 
 import { useState } from "react";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
@@ -216,7 +218,7 @@ export function DayReviewView({
           // claims, and only one of them is true here.
           <p role="status">{copy.unavailable(heading)}</p>
         ) : items.length === 0 ? (
-          <p className="quiet-state">{copy.empty[source]}</p>
+          <UniversalStateLine description={copy.empty[source]} locale={locale} state="empty" />
         ) : (
           <ul>{items.map((item) => <Row item={item} key={item.taskId} source={source} />)}</ul>
         )}
@@ -245,7 +247,7 @@ export function DayReviewView({
           <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope)}</h2>
           <p>{copy.description(projection.scope)}</p>
           {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
-          <p className="quiet-state">{copy.nothingScheduled}</p>
+          <UniversalStateLine description={copy.nothingScheduled} locale={locale} state="empty" />
         </div>
         <nav aria-label={copy.scopeLabel} className="day-review-scope-nav">
           {(["day", "next_day"] as const).map((scope) => (
@@ -280,7 +282,7 @@ export function DayReviewView({
       <section aria-label={copy.synthesis.heading} className="day-review-synthesis">
         <h3>{copy.synthesis.heading}</h3>
         {synthesis.quiet ? (
-          <p className="quiet-state">{copy.synthesis.quiet}</p>
+          <UniversalStateLine description={copy.synthesis.quiet} locale={locale} state="empty" />
         ) : (
           <ul className="day-review-counts">
             <li>{copy.synthesis.completed(synthesis.completed)}</li>
@@ -341,7 +343,7 @@ export function DayReviewView({
       <section aria-label={copy.unreadableHeading} className="day-review-unreadable">
         <h3>{copy.unreadableHeading}</h3>
         {projection.unreadable.length === 0 ? (
-          <p className="quiet-state">{copy.unreadableNone}</p>
+          <UniversalStateLine description={copy.unreadableNone} locale={locale} state="empty" />
         ) : (
           /*
             `role="status"` on the wrapper, not on the `<ul>`.
@@ -371,7 +373,7 @@ export function DayReviewView({
         {projection.sourceStates.captured === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.sections.captured)}</p>
         ) : projection.captured.length === 0 ? (
-          <p className="quiet-state">{copy.empty.captured}</p>
+          <UniversalStateLine description={copy.empty.captured} locale={locale} state="empty" />
         ) : (
           <ul>
             {projection.captured.map((capture) => (
@@ -399,7 +401,7 @@ export function DayReviewView({
         {projection.sourceStates.generated === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.generatedHeading)}</p>
         ) : projection.generated === null ? (
-          <p className="quiet-state">{copy.generatedNone}</p>
+          <UniversalStateLine description={copy.generatedNone} locale={locale} state="empty" />
         ) : (
           /*
            * `2M-REVIEW-008`. Every field here comes from `toReviewListItemView`

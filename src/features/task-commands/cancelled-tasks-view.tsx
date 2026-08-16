@@ -22,6 +22,7 @@
 
 import { useActionState } from "react";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import type { Locale } from "@/lib/preferences";
 
 import type { TaskCommandConsoleState } from "./console-state";
@@ -57,7 +58,7 @@ export function CancelledTasksView({
       </header>
 
       {tasks.length === 0 ? (
-        <p className="task-command-recovery-empty">{copy.recovery.empty}</p>
+        <UniversalStateLine className="task-command-recovery-empty" description={copy.recovery.empty} locale={locale} state="empty" />
       ) : (
         <section aria-label={copy.recovery.title}>
           {tasks.map((task) => (

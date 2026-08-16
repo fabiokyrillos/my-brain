@@ -169,7 +169,24 @@ describe("the owner node is drawn without a link, because the owner is not a row
 describe("an empty projection draws nothing rather than an empty frame", () => {
   it("renders no figure at all", () => {
     const { container } = diagram();
-    expect(container.querySelector("svg")).toBeNull();
+    /*
+     * The assertion used to be `querySelector("svg")` — every SVG in the
+     * subtree. `2O-RECOVER-002` routed the empty state through
+     * `UniversalStateLine`, whose tone icon is an SVG, and the check started
+     * failing against a component that is behaving correctly.
+     *
+     * The property was never "no SVG element exists"; it is **no diagram is
+     * drawn**, and the diagram is the `<figure>` and its `<svg>`. Stated that
+     * way it is both true and stronger — the old form would also have been
+     * satisfied by a diagram rendered with `<canvas>`.
+     */
+    expect(container.querySelector("figure")).toBeNull();
+    expect(container.querySelector("figure svg")).toBeNull();
+    expect(container.querySelector(".relations-node")).toBeNull();
+    // The fixture marker `2O-RECOVER-007` requires: three assertions above
+    // report an absence, and all three pass against a component that rendered
+    // nothing at all. This one proves it rendered.
+    expect(container.querySelector("[data-diagram-empty]")).not.toBeNull();
     expect(screen.getByText(/Nada para desenhar/)).toBeVisible();
   });
 });

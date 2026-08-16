@@ -25,6 +25,8 @@
  */
 
 import React, { useActionState, useEffect, useRef, useState } from "react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { useRouter } from "next/navigation";
 import type { Locale } from "@/lib/preferences";
 
@@ -367,7 +369,7 @@ export function TaskDetailControls({
 
                 {control.kind === "relation" && options !== null && control.relation !== null ? (
                   empty ? (
-                    <p className="quiet-state">{copy.relationEmpty[control.relation]}</p>
+                    <UniversalStateLine description={copy.relationEmpty[control.relation]} locale={locale} state="empty" />
                   ) : (
                     // The **name** is submitted, never the id. It is resolved by
                     // `resolve_owned_entity_exact` inside the candidate query,

@@ -1,8 +1,8 @@
-import { Building2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createOrganization } from "@/features/entities/actions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityCreateForm } from "@/features/entities/entity-create-form";
 import { loadOrganizations } from "@/features/entities/organizations";
@@ -74,11 +74,12 @@ export default async function OrganizationsPage({
           ))}
         </div>
       ) : (
-        <div className="empty-list">
-          <Building2 size={30} />
-          <strong>{copy.organizationsEmpty}</strong>
-          <p>{copy.organizationsEmptyHint}</p>
-        </div>
+        <UniversalStateView
+          description={copy.organizationsEmptyHint}
+          locale={locale}
+          state="empty"
+          title={copy.organizationsEmpty}
+        />
       )}
 
       <PaginationLinks hasNext={hasNext} locale={locale} page={page} path="organizations" />

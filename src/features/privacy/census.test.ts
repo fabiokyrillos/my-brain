@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { loadPrivacyCensus } from "./census";
-import { PRIVACY_CATEGORIES } from "./enumeration";
+import { ENUMERATED_TABLES, PRIVACY_CATEGORIES, WITHHELD_TABLES } from "./enumeration";
 
 /**
  * `2O-PRIVACY-001`, `-003` and `-010` — the census, and the rule the owner's
@@ -105,5 +105,73 @@ describe("2O-PRIVACY-010: a refused read is not a zero", () => {
     }));
     const census = await loadPrivacyCensus({ from } as never, "owner");
     for (const category of census.categories) expect(category.status).toBe("unreadable");
+  });
+});
+
+/**
+ * `2O-PRIVACY-001`, re-evaluated in slice 2O.6 after the owner's decision.
+ *
+ * Slice 2O.5 classified it `partial` for one reason: `product_events` had no
+ * page, and the surface said so honestly but nothing recorded whether that was
+ * a decision or a gap. **That classification and its record stand untouched.**
+ * What changed is that ADR-119 makes it a decision, so the absence is now
+ * something the tree can be checked against.
+ */
+describe("2O-PRIVACY-001 / ADR-119: a category with no page carries a signed decision", () => {
+  it("has categories to check, and at least one with no page", () => {
+    // Non-vacuity twice: the loop below is trivially true of an empty list,
+    // and the decision assertion is trivially true if every category has a page.
+    expect(PRIVACY_CATEGORIES.length).toBe(12);
+    const pageless = PRIVACY_CATEGORIES.filter((category) => category.surface === null);
+    expect(pageless.map((category) => category.key)).toEqual(["usage"]);
+  });
+
+  it("refuses a null surface that nobody decided", () => {
+    const undecided = PRIVACY_CATEGORIES.filter(
+      (category) => category.surface === null && category.noSurface === undefined,
+    ).map((category) => category.key);
+
+    expect(
+      undecided,
+      `categories with no page and no decision: ${undecided.join(", ")}. `
+        + "A comment is not a decision — without one, 'the owner decided the "
+        + "export is the sufficient view' is indistinguishable from 'nobody has "
+        + "built the page yet', and the second becomes the first by sitting there.",
+    ).toEqual([]);
+  });
+
+  it("refuses a decision attached to a category that HAS a page", () => {
+    // The control in the other direction: a decision is a permission, and a
+    // permission granted where it is not needed is one nobody re-examines.
+    const contradictory = PRIVACY_CATEGORIES.filter(
+      (category) => category.surface !== null && category.noSurface !== undefined,
+    ).map((category) => category.key);
+    expect(contradictory).toEqual([]);
+  });
+
+  it("names the governing record and gives a reason, not a token", () => {
+    for (const category of PRIVACY_CATEGORIES) {
+      if (category.noSurface === undefined) continue;
+      expect(category.noSurface.adr).toBe("ADR-119");
+      expect(category.noSurface.kind).toBe("export-is-the-view");
+      expect(category.noSurface.reason.length).toBeGreaterThan(200);
+    }
+  });
+
+  it("keeps `product_events` in the census and in the export, which is what makes the decision honest", () => {
+    /*
+     * The owner's decision removes a PAGE. It does not remove the category
+     * from the census and it does not remove the table from the export — the
+     * export is what makes "no page" acceptable, so an export that dropped it
+     * would turn a considered decision into a disappearance.
+     */
+    const usage = PRIVACY_CATEGORIES.find((category) => category.key === "usage");
+    expect(usage).toBeDefined();
+    expect(usage!.tables.map((table) => table.table)).toEqual(["product_events"]);
+    // Counted and exported like every other enumerated table. Not withheld —
+    // the withheld set is abuse counters and the operator error sink, and this
+    // is neither.
+    expect(ENUMERATED_TABLES.map((table) => table.table)).toContain("product_events");
+    expect(WITHHELD_TABLES.map((entry) => entry.table)).not.toContain("product_events");
   });
 });

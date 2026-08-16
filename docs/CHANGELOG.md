@@ -2,6 +2,98 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-16 - PHASE 2O SLICE 2O.6 — the product recovers in one language, and notifications say three things
+
+**`2O-NOTIFY-001` … `-007`, `2O-RECOVER-001` … `-007` — 14 built, 0 partial, 0
+undelivered. Plus `2O-PRIVACY-001` re-evaluated and closed built under ADR-119.
+Zero migrations created. 94, parity `202608140094`. 87 of 116.**
+
+### The re-audit caught the previous handoff twice
+
+- Handoff §83 recorded that **two** files render the universal state and called
+  the number load-bearing. **One did.** `work-view.tsx` names the contract in a
+  block comment and imports nothing from the module. The component is
+  `UniversalStateView`; `UniversalState` is the **type**, so a census keyed on
+  the type matches importers, the vocabulary module, two tests and a guard.
+- The plan's census reproduces only in total. Surface-level state blocks are
+  **22 files / 26 sites, split 16 route files + 6 feature components** — not ten
+  pages and thirteen components. Two categories its sentence never named are
+  real: **10 error/loading sites** and **40 section-level absences**.
+
+### Added
+
+- `UniversalStateLine` — the same seven states at section density, so a
+  populated page with five empty relations does not read as five failures.
+- `actionHref` on `UniversalStateView`, so a Server Component can offer an
+  action at all, and `titleAs` / `announce` / `children`.
+- `offersExit` in the state vocabulary. `error_terminal` had `recoverable:
+  false` and a null action label, so the one state that most needs a way out
+  was the only one that could not have one.
+- `universal-state-projection.ts` — `ProductState` → `UniversalState`, with
+  `organizing` and `saved` resolving to `interpreting` and never to `loading`.
+- `three-facts.ts` — consent, permission and delivery as three disjoint enums.
+  `DeliveryFact` has exactly one member, so no code path can claim a
+  notification arrived.
+- `NotificationFacts`, `NotificationBounds`, `NotificationInvitation`.
+- `composer-draft.ts` — a `sessionStorage` draft keyed per surface and
+  conversation, storing text and no authority.
+- `state-adoption.ts` and two guards: the adoption census and the notification
+  reach guard.
+- `e2e/online-notifications-and-recovery.spec.ts` — 7 authenticated journeys,
+  desktop and mobile.
+
+### Changed
+
+- Roughly ninety render sites across the product now render their state through
+  `features/experience/universal-state.tsx`. Adoption went from **one** file to
+  **forty-plus**.
+- The composer's offline sentence claimed the text was **not** stored in the
+  browser. That stopped being true when the draft shipped, so it was rewritten
+  rather than left to contradict the feature beside it.
+- `error_terminal` gains an exit label in both locales.
+- The 2I experience guard's `error_terminal.action === null` assertion is
+  **inverted**, superseded text quoted, and the property it protected — never a
+  retry on a terminal error — is now stated directly and proved across the whole
+  vocabulary.
+- The notification boundary guard's state-sentence scan is **narrowed to the
+  `states:` blocks**, with a planted control, because the new
+  `permissionFactValues` record legitimately reuses `granted` and `denied` for
+  the browser's vocabulary.
+- `PrivacyCategory` gains `noSurface` — required when `surface` is null,
+  forbidden otherwise — turning slice 2O.5's comment into a machine-checked
+  decision (ADR-119).
+
+### Not done, deliberately
+
+- **`2O-NOTIFY-005`'s third bound has no object.** There is no
+  important-reminder override; `decideDelivery` refuses inside quiet hours with
+  no exemption. The surface declares the absence rather than promising a
+  capability the product lacks.
+- **The push HTTP 403 / Android track is not resumed** (`OD-2O-11`). Stated,
+  not resolved.
+- **`2O-ACTIVATION-005` direction B's blind spot** — three nameless buttons in
+  two files — is routed to slice 2O.7, in the guard's predicate. Adding a
+  `name` so a guard can see a control is forbidden.
+
+## 2026-08-16 - PHASE 2O SLICE 2O.5 — privacy, consent and control of the data
+
+> **Added retroactively by slice 2O.6.** Slice 2O.5 shipped, merged at
+> `26922bc`, and wrote its acceptance record and the handoff — but left no
+> changelog entry, which the Definition of Done requires. Recorded here as a
+> pointer rather than rewritten, because
+> `docs/reports/phase-2o/PHASE_2O_SLICE_05_ACCEPTANCE.md` is the authoritative
+> account and duplicating it would create a second version to keep in step.
+
+**`2O-PRIVACY-001` … `-010`, `2O-CONSENT-001` … `-005` — 14 built, 1 partial, 0
+undelivered. Zero migrations created. 94, parity `202608140094`. 72 of 116.**
+
+The privacy centre, the consent history, the complete-or-refuse export, and the
+retention posture. The probable stop condition did not fire: the census counts
+under the requesting user's own identity and the existing RLS instead of
+reaching `public.account_owned_row_counts`, which is `service_role`-only. The
+one `partial` was `2O-PRIVACY-001` — `product_events` has no page — and it is
+closed by ADR-119 in slice 2O.6.
+
 ## 2026-08-16 - PHASE 2O SLICE 2O.4 — the product says what it does with a model, and what it costs
 
 **`2O-AICONFIG-001` … `-009`, `2O-COST-001` … `-007` — 14 built, 2 baseline, 0

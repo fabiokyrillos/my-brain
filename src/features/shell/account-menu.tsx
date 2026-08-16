@@ -24,6 +24,8 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { LogOut, Settings, UserRound } from "lucide-react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { idleSignOutState, type SignOutState } from "@/features/auth/sign-out-state";
 import type { Locale } from "@/lib/preferences";
 import { getAccountCopy } from "./account-copy";
@@ -108,7 +110,18 @@ export function AccountMenu({
         </div>
 
         {state.status === "failed" ? (
-          <p className="account-menu-error">{state.message}</p>
+          /*
+            `announce={false}`: the live region directly above already carries
+            this exact sentence, and a second one reads it to a screen-reader
+            user twice. The visible copy is the one that stays silent.
+          */
+          <UniversalStateLine
+            announce={false}
+            className="account-menu-error"
+            description={state.message}
+            locale={locale}
+            state="error_recoverable"
+          />
         ) : null}
       </div>
     </details>

@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
+import { universalStateForProductState } from "@/features/daily-cycle/universal-state-projection";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { ReturnToSource } from "@/features/provenance/return-to-source";
 import { requireUser } from "@/lib/auth/require-user";
 import { formatInstant } from "@/lib/time/instant-format";
@@ -103,6 +105,17 @@ export default async function EntryDetailPage({
   // below stamp from the same value, so the page cannot disagree with itself.
   const occurredAtLabel = formatInstant(view.original.occurredAt, "dayAndTime", locale, review.timezone) ?? "";
 
+  /*
+   * `2O-RECOVER-004`. `universalStateForProductState` returns null only for
+   * `needs_attention` and `ready` — both of which mean an interpretation
+   * exists, so they are unreachable on this branch. The fallback is
+   * `interpretation_failed` rather than `interpreting` because claiming work is
+   * still in progress when it is not is the worse of the two errors: it leaves
+   * the reader waiting for something that will never arrive.
+   */
+  const missingInterpretationState = universalStateForProductState(view.productState) ?? "interpretation_failed";
+  const stillInterpreting = missingInterpretationState === "interpreting";
+
   const nextActions = editableCurrent ? (
     <>
       {editableCurrent.isRecordOnly ? (
@@ -150,12 +163,33 @@ export default async function EntryDetailPage({
       )}
     </>
   ) : (
-    <div className="empty-interpretation-state">
-      <AlertTriangle size={24} />
-      <h2>{pt ? "Ainda não há interpretação" : "There is no interpretation yet"}</h2>
-      <p>{pt ? "O registro original permanece disponível. Você pode tentar novamente." : "The original record remains available. You can try again."}</p>
-      {!canRetry && <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
-    </div>
+    /*
+     * `2O-RECOVER-004`, and this is the surface the requirement was written
+     * for. "There is no interpretation yet" was one sentence covering two
+     * genuinely different situations: the AI is still reading the entry, and
+     * the AI tried and failed. The first is not a failure and must not offer a
+     * retry — there is nothing to retry — while the second is, and both were
+     * being told *"you can try again"*.
+     *
+     * The state now comes from the record's own lifecycle, so the two cannot be
+     * confused, and neither is ever rendered as `loading`: the entry is durable
+     * in both, and `interpreting` is the only state whose copy says so.
+     */
+    <UniversalStateView
+      className="empty-interpretation-state"
+      description={stillInterpreting
+        ? undefined
+        : (pt ? "O registro original permanece disponível. Você pode tentar novamente." : "The original record remains available. You can try again.")}
+      locale={locale}
+      state={missingInterpretationState}
+      title={stillInterpreting
+        ? undefined
+        : (pt ? "Ainda não há interpretação" : "There is no interpretation yet")}
+    >
+      {stillInterpreting || canRetry
+        ? null
+        : <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />}
+    </UniversalStateView>
   );
 
   return (

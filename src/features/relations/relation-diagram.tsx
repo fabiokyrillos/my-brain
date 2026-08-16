@@ -38,6 +38,8 @@
 
 import Link from "next/link";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import type { Locale } from "@/lib/preferences";
 
 import { getRelationsCopy } from "./copy";
@@ -76,9 +78,14 @@ export function RelationDiagram({
       </p>
 
       {layout.nodes.length === 0 ? (
-        <p className="quiet-state" data-diagram-empty="true">
-          <strong>{copy.nothingDrawableHeading}</strong> {copy.nothingDrawableBody}
-        </p>
+        // The wrapper keeps `data-diagram-empty`, which a shipped journey locates.
+        <div data-diagram-empty="true">
+          <UniversalStateLine
+            description={<><strong>{copy.nothingDrawableHeading}</strong> {copy.nothingDrawableBody}</>}
+            locale={locale}
+            state="empty"
+          />
+        </div>
       ) : (
         <figure
           aria-describedby={DIAGRAM_DESCRIPTION_ID}

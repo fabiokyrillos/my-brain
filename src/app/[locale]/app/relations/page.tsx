@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 
+import { UniversalStateLine } from "@/features/experience/universal-state";
+
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { getRelationsCopy } from "@/features/relations/copy";
@@ -72,9 +74,17 @@ export default async function RelationsPage({ params }: { params: Promise<{ loca
 
       {outcome.status === "failed" ? (
         <section className="relations-section">
-          <p className="quiet-state" data-relations-failed="true" role="alert">
-            <strong>{copy.failedHeading}</strong> {copy.failedBody}
-          </p>
+          {/* The wrapper keeps `data-relations-failed`. A read that failed is
+              `error_recoverable`, which the vocabulary announces politely —
+              this arrives with the page render rather than answering a click,
+              so an assertive region would interrupt for no event. */}
+          <div data-relations-failed="true">
+            <UniversalStateLine
+              description={<><strong>{copy.failedHeading}</strong> {copy.failedBody}</>}
+              locale={locale}
+              state="error_recoverable"
+            />
+          </div>
         </section>
       ) : (
         <>

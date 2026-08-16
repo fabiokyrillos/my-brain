@@ -1,6 +1,6 @@
-import { History } from "lucide-react";
 import { notFound } from "next/navigation";
 
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { getHistoryCopy } from "@/features/history/copy";
 import { HistoryFilterControls } from "@/features/history/history-filters";
 import { HistoryList } from "@/features/history/history-list";
@@ -109,11 +109,12 @@ export default async function HistoryPage({
       {events.length ? (
         <HistoryList copy={copy} events={events} formatDateTime={formatDateTime} locale={locale} />
       ) : (
-        <div className="empty-list">
-          <History size={30} />
-          <strong>{filtered ? copy.empty.filteredTitle : copy.empty.title}</strong>
-          <p>{filtered ? copy.empty.filteredBody : copy.empty.body}</p>
-        </div>
+        <UniversalStateView
+          description={filtered ? copy.empty.filteredBody : copy.empty.body}
+          locale={locale}
+          state="empty"
+          title={filtered ? copy.empty.filteredTitle : copy.empty.title}
+        />
       )}
 
       <PaginationLinks

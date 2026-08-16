@@ -101,6 +101,22 @@ export type UniversalStateDefinition = {
   readonly contentIsSafe: boolean;
   /** Is there an action that can move the user out of this state? */
   readonly recoverable: boolean;
+  /**
+   * `2O-RECOVER-003` — does this state offer **a way to leave** rather than a
+   * way to retry?
+   *
+   * Declared here rather than left to each call site, because the requirement
+   * is a property of the *state* and not of the surface that happens to render
+   * it. Before this field `error_terminal` was `recoverable: false` with a null
+   * action label, so the one state that most needs an exit was the only state
+   * in the vocabulary that could offer nothing at all — a dead end the user had
+   * to escape with the browser's back button.
+   *
+   * Exit and retry are mutually exclusive by construction: the invariant in
+   * `phase-2i-experience-guard.test.ts` refuses a state that claims both, so
+   * "offer a retry on a terminal error" cannot be reintroduced by a later edit.
+   */
+  readonly offersExit: boolean;
   /** `aria-live` politeness, or null when the state is not announced. */
   readonly announce: "polite" | "assertive" | null;
 };
@@ -108,17 +124,36 @@ export type UniversalStateDefinition = {
 export const UNIVERSAL_STATE_DEFINITIONS: Readonly<
   Record<UniversalState, UniversalStateDefinition>
 > = {
-  empty: { state: "empty", tone: "information", contentIsSafe: true, recoverable: true, announce: null },
-  loading: { state: "loading", tone: "information", contentIsSafe: true, recoverable: false, announce: "polite" },
+  empty: { state: "empty", tone: "information", contentIsSafe: true, recoverable: true, offersExit: false, announce: null },
+  loading: { state: "loading", tone: "information", contentIsSafe: true, recoverable: false, offersExit: false, announce: "polite" },
   // Saved, and still being read by the AI. The reassurance is the requirement.
-  interpreting: { state: "interpreting", tone: "information", contentIsSafe: true, recoverable: false, announce: "polite" },
+  interpreting: { state: "interpreting", tone: "information", contentIsSafe: true, recoverable: false, offersExit: false, announce: "polite" },
   // The interpretation failed; the entry did not. Recoverable, and safe.
-  interpretation_failed: { state: "interpretation_failed", tone: "attention", contentIsSafe: true, recoverable: true, announce: "polite" },
-  error_recoverable: { state: "error_recoverable", tone: "attention", contentIsSafe: true, recoverable: true, announce: "polite" },
-  // The only state that does not promise safety, because it cannot.
-  error_terminal: { state: "error_terminal", tone: "risk", contentIsSafe: false, recoverable: false, announce: "assertive" },
-  offline: { state: "offline", tone: "attention", contentIsSafe: true, recoverable: true, announce: "polite" },
+  interpretation_failed: { state: "interpretation_failed", tone: "attention", contentIsSafe: true, recoverable: true, offersExit: false, announce: "polite" },
+  error_recoverable: { state: "error_recoverable", tone: "attention", contentIsSafe: true, recoverable: true, offersExit: false, announce: "polite" },
+  // The only state that does not promise safety, because it cannot — and
+  // therefore the only one that offers a way OUT instead of a way to retry.
+  error_terminal: { state: "error_terminal", tone: "risk", contentIsSafe: false, recoverable: false, offersExit: true, announce: "assertive" },
+  offline: { state: "offline", tone: "attention", contentIsSafe: true, recoverable: true, offersExit: false, announce: "polite" },
 };
+
+/**
+ * `2O-RECOVER-003` — the states that must offer the user something to do.
+ *
+ * Derived from the vocabulary rather than listed by hand, so a state added
+ * later is classified by its own definition instead of by whoever remembers to
+ * extend a literal. A state qualifies as an error state when its tone is
+ * `attention` or `risk` **and** it is not merely an absence of content.
+ */
+export const ERROR_STATES = UNIVERSAL_STATES.filter((state) => {
+  const definition = UNIVERSAL_STATE_DEFINITIONS[state];
+  return definition.tone === "attention" || definition.tone === "risk";
+});
+
+/** Does this state owe the user an action out of it? */
+export function stateOwesAnAction(state: UniversalState): boolean {
+  return (ERROR_STATES as readonly UniversalState[]).includes(state);
+}
 
 /** The CSS class a tone renders under. One place, so a guard can find it. */
 export function toneClassName(tone: ExperienceTone): string {

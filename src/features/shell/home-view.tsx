@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
@@ -333,7 +335,7 @@ export function HomeView({
               </div>
             ) : (
               <div className="home-quiet">
-                <p className="quiet-state">{sections.attention.empty}</p>
+                <UniversalStateLine description={sections.attention.empty} locale={locale} state="empty" />
                 {/*
                   `04-estados.md`, Hoje **V**. The day's account, so the quiet
                   state reports what happened rather than only what did not.
@@ -428,7 +430,7 @@ export function HomeView({
                       day's list from being read as "these are your priorities" —
                       the promotion rule ran and nothing qualified.
                     */
-                    <p className="quiet-state">{sections.priorities.empty}</p>
+                    <UniversalStateLine description={sections.priorities.empty} locale={locale} state="empty" />
                   )}
                   {view.priorities.length ? (
                     <p className="home-priority-rule">{sections.priorities.rule}</p>
@@ -460,7 +462,7 @@ export function HomeView({
                 ) : null}
               </>
             ) : (
-              <p className="quiet-state">{sections.today.empty}</p>
+              <UniversalStateLine description={sections.today.empty} locale={locale} state="empty" />
             )}
           </Section>
 
@@ -585,7 +587,7 @@ export function HomeView({
                 ) : null}
               </ul>
             ) : (
-              <p className="quiet-state">{sections.endOfDay.clear}</p>
+              <UniversalStateLine description={sections.endOfDay.clear} locale={locale} state="empty" />
             )}
             <Link href={`/${locale}/app/reviews`} className="panel-view-all">
               {sections.endOfDay.openReview}

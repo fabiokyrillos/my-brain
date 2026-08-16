@@ -1,4 +1,14 @@
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+
+import { readPushConsent } from "@/features/notifications/consent-reader";
+import {
+  NOTIFICATION_INVITE_COOKIE,
+  isInviteDismissedValue,
+  shouldOfferInvitation,
+} from "@/features/notifications/invitation";
+import { NotificationInvitation } from "@/features/notifications/notification-invitation";
+import { deriveThreeFacts, mayInviteAtMomentOfValue } from "@/features/notifications/three-facts";
 
 import { createReminder } from "@/features/agent/actions";
 import { ReminderForm } from "@/features/agent/forms";
@@ -116,6 +126,31 @@ export default async function RemindersPage({
     now: new Date(),
   });
 
+  /*
+   * `2O-NOTIFY-002`. Three independent conditions, all required:
+   *
+   * - the account has a reminder still waiting to fire — the moment of value,
+   *   read from the page's own data rather than counted separately;
+   * - the three facts say an invitation could lead somewhere (a browser that
+   *   already refused is not sent to a page whose only offer is a control that
+   *   cannot work);
+   * - it has not been dismissed on this browser.
+   *
+   * The consent read is the same owner-scoped one the notifications page makes.
+   */
+  const inviteConsent = await readPushConsent(supabase, user.id);
+  const inviteJar = await cookies();
+  const inviteNotifications = shouldOfferInvitation({
+    // "Still waiting to fire" is `scheduled` or `snoozed`. There is no
+    // `pending` status on a reminder — `sent` has already happened and
+    // `cancelled` never will, and neither is a reason to offer an alert.
+    hasDemonstratedValue: reminders.some(
+      (reminder) => reminder.status === "scheduled" || reminder.status === "snoozed",
+    ),
+    mayInvite: mayInviteAtMomentOfValue(deriveThreeFacts(inviteConsent.state)),
+    dismissed: isInviteDismissedValue(inviteJar.get(NOTIFICATION_INVITE_COOKIE)?.value),
+  });
+
   return (
     <div className="content-page">
       <header className="list-header">
@@ -128,6 +163,16 @@ export default async function RemindersPage({
       </header>
 
       <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />
+
+      {/*
+        `2O-NOTIFY-002`. The invitation appears here and only here, and only
+        when there is a reminder still waiting to fire — which IS the
+        demonstrated value rather than a proxy for it, and which is why a
+        brand-new account can never see it. It links to `/app/notifications`;
+        it raises no prompt, and the permission call stays in the one file
+        allowed to make it.
+      */}
+      {inviteNotifications ? <NotificationInvitation locale={locale} /> : null}
 
       {/*
         The provider wraps the list so a completed transition survives the row

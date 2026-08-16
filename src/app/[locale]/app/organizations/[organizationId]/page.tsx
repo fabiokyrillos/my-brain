@@ -1,4 +1,5 @@
 import { ArrowLeft, Building2 } from "lucide-react";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -95,7 +96,7 @@ export default async function OrganizationDetailPage({
               ))}
             </div>
           ) : (
-            <p className="quiet-state">{copy.linkedPeopleEmpty}</p>
+            <UniversalStateLine description={copy.linkedPeopleEmpty} locale={locale} state="empty" />
           )}
         </section>
         <section>
@@ -110,7 +111,7 @@ export default async function OrganizationDetailPage({
               ))}
             </div>
           ) : (
-            <p className="quiet-state">{copy.linkedProjectsEmpty}</p>
+            <UniversalStateLine description={copy.linkedProjectsEmpty} locale={locale} state="empty" />
           )}
         </section>
       </div>

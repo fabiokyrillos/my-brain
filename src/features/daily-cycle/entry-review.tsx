@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { formatInstant } from "@/lib/time/instant-format";
 import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
@@ -214,7 +215,7 @@ export function EntryOutcomes({
       {outcomes.isEmpty ? (
         /* Said rather than hidden: "nothing was created" is an answer to the
            owner's question, and an absent section is not. */
-        <p className="entry-outcomes-empty">{copy.outcomesEmpty}</p>
+        <UniversalStateLine className="entry-outcomes-empty" description={copy.outcomesEmpty} locale={locale} state="empty" />
       ) : (
         outcomes.groups.map((group) => (
           <div className="entry-outcome-group" key={group.family}>

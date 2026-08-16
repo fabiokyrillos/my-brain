@@ -64,19 +64,49 @@ export type EnumeratedTable = Readonly<{
 
 export type WithheldColumnReason = "secret" | "bearer-capability" | "derived-vector";
 
+/**
+ * Why a category has no page of its own — as a **signed decision**, not an
+ * absence.
+ *
+ * Slice 2O.5 shipped `surface: null` with the reasoning in a comment, and
+ * classified `2O-PRIVACY-001` `partial` because a comment is not a decision:
+ * nothing distinguished *"the owner decided the export is the sufficient
+ * view"* from *"nobody has built the page yet"*, and the second silently
+ * becomes the first if it sits there long enough.
+ *
+ * The owner has now decided, and the decision is recorded in **ADR-119**:
+ * technical events get no navigable page; the privacy centre states plainly
+ * that the category exists; the full export is the sufficient view of it; and
+ * `product_events` is removed neither from the export nor from the census.
+ *
+ * `privacy-enumeration-guard` refuses a `null` surface that carries no
+ * decision, so the next category that loses its page has to be decided rather
+ * than merely noticed.
+ */
+export type PrivacyNoSurfaceDecision = Readonly<{
+  /** The only kind signed so far. A second one is a second owner decision. */
+  kind: "export-is-the-view";
+  /** The governing record, so the reasoning is one link away and not lost. */
+  adr: "ADR-119";
+  /** Why, for the reader of this file rather than of the ADR. */
+  reason: string;
+}>;
+
 /** One user-facing answer to "what is stored about me". */
 export type PrivacyCategory = Readonly<{
   key: PrivacyCategoryKey;
   tables: readonly EnumeratedTable[];
   /**
-   * The surface that shows this category, when one exists. `null` is a real
-   * answer rather than a missing one: `product_events` is owner-readable and
-   * **no page renders it**, so the honest link is none, and the copy says the
-   * export is where it can be seen. Inventing a page for it would be this slice
-   * widening itself; pointing at a page that does not show it would be the
-   * claim `2O-PRIVACY-001` exists to prevent.
+   * The surface that shows this category, when one exists.
+   *
+   * `null` is a real answer rather than a missing one, and it must be
+   * accompanied by `noSurface` — pointing at a page that does not show the
+   * category would be exactly the claim `2O-PRIVACY-001` exists to prevent,
+   * and inventing one would be the surface widening itself.
    */
   surface: NavigationKey | null;
+  /** Required when `surface` is null. Forbidden otherwise. */
+  noSurface?: PrivacyNoSurfaceDecision;
 }>;
 
 export const PRIVACY_CATEGORY_KEYS = [
@@ -225,7 +255,24 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
       { table: "policy_acceptances" },
     ],
   },
-  { key: "usage", surface: null, tables: [{ table: "product_events" }] },
+  {
+    key: "usage",
+    surface: null,
+    noSurface: {
+      kind: "export-is-the-view",
+      adr: "ADR-119",
+      reason:
+        "`product_events` is the product's own telemetry — which screen was "
+        + "opened, which control was used. The owner decided it gets no "
+        + "navigable page: a screen of raw technical events would present "
+        + "engineering exhaust as an everyday feature, and nobody would use it "
+        + "twice. The category is still NAMED here so its existence is not "
+        + "hidden, and the full export carries every row, so the reader who "
+        + "actually wants to inspect it has a complete answer. Nothing about "
+        + "retention, telemetry or the schema changes because of this.",
+    },
+    tables: [{ table: "product_events" }],
+  },
 ];
 
 /**

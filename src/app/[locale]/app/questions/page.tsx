@@ -1,7 +1,7 @@
-import { CircleHelp } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolvePendingQuestion, undoQuestionResolution } from "@/features/agent/actions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { QuestionAnswerForm } from "@/features/agent/forms";
 import { getQuestionOutcomeCopy } from "@/features/agent/question-outcome-copy";
 import { QuestionOutcomeCard } from "@/features/agent/question-outcome-panel";
@@ -76,11 +76,12 @@ export default async function QuestionsPage({ params, searchParams }: { params: 
             ))}
           </div>
         ) : (
-          <div className="empty-list">
-            <CircleHelp size={30} />
-            <strong>{outcomeCopy.emptyTitle}</strong>
-            <p>{outcomeCopy.emptyBody}</p>
-          </div>
+          <UniversalStateView
+            description={outcomeCopy.emptyBody}
+            locale={locale}
+            state="empty"
+            title={outcomeCopy.emptyTitle}
+          />
         )}
         <PaginationLinks locale={locale} path="questions?view=resolved" page={page} hasNext={resolvedHasNext} />
       </div>
@@ -136,17 +137,23 @@ export default async function QuestionsPage({ params, searchParams }: { params: 
           })}
         </div>
       ) : (
-        <div className="empty-list">
-          <CircleHelp size={30} />
-          <strong>{pt ? "Nenhuma dúvida aberta" : "No open questions"}</strong>
-          <p>{pt ? "Quando houver ambiguidade relevante, ela aparecerá aqui sem bloquear o restante." : "Relevant ambiguity appears here without blocking everything else."}</p>
-          {/*
-            The empty state now points at where the answers went. "No open
-            questions" on its own was part of UX-11: the queue emptied and said
-            nothing about what emptying it had achieved.
-          */}
-          <Link className="empty-list-link" href={`/${locale}/app/questions?view=resolved`}>{outcomeCopy.resolvedTab}</Link>
-        </div>
+        /*
+          The empty state points at where the answers went. "No open questions"
+          on its own was part of UX-11: the queue emptied and said nothing about
+          what emptying it had achieved.
+
+          `2O-RECOVER-002`: that link is the state's action, so it is passed as
+          the action rather than nested beside one. `empty` is `recoverable`, so
+          the vocabulary renders it.
+        */
+        <UniversalStateView
+          actionHref={`/${locale}/app/questions?view=resolved`}
+          actionLabel={outcomeCopy.resolvedTab}
+          description={pt ? "Quando houver ambiguidade relevante, ela aparecerá aqui sem bloquear o restante." : "Relevant ambiguity appears here without blocking everything else."}
+          locale={locale}
+          state="empty"
+          title={pt ? "Nenhuma dúvida aberta" : "No open questions"}
+        />
       )}
       <PaginationLinks locale={locale} path="questions" page={page} hasNext={hasNext} />
     </div>

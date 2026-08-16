@@ -1,4 +1,5 @@
 import { ArrowLeft, BrainCircuit } from "lucide-react";
+import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -423,7 +424,7 @@ export default async function MemoryDetailPage({
         <p className="section-explainer">{copy.changesExplainer}</p>
         {boundedChanges.items.length ? (
           <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <p className="quiet-state">{copy.changesEmpty}</p>}
+        ) : <UniversalStateLine description={copy.changesEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedChanges} locale={locale} />
       </section>
 

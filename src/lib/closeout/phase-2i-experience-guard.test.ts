@@ -19,6 +19,7 @@ import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  ERROR_STATES,
   EXPERIENCE_TONES,
   TONE_DEFINITIONS,
   UNIVERSAL_STATES,
@@ -176,8 +177,79 @@ describe("2I-LANG-005: interpreting is first-class, and it says the content is s
     // vocabulary that always says yes.
     expect(UNIVERSAL_STATE_DEFINITIONS.error_terminal.contentIsSafe).toBe(false);
     expect(UNIVERSAL_STATE_DEFINITIONS.error_terminal.recoverable).toBe(false);
+  });
+
+  /*
+   * **Superseded, and quoted rather than deleted.** This assertion used to
+   * carry a third clause:
+   *
+   *     for (const locale of experienceLocales) {
+   *       expect(getExperienceCopy(locale).states.error_terminal.action).toBeNull();
+   *     }
+   *
+   * Under 2I that was right: a terminal error offered nothing, so a null label
+   * was the honest encoding. `2O-RECOVER-003` changes the requirement — *"every
+   * error state offers at least one action, and `error_terminal` offers a way
+   * to leave rather than a way to retry"* — so a null label now encodes a dead
+   * end rather than an honest refusal.
+   *
+   * Only that clause inverted. The property the original protected — **a
+   * terminal error must never offer a retry** — is not weakened but stated
+   * directly, and in a form the old assertion could not make: a null label was
+   * only *evidence* that no retry was offered, and evidence is what
+   * `2O-RECOVER-003` had to take away.
+   */
+  it("2O-RECOVER-003: a terminal error offers a way out, and never a retry", () => {
+    const terminal = UNIVERSAL_STATE_DEFINITIONS.error_terminal;
+    expect(terminal.offersExit).toBe(true);
+    // The retry path is `recoverable`, and it stays false. This is the clause
+    // that must never move.
+    expect(terminal.recoverable).toBe(false);
+
     for (const locale of experienceLocales) {
-      expect(getExperienceCopy(locale).states.error_terminal.action).toBeNull();
+      const action = getExperienceCopy(locale).states.error_terminal.action;
+      expect(action, `${locale} leaves error_terminal with no way out`).not.toBeNull();
+      expect(action!.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("2O-RECOVER-003: exit and retry are mutually exclusive across the whole vocabulary", () => {
+    // Non-vacuity: the loop below is trivially satisfied by an empty set.
+    expect(UNIVERSAL_STATES.length).toBe(7);
+
+    const both = UNIVERSAL_STATES.filter((state) => {
+      const definition = UNIVERSAL_STATE_DEFINITIONS[state];
+      return definition.recoverable && definition.offersExit;
+    });
+    expect(
+      both,
+      `states claiming both a retry and an exit: ${both.join(", ")}. `
+        + "2O-RECOVER-003 distinguishes them precisely because a control that "
+        + "cannot work is worse than no control.",
+    ).toEqual([]);
+
+    // And exactly one state carries the exit, so "none of them do" cannot pass.
+    const exits = UNIVERSAL_STATES.filter((state) => UNIVERSAL_STATE_DEFINITIONS[state].offersExit);
+    expect(exits).toEqual(["error_terminal"]);
+  });
+
+  it("2O-RECOVER-003: every error state has something to offer", () => {
+    // `ERROR_STATES` is derived from the tones, so a state added later is
+    // included without anyone remembering to add it here.
+    expect(ERROR_STATES.length).toBeGreaterThanOrEqual(4);
+
+    for (const state of ERROR_STATES) {
+      const definition = UNIVERSAL_STATE_DEFINITIONS[state];
+      expect(
+        definition.recoverable || definition.offersExit,
+        `${state} is an error state that offers the reader nothing at all`,
+      ).toBe(true);
+      for (const locale of experienceLocales) {
+        expect(
+          getExperienceCopy(locale).states[state].action,
+          `${locale}/${state} has no action label`,
+        ).not.toBeNull();
+      }
     }
   });
 });

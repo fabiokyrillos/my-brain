@@ -1,6 +1,6 @@
-import { NotebookTabs } from "lucide-react";
 import { notFound } from "next/navigation";
 import { generateReview } from "@/features/agent/actions";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { ReviewButton } from "@/features/agent/forms";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { DayReviewView } from "@/features/day-review/day-review-view";
@@ -136,7 +136,7 @@ export default async function ReviewsPage({
           : "Each button asks Brain to write up a period. Nothing here runs on its own, and generating a review changes nothing."}
       </p>
       <div className="review-buttons"><ReviewButton action={generateReview} locale={locale} period="daily" /><ReviewButton action={generateReview} locale={locale} period="weekly_review" /><ReviewButton action={generateReview} locale={locale} period="weekly_plan" /><ReviewButton action={generateReview} locale={locale} period="monthly" /></div>
-      {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h3>{review.title}</h3></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <div className="empty-list"><NotebookTabs size={30} /><strong>{pt ? "Nenhuma revisão ainda" : "No reviews yet"}</strong><p>{pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."}</p></div>}
+      {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h3>{review.title}</h3></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <UniversalStateView description={pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."} locale={locale} state="empty" title={pt ? "Nenhuma revisão ainda" : "No reviews yet"} />}
       <PaginationLinks locale={locale} path="reviews" page={page} hasNext={hasNext} />
     </section>
   </div>;
