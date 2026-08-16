@@ -9,9 +9,15 @@ import { SettingsForm } from "@/features/profile/settings-form";
 import { updateProfile } from "@/features/profile/actions";
 import { loadSettingsFormValues } from "@/features/profile/settings-view";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { readPushConsent } from "@/features/notifications/consent-reader";
 import { restoreOnboarding } from "@/features/onboarding/actions";
 import { OnboardingRestore } from "@/features/onboarding/onboarding-restore";
 import { readDismissal } from "@/features/onboarding/onboarding-view";
+import { loadPrivacyCensus } from "@/features/privacy/census";
+import { loadConsentRecord } from "@/features/privacy/consent-record";
+import { ConsentSection } from "@/features/privacy/consent-section";
+import { PrivacySection } from "@/features/privacy/privacy-section";
+import { readSignedInEmail } from "@/features/privacy/session-identity";
 import { CapabilitySummary } from "@/features/shell/capability-summary";
 import { DataAiSection } from "@/features/transparency/data-ai-section";
 import { requireUser } from "@/lib/auth/require-user";
@@ -22,12 +28,26 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
-  const [values, credential, pending, onboardingDismissed] = await Promise.all([
-    loadSettingsFormValues(supabase, user.id),
-    loadCredentialMetadata(supabase, user.id),
-    loadPendingEntryCount(supabase, user.id),
-    readDismissal(),
-  ]);
+  const [values, credential, pending, onboardingDismissed, census, consent, pushConsent] =
+    await Promise.all([
+      loadSettingsFormValues(supabase, user.id),
+      loadCredentialMetadata(supabase, user.id),
+      loadPendingEntryCount(supabase, user.id),
+      readDismissal(),
+      /*
+        Slice 2O.5's three reads, in the page's existing parallel batch rather
+        than in three sequential awaits: the census alone is twelve counts, and
+        serialising them behind the credential read would make the most-visited
+        authenticated page pay for it. Every one runs on the request-scoped
+        `authenticated` client under forced RLS — there is no privileged client
+        on this page and `2O-PRIVACY-002`'s enumeration is never reached from
+        here (`2O-SEC-001`, `2O-SEC-002`).
+      */
+      loadPrivacyCensus(supabase, user.id),
+      loadConsentRecord(supabase, user.id),
+      readPushConsent(supabase, user.id),
+    ]);
+  const signedInEmail = await readSignedInEmail(supabase);
 
   return (
     <div className="settings-page">
@@ -134,6 +154,23 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         leaving.
       */}
       <AccountDataSection locale={locale} />
+      {/*
+        Slice 2O.5 — `2O-PRIVACY-001` … `-010` and `2O-CONSENT-001` … `-005`.
+
+        Both sections follow Conta e dados rather than replacing it: that section
+        is navigational and reaches three routes that keep their own properties,
+        and these two answer questions no route in the product answered at all.
+        Privacy precedes consent because *"what is stored about me"* is the
+        question people arrive with, and *"what did I agree to"* is the one they
+        ask once they are already reading.
+      */}
+      <PrivacySection locale={locale} census={census} email={signedInEmail} />
+      <ConsentSection
+        locale={locale}
+        record={consent}
+        pushConsent={pushConsent.state}
+        timeZone={await getOwnerTimeZone()}
+      />
     </div>
   );
 }

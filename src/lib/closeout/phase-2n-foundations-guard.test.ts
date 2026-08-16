@@ -176,11 +176,42 @@ describe("2N-PERSON-003 / -PROJECT-006 / -KNOWS-008: no silent bound survives", 
 describe("2N-IDENTITY-004/-009: the alias reader reads, and only reads", () => {
   const reader = "src/features/entities/aliases.ts";
 
-  it("is the only thing in src that touches entity_aliases", () => {
+  it("is the only thing in src that reads or writes entity_aliases", () => {
+    /*
+     * **Narrowed by slice 2O.5, and narrowed rather than weakened.**
+     *
+     * The claim this test protects is `2N-IDENTITY-004`/`-009`: exactly one
+     * module may **reach** `entity_aliases`, and none may write it. It was
+     * expressed as *any mention of the name*, which was exact while the tree
+     * held nothing else that could mention it — and then
+     * `src/features/privacy/enumeration.ts` named the table in a **list of
+     * table names**, because `2O-PRIVACY-002` requires the privacy projection to
+     * cover every table the deletion enumeration reaches. Naming a table in an
+     * enumeration is not reaching it, and there is no data access in that file
+     * at all.
+     *
+     * The two available responses were an allowlist entry and a narrower
+     * predicate. An allowlist grants a **file** a permission in order to make a
+     * test pass — the move §82 recorded refusing for `BYOK-GUARD-005` — and it
+     * would have exempted that file from the real rule forever. So the predicate
+     * moves to the access shape, `from("entity_aliases")`, which is the only way
+     * PostgREST reaches a table, and the control below proves the narrowing did
+     * not turn the assertion into a formality.
+     */
     const callers = walk("src").filter(
-      (file) => file !== "src/lib/supabase/database.types.ts" && /entity_aliases/.test(code(file)),
+      (file) =>
+        file !== "src/lib/supabase/database.types.ts" && /from\(["']entity_aliases["']\)/.test(code(file)),
     );
     expect(callers).toEqual([reader]);
+  });
+
+  it("the narrowed predicate still catches a second reader", () => {
+    // The control. Without it, "only one module reaches the table" would be
+    // satisfied by a predicate that had quietly stopped matching anything.
+    const access = /from\(["']entity_aliases["']\)/;
+    expect(access.test(code(reader)), "the reader itself no longer matches").toBe(true);
+    expect(access.test('const rows = await supabase.from("entity_aliases").select("*");')).toBe(true);
+    expect(access.test("const tables = ['entity_aliases', 'entity_tags'];")).toBe(false);
   });
 
   it("opens no write path", () => {

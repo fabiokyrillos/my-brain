@@ -66,6 +66,27 @@ const DECLARED_WRITERS = [
   "src/features/entities/associations.ts",
   "src/features/entities/relationships.ts",
   "src/features/memories/actions.ts",
+  /*
+   * Added by slice 2O.5, and the addition is the surface growing by exactly one
+   * module — which is what this test exists to make visible rather than to
+   * forbid.
+   *
+   * `2O-PRIVACY-006` requires the record of an export request to be auditable
+   * and `2O-SEC-004` requires every automatic action this phase adds to carry
+   * actor, source, reason, target, time and resulting state. The three
+   * alternatives were each worse: **not auditing** fails both requirements;
+   * **routing through an already-listed module** would couple privacy to
+   * entities to keep a list short, which is dishonest coupling; and **an RPC**
+   * would be a new `SECURITY DEFINER` function, which ADR-118 Decision 7
+   * forbids for this whole phase.
+   *
+   * This is **not new authority**: `authenticated` has held INSERT on
+   * `audit_logs` since ADR-081 chose to retain it, and this test inventories
+   * *usage* rather than granting anything. The residual capability ADR-081
+   * weighed — a user writing a true-looking audit row about their own account —
+   * is unchanged by one more caller.
+   */
+  "src/features/privacy/actions.ts",
 ].sort();
 
 function directWriters(): string[] {
