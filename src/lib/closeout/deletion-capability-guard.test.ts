@@ -73,6 +73,7 @@ const DELETION_CAPABILITY_ALLOWLIST: Readonly<
   "scripts/remote-interpretation-revisions-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-job-reliability-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-phase-2e-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
+  "scripts/remote-person-candidate-suggestions-smoke.mjs": { class: "operator-script", reason: "confirmable-person-suggestion disposable fixture cleanup" },
   "scripts/remote-product-events-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-question-preview-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
   "scripts/remote-question-reinterpretation-smoke.mjs": { class: "operator-script", reason: "pre-SH.2: fixture cleanup" },
@@ -244,7 +245,7 @@ describe("SH-DELETE-013: deletion capability has exactly one home", () => {
     expect(pushProof).toHaveLength(1);
 
     expect(operatorScripts)
-      .toHaveLength(14 + recoveryProof.length + funnelProof.length + pushProof.length);
+      .toHaveLength(15 + recoveryProof.length + funnelProof.length + pushProof.length);
     expect(operatorScripts).not.toContain("supabase/functions/delete-account/reap.ts");
   });
 

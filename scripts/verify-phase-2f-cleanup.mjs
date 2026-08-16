@@ -131,6 +131,7 @@ export const SCANNED_TABLES = Object.freeze([
   "task_people",
   "task_dependencies",
   "entry_task_candidate_resolutions",
+  "entry_person_candidate_resolutions",
   "reminders",
   "undo_operations",
   "ai_usage_events",

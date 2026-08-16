@@ -134,6 +134,7 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
       { table: "entries" },
       { table: "entry_interpretations" },
       { table: "entry_entities" },
+      { table: "entry_person_candidate_resolutions" },
       { table: "entry_task_candidate_resolutions" },
       {
         table: "entry_embeddings",

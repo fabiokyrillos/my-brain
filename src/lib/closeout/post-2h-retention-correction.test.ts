@@ -174,6 +174,7 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // verification block asserts that no `cron.job` names the table, so the
       // "scheduling is authorization" rule fails loudly rather than by review.
       "202608140094_phase_2n_slice_3_entity_deletion.sql",
+      "202608160095_entry_person_candidate_suggestions.sql",
     ]);
   });
 });

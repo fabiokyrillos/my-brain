@@ -218,8 +218,8 @@ select is(
   -- role that could INSERT one could authorize the deletion of a person,
   -- project or memory it was never shown a preview of. Its two writers are
   -- SECURITY DEFINER functions that derive the binding rather than accept it.
-  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
-  'exactly the eleven RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, entry_person_candidate_resolutions, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
+  'exactly the twelve RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -407,6 +407,7 @@ select is(
   || E'entry_embeddings -> INSERT,SELECT,UPDATE\n'
   || E'entry_entities -> SELECT\n'
   || E'entry_interpretations -> SELECT\n'
+  || E'entry_person_candidate_resolutions -> SELECT\n'
   || E'entry_task_candidate_resolutions -> SELECT\n'
   || E'error_events -> (none)\n'
   || E'heartbeat_runs -> SELECT\n'

@@ -17,6 +17,8 @@ import { TechnicalDetails } from "@/features/daily-cycle/technical-details";
 import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
 import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
 import { getInterpretationCopy } from "@/features/interpretations/copy";
+import { resolvePersonCandidates } from "@/features/interpretations/person-candidate-actions";
+import { PersonCandidateForm } from "@/features/interpretations/person-candidate-form";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
@@ -69,6 +71,8 @@ export default async function EntryDetailPage({
     history,
     taskUndoId,
     correctionUndoId,
+    pendingPersonCandidates,
+    personCandidateUndoId,
     relationOptions,
   } = review;
 
@@ -98,6 +102,13 @@ export default async function EntryDetailPage({
       ? (pt ? `${materializedCount} ${materializedCount === 1 ? "tarefa criada" : "tarefas criadas"}.` : `${materializedCount} ${materializedCount === 1 ? "task created" : "tasks created"}.`)
       : (pt ? "Decisões salvas." : "Decisions saved."),
     undoId: taskUndoId,
+  } : undefined;
+  const personInitialState = personCandidateUndoId ? {
+    status: "success" as const,
+    code: "resolved" as const,
+    message: pt ? "Decisões sobre pessoas salvas." : "Person decisions saved.",
+    undoId: personCandidateUndoId,
+    retryable: false,
   } : undefined;
 
   // `LDC-CONTEXT-001`. `review.timezone` rather than the accessor: this page
@@ -135,6 +146,18 @@ export default async function EntryDetailPage({
         />
       ) : (
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
+      )}
+      {!editableCurrent.isRecordOnly && (pendingPersonCandidates.length > 0 || personInitialState) && (
+        <PersonCandidateForm
+          action={resolvePersonCandidates}
+          candidates={pendingPersonCandidates}
+          entryId={entryId}
+          initialState={personInitialState}
+          interpretationId={editableCurrent.interpretationId}
+          locale={locale}
+          operationKey={randomUUID()}
+          undoAction={undoAgentAction}
+        />
       )}
       {canCorrect && (
         <InterpretationRevisionEditor agentName={agentName}

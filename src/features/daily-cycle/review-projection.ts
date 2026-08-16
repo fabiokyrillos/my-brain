@@ -2,8 +2,13 @@ import "server-only";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import type { EntryExtraction } from "@/lib/ai/extraction-schema";
-import type { CandidateResolutionHistoryItem, InterpretationReviewData, InterpretationRevision } from "@/features/interpretations/data";
+import type { CandidateResolutionHistoryItem, InterpretationReviewData, InterpretationRevision, PersonCandidateResolutionRow } from "@/features/interpretations/data";
 import { hasUnconfirmedTaskCandidates, loadInterpretationReview } from "@/features/interpretations/data";
+import {
+  derivePendingPersonCandidates,
+  normalizePersonCandidateName,
+  type PendingPersonCandidate,
+} from "@/features/interpretations/person-candidate-contract";
 import type { EntityOption } from "@/features/interpretations/revision-editor";
 import { loadCandidateRelationOptions, type CandidateRelationOptions } from "@/features/tasks/relation-options";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -59,6 +64,8 @@ export type EntryReviewProjection = {
   history: EntryReviewHistoryItem[];
   taskUndoId: string | null;
   correctionUndoId: string | null;
+  pendingPersonCandidates: readonly PendingPersonCandidate[];
+  personCandidateUndoId: string | null;
   relationOptions: CandidateRelationOptions;
 };
 
@@ -76,6 +83,8 @@ export type EntryReviewProjectionInput = {
   tasks: InterpretationReviewData["tasks"];
   taskUndoId: string | null;
   correctionUndoId: string | null;
+  personCandidateResolutions?: readonly PersonCandidateResolutionRow[];
+  personCandidateUndoId?: string | null;
   candidateResolutionHistory?: readonly CandidateResolutionHistoryItem[];
   unavailableCandidateIndexes: readonly number[];
   lifecycle: DailyCycleLifecycleInput;
@@ -169,6 +178,24 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
   const { productState, attentionReason } = resolveDailyCycleLifecycle(input.lifecycle);
   const copy = getDailyCycleCopy(input.locale, input.agentName);
   const current = input.current;
+  const resolvedPersonCandidateIndexes = new Set(
+    (input.personCandidateResolutions ?? [])
+      .filter((resolution) => resolution.interpretation_id === current?.id)
+      .map((resolution) => resolution.candidate_index),
+  );
+  const linkedPersonNames = new Set(
+    (current?.entityLinks ?? [])
+      .filter((link) => link.entityType === "person")
+      .flatMap((link) => [link.name, link.mention])
+      .map(normalizePersonCandidateName),
+  );
+  const pendingPersonCandidates = current && input.extraction && !current.isRecordOnly
+    ? derivePendingPersonCandidates({
+      extractedPeople: input.extraction.people,
+      resolvedCandidateIndexes: resolvedPersonCandidateIndexes,
+      linkedNormalizedNames: linkedPersonNames,
+    })
+    : [];
 
   const availableActions: AvailableAction[] = [];
   if (current) availableActions.push(action("correct_interpretation"));
@@ -303,6 +330,8 @@ export function toEntryReviewProjection(input: EntryReviewProjectionInput): Entr
     history,
     taskUndoId: input.taskUndoId,
     correctionUndoId: input.correctionUndoId,
+    pendingPersonCandidates,
+    personCandidateUndoId: input.personCandidateUndoId ?? null,
     relationOptions: input.relationOptions ?? emptyRelationOptions,
   };
 }
@@ -368,6 +397,8 @@ export async function loadEntryReviewProjection(
     tasks: data.tasks,
     taskUndoId: data.taskUndoId,
     correctionUndoId: data.correctionUndoId,
+    personCandidateResolutions: data.personCandidateResolutions ?? [],
+    personCandidateUndoId: data.personCandidateUndoId ?? null,
     candidateResolutionHistory: data.candidateResolutionHistory,
     unavailableCandidateIndexes: data.unavailableCandidateIndexes,
     locale,

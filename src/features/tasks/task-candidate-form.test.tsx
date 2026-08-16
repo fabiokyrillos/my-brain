@@ -87,6 +87,15 @@ function submittedFormData(action: ConfirmTasksAction, call = 0) {
 }
 
 describe("TaskCandidateForm", () => {
+  it("groups each suggestion into one compact decision card", () => {
+    renderForm();
+
+    const cards = document.querySelectorAll(".task-candidate-decision-card");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]?.querySelector(".candidate-disposition-grid")).not.toBeNull();
+    expect(cards[0]?.querySelectorAll(".candidate-disposition-option")).toHaveLength(4);
+  });
+
   it("mounts one CandidateEditor per actionable candidate in stable order with locale and profile timezone", () => {
     renderForm();
 
