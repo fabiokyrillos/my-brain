@@ -50,6 +50,8 @@ function baseInput(overrides: Partial<EntryReviewProjectionInput> = {}): EntryRe
     tasks: [],
     taskUndoId: null,
     correctionUndoId: null,
+    personCandidateResolutions: [],
+    personCandidateUndoId: null,
     candidateResolutionHistory: [],
     unavailableCandidateIndexes: [],
     locale: "pt-BR",
@@ -67,6 +69,72 @@ function baseInput(overrides: Partial<EntryReviewProjectionInput> = {}): EntryRe
 }
 
 describe("toEntryReviewProjection", () => {
+  it("projects only unmatched person mentions from the current interpretation", () => {
+    const current = revision({
+      entityLinks: [{ entityType: "person", entityId: "person-jaime", mention: "Jaime", name: "Jaime", confidence: 1 }],
+    });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      revisions: [current],
+      extraction: {
+        language: "pt-BR",
+        occurredAt: "2026-08-16T12:28:00.000Z",
+        isRetroactive: false,
+        summary: "Enviar o relatório para Giovanna",
+        concepts: ["task"],
+        contexts: [], organizations: [], projects: [],
+        people: [
+          { name: "Jaime", evidence: "para Jaime", confidence: 1, inferred: false },
+          { name: "Giovanna (Gigi)", evidence: "pra Giovanna(gigi)", confidence: 1, inferred: false },
+        ],
+        taskCandidates: [], pendingQuestions: [], confidence: 1,
+      },
+    }));
+
+    expect(projection.pendingPersonCandidates).toEqual([{
+      candidateIndex: 1,
+      originalName: "Giovanna (Gigi)",
+      proposedName: "Giovanna (Gigi)",
+      evidence: "pra Giovanna(gigi)",
+      confidence: 1,
+    }]);
+  });
+
+  it("does not let an older interpretation resolution hide a current person candidate", () => {
+    const current = revision({ id: "interp-2", version: 2, entityLinks: [] });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      revisions: [revision(), current],
+      extraction: {
+        language: "pt-BR", occurredAt: "2026-08-16T12:28:00.000Z", isRetroactive: false,
+        summary: "Falar com Giovanna", concepts: [], contexts: [], organizations: [], projects: [],
+        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false }],
+        taskCandidates: [], pendingQuestions: [], confidence: 1,
+      },
+      personCandidateResolutions: [{ interpretation_id: "interp-1", candidate_index: 0, disposition: "rejected" }],
+    }));
+
+    expect(projection.pendingPersonCandidates).toHaveLength(1);
+  });
+
+  it("removes current confirmed or rejected indexes and exposes their own undo", () => {
+    const current = revision({ entityLinks: [] });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      extraction: {
+        language: "pt-BR", occurredAt: "2026-08-16T12:28:00.000Z", isRetroactive: false,
+        summary: "Falar com Giovanna", concepts: [], contexts: [], organizations: [], projects: [],
+        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false }],
+        taskCandidates: [], pendingQuestions: [], confidence: 1,
+      },
+      personCandidateResolutions: [{ interpretation_id: "interp-1", candidate_index: 0, disposition: "rejected" }],
+      personCandidateUndoId: "undo-person-1",
+    }));
+
+    expect(projection.pendingPersonCandidates).toEqual([]);
+    expect(projection.personCandidateUndoId).toBe("undo-person-1");
+  });
+
   it("fixes the human contract without any score, policy, or evidence field", () => {
     const projection = toEntryReviewProjection(baseInput());
     const serialized = JSON.stringify(projection.view);

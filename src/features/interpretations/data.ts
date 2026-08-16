@@ -68,6 +68,14 @@ export type CandidateResolutionRow = {
   created_at?: string;
 };
 
+export type PersonCandidateResolutionRow = {
+  interpretation_id: string;
+  candidate_index: number;
+  disposition: string;
+  person_id?: string | null;
+  resolved_name?: string | null;
+};
+
 export type CandidateResolutionHistoryItem = {
   key: string;
   interpretationId: string;
@@ -246,14 +254,19 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     .eq("entry_id", entryId)
     .order("created_at", { ascending: false })
     .limit(500);
-  const [entryResult, interpretationsResult, linksResult, taskResult, candidateResolutionsResult, taskUndoResult, correctionUndoResult, contextsResult, organizationsResult, projectsResult, peopleResult] = await Promise.all([
+  const [entryResult, interpretationsResult, linksResult, taskResult, candidateResolutionsResult, personCandidateResolutionsResult, taskUndoResult, correctionUndoResult, personCandidateUndoResult, contextsResult, organizationsResult, projectsResult, peopleResult] = await Promise.all([
     supabase.from("entries").select("*").eq("id", entryId).maybeSingle(),
     supabase.from("entry_interpretations").select("*").eq("entry_id", entryId).order("version", { ascending: false }).limit(50),
     supabase.from("entry_entities").select("interpretation_id,entity_type,entity_id,mention,confidence").eq("entry_id", entryId).limit(500),
     supabase.from("tasks").select("id,title,status,due_at,candidate_index,source_interpretation_id").eq("source_entry_id", entryId).neq("status", "cancelled").order("candidate_index").limit(100),
     candidateResolutionQuery,
+    supabase.from("entry_person_candidate_resolutions")
+      .select("interpretation_id,candidate_index,disposition,person_id,resolved_name")
+      .eq("entry_id", entryId)
+      .limit(500),
     supabase.from("undo_operations").select("id").in("action_type", ["confirm_entry_tasks", "confirm_entry_task_candidates", "confirm_entry_task_candidates_v5", "confirm_entry_task_candidates_v6"]).eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("undo_operations").select("id").eq("action_type", "correct_entry_interpretation").eq("status", "available").contains("after_state", { entry_id: entryId }).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("undo_operations").select("id").eq("action_type", "resolve_entry_person_candidates").eq("status", "available").eq("source_entry_id", entryId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("contexts").select("id,name").order("updated_at", { ascending: false }).limit(50),
     supabase.from("organizations").select("id,name").order("updated_at", { ascending: false }).limit(50),
     supabase.from("projects").select("id,name").order("updated_at", { ascending: false }).limit(50),
@@ -264,8 +277,10 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
   const links = (requireSupabaseData(linksResult, "load interpretation entity links") ?? []) as EntryEntityRow[];
   const tasks = requireSupabaseData(taskResult, "load entry tasks") ?? [];
   const candidateResolutions = (requireSupabaseData(candidateResolutionsResult as never, "load candidate resolutions") ?? []) as CandidateResolutionRow[];
+  const personCandidateResolutions = (requireSupabaseData(personCandidateResolutionsResult, "load person candidate resolutions") ?? []) as PersonCandidateResolutionRow[];
   const taskUndo = requireSupabaseData(taskUndoResult, "load entry task undo");
   const correctionUndo = requireSupabaseData(correctionUndoResult, "load interpretation correction undo");
+  const personCandidateUndo = requireSupabaseData(personCandidateUndoResult, "load person candidate undo");
   const groups: Array<[EntityOption["entityType"], Array<{ id: string; name: string }>]> = [
     ["context", requireSupabaseData(contextsResult, "load context options") ?? []],
     ["organization", requireSupabaseData(organizationsResult, "load organization options") ?? []],
@@ -290,6 +305,8 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
     tasks,
     taskUndoId: taskUndo?.id ?? null,
     correctionUndoId: correctionUndo?.id ?? null,
+    ...(personCandidateResolutions.length > 0 ? { personCandidateResolutions } : {}),
+    ...(personCandidateUndo?.id ? { personCandidateUndoId: personCandidateUndo.id } : {}),
     ...(candidateResolutionHistory.length > 0 ? { candidateResolutionHistory } : {}),
     unavailableCandidateIndexes: computeUnavailableCandidateIndexes(current?.id ?? null, tasks, candidateResolutions),
   };

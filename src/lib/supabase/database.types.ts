@@ -1068,6 +1068,70 @@ export type Database = {
           },
         ]
       }
+      entry_person_candidate_resolutions: {
+        Row: {
+          candidate_index: number
+          created_at: string
+          disposition: string
+          entry_id: string
+          interpretation_id: string
+          operation_key: string
+          original_name: string
+          person_created: boolean
+          person_id: string | null
+          resolved_name: string | null
+          user_id: string
+        }
+        Insert: {
+          candidate_index: number
+          created_at?: string
+          disposition: string
+          entry_id: string
+          interpretation_id: string
+          operation_key: string
+          original_name: string
+          person_created?: boolean
+          person_id?: string | null
+          resolved_name?: string | null
+          user_id: string
+        }
+        Update: {
+          candidate_index?: number
+          created_at?: string
+          disposition?: string
+          entry_id?: string
+          interpretation_id?: string
+          operation_key?: string
+          original_name?: string
+          person_created?: boolean
+          person_id?: string | null
+          resolved_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entry_person_candidate_resolutions_user_id_entry_id_fkey"
+            columns: ["user_id", "entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_person_candidate_resolutions_user_id_interpretation_id_fkey"
+            columns: ["user_id", "interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "entry_person_candidate_resolutions_user_id_person_id_fkey"
+            columns: ["user_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       entry_interpretations: {
         Row: {
           concepts: string[]
@@ -3658,6 +3722,15 @@ export type Database = {
           p_operation_key: string
           p_question_id: string
           p_resolution: Json
+        }
+        Returns: Json
+      }
+      resolve_entry_person_candidates: {
+        Args: {
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+          p_resolutions: Json
         }
         Returns: Json
       }
