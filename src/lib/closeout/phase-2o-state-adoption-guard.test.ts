@@ -221,3 +221,46 @@ describe("2O-RECOVER-002: every exception is live, and says why", () => {
     }
   });
 });
+
+/**
+ * `2O-RECOVER-005` — an incomplete configuration is recoverable from where it
+ * blocks something, in the shape `awaiting_ai_configuration` already set.
+ *
+ * **Re-asserted rather than rebuilt.** The four-part shape the requirement
+ * names — *a named state, a count, a message and one action* — was already in
+ * the tree when this slice started, and the re-audit found it. What it did not
+ * have was anything holding it there: the count and the action live in two
+ * different modules, and a change to either could have removed a part of the
+ * shape without a single test noticing.
+ */
+describe("2O-RECOVER-005: the incomplete-configuration recovery keeps all four of its parts", () => {
+  const panel = FILES.find(
+    (file) => file.name === "src/features/byok/credential-panel.tsx",
+  );
+
+  it("has the surface to read", () => {
+    // Non-vacuity: every assertion below is over this one file.
+    expect(panel, "the credential panel is missing").toBeDefined();
+    expect(panel!.source.length).toBeGreaterThan(1000);
+  });
+
+  it("names the state, counts it, says something, and offers exactly one way out", () => {
+    const source = panel!.source;
+    // The named state, and the count that makes it a quantity rather than a mood.
+    expect(source).toContain("pending.count");
+    expect(source).toMatch(/pending\.count > 0/);
+    // The message.
+    expect(source).toContain("copy.pendingEntries.description");
+    // One action, and one only — a recovery offering two routes is a decision
+    // handed back to the reader who is already blocked.
+    expect(source).toContain("copy.pendingEntries.button");
+    expect((source.match(/copy\.pendingEntries\.button/g) ?? []).length).toBe(1);
+  });
+
+  it("is gated on the configuration being complete, so it never offers a recovery that cannot run", () => {
+    // The block is only recoverable once there is a key to reprocess with.
+    // Offering the action before that would be a control whose only outcome is
+    // the same refusal the reader is already looking at.
+    expect(panel!.source).toMatch(/credential\.status === "active"[\s\S]{0,40}pending\.count > 0/);
+  });
+});
