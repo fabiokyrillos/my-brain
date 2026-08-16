@@ -142,7 +142,7 @@ export function ReviewNextActions({ locale, children }: { locale: DailyCycleLoca
         <span aria-hidden="true">→</span>
         <div>
           <h2>{pt ? "Próximas ações" : "Next actions"}</h2>
-          <p>{pt ? "Nada vira tarefa sem sua confirmação." : "Nothing becomes a task without your confirmation."}</p>
+          <p>{pt ? "Nada vira tarefa ou pessoa sem sua confirmação." : "Nothing becomes a task or person without your confirmation."}</p>
         </div>
       </div>
       {children}

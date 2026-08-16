@@ -115,6 +115,8 @@ export const HISTORY_ACTION_TYPES = [
   "entry_awaiting_ai_configuration",
   "entry_interpretation_corrected",
   "entry_interpretation_correction_undone",
+  "entry_person_candidates_resolved",
+  "entry_person_candidates_undone",
   "entry_interpretation_failed",
   "entry_interpreted",
   "entry_processing_enqueued",
@@ -212,6 +214,8 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // the same shape as `reminder_cancelled` and `end_person_project`.
   entry_awaiting_ai_configuration: "lifecycle",
   entry_interpretation_correction_undone: "undone",
+  entry_person_candidates_resolved: "created",
+  entry_person_candidates_undone: "undone",
   entry_interpretation_failed: "failed",
   entry_interpreted: "interpreted",
   entry_processing_enqueued: "interpreted",

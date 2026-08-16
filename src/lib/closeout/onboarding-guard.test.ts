@@ -249,7 +249,7 @@ describe("2O-ACTIVATION-002 is absolute: the path stores no progress", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((name) =>
       name.endsWith(".sql"),
     );
-    expect(migrations).toHaveLength(94);
+    expect(migrations).toHaveLength(95);
     expect(migrations.some((name) => /onboard/i.test(name))).toBe(false);
   });
 

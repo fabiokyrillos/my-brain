@@ -206,7 +206,7 @@ begin
     raise exception 'Entry not found' using errcode = 'P0002', detail = 'ENTRY_NOT_FOUND';
   end if;
   if owned_entry.current_interpretation_id is distinct from p_expected_interpretation_id then
-    raise exception 'Interpretation is stale' using errcode = '40001', detail = 'STALE_INTERPRETATION';
+    raise exception 'Interpretation is stale' using errcode = '55P03', detail = 'STALE_INTERPRETATION';
   end if;
 
   select * into current_interpretation

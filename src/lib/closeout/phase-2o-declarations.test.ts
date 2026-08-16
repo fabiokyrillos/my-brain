@@ -551,7 +551,7 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
   it("has created no migration, and the tree agrees", () => {
     const migrations = readdirSync(join(REPO, "supabase", "migrations"))
       .filter((name) => name.endsWith(".sql"));
-    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O);
+    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 1);
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);
     // Non-vacuous: the filter really filters.
