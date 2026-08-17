@@ -27,6 +27,45 @@ function refreshEntry(locale: "pt-BR" | "en", entryId: string) {
   revalidatePath(`/${locale}/app/inbox/${entryId}`);
 }
 
+export async function confirmInterpretation(
+  _state: RevisionActionState,
+  formData: FormData,
+): Promise<RevisionActionState> {
+  const entryId = uuidSchema.safeParse(formData.get("entryId"));
+  const interpretationId = uuidSchema.safeParse(formData.get("interpretationId"));
+  const operationKey = uuidSchema.safeParse(formData.get("operationKey"));
+  const locale = localeSchema.safeParse(formData.get("locale"));
+  if (!entryId.success || !interpretationId.success || !operationKey.success || !locale.success) {
+    return {
+      status: "error",
+      message: localized(resolveLocale(formData.get("locale")), "Não foi possível confirmar este entendimento.", "Could not confirm this understanding."),
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
+  await assertActiveAccount(supabase, user.id, locale.data);
+
+  const { error } = await supabase.rpc("confirm_entry_interpretation", {
+    p_entry_id: entryId.data,
+    p_expected_interpretation_id: interpretationId.data,
+    p_operation_key: operationKey.data,
+  });
+  if (error) {
+    const conflict = error.code === "55P03" || /interpretation|current|status/i.test(error.message ?? "");
+    return {
+      status: "error",
+      message: conflict
+        ? localized(locale.data, "O registro mudou. Recarregue antes de confirmar.", "The record changed. Reload before confirming.")
+        : localized(locale.data, "Não foi possível confirmar agora.", "Could not confirm right now."),
+    };
+  }
+
+  refreshEntry(locale.data, entryId.data);
+  return { status: "success", message: localized(locale.data, "Entendimento confirmado.", "Understanding confirmed.") };
+}
+
 export async function correctInterpretation(
   _state: RevisionActionState,
   formData: FormData,

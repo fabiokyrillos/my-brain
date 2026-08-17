@@ -15,11 +15,11 @@ import { loadEntryOutcomeProjection } from "@/features/daily-cycle/entry-outcome
 import { loadEntryReviewProjection } from "@/features/daily-cycle/review-projection";
 import { TechnicalDetails } from "@/features/daily-cycle/technical-details";
 import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
-import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
+import { confirmInterpretation, correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
 import { getInterpretationCopy } from "@/features/interpretations/copy";
 import { resolvePersonCandidates } from "@/features/interpretations/person-candidate-actions";
 import { PersonCandidateForm } from "@/features/interpretations/person-candidate-form";
-import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
+import { EntryReprocessButton, InterpretationConfirmationButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 import { getAgentName } from "@/features/profile/agent-identity";
@@ -129,6 +129,15 @@ export default async function EntryDetailPage({
 
   const nextActions = editableCurrent ? (
     <>
+      {attentionReason === "review_interpretation" && (
+        <InterpretationConfirmationButton
+          action={confirmInterpretation}
+          entryId={entryId}
+          interpretationId={editableCurrent.interpretationId}
+          locale={locale}
+          operationKey={randomUUID()}
+        />
+      )}
       {editableCurrent.isRecordOnly ? (
         <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale, agentName).recordOnly}</p></div>
       ) : canConfirmCandidates || taskInitialState ? (

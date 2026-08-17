@@ -3160,6 +3160,14 @@ export type Database = {
         Args: { p_candidate_indexes: number[]; p_entry_id: string }
         Returns: Json
       }
+      confirm_entry_interpretation: {
+        Args: {
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
+        Returns: Json
+      }
       correct_entry_interpretation: {
         Args: {
           p_entry_id: string

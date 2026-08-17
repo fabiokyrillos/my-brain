@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  InterpretationConfirmationButton,
   InterpretationRevisionEditor,
   type CorrectionAction,
   type ReprocessAction,
@@ -10,8 +11,23 @@ import {
 const correctionAction = vi.fn(async () => ({ status: "success" as const, message: "Revisão salva." })) as CorrectionAction;
 const undoAction = vi.fn(async () => ({ status: "success" as const, message: "Correção desfeita." })) as UndoCorrectionAction;
 const reprocessAction = vi.fn(async () => ({ status: "success" as const, message: "Entrada reinterpretada." })) as ReprocessAction;
+const confirmationAction = vi.fn(async () => ({ status: "success" as const, message: "Entendimento confirmado." })) as CorrectionAction;
 
 afterEach(cleanup);
+
+it("offers a positive confirmation path for an understanding that needs review", () => {
+  render(
+    <InterpretationConfirmationButton
+      action={confirmationAction}
+      entryId="72f1f8af-8b90-4f1d-9916-ec6d983fd4c6"
+      interpretationId="ea9f441a-aa22-47bc-b8e7-cfe2209f5987"
+      locale="pt-BR"
+      operationKey="6118fb25-2f80-432a-aa96-0e76d924862e"
+    />,
+  );
+
+  expect(screen.getByRole("button", { name: "Confirmar entendimento" })).toBeInTheDocument();
+});
 
 const props = {
   agentName: "Brain",

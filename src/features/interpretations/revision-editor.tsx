@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { LoaderCircle, Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { Check, LoaderCircle, Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import type { InterpretationPatch } from "./schema";
 import { entityTypeLabel } from "@/features/vocabulary/copy";
 import {
@@ -19,6 +19,36 @@ export type RevisionActionState = {
 export type CorrectionAction = (state: RevisionActionState, formData: FormData) => Promise<RevisionActionState>;
 export type UndoCorrectionAction = CorrectionAction;
 export type ReprocessAction = CorrectionAction;
+
+export function InterpretationConfirmationButton({
+  action,
+  entryId,
+  interpretationId,
+  locale,
+  operationKey,
+}: {
+  action: CorrectionAction;
+  entryId: string;
+  interpretationId: string;
+  locale: InterpretationLocale;
+  operationKey: string;
+}) {
+  const [state, formAction, pending] = useActionState(action, idleState);
+  const pt = locale === "pt-BR";
+  return (
+    <form action={formAction} className="interpretation-confirmation-form">
+      <input type="hidden" name="entryId" value={entryId} />
+      <input type="hidden" name="interpretationId" value={interpretationId} />
+      <input type="hidden" name="locale" value={locale} />
+      <input type="hidden" name="operationKey" value={operationKey} />
+      <button type="submit" className="button-primary" disabled={pending}>
+        {pending ? <LoaderCircle className="spin" size={16} /> : <Check size={16} />}
+        {pending ? (pt ? "Confirmando…" : "Confirming…") : (pt ? "Confirmar entendimento" : "Confirm understanding")}
+      </button>
+      <ActionFeedback state={state} />
+    </form>
+  );
+}
 
 type CurrentRevision = Pick<
   InterpretationPatch,

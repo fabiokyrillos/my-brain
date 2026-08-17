@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
-import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "./actions";
+import { confirmInterpretation, correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "./actions";
 
 // `agent-identity` begins `import "server-only"`, which throws in this jsdom
 // environment. The name it resolves is not what these cases are about.
@@ -70,6 +70,28 @@ async function flushAfter() {
 
 describe("interpretation actions", () => {
   beforeEach(() => vi.clearAllMocks());
+
+  it("confirms the current understanding and refreshes every attention surface", async () => {
+    const { client, rpc } = authenticatedClient();
+    vi.mocked(createClient).mockResolvedValue(client as never);
+    const form = new FormData();
+    form.set("entryId", entryId);
+    form.set("interpretationId", "ea9f441a-aa22-47bc-b8e7-cfe2209f5987");
+    form.set("operationKey", operationKey);
+    form.set("locale", "pt-BR");
+
+    const result = await confirmInterpretation({ status: "idle", message: "" }, form);
+
+    expect(result).toEqual({ status: "success", message: "Entendimento confirmado." });
+    expect(rpc).toHaveBeenCalledWith("confirm_entry_interpretation", {
+      p_entry_id: entryId,
+      p_expected_interpretation_id: "ea9f441a-aa22-47bc-b8e7-cfe2209f5987",
+      p_operation_key: operationKey,
+    });
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app");
+    expect(revalidatePath).toHaveBeenCalledWith("/pt-BR/app/inbox");
+    expect(revalidatePath).toHaveBeenCalledWith(`/pt-BR/app/inbox/${entryId}`);
+  });
 
   it("rejects malformed correction input before creating a privileged client", async () => {
     const result = await correctInterpretation({ status: "idle", message: "" }, new FormData());
