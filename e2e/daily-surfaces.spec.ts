@@ -39,9 +39,20 @@ import { expect, test, type Page } from "@playwright/test";
 
 const ROOT = join(__dirname, "..");
 
-// `tokens.css` and `experience.css` first: since ADR-114 they carry the palette
-// every rule below resolves against, so a fixture without them is unstyled.
-const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css"] as const;
+/*
+ * `tokens.css` and `experience.css` first: since ADR-114 they carry the palette
+ * every rule below resolves against, so a fixture without them is unstyled.
+ *
+ * `settings-extended.css` was MISSING, and the omission was load-bearing for
+ * the notification lane below. Every `.notification-*` and `.push-*` rule the
+ * governance surface has lives in that file, so this lane measured touch
+ * targets and reflow against markup the browser was drawing with its own
+ * defaults — the "stylesheet array goes stale silently" failure, where a
+ * geometry assertion passes because it is measuring nothing. Removing it again
+ * makes the 375px touch-target test below fail on the first option row, which
+ * is how that was established rather than assumed.
+ */
+const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css", "settings-extended.css"] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
   .join("\n")
@@ -100,6 +111,9 @@ const COPY = {
     quietEndLabel: "Termina às",
     dailyCapLabel: "Máximo de avisos por dia",
     savePreferences: "Salvar preferências",
+    savedNotice: "Preferências salvas.",
+    notifyPageTitle: "Notificações",
+    notifyHistoryHeading: "Avisos recebidos",
   },
   en: {
     plannerTitle: "Plan the day",
@@ -129,6 +143,9 @@ const COPY = {
     quietEndLabel: "Ends at",
     dailyCapLabel: "Most alerts per day",
     savePreferences: "Save preferences",
+    savedNotice: "Preferences saved.",
+    notifyPageTitle: "Notifications",
+    notifyHistoryHeading: "Alerts you received",
   },
 } as const;
 
@@ -332,54 +349,91 @@ type PushState = "no-key" | "ungranted" | "granted";
 
 function pushControls(locale: Locale, state: PushState): string {
   const copy = COPY[locale];
-  if (state === "no-key") return `<p class="quiet-state">${copy.notAvailableYet}</p>`;
+  if (state === "no-key") {
+    return `<p class="quiet-state push-unavailable">${copy.notAvailableYet}</p>`;
+  }
   if (state === "ungranted") {
     return `<div class="push-controls">
-      <button type="button">${copy.enableAction}</button>
+      <button class="push-action" type="button">${copy.enableAction}</button>
     </div>`;
   }
   return `<div class="push-controls">
-    <button type="button">${copy.disableAction}</button>
+    <button class="push-action push-action-off" type="button">${copy.disableAction}</button>
+    <p class="push-notice" role="status">${copy.savedNotice}</p>
     <div class="push-preferences">
-      <fieldset>
+      <fieldset class="push-card">
         <legend>${copy.typesHeading}</legend>
+        <div class="push-options">
         ${["reminder", "follow_up", "review", "digest"].map((type) => `
-        <label><input type="checkbox" name="notificationType" value="${type}" checked />${type}</label>`).join("")}
+        <label class="push-option"><input type="checkbox" name="notificationType" value="${type}" checked />${type}</label>`).join("")}
+        </div>
       </fieldset>
-      <fieldset>
+      <fieldset class="push-card">
         <legend>${copy.frequencyHeading}</legend>
+        <div class="push-options">
         ${["immediate", "daily_digest", "off"].map((option) => `
-        <label><input type="radio" name="notificationFrequency" value="${option}" />${option}</label>`).join("")}
+        <label class="push-option"><input type="radio" name="notificationFrequency" value="${option}" />${option}</label>`).join("")}
+        </div>
       </fieldset>
-      <fieldset>
+      <fieldset class="push-card">
         <legend>${copy.quietHeading}</legend>
-        <label>${copy.quietStartLabel}<input type="time" name="quietStart" value="22:30" /></label>
-        <label>${copy.quietEndLabel}<input type="time" name="quietEnd" value="07:00" /></label>
+        <div class="push-times">
+          <label class="push-time">${copy.quietStartLabel}<input type="time" name="quietStart" value="22:30" /></label>
+          <label class="push-time">${copy.quietEndLabel}<input type="time" name="quietEnd" value="07:00" /></label>
+        </div>
+        <p class="push-note">Durante esse período nada é enviado.</p>
       </fieldset>
-      <label>${copy.dailyCapLabel}<input type="number" name="dailyCap" min="0" max="20" value="3" /></label>
-      <button type="button">${copy.savePreferences}</button>
+      <div class="push-card">
+        <label class="push-cap">${copy.dailyCapLabel}<input type="number" name="dailyCap" min="0" max="20" value="3" /></label>
+        <p class="push-note">Vale para o aparelho e para o app.</p>
+      </div>
+      <div class="push-save">
+        <button class="push-submit" type="button">${copy.savePreferences}</button>
+      </div>
     </div>
   </div>`;
 }
 
 function notificationPage(locale: Locale, state: PushState = "granted"): string {
   const copy = COPY[locale];
+  /*
+   * The page's ONE `<h1>`, above the governance section.
+   *
+   * It used to sit BELOW it, which opened the document at level two and put a
+   * second "Notificações" in the middle of the page. The mirror follows the
+   * page rather than the other way round.
+   */
   return shell(locale, `<div class="content-page">
+    <header class="list-header"><div>
+      <p class="eyebrow">BRAIN PROATIVO</p>
+      <h1>${copy.notifyPageTitle}</h1>
+      <p>Somente sinais relevantes, com deduplicação e respeito ao silêncio.</p>
+    </div></header>
     <section aria-label="${copy.notifyHeading}" class="notification-settings">
-      <h2>${copy.notifyHeading}</h2>
-      <p>Se você quiser, o Brain pode avisar no aparelho.</p>
-      <p class="quiet-state">O aviso nunca carrega o conteúdo.</p>
-      <h3>Situação atual</h3>
-      <p data-consent-state="${state === "granted" ? "granted" : "unsupported"}" role="status">${copy.notifyState}</p>
-      <p class="quiet-state">Nada será perguntado ao navegador até que você peça, nesta página.</p>
-      ${pushControls(locale, state)}
+      <div class="notification-panel">
+        <h2>${copy.notifyHeading}</h2>
+        <p class="notification-benefit">Se você quiser, o Brain pode avisar no aparelho.</p>
+        <p class="notification-promise">O aviso nunca carrega o conteúdo.</p>
+      </div>
+      <div class="notification-panel">
+        <h3>Situação atual</h3>
+        <p class="notification-state-line" data-consent-state="${state === "granted" ? "granted" : "unsupported"}" role="status">${copy.notifyState}</p>
+      </div>
+      <div class="notification-panel">
+        <p class="quiet-state notification-no-prompt">Nada será perguntado ao navegador até que você peça, nesta página.</p>
+        ${pushControls(locale, state)}
+      </div>
+      <p class="notification-inapp-note">As notificações com conteúdo continuam nesta página.</p>
     </section>
-    <div class="list-stack">
-      <article class="list-row notification-row unread">
-        <div class="list-row-main"><strong>Um lembrete</strong><p>Corpo do lembrete.</p></div>
-        <div class="list-meta"><span>11 de ago. de 2026, 14:00</span></div>
-      </article>
-    </div>
+    <section class="notification-history">
+      <h2>${copy.notifyHistoryHeading}</h2>
+      <div class="list-stack">
+        <article class="list-row notification-row unread">
+          <div class="list-row-main"><strong>Um lembrete</strong><p>Corpo do lembrete.</p></div>
+          <div class="list-meta"><span>11 de ago. de 2026, 14:00</span></div>
+        </article>
+      </div>
+    </section>
   </div>`);
 }
 
@@ -552,6 +606,61 @@ test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance sectio
     await page.setViewportSize({ width: 320, height: 720 });
     await open(page, notificationPage("pt-BR"));
     await noHorizontalScroll(page);
+  });
+
+  /*
+   * The polish pass between slices 2O.6 and 2O.7, measured rather than
+   * described.
+   *
+   * Until it, `.push-controls`, `.push-preferences` and `.notification-
+   * settings` had **no rule in any stylesheet**, so this surface was drawn
+   * entirely by the user-agent default: a checkbox is 13-16px tall on every
+   * browser, and its label sat beside it with no padding and no height of its
+   * own. `2M-MOBILE-004` asks for a 44px minimum and nothing here was ever
+   * measuring it — which is what `settings-extended.css` missing from
+   * `STYLESHEETS` above meant in practice.
+   */
+  for (const width of [375, 320] as const) {
+    test(`every option row and action meets the touch minimum at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, notificationPage("pt-BR", "granted"));
+
+      const rows = page.locator(".push-option");
+      const count = await rows.count();
+      // The positive control: a surface that rendered no option row would pass
+      // a loop over zero rows without measuring anything.
+      expect(count, "there are no option rows to measure").toBe(7);
+      for (let index = 0; index < count; index += 1) {
+        const box = await rows.nth(index).boundingBox();
+        expect(box, "an option row has no box").not.toBeNull();
+        expect(box!.height, "an option row is below the touch minimum")
+          .toBeGreaterThanOrEqual(44);
+      }
+
+      for (const selector of [".push-action", ".push-submit", 'input[name="dailyCap"]']) {
+        const box = await page.locator(selector).boundingBox();
+        expect(box, `${selector} has no box`).not.toBeNull();
+        expect(box!.height, `${selector} is below the touch minimum`)
+          .toBeGreaterThanOrEqual(44);
+      }
+
+      await noHorizontalScroll(page);
+    });
+  }
+
+  test("the option label is the hit area, not the box the browser draws", async ({ page }) => {
+    /*
+     * A 44px row whose only clickable part is the 16px checkbox inside it is a
+     * 16px target wearing a 44px costume. The label wraps the input, so this
+     * asserts that clicking the row's TEXT toggles the control.
+     */
+    await open(page, notificationPage("pt-BR", "granted"));
+    const first = page.locator(".push-option").first();
+    const input = first.locator("input");
+    await expect(input).toBeChecked();
+    // The far end of the row, well clear of the checkbox itself.
+    await first.click({ position: { x: 200, y: 22 } });
+    await expect(input).not.toBeChecked();
   });
 });
 

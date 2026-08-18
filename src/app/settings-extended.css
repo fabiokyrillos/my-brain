@@ -125,3 +125,444 @@
   .notification-invitation-actions { width: 100%; }
   .notification-invitation-actions > * { flex: 1; }
 }
+
+/* ---- polish between slices 2O.6 and 2O.7: the two surfaces that had none ----
+   Visual only. No control is added, removed, reordered against a contract, or
+   given a new consumer — every rule below styles markup that already shipped.
+
+   The finding this repairs is narrow and was measurable: `.notification-
+   settings`, `.push-controls`, `.push-preferences`, `.settings-section` and
+   every `.byok-*` class rendered with NO RULE anywhere in the stylesheets, so
+   both surfaces were drawn entirely by the user-agent default. That is why the
+   checkboxes touched their labels, why the time fields had no shape, and why
+   the BYOK status, fingerprint and validity ran together on one line.
+
+   Three rules this file has already paid for, kept here as well:
+     - one `font:` shorthand per block — the shorthand resets every property it
+       does not name, so a second one silently discards the first;
+     - every `var()` must resolve — an undefined custom property voids the whole
+       declaration and warns nowhere;
+     - no `var()` inside a media query condition — the block is dropped. */
+
+/* ---- notifications: the governance surface as panels ---------------------- */
+
+.notification-settings { display: grid; gap: var(--space-5); margin: 0 0 var(--space-12); }
+
+/* `.quiet-state` carries a 42px top margin from `globals.css`, written for the
+   dashboard panels. Inside a panel stack that margin is a hole. */
+.notification-settings .quiet-state { margin-top: 0; }
+
+.notification-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+.notification-panel > h2 { margin: 0; font: var(--type-title-2); color: var(--text-primary); }
+.notification-panel > h3 { margin: 0; font: var(--type-heading); color: var(--text-primary); }
+.notification-panel p { margin: 0; max-width: 68ch; }
+
+.notification-benefit { font: var(--type-body); color: var(--text-secondary); }
+/* The payload promise is the sentence a reader most needs to believe, so it is
+   set apart rather than folded into the paragraph above it. */
+.notification-promise {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  line-height: 1.6;
+}
+
+.notification-state-line { font: var(--type-body); color: var(--text-primary); }
+
+/* The three facts keep their own rules above; this only puts the nested section
+   into the panel's grid instead of letting its default margins collapse. */
+.notification-facts { display: grid; gap: var(--space-2); }
+.notification-facts > h3 { margin: 0; font: var(--type-heading); color: var(--text-primary); }
+.notification-facts > p { margin: 0; max-width: 68ch; }
+
+/* Declared again, after the slice 2O.6 block, so the later rule wins: the bounds
+   are a panel now rather than a paragraph with a top margin. */
+.notification-bounds {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-subtle);
+}
+.notification-bounds > h3 { margin: 0; font: var(--type-heading); color: var(--text-primary); }
+/* `list-style: disc` is stated rather than inherited: Tailwind's preflight
+   resets it to `none`, so these three long sentences were rendering as
+   indented paragraphs with no marker — indentation that pointed at nothing. */
+.notification-bounds ul { margin: 0; padding-left: var(--space-5); list-style: disc; }
+.notification-bounds li::marker { color: var(--mark-decorative); }
+.notification-bounds p { margin: 0; max-width: 68ch; }
+
+.notification-no-prompt { font: var(--type-caption); color: var(--text-muted); line-height: 1.5; }
+
+.notification-inapp-note {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--text-muted);
+  font: var(--type-caption);
+  line-height: 1.5;
+}
+
+/* The feed: a section of the same page rather than a second page. */
+.notification-history { display: grid; gap: var(--space-4); margin-top: var(--space-10); }
+.notification-history > h2 {
+  margin: 0;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-divider);
+  color: var(--text-primary);
+  font: var(--type-title-2);
+}
+
+/* ---- notifications: the controls ------------------------------------------ */
+
+.push-controls { display: grid; gap: var(--space-4); }
+.push-unavailable { font: var(--type-caption); color: var(--text-muted); line-height: 1.5; }
+
+.push-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  justify-self: start;
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--action-primary);
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-label);
+}
+.push-action:hover:not(:disabled) { background: var(--action-primary-hover); }
+/* Turning alerts off is not the page's promoted action, so it does not wear the
+   promoted shape — it stays a full-size, fully legible control that simply does
+   not compete with the content for attention. */
+.push-action-off {
+  border-color: var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
+}
+.push-action-off:hover:not(:disabled) { background: var(--background-subtle); }
+.push-action:disabled { opacity: .6; cursor: not-allowed; }
+
+.push-notice { margin: 0; color: var(--text-secondary); font: var(--type-body); }
+
+.push-preferences { display: grid; gap: var(--space-4); }
+@media (min-width: 900px) {
+  .push-preferences { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+  .push-save { grid-column: 1 / -1; }
+}
+
+.push-card {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+/* A `<legend>` cannot be a grid item — the browser lays it out on the fieldset's
+   border box — so it is floated back into flow and the next child clears it.
+   The alternative is to stop using a fieldset, and the fieldset is what gives a
+   screen-reader user the group name (`2M-ACCESS-004`). */
+.push-card > legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 var(--space-1);
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+.push-card > legend + * { clear: both; }
+
+.push-options { display: grid; gap: var(--space-1); }
+/* The whole row is the target, so the label carries the height and the padding
+   rather than the 16px box the browser draws. */
+.push-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: var(--type-body);
+  cursor: pointer;
+}
+.push-option:hover { background: var(--background-subtle); }
+.push-option input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--link);
+  cursor: pointer;
+}
+
+.push-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.push-time {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+.push-time input,
+.push-cap input {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+  /* 16px is what stops iOS Safari zooming the page on focus. A longhand after
+     the shorthand, deliberately — not a second `font:`. */
+  font-size: 16px;
+}
+.push-cap {
+  display: grid;
+  gap: var(--space-2);
+  max-width: 220px;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+.push-note { margin: 0; max-width: 68ch; color: var(--text-muted); font: var(--type-caption); line-height: 1.5; }
+
+.push-save {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-divider);
+}
+.push-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-label);
+}
+.push-submit:hover:not(:disabled) { background: var(--action-primary-hover); }
+.push-submit:disabled { opacity: .72; }
+
+@media (max-width: 899px) {
+  .notification-panel, .notification-bounds { padding: var(--space-4); }
+  .push-action, .push-submit { width: 100%; }
+  .push-save { justify-content: stretch; }
+  .push-cap { max-width: none; }
+}
+@media (max-width: 380px) {
+  /* Two time fields side by side stop being readable before the page stops
+     fitting, so they stack before anything overflows. */
+  .push-times { grid-template-columns: 1fr; }
+}
+
+/* ---- BYOK: the same card the rest of Ajustes is made of -------------------- */
+
+.byok-panel {
+  margin-top: var(--space-10);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
+  overflow: hidden;
+}
+.byok-body { display: grid; gap: var(--space-5); padding: 0 30px 28px; }
+
+/* Badge, identifier and validity are three separate answers, so they get three
+   separate lines. They were three inline children of one paragraph, which is
+   why the status ran into the fingerprint. */
+.byok-state { display: grid; justify-items: start; gap: var(--space-2); }
+.byok-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 30px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--tone-archived-line);
+  border-radius: var(--radius-full);
+  background: var(--tone-archived-bg);
+  color: var(--tone-archived-fg);
+  font: var(--type-label);
+}
+.byok-badge[data-status="active"] {
+  border-color: var(--tone-success-line);
+  background: var(--tone-success-bg);
+  color: var(--tone-success-fg);
+}
+.byok-badge[data-status="invalid"] {
+  border-color: var(--tone-risk-line);
+  background: var(--tone-risk-bg);
+  color: var(--tone-risk-fg);
+}
+.byok-badge[data-status="absent"] {
+  border-color: var(--tone-attention-line);
+  background: var(--tone-attention-bg);
+  color: var(--tone-attention-fg);
+}
+.byok-identifier { margin: 0; }
+.byok-identifier code {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--background-subtle);
+  color: var(--text-primary);
+  font: var(--type-mono);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.byok-validated { margin: 0; color: var(--text-secondary); font: var(--type-caption); }
+
+.byok-honesty {
+  margin: 0;
+  max-width: 68ch;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  line-height: 1.6;
+}
+
+.byok-form { display: grid; gap: var(--space-2); }
+.byok-form > label { color: var(--text-secondary); font: var(--type-label); }
+.byok-form > input {
+  width: 100%;
+  max-width: 520px;
+  min-height: 46px;
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+  /* See the note on `.push-time input`: a longhand after the shorthand. */
+  font-size: 16px;
+}
+.byok-hint { margin: 0; max-width: 68ch; color: var(--text-muted); font: var(--type-caption); line-height: 1.5; }
+.byok-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  justify-self: start;
+  min-height: var(--touch-target);
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-label);
+}
+.byok-submit:hover:not(:disabled) { background: var(--action-primary-hover); }
+.byok-submit:disabled { opacity: .72; }
+
+/* The destructive action is separated by a rule rather than by distance: it is
+   the one control on this card that pressing again does not undo. */
+.byok-danger { margin: 0; padding-top: var(--space-5); border-top: 1px solid var(--border-divider); }
+.byok-destructive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--tone-risk-line);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--tone-risk-fg);
+  font: var(--type-label);
+}
+.byok-destructive:hover:not(:disabled) {
+  border-color: var(--tone-risk-fg);
+  background: var(--tone-risk-bg);
+}
+.byok-destructive:disabled { opacity: .72; }
+
+.byok-feedback {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--tone-information-line);
+  border-radius: var(--radius-md);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+  font: var(--type-body);
+}
+.byok-feedback[data-state="success"] {
+  border-color: var(--tone-success-line);
+  background: var(--tone-success-bg);
+  color: var(--tone-success-fg);
+}
+.byok-feedback[data-state="error"] {
+  border-color: var(--tone-risk-line);
+  background: var(--tone-risk-bg);
+  color: var(--tone-risk-fg);
+}
+
+.byok-pending {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-subtle);
+}
+.byok-pending h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-heading);
+}
+.byok-pending p { margin: 0; max-width: 68ch; color: var(--text-secondary); font: var(--type-caption); }
+.byok-pending .byok-pending-count { color: var(--text-primary); font: var(--type-title-2); }
+.byok-pending .byok-feedback { justify-self: stretch; }
+.byok-pending-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+.byok-pending-submit:hover:not(:disabled) { background: var(--background-subtle-strong); }
+.byok-pending-submit:disabled { opacity: .72; }
+
+.byok-costs-note { margin: 0; max-width: 68ch; color: var(--text-muted); font: var(--type-caption); line-height: 1.5; }
+
+@media (max-width: 600px) {
+  .byok-body { padding: 0 20px 24px; }
+  .byok-submit, .byok-destructive, .byok-pending-submit { width: 100%; }
+  .byok-pending { justify-items: stretch; }
+}

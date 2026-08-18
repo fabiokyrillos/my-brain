@@ -91,7 +91,10 @@ export function PushControls(props: PushControlsProps) {
    * can never receive anything -- a consent the product cannot honour.
    */
   if (key === null) {
-    return <p className="quiet-state">{copy.notAvailableYet}</p>;
+    // `quiet-state` is retained deliberately — see the note in
+    // `notification-settings.tsx`: this paragraph is what the deployed
+    // notifications journey falls back to when `.push-controls` is absent.
+    return <p className="quiet-state push-unavailable">{copy.notAvailableYet}</p>;
   }
 
   async function enable() {
@@ -177,12 +180,19 @@ export function PushControls(props: PushControlsProps) {
 
   return (
     <div className="push-controls">
+      {/*
+        One button, two shapes, and the shape is the whole difference: turning
+        alerts ON is this surface's promoted action, so it wears the promoted
+        form; turning them OFF must stay just as reachable and just as legible
+        without competing for attention. Neither branch changed what it does,
+        which handler it calls, or when it is disabled.
+      */}
       {state === "granted" ? (
-        <button type="button" onClick={run(disable)} disabled={pending}>
+        <button className="push-action push-action-off" type="button" onClick={run(disable)} disabled={pending}>
           {copy.disableAction}
         </button>
       ) : (
-        <button type="button" onClick={run(enable)} disabled={pending || state === "denied"}>
+        <button className="push-action" type="button" onClick={run(enable)} disabled={pending || state === "denied"}>
           {pending ? copy.enablePending : copy.enableAction}
         </button>
       )}
@@ -192,7 +202,7 @@ export function PushControls(props: PushControlsProps) {
         assertive live region would interrupt a screen-reader user mid-sentence
         for something that is not an emergency. `2M-ACCESS-004`.
       */}
-      {notice === null ? null : <p role="status">{notice}</p>}
+      {notice === null ? null : <p className="push-notice" role="status">{notice}</p>}
 
       {/*
         The preference controls are rendered only under a granted consent.
@@ -202,81 +212,100 @@ export function PushControls(props: PushControlsProps) {
       */}
       {state !== "granted" ? null : (
         <div className="push-preferences">
-          <fieldset>
+          {/*
+            Four cards, and the grouping is the only thing that changed. The
+            three `<fieldset>`s stay fieldsets — the legend is what names the
+            group to a screen reader (`2M-ACCESS-004`), and a `<div>` with a
+            heading would have looked identical and announced nothing. The
+            daily cap is deliberately NOT a fourth fieldset: it is a single
+            control with a single label, and wrapping one labelled input in a
+            group would announce the same words twice.
+          */}
+          <fieldset className="push-card">
             <legend>{copy.typesHeading}</legend>
-            {notificationTypes.map((type) => (
-              <label key={type}>
-                <input
-                  type="checkbox"
-                  name="notificationType"
-                  value={type}
-                  checked={types.includes(type)}
-                  onChange={(event) => {
-                    setTypes(event.target.checked
-                      ? [...types, type]
-                      : types.filter((candidate) => candidate !== type));
-                  }}
-                />
-                {copy.types[type]}
-              </label>
-            ))}
+            <div className="push-options">
+              {notificationTypes.map((type) => (
+                <label className="push-option" key={type}>
+                  <input
+                    type="checkbox"
+                    name="notificationType"
+                    value={type}
+                    checked={types.includes(type)}
+                    onChange={(event) => {
+                      setTypes(event.target.checked
+                        ? [...types, type]
+                        : types.filter((candidate) => candidate !== type));
+                    }}
+                  />
+                  {copy.types[type]}
+                </label>
+              ))}
+            </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset className="push-card">
             <legend>{copy.frequencyHeading}</legend>
-            {notificationFrequencies.map((option) => (
-              <label key={option}>
-                <input
-                  type="radio"
-                  name="notificationFrequency"
-                  value={option}
-                  checked={frequency === option}
-                  onChange={() => setFrequency(option)}
-                />
-                {copy.frequencies[option]}
-              </label>
-            ))}
+            <div className="push-options">
+              {notificationFrequencies.map((option) => (
+                <label className="push-option" key={option}>
+                  <input
+                    type="radio"
+                    name="notificationFrequency"
+                    value={option}
+                    checked={frequency === option}
+                    onChange={() => setFrequency(option)}
+                  />
+                  {copy.frequencies[option]}
+                </label>
+              ))}
+            </div>
           </fieldset>
 
-          <fieldset>
+          <fieldset className="push-card">
             <legend>{copy.quietHeading}</legend>
-            <label>
-              {copy.quietStartLabel}
-              <input
-                type="time"
-                name="quietStart"
-                value={quietStart}
-                onChange={(event) => setQuietStart(event.target.value)}
-              />
-            </label>
-            <label>
-              {copy.quietEndLabel}
-              <input
-                type="time"
-                name="quietEnd"
-                value={quietEnd}
-                onChange={(event) => setQuietEnd(event.target.value)}
-              />
-            </label>
-            <p className="quiet-state">{copy.quietNote}</p>
+            <div className="push-times">
+              <label className="push-time">
+                {copy.quietStartLabel}
+                <input
+                  type="time"
+                  name="quietStart"
+                  value={quietStart}
+                  onChange={(event) => setQuietStart(event.target.value)}
+                />
+              </label>
+              <label className="push-time">
+                {copy.quietEndLabel}
+                <input
+                  type="time"
+                  name="quietEnd"
+                  value={quietEnd}
+                  onChange={(event) => setQuietEnd(event.target.value)}
+                />
+              </label>
+            </div>
+            <p className="push-note">{copy.quietNote}</p>
           </fieldset>
 
-          <label>
-            {copy.dailyCapLabel}
-            <input
-              type="number"
-              name="dailyCap"
-              min={0}
-              max={20}
-              value={dailyCap}
-              onChange={(event) => setDailyCap(Number(event.target.value))}
-            />
-          </label>
-          <p className="quiet-state">{copy.dailyCapNote}</p>
+          <div className="push-card">
+            <label className="push-cap">
+              {copy.dailyCapLabel}
+              <input
+                type="number"
+                name="dailyCap"
+                min={0}
+                max={20}
+                value={dailyCap}
+                onChange={(event) => setDailyCap(Number(event.target.value))}
+              />
+            </label>
+            <p className="push-note">{copy.dailyCapNote}</p>
+          </div>
 
-          <button type="button" onClick={run(savePreferences)} disabled={pending}>
-            {copy.savePreferences}
-          </button>
+          <div className="push-save">
+            <button className="push-submit" type="button" onClick={run(savePreferences)} disabled={pending}>
+              {copy.savePreferences}
+            </button>
+          </div>
         </div>
       )}
     </div>

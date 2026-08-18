@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -132,6 +132,69 @@ describe("CredentialPanel", () => {
     expect(screen.getByText("No key configured")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Remove key" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Save key" })).toBeVisible();
+  });
+
+  /**
+   * The polish pass between slices 2O.6 and 2O.7 — presentation only.
+   *
+   * The panel's three status facts were three inline children of one `<p>` with
+   * no rule anywhere in the stylesheets, so "Configurada" ran into the keyed
+   * digest beside it and the validation date trailed off with no hierarchy. The
+   * assertions below fix the *structure* that made that possible, and each is
+   * paired with the security contract it must not weaken.
+   */
+  describe("the state reads as three separate facts", () => {
+    it("puts the badge, the identifier and the validity on three separate lines", () => {
+      renderPanel(active);
+      const badge = document.querySelector(".byok-badge");
+      const identifier = document.querySelector(".byok-identifier");
+      const validated = document.querySelector(".byok-validated");
+      expect(badge?.textContent).toContain("Configured");
+      expect(identifier?.textContent).toContain("sk-proj · a3f9c1");
+      expect(validated).not.toBeNull();
+      // Three elements, none containing another. The defect was exactly that
+      // they were siblings in one paragraph's text flow.
+      expect(badge?.contains(identifier!)).toBe(false);
+      expect(identifier?.contains(validated!)).toBe(false);
+    });
+
+    it("keeps the fingerprint the only `<code>` in the panel", () => {
+      // `byok-settings-journey.spec.ts` matches it by element and asserts its
+      // shape. A second `<code>` anywhere in this panel breaks that lane, and
+      // it would break it in a way that reads as a product defect.
+      renderPanel(active);
+      const codes = document.querySelectorAll("section.byok-panel code");
+      expect(codes).toHaveLength(1);
+      expect(codes[0]?.textContent).toBe("sk-proj · a3f9c1");
+    });
+
+    it("carries the status on the badge, so each state can be told apart visually", () => {
+      renderPanel(active);
+      expect(document.querySelector(".byok-badge")?.getAttribute("data-status")).toBe("active");
+      cleanup();
+      renderPanel(absent);
+      expect(document.querySelector(".byok-badge")?.getAttribute("data-status")).toBe("absent");
+    });
+  });
+
+  describe("the destructive action stands apart from the primary one", () => {
+    it("keeps removal outside the form that saves", () => {
+      // Two forms, two actions, and nothing that could submit one by pressing
+      // the other. The separation existed already; this asserts it survives the
+      // restyling that put a rule between them.
+      renderPanel(active);
+      const save = document.querySelector("form.byok-form");
+      const remove = document.querySelector("form.byok-remove");
+      expect(save).not.toBeNull();
+      expect(remove).not.toBeNull();
+      expect(save!.contains(remove!)).toBe(false);
+      expect(document.querySelector(".byok-danger")?.contains(remove!)).toBe(true);
+    });
+
+    it("renders no destructive region at all when there is nothing to remove", () => {
+      renderPanel(absent);
+      expect(document.querySelector(".byok-danger")).toBeNull();
+    });
   });
 
   it("discloses who is billed and that decryption is possible operator-side", () => {

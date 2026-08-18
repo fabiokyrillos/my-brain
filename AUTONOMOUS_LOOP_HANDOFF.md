@@ -8019,3 +8019,81 @@ activation and accessibility** (`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` …
 > **Do not** absorb a declined residual, reallocate **M2**, or create a migration
 > outside the signed conditions. **Do not** open signup, resume the push HTTP 403
 > track, or start the successor phase.
+
+## §85 — A visual polish between 2O.6 and 2O.7, and both surfaces had no stylesheet at all (2026-08-17)
+
+PR **#247**, owner-requested, **strictly visual**. **No phase work, no
+requirement claimed, no slice advanced.** 87 of 116 stands unchanged; **2O.7 is
+untouched and unstarted**.
+
+**Zero migrations. 97 local = 97 hosted, parity `202608160097`. Signup closed.
+Rollout gate 25 · 3 · 2, byte-identical. `embedding_model`, `ai_provider`,
+models and prices untouched. No Server Action, schema, encryption or validation
+path changed. One BYOK mount point, one write path.**
+
+### The finding, and it explains every symptom the owner reported
+
+The owner reported two surfaces looking like raw HTML forms. They were.
+
+```
+grep -o "\.byok[a-z-]*"           --include=*.css src/  →  zero
+grep -o "\.push-[a-z-]*"          --include=*.css src/  →  zero
+grep -o "\.notification-settings" --include=*.css src/  →  zero
+```
+
+`.notification-settings`, `.push-controls`, `.push-preferences`,
+`.settings-section` and **every** `.byok-*` class had no rule anywhere in the
+twenty-six stylesheets. Both surfaces were drawn entirely by the user-agent
+default. Everything else on the list — checkboxes touching their labels, time
+fields with no shape, a save button with no more weight than the sentence beside
+it, "Configurada" running into the keyed digest — is a consequence of that one
+fact and not four separate defects.
+
+`.danger` is the same shape of hole: the BYOK removal button carried
+`className="danger"`, and `.danger` alone matches nothing. Only
+`.reminder-button.danger` and `.reminder-panel.danger` exist.
+
+### The heading defect a passing spec could not see
+
+The notifications page mounted `NotificationSettings` **above** its own
+`<header>`. That component opens with `<h2>Notificações no aparelho</h2>`, so the
+document began at level two and the `<h1>Notificações</h1>` arrived two-thirds
+of the way down in display serif — the word twice, the second one reading as the
+start of a different page.
+
+`online-notifications-and-recovery.spec.ts` asserts that `<h1>` is **visible**,
+and it was. A presence assertion cannot see an ordering defect, which is why the
+new guard is `page-outline.test.ts` and why it asserts positions rather than
+presence.
+
+### A stylesheet was missing from a browser lane, and it was load-bearing
+
+`settings-extended.css` was **not** in `STYLESHEETS` in
+`e2e/daily-surfaces.spec.ts`. Every `.notification-*` and `.push-*` rule lives
+there, so that lane had been measuring touch targets and reflow against the
+browser default rather than against the product — the stale-array failure this
+handoff has recorded before, in the form where the assertion passes because it
+is measuring nothing.
+
+It is added, and the new 44px assertions are proved live by removing it again:
+the 375px test then fails on the first option row. A measurement that cannot
+fail measures nothing.
+
+### What was deliberately not done
+
+The HTTP 403 was not investigated and not touched (`OD-2O-11`). No permission is
+requested automatically. Nothing claims push delivery works. Signup was not
+opened. No migration was created. The rest of Ajustes was not redesigned. No
+2O.7 or 2O.8 requirement was absorbed.
+
+One thing left as it is, for the owner: the BYOK `removed` status reuses
+`absent`'s copy — *"Nenhuma chave configurada"*. It now carries its own
+`data-status` so the two are visually distinguishable, but no new sentence was
+minted, because minting copy is a content decision and this was a polish pass.
+
+### Where the next unit starts
+
+Unchanged: **slice 2O.7**, from §84. This section adds nothing to its scope and
+removes nothing from it. The two surfaces it may touch now have stylesheets, a
+page-outline guard and touch-target assertions that did not exist before, so a
+regression on either is caught by CI rather than by the owner.

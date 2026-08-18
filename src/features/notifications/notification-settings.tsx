@@ -81,26 +81,39 @@ export function NotificationSettings({
 
   return (
     <section aria-label={copy.heading} className="notification-settings">
-      <h2>{copy.heading}</h2>
-      <p>{copy.benefit}</p>
-      <p className="quiet-state">{copy.contentPromise}</p>
-
-      <h3>{copy.stateHeading}</h3>
       {/*
-        A `status`, not a bare paragraph: this is the one line on the page whose
-        value changes what the user can do, and `2M-ACCESS-004` asks for a state
-        a sighted user perceives to be announced.
+        The three panels below are a **visual** grouping and nothing else. The
+        order the requirements fixed is unchanged — benefit and payload promise
+        above the control that prompts (`2M-NOTIFY-003`), bounds above the
+        control they bound (`2O-NOTIFY-005`) — and no control moved between
+        them. Before the polish pass these were eleven bare children of one
+        section with no rule anywhere in the stylesheets, so the browser drew
+        them as running text and the reader had to find the seams.
       */}
-      <p data-consent-state={state} role="status">{copy.states[state]}</p>
+      <div className="notification-panel">
+        <h2>{copy.heading}</h2>
+        <p className="notification-benefit">{copy.benefit}</p>
+        <p className="notification-promise">{copy.contentPromise}</p>
+      </div>
 
-      {/*
-        `2O-NOTIFY-004`/`-006`/`-007`. The single sentence above is the state
-        machine's own summary and stays; below it the same situation is broken
-        into the three facts that are genuinely separate. A reader who has
-        granted permission would otherwise conclude alerts work, and on this
-        product's current hardware evidence they may not.
-      */}
-      <NotificationFacts facts={deriveThreeFacts(state)} locale={locale} />
+      <div className="notification-panel">
+        <h3>{copy.stateHeading}</h3>
+        {/*
+          A `status`, not a bare paragraph: this is the one line on the page whose
+          value changes what the user can do, and `2M-ACCESS-004` asks for a state
+          a sighted user perceives to be announced.
+        */}
+        <p className="notification-state-line" data-consent-state={state} role="status">{copy.states[state]}</p>
+
+        {/*
+          `2O-NOTIFY-004`/`-006`/`-007`. The single sentence above is the state
+          machine's own summary and stays; below it the same situation is broken
+          into the three facts that are genuinely separate. A reader who has
+          granted permission would otherwise conclude alerts work, and on this
+          product's current hardware evidence they may not.
+        */}
+        <NotificationFacts facts={deriveThreeFacts(state)} locale={locale} />
+      </div>
 
       {/*
         `2O-NOTIFY-005`. Above the control, not inside the preferences that only
@@ -109,9 +122,16 @@ export function NotificationSettings({
       */}
       <NotificationBounds locale={locale} />
 
-      <p className="quiet-state">{copy.noPromptYet}</p>
+      <div className="notification-panel">
+        {/*
+          `quiet-state` is kept alongside the new class. It is not decoration:
+          `online-notifications-and-recovery.spec.ts` falls back to
+          `.quiet-state:last-of-type` to find the control region in a deployment
+          with no sender key, where `.push-controls` does not exist at all.
+        */}
+        <p className="quiet-state notification-no-prompt">{copy.noPromptYet}</p>
 
-      {/*
+        {/*
         Slice 2M.4b. The controls the 2M.4a record routed here, each with a
         consumer: the enable button's consumer is the consent record, and the
         type, frequency, quiet-period and cap controls' consumer is
@@ -122,18 +142,25 @@ export function NotificationSettings({
         from a click handler, below the benefit and the content promise
         rendered above, which is the ordering `2M-NOTIFY-003` requires.
       */}
-      <PushControls
-        locale={locale}
-        state={state}
-        pushPublicKey={pushPublicKey}
-        enabledTypes={enabledTypes}
-        frequency={frequency}
-        quietStart={quietStart}
-        quietEnd={quietEnd}
-        dailyCap={dailyCap}
-      />
+        <PushControls
+          locale={locale}
+          state={state}
+          pushPublicKey={pushPublicKey}
+          enabledTypes={enabledTypes}
+          frequency={frequency}
+          quietStart={quietStart}
+          quietEnd={quietEnd}
+          dailyCap={dailyCap}
+        />
+      </div>
 
-      <p className="quiet-state">{copy.inAppNote}</p>
+      {/*
+        Deliberately NOT `quiet-state`. It is the last paragraph of the section,
+        so carrying that class would make it a candidate for the
+        `:last-of-type` fallback described above — which would point that spec
+        at a closing note instead of at the control region.
+      */}
+      <p className="notification-inapp-note">{copy.inAppNote}</p>
     </section>
   );
 }
