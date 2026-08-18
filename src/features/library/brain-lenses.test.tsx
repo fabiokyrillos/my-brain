@@ -14,7 +14,11 @@ describe("BrainLensTabs", () => {
     const strip = screen.getByRole("navigation", { name: "Lentes do Brain" });
 
     expect(within(strip).getAllByRole("link").map((link) => link.textContent)).toEqual([
+      // `2P-CHAT-004` (`OD-2P-7`). Conversar moved from last to first among the
+      // domains: it is the one interactive destination in a strip of seven
+      // browse destinations, and it used to sit at the far end of them.
       "Visão geral",
+      "Conversar",
       "Pessoas",
       "Projetos",
       "Empresas",
@@ -22,7 +26,6 @@ describe("BrainLensTabs", () => {
       "Memórias",
       "Arquivos",
       "Relações",
-      "Conversar",
     ]);
   });
 
@@ -37,7 +40,11 @@ describe("BrainLensTabs", () => {
      * the duplication ADR-114 Decision 6 refused.
      */
     expect(within(strip).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+      // `2P-CHAT-004` (`OD-2P-7`): Conversas leads the domain lenses, and the
+      // overview still leads the strip. Every href is unchanged — this is a
+      // reordering, and no deep link moved.
       "/pt-BR/app/library",
+      "/pt-BR/app/chat",
       "/pt-BR/app/people",
       "/pt-BR/app/projects",
       "/pt-BR/app/organizations",
@@ -45,7 +52,6 @@ describe("BrainLensTabs", () => {
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
       "/pt-BR/app/relations",
-      "/pt-BR/app/chat",
     ]);
   });
 

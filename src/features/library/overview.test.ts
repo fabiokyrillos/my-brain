@@ -237,6 +237,10 @@ describe("the overview stays a door", () => {
     const summaries = await loadBrainOverview(supabase, "en");
 
     expect(summaries.map((summary) => summary.href)).toEqual([
+      // `2P-CHAT-004`. The overview is derived from `BRAIN_DOMAIN_LENSES`, so
+      // Conversas leading the strip leads the panels too — which is the point of
+      // deriving one from the other rather than restating it.
+      "/en/app/chat",
       "/en/app/people",
       "/en/app/projects",
       "/en/app/organizations",
@@ -244,7 +248,6 @@ describe("the overview stays a door", () => {
       "/en/app/memories",
       "/en/app/files",
       "/en/app/relations",
-      "/en/app/chat",
     ]);
   });
 });

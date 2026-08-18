@@ -1,3 +1,4 @@
+import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
 import { ArrowLeft, Layers } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
@@ -76,10 +77,14 @@ export default async function ContextDetailPage({
 
   return (
     <div className="content-page entity-detail">
-      <Link className="back-link" href={`/${locale}/app/contexts`}>
-        <ArrowLeft size={16} />
-        {copy.contextsTitle}
-      </Link>
+      <div className="entity-workspace-actions">
+        <Link className="back-link" href={`/${locale}/app/contexts`}>
+          <ArrowLeft size={16} />
+          {copy.contextsTitle}
+        </Link>
+        {/* `2P-CHAT-005`. See the person workspace for why only `context:<id>` travels. */}
+        <AskAboutLink locale={locale} name={context.name} about={{ type: "context", id: context.id }} />
+      </div>
 
       <header className="entity-hero">
         <Layers size={28} />
