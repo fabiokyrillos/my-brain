@@ -2,6 +2,17 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Phase 2P planning authorized: trustworthy capture and everyday UX
+
+- Added the Phase 2P PRD and nine-slice implementation plan: 86 requirements
+  across fourteen families, with implementation explicitly unauthorized.
+- Recorded the current-experience audit, UX gap map, threat model and
+  traceability contract.
+- ADR-121 signs twelve owner product decisions and retargets A13 to the unnamed
+  roadmap successor.
+- No product code, migration or deployment. Hosted parity remains
+  `202608160097`; signup and rollout posture are unchanged.
+
 ## 2026-08-18 - Phase 2O closeout: readiness, telemetry, security, traceability
 
 **`2O-READY-001` … `-005`, `2O-METRICS-001` … `-005`, `2O-SEC-001` … `-005`,
