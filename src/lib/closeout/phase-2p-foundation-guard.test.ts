@@ -172,7 +172,15 @@ describe("2P-FOUNDATION-002: which functions re-derive an entry's lifecycle", ()
 });
 
 describe("2P-FOUNDATION-004: the capture surface census", () => {
-  const quickCapture = tsCode(read("src/features/capture/quick-capture-form.tsx"));
+  /*
+    Slice 2P.3 renamed this file: `quick-capture-form.tsx` became `composer.tsx`
+    when the modality tabs were deleted and the text form grew the attachment
+    and microphone controls. The PROPERTY this block pins is unchanged -- two
+    mounting surfaces, one draft store, one consumer, text only -- so the pin is
+    retargeted rather than relaxed, which is the passage 2P.0 asked any later
+    slice to make consciously.
+  */
+  const composer = tsCode(read("src/features/capture/composer.tsx"));
   const draftModule = "src/features/capture/composer-draft.ts";
 
   it("mounts the text composer from exactly two surfaces, with distinct draft scopes", () => {
@@ -195,14 +203,14 @@ describe("2P-FOUNDATION-004: the capture surface census", () => {
       .filter((path) => !/\.test\.tsx?$/.test(path))
       .filter((path) => tsCode(readFileSync(path, "utf8")).includes("composer-draft"));
     expect(consumers.map((path) => path.slice(REPO.length + 1).replace(/\\/g, "/")))
-      .toEqual(["src/features/capture/quick-capture-form.tsx"]);
+      .toEqual(["src/features/capture/composer.tsx"]);
 
     const store = tsCode(read(draftModule));
     // `T-4`: a restored draft may never carry authority to replay a send.
     expect(store).not.toMatch(/localStorage/);
     expect(store).toContain("sessionStorage");
     expect(store).not.toMatch(/idempotenc/i);
-    expect(quickCapture).toContain("clearDraft");
+    expect(composer).toContain("clearDraft");
   });
 
   it("is not vacuous: the census detects a planted third surface and a planted store", () => {

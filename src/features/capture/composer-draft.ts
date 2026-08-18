@@ -21,7 +21,7 @@
  * ## The draft is text and never authority
  *
  * What is stored is the textarea's content and nothing else. In particular the
- * **idempotency key is not stored**, deliberately: `QuickCaptureForm` mints one
+ * **idempotency key is not stored**, deliberately: `Composer` mints one
  * per mount and rotates it after a successful capture, so a restored draft
  * arrives with a *fresh* key and cannot replay a submission that already
  * happened. A draft that carried its key would be a stored authorization to

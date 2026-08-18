@@ -116,7 +116,7 @@ export function TaskList({
   agentName: string;
   /**
    * The Server Action, injected by the Server Component that mounts this — the
-   * shape `QuickCaptureForm` and `CommandConsole` already use.
+   * shape `Composer` and `CommandConsole` already use.
    *
    * Not defaulted to an import of `./actions`, and that is not a style choice:
    * `actions.ts` is `"use server"` and reaches `@/lib/supabase/server`, whose

@@ -440,18 +440,41 @@ export function recordCandidateEditReset(input: {
  * key whitelist enforces one layer down (`2J-METRICS-006`).
  * ------------------------------------------------------------------ */
 
-/** `2J-METRICS-003`. Which modality the user chose, and nothing about what. */
+/**
+ * `2J-METRICS-003`. Which modality the user chose, and nothing about what.
+ *
+ * ## Two things moved in slice 2P.3, and neither needed a migration
+ *
+ * **The producer.** This event's only writer used to be the capture page's
+ * modality tablist, which `2P-CAPTURE-002` deletes. A deployed vocabulary value
+ * whose producer is removed is the mirror of the defect recorded earlier as
+ * "a producer with no consumer is invisible", so it was re-wired rather than
+ * left dangling: the composer reports `attachment` when a file is actually
+ * chosen, `voice` when recording starts, and `text` when the owner begins
+ * writing. All three values keep a writer, and each fires at the moment the
+ * owner genuinely engages that modality — which the tabs only ever approximated,
+ * since `text` was the initial panel and reported nothing unless it was
+ * returned to.
+ *
+ * **The surface.** It was hardcoded to `capture`, because the tabs only existed
+ * there. The composer also mounts on Today, so the surface is now derived from
+ * the capture source exactly as `recordCaptureStarted` above derives it — both
+ * values are already in the deployed `product_events_surface_check`. Leaving it
+ * hardcoded would have filed every cockpit capture under the wrong surface,
+ * which is worse than not recording it.
+ */
 export function recordCaptureModeSelected(input: {
   attemptId: string;
   captureMode: CaptureModeAnalytics;
+  captureSource: CaptureSource;
   locale: ProductEventLocale;
 }) {
   recordOnce({
-    // Keyed by attempt AND mode, so switching back and forth records each
-    // choice once rather than collapsing into a single event per visit.
+    // Keyed by attempt AND mode, so an attempt that uses two modalities records
+    // each once rather than collapsing into a single event per visit.
     logicalKey: `capture-mode:${input.attemptId}:${input.captureMode}`,
     name: "capture_mode_selected",
-    surface: "capture",
+    surface: input.captureSource === "home" ? "home" : "capture",
     locale: input.locale,
     properties: { captureMode: input.captureMode },
   });

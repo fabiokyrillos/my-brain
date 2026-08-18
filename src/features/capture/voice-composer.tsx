@@ -1,42 +1,49 @@
 "use client";
 
 /**
- * `2J-VOICE-001` … `2J-VOICE-015` — record, transcribe, edit, confirm.
+ * `2J-VOICE-001` … `2J-VOICE-015`, and `2P-CAPTURE-004`/`006`/`007`/`009` —
+ * record, transcribe, hand the text over.
  *
- * ## The shape of the flow, and why each step is separate
+ * ## What changed in slice 2P.3, and why it made the component smaller
  *
- * record → transcribe → **editable draft** → (type more, or record another
- * part) → **explicit confirm** → audio discarded.
+ * This used to be a *panel*: a microphone, its own editable draft box, and its
+ * own form submitting entries through the shared action. Two boxes meant a
+ * transcript could never join a sentence the owner had already begun, and meant
+ * a second `<form>` creating entries.
  *
- * The draft step is the whole feature. Transcription is wrong often enough that
- * a flow which captured straight from the microphone would be a machine putting
- * words in someone's mouth and filing them under their own memory. So the
- * transcript arrives as text in a box the user owns, and **nothing is captured
- * until they press the button** (`2J-VOICE-015`).
+ * It is now a **control**. It records, transcribes, and calls `onTranscript`.
+ * It owns no draft, renders no textarea, submits nothing, and never sees
+ * `captureEntry` at all — the composer inserts the text at the caret and the
+ * owner sends it, once, on purpose.
+ *
+ * ## The shape of the flow, and why each step is still separate
+ *
+ * record → transcribe → **the composer's editable field** → (type more, or
+ * record another part) → **explicit send** → audio already gone.
+ *
+ * The editable step is still the whole feature. Transcription is wrong often
+ * enough that a flow which captured straight from the microphone would be a
+ * machine putting words in someone's mouth and filing them under their own
+ * memory. Nothing is captured until the owner presses send (`2J-VOICE-015`,
+ * `2P-CAPTURE-008`).
  *
  * ## Where the audio lives, and for how long
  *
  * In memory, inside this component, until the transcript comes back — then it
- * is dropped on the floor. There is no upload to storage, no object URL kept
- * past its use, no cache, and no "keep it in case they retry". Cancelling stops
- * the tracks and drops the chunks immediately (`2J-VOICE-008`).
- * `no-durable-audio-guard.test.ts` re-derives that absence from the schema and
- * the source tree on every run rather than trusting this comment.
- *
- * ## What it will not do
- *
- * It never calls `captureEntry` on its own. Confirmation submits the **draft
- * text** through the same action the typed composer uses, injected as a prop —
- * so voice adds no write path, and a transcript is text like any other text.
+ * is dropped. No upload to storage, no object URL kept past its use, no cache,
+ * no "keep it in case they retry". Cancelling stops the tracks and drops the
+ * chunks immediately, and unmounting does the same (`2J-VOICE-008`,
+ * `2P-CAPTURE-009`). `no-durable-audio-guard.test.ts` re-derives that absence
+ * from the schema and the source tree on every run rather than trusting this
+ * comment.
  */
 
-import { useActionState, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { LoaderCircle, Mic, Square } from "lucide-react";
 
 import type { Locale } from "@/lib/preferences";
 
 import { transcriptionCopy } from "./voice-copy";
-import type { CaptureAction, CaptureState } from "./quick-capture-form";
 import { recordVoiceTranscriptionFinished } from "@/features/product-analytics/interaction-events";
 
 import { MAX_RECORDING_BYTES, type TranscribeState } from "./voice-contracts";
@@ -48,7 +55,6 @@ export type TranscribeAction = (
 
 /** `2J-VOICE-006`. Every state the user can be in, named. */
 type RecordingPhase = "idle" | "recording" | "paused" | "transcribing" | "denied";
-
 
 function formatDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
@@ -75,18 +81,18 @@ function preferredMimeType(): string | undefined {
 export function VoiceComposer({
   locale,
   transcribeAction,
-  captureAction,
-  agentName,
+  onTranscript,
+  onRecordingStart,
 }: {
   locale: Locale;
   transcribeAction: TranscribeAction;
-  /** The SAME action the typed composer uses. Voice adds no write path. */
-  captureAction: CaptureAction;
-  agentName: string;
+  /** `2P-CAPTURE-006`. The only thing this component produces. */
+  onTranscript: (text: string) => void;
+  /** Content-free. Reports that the microphone modality was chosen. */
+  onRecordingStart?: () => void;
 }) {
   const text = transcriptionCopy[locale];
   const [phase, setPhase] = useState<RecordingPhase>("idle");
-  const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,18 +100,19 @@ export function VoiceComposer({
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const idempotencyKeyRef = useRef<string | null>(null);
-  if (idempotencyKeyRef.current === null) idempotencyKeyRef.current = crypto.randomUUID();
   /*
     `2J-METRICS-004`. Two facts worth knowing and neither of them is content:
-    whether the transcript was good enough to use unedited, and whether one
-    recording was enough. Tracked as refs rather than state because they must
-    not trigger a render -- they are reported, not displayed.
+    whether one recording was enough, and how the attempt ended. Refs rather
+    than state because they are reported, not displayed.
   */
   const attemptIdRef = useRef<string | null>(null);
   if (attemptIdRef.current === null) attemptIdRef.current = crypto.randomUUID();
-  const segmentCountRef = useRef(0);
-  const lastTranscriptRef = useRef<string>("");
+  /*
+    State rather than a ref, unlike the id above: how many segments have landed
+    decides both the record button's label and whether the discard notice is
+    showing, so it has to cause a render.
+  */
+  const [segments, setSegments] = useState(0);
 
   /** Stops everything and releases the microphone. Safe to call twice. */
   const teardown = useCallback(() => {
@@ -144,6 +151,7 @@ export function VoiceComposer({
 
   async function start() {
     setError(null);
+    onRecordingStart?.();
     try {
       // `2J-VOICE-009`. Permission is requested here -- at the point of value,
       // when the user has pressed record -- not on page load.
@@ -182,7 +190,7 @@ export function VoiceComposer({
     setPhase("recording");
   }
 
-  /** `2J-VOICE-007`. Cancel discards the audio and keeps the draft. */
+  /** `2J-VOICE-007`. Cancel discards the audio and touches no text. */
   function cancel() {
     try {
       recorderRef.current?.stop();
@@ -225,27 +233,24 @@ export function VoiceComposer({
 
     const result = await transcribeAction({ status: "idle" }, form);
     // Whatever happened, the audio is gone by now. There is nothing to retry
-    // against, which is exactly why a failure must not clear the draft.
-    const additionalSegment = segmentCountRef.current > 0;
+    // against, which is exactly why a failure must not disturb the composer.
+    const additionalSegment = segments > 0;
+    const landed = result.status === "success" ? segments + 1 : segments;
     if (result.status === "success") {
-      segmentCountRef.current += 1;
-      // `2J-VOICE-012`. Appended, never replaced: a second segment adds to what
-      // the user already has, including anything they typed themselves.
-      setDraft((previous) => {
-        const next = previous ? `${previous.trimEnd()} ${result.text}` : result.text;
-        lastTranscriptRef.current = next;
-        return next;
-      });
+      setSegments(landed);
+      // `2J-VOICE-012` / `2P-CAPTURE-006`. Handed over, never held: the
+      // composer decides where in the sentence it belongs.
+      onTranscript(result.text);
       setError(null);
     } else if (result.status === "error") {
       setError(result.message);
     }
     recordVoiceTranscriptionFinished({
-      attemptId: `${attemptIdRef.current}:${segmentCountRef.current}`,
+      attemptId: `${attemptIdRef.current}:${landed}`,
       outcome: result.status === "success" ? "succeeded" : "failed",
-      // Compared at confirmation time, not here -- at this instant the user has
-      // not had a chance to edit yet. `false` is the truthful answer now, and
-      // the confirm path reports the edited case.
+      // Compared at send time by the composer, which is the only place that can
+      // see whether the owner changed anything afterwards. `false` is the
+      // truthful answer at this instant.
       draftEdited: false,
       additionalSegment,
       locale,
@@ -254,112 +259,65 @@ export function VoiceComposer({
     setPhase("idle");
   }
 
-  async function submitCapture(state: CaptureState, formData: FormData): Promise<CaptureState> {
-    formData.set("idempotencyKey", idempotencyKeyRef.current!);
-    formData.set("captureSource", "capture_page");
-    const submitted = String(formData.get("content") ?? "");
-    if (lastTranscriptRef.current && submitted.trim() !== lastTranscriptRef.current.trim()) {
-      // `2J-METRICS-004`. The transcript was edited before capture. Reported as
-      // a boolean by comparing lengths of intent, never by recording either
-      // version of the text.
-      recordVoiceTranscriptionFinished({
-        attemptId: `${attemptIdRef.current}:edited`,
-        outcome: "succeeded",
-        draftEdited: true,
-        additionalSegment: segmentCountRef.current > 1,
-        locale,
-      });
-    }
-    const result = await captureAction(state, formData);
-    if (result.status === "success") {
-      idempotencyKeyRef.current = crypto.randomUUID();
-      setDraft("");
-    }
-    return result;
-  }
-
-  const [captureState, captureFormAction, capturePending] = useActionState(submitCapture, {
-    status: "idle",
-  } as CaptureState);
-
   if (!supported) {
     return <p className="quiet-state voice-unsupported">{text.unsupported}</p>;
   }
 
   return (
-    <div className="voice-composer">
-      <div className="voice-controls">
-        {phase === "idle" ? (
-          <button type="button" className="voice-record" onClick={start}>
-            <Mic size={16} aria-hidden="true" />
-            {draft ? text.addSegment : text.recordLabel}
+    <div className="voice-control">
+      {phase === "idle" ? (
+        <button type="button" className="composer-mic" onClick={start}>
+          <Mic size={18} aria-hidden="true" />
+          <span className="sr-only">{segments > 0 ? text.addSegment : text.recordLabel}</span>
+        </button>
+      ) : null}
+
+      {phase === "recording" || phase === "paused" ? (
+        <div className="voice-live" role="status">
+          <span className="voice-indicator" data-recording={phase === "recording"} aria-hidden="true" />
+          <span>{phase === "recording" ? text.recording : text.pause}</span>
+          {/* `2J-VOICE-006`. The duration is always visible while recording. */}
+          <span className="voice-duration">{formatDuration(elapsed)}</span>
+          {phase === "recording" ? (
+            <button type="button" onClick={pause}>{text.pause}</button>
+          ) : (
+            <button type="button" onClick={resume}>{text.resume}</button>
+          )}
+          <button type="button" className="voice-finish" onClick={finish}>
+            <Square size={14} aria-hidden="true" />
+            {text.finish}
           </button>
-        ) : null}
+          <button type="button" className="voice-cancel" onClick={cancel}>{text.cancel}</button>
+        </div>
+      ) : null}
 
-        {phase === "recording" || phase === "paused" ? (
-          <div className="voice-live" role="status">
-            <span className="voice-indicator" data-recording={phase === "recording"} aria-hidden="true" />
-            <span>{phase === "recording" ? text.recording : text.pause}</span>
-            {/* `2J-VOICE-006`. The duration is always visible while recording. */}
-            <span className="voice-duration">{formatDuration(elapsed)}</span>
-            {phase === "recording" ? (
-              <button type="button" onClick={pause}>{text.pause}</button>
-            ) : (
-              <button type="button" onClick={resume}>{text.resume}</button>
-            )}
-            <button type="button" className="voice-finish" onClick={finish}>
-              <Square size={14} aria-hidden="true" />
-              {text.finish}
-            </button>
-            <button type="button" className="voice-cancel" onClick={cancel}>{text.cancel}</button>
-          </div>
-        ) : null}
+      {phase === "transcribing" ? (
+        <p className="voice-transcribing" role="status">
+          <LoaderCircle className="spin" size={16} aria-hidden="true" />
+          {text.transcribing}
+        </p>
+      ) : null}
 
-        {phase === "transcribing" ? (
-          <p className="voice-transcribing" role="status">
-            <LoaderCircle className="spin" size={16} aria-hidden="true" />
-            {text.transcribing}
-          </p>
-        ) : null}
-
-        {phase === "denied" ? (
-          <div className="voice-denied" role="alert">
-            <strong>{text.permissionDenied}</strong>
-            <p>{text.permissionHelp}</p>
-            <button type="button" onClick={start}>{text.recordLabel}</button>
-          </div>
-        ) : null}
-      </div>
+      {phase === "denied" ? (
+        <div className="voice-denied" role="alert">
+          <strong>{text.permissionDenied}</strong>
+          <p>{text.permissionHelp}</p>
+          <button type="button" onClick={start}>{text.recordLabel}</button>
+        </div>
+      ) : null}
 
       {error ? <p className="form-error" role="alert">{error}</p> : null}
 
       {/*
-        The draft. Present from the first transcript onward and editable
-        throughout -- the user can fix a word, type a whole sentence the
-        microphone never heard, or record another part and watch it append.
+        `2J-VOICE-013`, told to the owner before anything is sent — and only
+        while it is about them. A permanent line in the action row would be a
+        standing statement about a feature most captures never touch; shown from
+        the moment the microphone is live until the composer is sent, it is
+        visible exactly when the owner is deciding.
       */}
-      <form action={captureFormAction} className="voice-draft-form">
-        <input type="hidden" name="locale" value={locale} />
-        <input type="hidden" name="source" value="web" />
-        <label htmlFor="voice-draft">{text.draftLabel}</label>
-        <textarea
-          id="voice-draft"
-          name="content"
-          className="voice-draft"
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          rows={5}
-          placeholder={text.draftHint}
-        />
+      {phase !== "idle" || segments > 0 ? (
         <p className="voice-notice">{text.discardedNotice}</p>
-        <button type="submit" className="ux-action ux-action-primary" disabled={!draft.trim() || capturePending}>
-          {capturePending ? <LoaderCircle className="spin" size={16} aria-hidden="true" /> : null}
-          {locale === "pt-BR" ? `Capturar para o ${agentName}` : `Capture to ${agentName}`}
-        </button>
-        {captureState.status === "error" ? (
-          <p className="form-error" role="alert">{captureState.message}</p>
-        ) : null}
-      </form>
+      ) : null}
     </div>
   );
 }

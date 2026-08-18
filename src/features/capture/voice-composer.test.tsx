@@ -1,11 +1,24 @@
 /**
- * `2J-VOICE-006` … `2J-VOICE-015`, as behaviour.
+ * `2J-VOICE-006` … `2J-VOICE-015`, as behaviour, under the slice 2P.3 contract.
  *
  * MediaRecorder and getUserMedia are faked. That is a real limit and it is
  * named rather than glossed: this proves the **component's** contract — which
  * states it enters, what it sends, what it keeps, what it releases — and proves
  * nothing about how Safari or Android Chrome actually behave. Gate G-2J.4b
  * requires measurement on real devices and is NOT discharged here.
+ *
+ * ## What moved, and what did not
+ *
+ * The component stopped owning a draft and a capture form; it now reports a
+ * transcript through `onTranscript` and the composer decides where it lands.
+ * So every assertion about a *draft textarea* moved to `composer.test.tsx`,
+ * where the draft actually lives, and the assertions here became assertions
+ * about **what is handed over**: the same requirements, read at the new seam.
+ *
+ * `2J-VOICE-011` is the one worth watching. It used to mean "a failure does not
+ * clear this component's textarea". It now means something stronger and easier
+ * to get wrong: a failure must not call `onTranscript` at all, because a single
+ * spurious call would insert something into text the owner wrote by hand.
  */
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -19,7 +32,6 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
   recordVoiceTranscriptionFinished: vi.fn(),
 }));
 import type { TranscribeState } from "./voice-contracts";
-import type { CaptureState } from "./quick-capture-form";
 
 /** Tracks stopped, so the "microphone is released" claim is observable. */
 const stopped: string[] = [];
@@ -80,18 +92,17 @@ const failTranscribe = (message = "Não foi possível transcrever agora. Seu tex
     message,
   }));
 
-const okCapture = vi.fn(async (): Promise<CaptureState> => ({ status: "idle" }));
-
 function renderComposer(overrides: {
   transcribe?: TranscribeFn;
-  capture?: typeof okCapture;
+  onTranscript?: (text: string) => void;
+  onRecordingStart?: () => void;
 } = {}) {
   return render(
     <VoiceComposer
       locale="pt-BR"
       transcribeAction={overrides.transcribe ?? okTranscribe()}
-      captureAction={overrides.capture ?? okCapture}
-      agentName="Brain"
+      onTranscript={overrides.onTranscript ?? (() => {})}
+      onRecordingStart={overrides.onRecordingStart}
     />,
   );
 }
@@ -152,14 +163,18 @@ describe("2J-VOICE-006/007: the recording state is explicit and interruptible", 
   });
 });
 
-describe("2J-VOICE-010/012: transcription produces an editable draft", () => {
-  it("shows a transcribing state, then the transcript in an editable field", async () => {
-    renderComposer({ transcribe: okTranscribe("comprar pão amanhã") });
+describe("2J-VOICE-010/012 and 2P-CAPTURE-006: the transcript is handed over, never held", () => {
+  it("reports the transcribed text exactly once, and keeps no field of its own", async () => {
+    const onTranscript = vi.fn();
+    renderComposer({ transcribe: okTranscribe("comprar pão amanhã"), onTranscript });
     await recordAndFinish();
 
-    const draft = await screen.findByLabelText("Rascunho");
-    await waitFor(() => expect(draft).toHaveValue("comprar pão amanhã"));
-    expect(draft.tagName).toBe("TEXTAREA");
+    await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("comprar pão amanhã"));
+    expect(onTranscript).toHaveBeenCalledTimes(1);
+    // The second textarea is what slice 2P.3 removed. Its absence is why a
+    // transcript can join a sentence the owner had already begun.
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByLabelText("Rascunho")).toBeNull();
   });
 
   it("sends the container the recorder actually produced, not an assumed one", async () => {
@@ -173,39 +188,44 @@ describe("2J-VOICE-010/012: transcription produces an editable draft", () => {
     expect(form.get("audio")).toBeInstanceOf(File);
   });
 
-  it("appends a second segment instead of replacing the first", async () => {
+  it("reports a second segment as its own hand-over rather than a replacement", async () => {
+    const onTranscript = vi.fn();
     const transcribe = vi
       .fn<TranscribeFn>()
       .mockResolvedValueOnce({ status: "success", text: "primeira parte" })
       .mockResolvedValueOnce({ status: "success", text: "segunda parte" });
-    renderComposer({ transcribe });
+    renderComposer({ transcribe, onTranscript });
 
     await recordAndFinish();
-    await waitFor(() => expect(screen.getByLabelText("Rascunho")).toHaveValue("primeira parte"));
+    await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("primeira parte"));
 
-    // The record button becomes "record another part" once a draft exists.
+    // The record button becomes "record another part" once a segment has landed.
     fireEvent.click(screen.getByRole("button", { name: /Gravar mais um trecho/ }));
     await screen.findByRole("button", { name: "Concluir" });
     fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
 
-    await waitFor(() =>
-      expect(screen.getByLabelText("Rascunho")).toHaveValue("primeira parte segunda parte"),
-    );
-  });
-
-  it("lets the user type alongside what was transcribed", async () => {
-    renderComposer({ transcribe: okTranscribe("do microfone") });
-    await recordAndFinish();
-    const draft = await screen.findByLabelText("Rascunho");
-    await waitFor(() => expect(draft).toHaveValue("do microfone"));
-
-    fireEvent.change(draft, { target: { value: "do microfone e digitado" } });
-    expect(draft).toHaveValue("do microfone e digitado");
+    await waitFor(() => expect(onTranscript).toHaveBeenCalledTimes(2));
+    // Each call carries only the NEW text. Handing over the accumulated draft
+    // would make the composer's caret insertion duplicate everything before it.
+    expect(onTranscript.mock.calls.map(([text]) => text)).toEqual(["primeira parte", "segunda parte"]);
   });
 });
 
-describe("2J-VOICE-011: a transcription failure preserves the draft", () => {
-  it("keeps existing text and says so, rather than clearing the field", async () => {
+describe("2J-VOICE-011: a transcription failure disturbs nothing the owner wrote", () => {
+  it("hands over nothing at all when transcription fails", async () => {
+    const onTranscript = vi.fn();
+    renderComposer({ transcribe: failTranscribe(), onTranscript });
+    await recordAndFinish();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    // The stronger form of the old assertion: there is no field here to
+    // preserve any more, so the requirement is that the composer's field is
+    // never touched -- and the only way this component could touch it is a call.
+    expect(onTranscript).not.toHaveBeenCalled();
+  });
+
+  it("leaves an earlier segment's hand-over standing when a later one fails", async () => {
+    const onTranscript = vi.fn();
     const transcribe = vi
       .fn<TranscribeFn>()
       .mockResolvedValueOnce({ status: "success", text: "texto que já existia" })
@@ -214,18 +234,17 @@ describe("2J-VOICE-011: a transcription failure preserves the draft", () => {
         code: "transcription_failed",
         message: "Não foi possível transcrever agora. Seu texto continua aqui.",
       });
-    renderComposer({ transcribe });
+    renderComposer({ transcribe, onTranscript });
 
     await recordAndFinish();
-    await waitFor(() => expect(screen.getByLabelText("Rascunho")).toHaveValue("texto que já existia"));
+    await waitFor(() => expect(onTranscript).toHaveBeenCalledWith("texto que já existia"));
 
     fireEvent.click(screen.getByRole("button", { name: /Gravar mais um trecho/ }));
     await screen.findByRole("button", { name: "Concluir" });
     fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
-    // The draft is untouched. This is the assertion the requirement exists for.
-    expect(screen.getByLabelText("Rascunho")).toHaveValue("texto que já existia");
+    expect(onTranscript).toHaveBeenCalledTimes(1);
   });
 
   it("surfaces no provider detail, only the product's own message", async () => {
@@ -236,25 +255,56 @@ describe("2J-VOICE-011: a transcription failure preserves the draft", () => {
   });
 });
 
-describe("2J-VOICE-015: nothing is captured without explicit confirmation", () => {
-  it("does not capture when a transcript arrives", async () => {
-    const capture = vi.fn(async (): Promise<CaptureState> => ({ status: "idle" }));
-    renderComposer({ transcribe: okTranscribe("uma ideia"), capture });
-    await recordAndFinish();
-    await waitFor(() => expect(screen.getByLabelText("Rascunho")).toHaveValue("uma ideia"));
-    expect(capture).not.toHaveBeenCalled();
+describe("2J-VOICE-013/015: the audio rule is stated where the owner is deciding", () => {
+  it("says nothing about audio before the microphone is involved", () => {
+    // The control lives in the composer's action row now. A standing sentence
+    // about recordings would be a permanent statement about a feature most
+    // captures never touch.
+    renderComposer();
+    expect(screen.queryByText(/O áudio é descartado/)).toBeNull();
   });
 
-  it("disables confirmation while the draft is empty", () => {
-    renderComposer();
-    expect(screen.getByRole("button", { name: /Capturar para o Brain/ })).toBeDisabled();
+  it("says it while recording, and keeps saying it once a segment has landed", async () => {
+    renderComposer({ transcribe: okTranscribe("uma ideia") });
+    fireEvent.click(screen.getByRole("button", { name: /Gravar/ }));
+    await screen.findByText("Gravando");
+    expect(screen.getByText(/O áudio é descartado/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Gravar mais um trecho/ })).toBeInTheDocument());
+    expect(screen.getByText(/O áudio é descartado/)).toBeInTheDocument();
   });
 
-  it("tells the user the audio is discarded, before they confirm", () => {
-    renderComposer();
-    expect(
-      screen.getByText("O áudio é descartado depois da transcrição. Só o texto é guardado."),
-    ).toBeInTheDocument();
+  it("submits nothing itself, because it no longer owns a form", () => {
+    const { container } = renderComposer();
+    // `2P-CAPTURE-008`. This component cannot create an entry: there is no form
+    // and no submit control in it to do so.
+    expect(container.querySelectorAll("form")).toHaveLength(0);
+    expect(container.querySelectorAll('button[type="submit"]')).toHaveLength(0);
+  });
+});
+
+describe("2P-CAPTURE-004: choosing the microphone is reported before anything is recorded", () => {
+  it("reports the modality when record is pressed, not when audio arrives", async () => {
+    const onRecordingStart = vi.fn();
+    renderComposer({ onRecordingStart });
+    expect(onRecordingStart).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Gravar/ }));
+    await screen.findByText("Gravando");
+    expect(onRecordingStart).toHaveBeenCalledTimes(1);
+    // Content-free: there is no argument through which a transcript could go.
+    expect(onRecordingStart.mock.calls[0]).toHaveLength(0);
+  });
+
+  it("reports it even when permission is then refused, because the choice was made", async () => {
+    getUserMedia.mockRejectedValueOnce(new Error("denied"));
+    const onRecordingStart = vi.fn();
+    renderComposer({ onRecordingStart });
+
+    fireEvent.click(screen.getByRole("button", { name: /Gravar/ }));
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(onRecordingStart).toHaveBeenCalledTimes(1);
   });
 });
 
