@@ -23,6 +23,7 @@
     "docs:phase-2h:traceability": "node scripts/generate-phase-2h-traceability.mjs",
     "docs:phase-2i:traceability": "node scripts/generate-phase-2i-traceability.mjs",
     "docs:phase-2j:traceability": "node scripts/generate-phase-2j-traceability.mjs",
+    "docs:phase-2o:traceability": "node scripts/generate-phase-2o-traceability.mjs",
     "docs:phase-2x:traceability": "node scripts/generate-phase-2x-traceability.mjs",
     "docs:signup-hardening:traceability": "node scripts/generate-signup-hardening-traceability.mjs",
     "lint": "eslint .",
