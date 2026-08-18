@@ -8562,3 +8562,78 @@ of the right document matches, and a document with one changed count does not.
 **Three of this closeout's five defects were in the machinery that checks the
 work rather than in the work.** That ratio is the thing to carry, not any one of
 them.
+
+## §88 — Phase 2P is authorized for PLANNING ONLY, and the package was independently re-audited against the tree it names (2026-08-18)
+
+**ADR-121.** Baseline `main` `27f9f77`, equal to `origin/main`, worktree clean.
+**97 local = 97 hosted, parity `202608160097`**, confirmed twice by live
+read-only reads — once by the package's own audit and once by this review.
+Signup **closed**; rollout **25 pass · 3 fail · 2 owner-signature**.
+
+**Zero product code. Zero migrations created. Zero deploy. Zero secret touched.
+Implementation is NOT authorized** — that is a separate, later owner decision,
+and until it exists no Phase 2P acceptance record, traceability matrix, closing
+report, migration or product-code file claiming a 2P requirement may exist. The
+declaration guard (`src/lib/closeout/phase-2p-declarations.test.ts`) asserts
+both the package's presence and those absences.
+
+§87's closing lines are a point-in-time record and are left standing: *"the
+roadmap's lettered sequence ends at 2O"* was true when written, and ADR-121 is
+exactly the owner decision §87 said the next unit required. The earlier line is
+not rewritten to agree with what followed it.
+
+### The package, and what the independent review verified
+
+The governing pair is `docs/initiatives/phase-2p/PHASE_2P_PRD.md` and
+`PHASE_2P_IMPLEMENTATION_PLAN.md`; the evidence — current-experience audit, UX
+gap map, threat model, traceability contract — lives under
+`docs/reports/phase-2p/`. **86 requirements across fourteen families and nine
+slices (2P.0 … 2P.8)**, twelve owner decisions signed by ADR-121, and **A13
+retargeted to the unnamed roadmap successor in the same change** — the eleventh
+application, with the planted positive and negative controls retained.
+
+A full independent review re-audited the package against the tree it names,
+because a recorded audit can be false (§82 proved that). Every one of the
+twelve audit findings reproduced against the real code: Today mounts only the
+text form; Capture asks for a modality first; `VoiceComposer` already carries
+the desired record → transcribe → editable draft → explicit send lifecycle with
+memory-only audio; Chat sits behind `visibility: "more"` and only the generic
+application boundary answers its failure; Relations renders the list before the
+drawing with no view choice; memory creation is a one-line inline input;
+reminder creation is an inline page form; Notifications mixes governance with
+history; Settings is one long scroll of real sections; raw `confidence` exists
+in the extraction schema and is not an authorization contract. The counts,
+ID discipline and family sequence were re-derived mechanically and match the
+guard. Branch `codex/fix-needs-attention-confirmation` (`2bfbe91`) still holds
+migration `202608170098_confirm_entry_interpretation.sql`, which is **absent
+from the hosted chain** — the package correctly treats it as a re-audit
+candidate, never as delivered work. The three actions the plan names for reuse
+(`captureEntry`, `uploadAttachment`, `transcribeRecording`) exist under exactly
+those names.
+
+**One divergence was found and it is this section**: the durable handoff had no
+record of the authorization, against the precedent §37, §49 and §74 set for
+every prior planning authorization. Nothing else in the package needed
+correction.
+
+### Open for the owner at the implementation checkpoint
+
+`OD-2P-8`'s second half — Notifications becomes the history/inbox surface once
+its governance moves to Settings — is covered by the plan's slice 2P.5 prose,
+by threat T-15 and by the Settings-section requirement, but **no dedicated
+requirement ID traces the Notifications page's own end state**. The 2O
+precedent (§75: requirements appended at the signature step, recorded by the
+ADR that signed them) makes the implementation authorization the natural moment
+to append one to the end of the `2P-SETTINGS` family, if the owner wants the
+matrix to see it. Appending it now would contradict the accepted ADR-121's
+declared count, which is not this review's call to make.
+
+### Where this stops
+
+**At owner review of the package.** The next action is a separate
+implementation authorization if approved, beginning with slice 2P.0. No slice,
+migration, deploy or product-code change is authorized by ADR-121 or by this
+review. Push HTTP 403/Android, retention scheduling, SMTP, the restore drill,
+the unexecuted screen-reader session and every other inherited residual stay
+exactly where §87 left them. **This section deliberately does not name what
+comes after Phase 2P.**
