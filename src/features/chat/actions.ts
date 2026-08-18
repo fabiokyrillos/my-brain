@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, unstable_rethrow } from "next/navigation";
 import { z } from "zod";
 import { getByokCopy } from "@/features/byok/copy";
 import { admitRateLimitedOperation } from "@/features/rate-limits/server";
@@ -12,6 +12,8 @@ import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
+import { recordErrorEvent, type ErrorOperation } from "@/lib/observability/error-sink";
+import { chatFailureMessage, classifyChatFailure, withChatFailureReference } from "./diagnostics";
 import {
   buildCitationsEnvelope,
   supportKindForSource,
@@ -19,7 +21,6 @@ import {
 import { buildAnswerExplanation } from "@/features/conversation-sources/explanation";
 import { isMemoryInForce } from "@/features/memories/lifecycle";
 import type { ChatState } from "./chat-state";
-import { getAgentName } from "@/features/profile/agent-identity";
 import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const chatInputSchema = z.object({
@@ -35,7 +36,16 @@ type ChatCopy = {
   conversationNotFound: string;
   conversationNotStarted: string;
   questionNotSaved: string;
-  answerUnavailable: (agent: string) => string;
+  /**
+   * `answerUnavailable` is gone (`2P-CHAT-002`).
+   *
+   * It was one sentence for every fault inside the provider block — credential,
+   * quota, retrieval, provider and timeout all reached the owner as *"could not
+   * answer right now"*. `diagnostics.ts` replaces it with one sentence per
+   * class, each carrying the correlation id of the row the failure wrote, and
+   * removing the key is what stops a future caller from reaching for the
+   * flattened version again.
+   */
 };
 
 // Canonical localization mechanism (ADR-036): one typed copy record per
@@ -50,7 +60,6 @@ const chatCopy = {
     conversationNotFound: "Conversa não encontrada.",
     conversationNotStarted: "Não foi possível iniciar a conversa.",
     questionNotSaved: "Não foi possível salvar sua pergunta.",
-    answerUnavailable: (agent: string) => `O ${agent} não conseguiu responder agora. Sua pergunta ficou salva.`,
   },
   en: {
     invalidQuestion: "Write a valid question.",
@@ -59,7 +68,6 @@ const chatCopy = {
     conversationNotFound: "Conversation not found.",
     conversationNotStarted: "We could not start the conversation.",
     questionNotSaved: "We could not save your question.",
-    answerUnavailable: (agent: string) => `${agent} could not answer right now. Your question was saved.`,
   },
 } satisfies Record<Locale, ChatCopy>;
 
@@ -138,15 +146,49 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   });
   if (userMessageError) return { status: "error", message: copy.questionNotSaved };
 
+  /**
+   * `2P-CHAT-002`. Which provider call was in flight when a fault arrived.
+   *
+   * The try below spans two provider calls — the embedding and the answer — and
+   * `error_events` has a distinct `operation` for each (`embed_text`,
+   * `chat_answer`). Filing both under one operation would make the sink unable
+   * to answer "is retrieval failing, or is generation failing", which is the
+   * first question anyone reading it would ask. It is a `let` because the phase
+   * genuinely changes as the turn proceeds; the catch reads whichever value was
+   * current.
+   */
+  let operation: ErrorOperation = "chat_answer";
+
   try {
     // BYOK gate, before any preference read and before any provider call. A
     // gated user costs nothing and reaches no network; the project key is not
     // consulted because no code path can consult one any more.
     const gate = await openAiGate(supabase, user.id);
     if (!gate.ok) {
+      /*
+       * `2P-CHAT-003`. Recorded, and the existing BYOK sentence is kept.
+       *
+       * The gate's own copy distinguishes "no credential" from "credential
+       * unreadable", which is finer than this module's `credential` class, so
+       * replacing it with the generic sentence would lose information the owner
+       * can act on. What was missing is the record: before this, a gated
+       * conversation left nothing behind at all. `permission_denied` is the
+       * reason both gate outcomes classify to.
+       */
+      const { correlationId } = await recordErrorEvent(supabase, {
+        surface: "server_action",
+        operation: "chat_answer",
+        reason: "permission_denied",
+      });
       return {
         status: "error",
-        message: getByokCopy(formData.get("locale")).messages[gateMessageKey(gate.reason)],
+        message: withChatFailureReference(
+          parsed.data.locale,
+          getByokCopy(formData.get("locale")).messages[gateMessageKey(gate.reason)],
+          correlationId,
+        ),
+        failure: "credential",
+        reference: correlationId,
       };
     }
 
@@ -162,7 +204,13 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       locale: parsed.data.locale,
       operation: "chat_answer",
     });
-    if (!admission.ok) return { status: "error", message: admission.message };
+    // Already recorded by `admitRateLimitedOperation`, which writes its own
+    // `rate_limit_refused` product event and its own sink row on a database
+    // fault — so this path must not record a second one. What it gains here is
+    // the class, so a caller can route the owner to their usage.
+    if (!admission.ok) {
+      return { status: "error", message: admission.message, failure: "quota", reference: null };
+    }
 
     const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", user.id).maybeSingle();
     const preferences = requireSupabaseData(preferencesResult, "load chat preferences");
@@ -171,7 +219,9 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       model: preferences?.chat_model ?? "gpt-5.6-terra",
       embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small",
     });
+    operation = "embed_text";
     const embedded = await provider.embedText(parsed.data.question);
+    operation = "chat_answer";
     await recordAIUsage(supabase, {
       operation: "semantic_search",
       model: embedded.model,
@@ -329,8 +379,52 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     requireSupabaseSuccess(conversationUpdate, "update conversation timestamp");
     requireSupabaseSuccess(auditInsert, "record chat audit");
   } catch (error) {
-    console.error("Grounded chat failed", error instanceof Error ? error.message : "unknown error");
-    return { status: "error", message: copy.answerUnavailable(await getAgentName()) };
+    /*
+     * `2P-CHAT-001`, `-002`, `-003`. One catch, five answers, and a record.
+     *
+     * `unstable_rethrow` first, at the top of the block, which is where Next's
+     * own documentation puts it. Nothing inside this try redirects today —
+     * `assertActiveAccount` runs above it and `redirect()` runs below it — but a
+     * catch this broad is exactly where a future `notFound()` or `redirect()`
+     * would be swallowed, and the failure mode is invisible: the framework's
+     * navigation silently becomes a rendered error state. Guarding it costs one
+     * line and removes the whole class.
+     *
+     * Then one call to `classifyChatFailure`, whose reason goes to the sink and
+     * whose class chooses the sentence — so the row and what the owner reads
+     * cannot disagree. The sink never throws and always returns a correlation
+     * id, so there is no branch here where the owner is left with nothing to
+     * quote.
+     *
+     * What used to be here was `console.error` plus one sentence for every
+     * fault. The log reached a host and nothing else; the sentence flattened a
+     * credential problem, a quota ceiling, a retrieval fault, a provider outage
+     * and a timeout into the same words. Slice 2P.0 measured that
+     * `public.error_events` held one row, dated 2026-08-07, and that the chat
+     * path had never written to it.
+     */
+    unstable_rethrow(error);
+
+    const { reason, failure } = classifyChatFailure(error);
+    const { correlationId } = await recordErrorEvent(supabase, {
+      surface: "server_action",
+      operation,
+      reason,
+    });
+    /*
+     * The console line stays, and now prints only the classification and the
+     * correlation id. Printing `error.message` was the one place a provider
+     * string or a fragment of the owner's own question could reach a host log
+     * from this path — the same rule the sink itself follows, and the reason
+     * `error_events` has no free-text column.
+     */
+    console.error("Grounded chat failed", { operation, reason, correlationId });
+    return {
+      status: "error",
+      message: chatFailureMessage(parsed.data.locale, failure, correlationId),
+      failure,
+      reference: correlationId,
+    };
   }
 
   revalidatePath(`/${parsed.data.locale}/app/chat/${conversationId}`);

@@ -6,6 +6,9 @@ import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { askAboutCopy, parseAskAbout } from "@/features/conversation-cards/ask-about";
+import { AskingAboutBanner } from "@/features/conversation-cards/asking-about-banner";
+import { resolveAskAboutSubject } from "@/features/conversation-cards/resolve-ask-about";
 import { deriveConversationSuggestions } from "@/features/conversation-cards/suggestions";
 import { SuggestionRow } from "@/features/conversation-cards/suggestion-row";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
@@ -18,14 +21,15 @@ import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
-export default async function ChatPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ page?: string | string[] }> }) {
+export default async function ChatPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ page?: string | string[]; about?: string | string[] }> }) {
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const pt = locale === "pt-BR";
   const copy = getAssistantCopy(locale);
   const agentName = await getAgentName();
-  const page = parsePage((await searchParams).page);
+  const query = await searchParams;
+  const page = parsePage(query.page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
@@ -51,6 +55,18 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
     projects: requireSupabaseData(projectsResult, "load suggestion projects") ?? [],
   });
 
+  /*
+   * `2P-CHAT-005`. The owner arrived from a contextual page.
+   *
+   * The handle is parsed and the name is read here, under this caller's own
+   * client and therefore under RLS — a subject somebody else owns resolves to
+   * null and renders exactly like a subject that does not exist, so the link is
+   * not an existence oracle. `resolveAskAboutSubject` never throws: the banner
+   * is additive context and must not be able to fail the page whose composer
+   * still works without it.
+   */
+  const askingAbout = await resolveAskAboutSubject(supabase, parseAskAbout(query.about));
+
   return (
     <div className="content-page chat-page">
       <header className="list-header">
@@ -66,9 +82,19 @@ export default async function ChatPage({ params, searchParams }: { params: Promi
         whole of UX-07's fix: one field, no mode to choose, and nothing above it
         competing for the first thing the user types into.
       */}
+      {/*
+        `2P-CHAT-005`. Above the composer, because it is the context the next
+        thing typed belongs to — and it carries the way back, so arriving here
+        from a person's page is a step rather than a departure.
+      */}
+      {askingAbout === null ? null : (
+        <AskingAboutBanner locale={locale} resolved={askingAbout} />
+      )}
+
       <AssistantComposer
         action={runAssistantTurn}
         agentName={agentName}
+        initialText={askingAbout === null ? undefined : askAboutCopy(locale).seed(askingAbout.name)}
         locale={locale}
         memoryAction={createProposedMemory}
         memoryUndoAction={undoProposedMemory}

@@ -522,3 +522,104 @@
   /* Owner content. A long name must not push the row off a narrow viewport. */
   overflow-wrap: anywhere;
 }
+
+/*
+ * `2P-CHAT-005` — the contextual entry into a conversation, and its banner.
+ *
+ * ## The 44px is a requirement, not a preference
+ *
+ * `2P-MOBILE-003` binds every interactive target this phase creates to 44 by 44
+ * CSS pixels. `min-height` rather than padding arithmetic, because the caption
+ * font is a token and a token can change: padding tuned to one line-height
+ * silently drops below the floor when it does.
+ *
+ * ## Why `.back-link`'s margin is reset here
+ *
+ * `.back-link` carries `margin-bottom:35px` in `operations.css`, which was the
+ * spacing between it and the hero when it was the only thing in that position.
+ * It now sits inside a flex row, where that margin would push the row's baseline
+ * and leave the row itself with no spacing of its own. The row owns the gap; the
+ * link inside it owns none.
+ */
+.entity-workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 35px;
+}
+
+.entity-workspace-actions .back-link {
+  margin-bottom: 0;
+}
+
+.ask-about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-caption);
+  font-weight: 700;
+}
+
+.ask-about-link:hover {
+  border-color: var(--link);
+  color: var(--link);
+}
+
+/*
+ * The banner. Two facts and a way back, above the composer.
+ *
+ * It borrows the suggestion tone rather than an alert tone deliberately: this is
+ * context the owner asked for, not a warning, and reusing the tone that already
+ * means "the Brain is offering you something" keeps the surface one vocabulary.
+ */
+.asking-about-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--tone-suggestion-line);
+  border-radius: var(--radius-md);
+  background: var(--tone-suggestion-bg);
+}
+
+.asking-about-subject {
+  margin: 0;
+  color: var(--tone-suggestion-fg);
+  font: var(--type-caption);
+  font-weight: 750;
+  /* Owner content. A long name must not push the row off a narrow viewport. */
+  overflow-wrap: anywhere;
+}
+
+.asking-about-banner .back-link {
+  margin-bottom: 0;
+  min-height: 44px;
+}
+
+/*
+ * Below the base rules, never above them: a media query with no added
+ * specificity that precedes the declarations it means to override is dropped in
+ * silence, and only a rendered-page check catches it.
+ */
+@media (max-width: 560px) {
+  .entity-workspace-actions,
+  .asking-about-banner {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ask-about-link {
+    justify-content: center;
+  }
+}

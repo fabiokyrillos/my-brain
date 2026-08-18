@@ -8833,3 +8833,180 @@ path, one action, one draft store and two `captureSource` scopes. Push HTTP
 screen-reader session and every other inherited residual stay exactly where §87
 and §88 left them. **This section deliberately does not name what comes after
 Phase 2P.**
+
+## §90 — Slice 2P.2 ships: Conversation was repaired at a boundary nobody had looked at, and the requirement asking to preserve a property found the property had never been true (2026-08-18)
+
+**ADR-122.** Baseline `main` `7d94cdb` (2P.0's merge), clean, no open PR, **CI
+green on that exact merge SHA** (three jobs, all `success`). **97 local = 97
+hosted, parity `202608160097`, unchanged. Zero migrations.** Signup closed;
+rollout 25 pass · 3 fail · 2 owner-signature. **No provider call, no BYOK
+spend.**
+
+**Slice 2P.1 was skipped deliberately**, not missed: its correction is in
+deployed SQL and no authorization funds it. 2P.2 is an independent P0 that
+depends on nothing 2P.1 delivers, so stopping the whole loop for one blocked
+slice would have wasted seven unblocked ones.
+
+### The root cause was not where anyone would look
+
+2P.0 had already proved the grounded-answer path *works* — every hosted question
+produced an answer, an audit row, a usage row and a well-formed envelope. So the
+repair was never in retrieval or in the model call. It was one line:
+
+```
+if (!known) throw error;      // features/task-commands/actions.ts
+```
+
+Four declared precondition classes were rendered; **everything else was
+rethrown**, contradicting property 4 in that module's own header. The default
+Conversation route runs `runTaskCommand` *before* the knowledge path, so an
+undeclared fault escaped `runAssistantTurn`, React rendered the app error
+boundary — a Client Component whose only record is a browser console line — and
+the owner's pending command was gone. **The generic screen was the entire
+artifact of the failure.**
+
+`guard` is now async, calls `unstable_rethrow(error)` **first** (Next's own
+documented position, and the reason a future `redirect()` under a command round
+will not be silently converted into a rendered refusal), records one
+`error_events` row, and renders the unchanged refusal sentence plus its
+correlation id. The four declared classes are recorded too: a precondition fault
+nobody can count is one nobody fixes.
+
+**Proved against the old implementation, not merely described.** `if (!known)
+throw error;` was temporarily restored and exactly the new test failed — then
+removed, 42/42 green, and the sentinel line verified gone while the comment that
+*explains* the old behaviour correctly still mentions it.
+
+### Five classes, one classifier, and three refusals worth keeping
+
+`features/chat/diagnostics.ts` is a **total function over the sink's fourteen
+reasons**, written as a `Record<ErrorReason, ChatFailureClass>` rather than a
+`switch`, so a reason added to `error_events` is a **type error here** instead of
+a silent fallthrough to "unexpected".
+
+`classifyChatFailure` returns the reason *and* the class from **one**
+`classifyError` call. Two calls would have been two decisions, and they drift —
+the classic shape being a recovery state that says "try again" while the row
+says `quota_exceeded`.
+
+Three refusals that a looser mapping would have got wrong:
+
+- **`provider_rate_limited` is not `quota`.** That is the provider throttling us,
+  not the owner spending their signed ceiling. Collapsing them tells the owner
+  they spent something they did not.
+- **`unexpected` exists.** The fourteenth reason is literally `unclassified`;
+  folding it into one of the five attaches a confident next step to a fault
+  nobody diagnosed.
+- **`validation_failed`, `storage_error` and `lifecycle_blocked` get no
+  chat-shaped advice.** None can reach the path — the schema refuses the first
+  before the try, attachments own the second, the lifecycle gate redirects the
+  third to its own surface. Inventing recoveries for them would be lies with
+  plausible shapes.
+
+`answerUnavailable` is **deleted** from `chatCopy`, not left unused. Removing the
+key is what stops the next caller reaching for the flattened sentence.
+
+### The hosted check that had to happen before the fix could be trusted
+
+`sendChatMessage` runs as the **user's** client, not `service_role`. If
+`record_error_event` were service-role-only, every recording call would have
+returned `recorded: false` and the whole repair would have been decorative — the
+"suspect the probe before the product" failure in its cheapest form. Read live
+before relying on it:
+
+| Check | Result |
+|---|---|
+| grants | `EXECUTE` to `authenticated`, `anon`, `service_role`, `postgres` |
+| definer | `SECURITY DEFINER`, `SET search_path TO ''` |
+| owner scope | inserts `user_id = auth.uid()` |
+| columns | `surface`, `operation`, `reason`, `correlation_id`, `user_id` |
+| free text | **no such column exists** |
+
+So `T-11` closes **by construction** rather than by discipline. The leak test
+throws a value carrying an API key, a model id, a SQLSTATE, an HTTP status and a
+quota string, and asserts none of them reaches either locale's sentence.
+
+`error.tsx` also stopped claiming the product has no error sink — false since
+`202608070080`. And the replacement comment **paraphrases** that claim instead of
+quoting it, because the guard asserts the exact sentence is gone and a comment
+reciting it kept the guard failing on correct code. That cost one iteration and is
+the same trap as "a check can pass by containing its own subject", seen from the
+other side.
+
+### A requirement asked to preserve something that had never been true
+
+`2P-CHAT-004` says Conversation "**remains** the first lens inside Brain".
+`lenses.ts` ordered it **last**, with a deliberate rationale worth keeping in
+mind: *Conversas is the way to ask about the rest, and the rest has to exist
+before the question means anything.* That is right about a new owner's first
+visit. `OD-2P-7` — signed — decides every visit after it, and says **becomes**.
+So the code was consistent and the requirement's verb was the error.
+
+Conversas now leads the domain lenses. `overview` stays at position zero:
+`phase-2i-library-guard` pins it there, and it is the one lens that explains the
+other eight. **Every href is unchanged; no deep link moved.** Three tests that
+pinned the old order were updated with the reason rather than the new list.
+
+### The mobile half is refused, named, and routed
+
+`mobileBarSlots` is `["home","inbox","capture","work","more"]`, and
+`mobile-reachability-guard` asserts in **both directions** that the fifth slot
+frees only when `AccountMenu` reaches the mobile header — with the slot destined
+for **Brain**, not chat. So "a first-class mobile destination" cannot mean a bar
+slot without breaking that guard's stated destination or landing 2P.5's account
+work early.
+
+`2P-CHAT-004` is therefore **`partial`**, remainder `2P-CHAT-004-MOBILE`,
+destination **slice 2P.5**. No authority in this slice retires `Mais`.
+
+### What travels in the URL, and what does not
+
+`2P-CHAT-005` ships on all four subject workspaces. The URL carries **`type:id`
+and nothing else**. The obvious version puts a ready-made question in the query
+string — owner content on a shared, logged, bookmarked surface, and a copy of a
+name outside the row that owns it, which is exactly the defect `202608080087`
+deleted. The name is re-read **server-side under RLS at render time**, so an
+unowned subject renders identically to a nonexistent one (no existence oracle)
+and a renamed subject is right on the next view because nothing cached can
+disagree. The type list is closed and the resolver runs four explicit queries;
+`supabase.from(subject.type)` would have made a query parameter a table selector,
+and the guard asserts that shape is absent.
+
+The composer is **seeded, never submitted**: `idle`-route only, loses to a
+restored `echo`, still uncontrolled, still `required`. The ordering is the part
+that matters — reversed, a conversation reached from a person's page would answer
+a failure by deleting what the owner wrote and replacing it with a suggestion.
+
+### Two things that cost an iteration each, worth not repeating
+
+1. **A type exported from a `server-only` module poisons a client test.**
+   `AskingAboutBanner` took its type from the resolver, and `server-only` threw
+   at import time in jsdom — naming neither the type nor the component, because
+   it only knows that *something* reached it. Fixed by declaring the shape in the
+   module with no runtime dependencies and having the resolver import it.
+2. **`useActionState` seeds from its initial value, so a non-idle route cannot be
+   reached by rendering.** The first draft of the render test passed a state in
+   and asserted against it — and was asserting the idle render three times over.
+   Reaching `knowledge_failed` requires actually submitting.
+
+Also: `AskAboutLink`'s subject prop is named `about`, because
+`phase-2n-project-guard` scans the project page for `subject={` and requires
+every one to be a provenance label. The collision was real; renaming beat
+narrowing the guard, since `subject` already means something specific there.
+
+### Where this stops
+
+**Slice 2P.3 is next and unblocked** — 2P.0's census proved Today and Capture
+already submit through one action, one write path, one draft store and two
+`captureSource` scopes, so unifying the surface is a component change.
+
+**Two remainders are open and neither is absorbed:**
+`2P-CHAT-004-MOBILE` (slice 2P.5) and `2P-CHAT-007-JOURNEY` — the desktop and
+mobile conversation journeys are **NOT EXECUTED**, because the authenticated lane
+needs the hosted harness and the live-answer case needs a provider call the owner
+has not authorized spending on a proof. Destination slice 2P.8 plus that
+decision. The component-boundary tests are recorded as what they are and are not
+allowed to stand in for the journey.
+
+**Slice 2P.1 remains blocked on the owner**, exactly where §89 left it. This
+section deliberately does not name what comes after Phase 2P.

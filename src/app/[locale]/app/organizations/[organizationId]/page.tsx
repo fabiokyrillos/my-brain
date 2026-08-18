@@ -1,3 +1,4 @@
+import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
 import { ArrowLeft, Building2 } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
@@ -58,10 +59,18 @@ export default async function OrganizationDetailPage({
 
   return (
     <div className="content-page entity-detail">
-      <Link className="back-link" href={`/${locale}/app/organizations`}>
-        <ArrowLeft size={16} />
-        {copy.organizations}
-      </Link>
+      <div className="entity-workspace-actions">
+        <Link className="back-link" href={`/${locale}/app/organizations`}>
+          <ArrowLeft size={16} />
+          {copy.organizations}
+        </Link>
+        {/* `2P-CHAT-005`. See the person workspace for why only `organization:<id>` travels. */}
+        <AskAboutLink
+          locale={locale}
+          name={organization.name}
+          about={{ type: "organization", id: organization.id }}
+        />
+      </div>
 
       <header className="entity-hero">
         <Building2 size={28} />

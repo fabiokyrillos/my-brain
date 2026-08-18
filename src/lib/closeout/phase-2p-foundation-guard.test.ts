@@ -44,6 +44,7 @@ import { describe, expect, it } from "vitest";
 
 import { ERROR_OPERATIONS, ERROR_REASONS, ERROR_SURFACES } from "@/lib/observability/error-sink";
 import { productEventNames } from "@/features/product-analytics/contracts";
+import { BRAIN_DOMAIN_LENSES, BRAIN_LENSES } from "@/features/library/lenses";
 
 const REPO = join(__dirname, "..", "..", "..");
 const MIGRATIONS = join(REPO, "supabase", "migrations");
@@ -239,16 +240,45 @@ describe("2P-FOUNDATION-005: the telemetry map is already deployed", () => {
     }
   });
 
-  it("records that the chat path has no sink producer yet", () => {
-    // The measured gap. Slice 2P.2 closes it, and when it does this assertion
-    // fails and must be inverted — which is how the change becomes visible in
-    // review rather than arriving as an unremarked behaviour.
+  /**
+   * **Inverted by slice 2P.2, which is what this pair was for.**
+   *
+   * Slice 2P.0 asserted the gap: the chat path contained no `recordErrorEvent`
+   * call, and `error.tsx` still claimed *"There is no error sink in this product
+   * yet"* although the sink shipped in `202608070080`. Both assertions carried a
+   * message saying they must be inverted when the gap closed, so that closing it
+   * could not arrive as an unremarked behaviour change. It closed; they are
+   * inverted; the direction each one guards is now the opposite one.
+   */
+  it("records to the sink from the chat path, and the boundary no longer denies the sink", () => {
     const chat = tsCode(read("src/features/chat/actions.ts"));
-    expect(chat, "chat now records to the sink — invert this and say so in the 2P.2 record")
-      .not.toContain("recordErrorEvent");
-    // And the boundary still claims the sink does not exist, which it has since
-    // `202608070080`.
-    expect(read("src/app/[locale]/app/error.tsx")).toContain("There is no error sink in this product yet");
+    expect(chat, "the chat path stopped recording failures").toContain("recordErrorEvent");
+    // Both provider operations are distinguishable in the row, or the sink
+    // cannot answer "is retrieval failing, or is generation failing".
+    expect(chat).toContain('"chat_answer"');
+    expect(chat).toContain('"embed_text"');
+    // `unstable_rethrow` guards the broadened catch. Without it, a future
+    // `redirect()` inside the try becomes a rendered error state in silence.
+    expect(chat).toContain("unstable_rethrow");
+
+    const boundary = read("src/app/[locale]/app/error.tsx");
+    expect(boundary, "the false no-sink claim came back").not.toContain(
+      "There is no error sink in this product yet",
+    );
+    // It must still not claim the render-time fault WAS recorded — it is not,
+    // and the digest is the only durable value on that screen.
+    expect(boundary).toContain("error.digest");
+  });
+
+  it("leaves no thrown value able to escape the task-command guard", () => {
+    const commands = tsCode(read("src/features/task-commands/actions.ts"));
+    // The rethrow this replaced was the measured mechanism behind the generic
+    // boundary: `runTaskCommand` runs before the knowledge path on the default
+    // Conversation route.
+    expect(commands, "an undeclared fault can escape the Server Action again")
+      .not.toMatch(/if \(!known\) throw error;/);
+    expect(commands).toContain("unstable_rethrow");
+    expect(commands).toContain("recordErrorEvent");
   });
 
   it("is not vacuous: the vocabularies are real and a missing name is detected", () => {
@@ -256,6 +286,80 @@ describe("2P-FOUNDATION-005: the telemetry map is already deployed", () => {
     expect(productEventNames.length).toBeGreaterThan(30);
     expect(ERROR_REASONS as readonly string[]).not.toContain("automation_declined");
     expect(productEventNames as readonly string[]).not.toContain("automation_decided");
+  });
+});
+
+describe("2P-CHAT-004/005: Conversation is reachable, and the way in carries no content", () => {
+  it("makes Conversas the first Brain domain lens, with the overview still leading", () => {
+    // `OD-2P-7`. This reverses `lenses.ts`'s prior reading order, so the
+    // assertion is on the derived arrays rather than on the literal — a future
+    // edit that reorders `DECLARED_ORDER` back has to fail here.
+    expect(BRAIN_LENSES[0]).toBe("overview");
+    expect(BRAIN_LENSES[1]).toBe("chat");
+    expect(BRAIN_DOMAIN_LENSES[0]).toBe("chat");
+    // Nothing was dropped by the reorder.
+    expect(BRAIN_DOMAIN_LENSES).toHaveLength(8);
+    expect(new Set(BRAIN_LENSES).size).toBe(BRAIN_LENSES.length);
+  });
+
+  it("mounts the contextual entry on all four subject workspaces", () => {
+    const pages = [
+      "src/app/[locale]/app/people/[personId]/page.tsx",
+      "src/app/[locale]/app/projects/[projectId]/page.tsx",
+      "src/app/[locale]/app/organizations/[organizationId]/page.tsx",
+      "src/app/[locale]/app/contexts/[contextId]/page.tsx",
+    ];
+    for (const page of pages) {
+      const code = tsCode(read(page));
+      expect(code, `${page} has no way into a conversation`).toContain("<AskAboutLink");
+    }
+    // The census, re-derived: exactly four mounts, so a fifth subject type
+    // arriving without a route in `ask-about.ts` is visible here.
+    const mounts = [...walkSource()]
+      .filter((path) => !/\.test\.tsx?$/.test(path))
+      .filter((path) => tsCode(readFileSync(path, "utf8")).includes("<AskAboutLink"));
+    expect(mounts).toHaveLength(pages.length);
+  });
+
+  it("carries only an opaque handle into the conversation surface", () => {
+    // `T-11` in its 2P.2 form: the affordance must not put a name, a question or
+    // any owner content into a URL. The href is built in exactly one place and
+    // that place serializes `type:id`.
+    const contract = tsCode(read("src/features/conversation-cards/ask-about.ts"));
+    expect(contract).toContain("`${subject.type}:${subject.id}`");
+    const link = tsCode(read("src/features/conversation-cards/ask-about-link.tsx"));
+    expect(link).toContain("askAboutHref(locale, about)");
+    // A name reaching the href would mean the link built its own query string.
+    expect(link).not.toMatch(/href=\{`/);
+  });
+
+  it("resolves the subject name server-side, under the caller's own client", () => {
+    const resolver = tsCode(read("src/features/conversation-cards/resolve-ask-about.ts"));
+    expect(resolver).toContain('"server-only"');
+    // Four explicit queries. `supabase.from(subject.type)` would make a query
+    // parameter a table selector.
+    expect(resolver).not.toMatch(/\.from\(\s*subject\./);
+    for (const table of ["people", "projects", "organizations", "contexts"]) {
+      expect(resolver, table).toContain(`read("${table}")`);
+    }
+  });
+
+  it("seeds the composer without submitting it", () => {
+    const composer = tsCode(read("src/features/assistant/assistant-composer.tsx"));
+    // `idle`-only, so a resolved turn never has its field refilled, and the
+    // owner's restored echo always wins over a seed.
+    expect(composer).toContain('state.route === "idle" && initialText');
+    expect(composer).toContain("restored ?? seeded ?? \"\"");
+    // Still uncontrolled and still `required`: seeding is not sending.
+    expect(composer).toContain("defaultValue={initial}");
+    expect(composer).toContain("required");
+  });
+
+  it("is not vacuous: the mount and handle detectors answer differently on fixtures", () => {
+    expect(tsCode("<AskAboutLink locale={l} />").includes("<AskAboutLink")).toBe(true);
+    expect(tsCode("// mounts <AskAboutLink here").includes("<AskAboutLink")).toBe(false);
+    expect(/\.from\(\s*subject\./.test('supabase.from(subject.type)')).toBe(true);
+    expect(/\.from\(\s*subject\./.test('supabase.from("people")')).toBe(false);
   });
 });
 

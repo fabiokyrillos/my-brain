@@ -41,10 +41,30 @@ import { LIBRARY_MEMBERS } from "./contracts";
 export type BrainLensKey = "overview" | NavigationKey;
 
 /**
- * The reading order. Conversas is last because it is the way to *ask about* the
- * rest, and the rest has to exist before the question means anything.
+ * The reading order. **Conversas is first, and that reverses a prior decision.**
+ *
+ * It used to be last, with a rationale worth quoting because it was a good one:
+ * Conversas is the way to *ask about* the rest, and the rest has to exist before
+ * the question means anything. That argument is about a **new** owner's first
+ * visit, and it is right about that visit.
+ *
+ * `OD-2P-7` decides for every visit after it. Once the rest exists, asking is
+ * the thing the owner comes to Brain to do, and the eight-item strip put the one
+ * interactive destination at the far end of seven browse destinations. Slice 2P.0
+ * also found the requirement text (`2P-CHAT-004`) claiming Conversation
+ * *remains* the first lens — a property that had never been true — so the choice
+ * here is between honouring the signed decision and correcting the requirement
+ * to match the code. The owner signed "becomes the first Brain lens"; this is
+ * that.
+ *
+ * `overview` still leads `BRAIN_LENSES`, and deliberately: it is the space's own
+ * summary rather than a domain, `phase-2i-library-guard.test.ts` pins it at
+ * position zero, and displacing it would remove the one lens that explains what
+ * the other eight are. Conversas is the first **domain** lens, which is what the
+ * decision is about.
  */
 const DECLARED_ORDER: readonly NavigationKey[] = [
+  "chat",
   "people",
   "projects",
   "organizations",
@@ -52,7 +72,6 @@ const DECLARED_ORDER: readonly NavigationKey[] = [
   "memories",
   "files",
   "relations",
-  "chat",
 ];
 
 /** Every context destination, in reading order, with nothing lost. */

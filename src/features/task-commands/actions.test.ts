@@ -1080,7 +1080,62 @@ describe("fault mapping (2E-UX-002)", () => {
     const state = await startTaskCommand(idleTaskCommandState, form({ commandText: "mark the report as done" }));
     expect(state.status).toBe("resolved");
     expect(state.retryable).toBe(true);
-    expect(state.reason).toBe("Something went wrong and nothing was changed. Try again.");
+    /*
+     * `2P-CHAT-003`. The sentence is unchanged and now carries a reference.
+     *
+     * The assertion was `toBe(sentence)`. It is split in two deliberately: the
+     * honest sentence must still be exactly what it was — this is not the place
+     * to reword a refusal — and a correlation id must follow it, because a
+     * failure the owner cannot name is a failure nobody can look up. Asserting
+     * the whole string would pin a random UUID; asserting only the prefix would
+     * let the reference silently disappear.
+     */
+    expect(state.reason).toMatch(/^Something went wrong and nothing was changed\. Try again\. /);
+    expect(state.reason).toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
+  it("records an UNDECLARED fault and renders it instead of throwing out of the action", async () => {
+    /*
+     * `2P-CHAT-001`. The regression this locks.
+     *
+     * `guard` used to be `if (!known) throw error;` — the four declared
+     * precondition classes were rendered and every other thrown value escaped
+     * the Server Action onto the app error boundary, taking the user's pending
+     * command with it. Because the default Conversation route runs
+     * `runTaskCommand` before the knowledge path, that was the mechanism behind
+     * the generic screen slice 2P.0 was asked to classify.
+     *
+     * A plain `Error` is exactly the case the old code rethrew, so this test
+     * fails against the old implementation rather than merely describing the new
+     * one.
+     */
+    const bench = harness();
+    provider(modelProposal());
+    // A rejected candidate query, which is neither of the four declared classes.
+    // The sink's own RPC keeps working, so the row is still written.
+    const client = bench.client as { rpc: ReturnType<typeof vi.fn> };
+    // `getMockImplementation` widens to a call/construct union; the harness
+    // installs a plain async function and this narrows back to it.
+    const passthrough = client.rpc.getMockImplementation() as (
+      fn: string,
+      args: Record<string, unknown>,
+    ) => Promise<unknown>;
+    client.rpc.mockImplementation(async (fn: string, args: Record<string, unknown>) => {
+      if (fn === "list_task_command_candidates") throw new Error("an undeclared fault nobody named");
+      return passthrough(fn, args);
+    });
+
+    const state = await startTaskCommand(idleTaskCommandState, form({ commandText: "mark the report as done" }));
+    expect(bench.rpcCalls.map((call) => call.fn)).toContain("record_error_event");
+    expect(state.status).toBe("resolved");
+    expect(state.retryable).toBe(true);
+    expect(state.reason).toMatch(
+      /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    // The thrown message must not reach the owner (`T-11`).
+    expect(state.reason).not.toContain("undeclared fault nobody named");
   });
 
   it("refuses an unknown intent instead of falling through to a branch", async () => {

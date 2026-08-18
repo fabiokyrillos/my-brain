@@ -13,17 +13,37 @@ export default function AppError({
 }) {
   const pt = typeof window === "undefined" || !window.location.pathname.startsWith("/en/");
 
-  // There is no error sink in this product yet (H7 remains open in docs/TODO.md).
-  // Until there is, this boundary must simply stop claiming the failure was
-  // recorded — the previous copy promised exactly that while discarding the
-  // `error` prop entirely.
-  //
-  // Being precise about what this line is worth: an error boundary is a Client
-  // Component, so it reaches the BROWSER console, never a host log. And for an
-  // error thrown in a Server Component, Next replaces `error.message` with a
-  // generic string in production and exposes only `error.digest` to correlate
-  // with the server-side log. So the digest is the only durable value here, and
-  // it is the one thing shown to the user to quote.
+  /*
+   * `2P-CHAT-003`. What this boundary can and cannot claim, corrected.
+   *
+   * The comment here used to assert that the product had no error sink at all,
+   * and pointed at an open backlog item for one. That stopped being true in
+   * Phase 2H — `public.error_events` shipped in `202608070080` — and slice 2P.0
+   * found the claim still standing, which made it the oldest false statement on
+   * this screen. It is deliberately paraphrased rather than quoted here:
+   * `phase-2p-foundation-guard.test.ts` asserts the exact sentence is gone, and
+   * a comment reciting it would keep that guard failing forever on correct code.
+   *
+   * The sink is real, and **this component still cannot reach it.** An error
+   * boundary is a Client Component: the `console.error` below reaches the
+   * BROWSER console and no host log, and a browser-initiated sink write would
+   * need a route handler that any page could call, which is a wider surface than
+   * this screen is worth. So the honest division is:
+   *
+   * - a fault a **Server Action** can catch is recorded server-side with a
+   *   correlation id the surface quotes — `sendChatMessage` and the task-command
+   *   `guard` both do that now, and between them they cover the faults that used
+   *   to arrive here;
+   * - a fault that reaches **this** boundary was thrown during render, and its
+   *   only durable identifier is `error.digest`, which Next generates precisely
+   *   so a generic client-side message can be correlated with the server log.
+   *   Next replaces `error.message` in production, so the digest is genuinely
+   *   all there is.
+   *
+   * The digest is therefore still the one value shown, and this boundary still
+   * does not claim the failure was recorded — because for a render-time fault,
+   * it was not.
+   */
   useEffect(() => {
     console.error(
       JSON.stringify({

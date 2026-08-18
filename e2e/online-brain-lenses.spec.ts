@@ -23,9 +23,19 @@ import { onlineEnvironment, signInOnline } from "./support/online-session";
 
 const EMAIL = process.env.ONLINE_AUTH_TEST_EMAIL ?? "";
 
-/** The nine, in the strip's own order — the overview first. */
+/**
+ * The nine, in the strip's own order — the overview first, then Conversar.
+ *
+ * `2P-CHAT-004` (`OD-2P-7`) moved Conversar from last to first among the
+ * domains. This list is hand-written because the spec runs in a browser and
+ * cannot import the registry, so it has to be kept in step deliberately — and
+ * the panel test below now derives its destination from `DOMAINS[0]` rather than
+ * naming a route, so the next reorder cannot leave a passing-looking assertion
+ * waiting on a URL the product no longer navigates to.
+ */
 const LENSES = [
   { route: "library", label: "Visão geral" },
+  { route: "chat", label: "Conversar" },
   { route: "people", label: "Pessoas" },
   { route: "projects", label: "Projetos" },
   { route: "organizations", label: "Empresas" },
@@ -33,8 +43,10 @@ const LENSES = [
   { route: "memories", label: "Memórias" },
   { route: "files", label: "Arquivos" },
   { route: "relations", label: "Relações" },
-  { route: "chat", label: "Conversar" },
 ] as const;
+
+/** The eight the overview draws a panel for: every lens but the overview itself. */
+const DOMAINS = LENSES.slice(1);
 
 test.describe("Brain's lenses are one space", () => {
   test.skip(!onlineEnvironment.configured || !EMAIL, "linked Supabase credentials or ONLINE_AUTH_TEST_EMAIL absent");
@@ -94,10 +106,18 @@ test.describe("Brain's lenses are one space", () => {
     const panels = page.locator(".brain-domain");
     // Eight domains, one panel each. A page that rendered none would satisfy
     // every per-panel assertion below by never running one.
-    await expect(panels).toHaveCount(LENSES.length - 1);
+    await expect(panels).toHaveCount(DOMAINS.length);
 
+    /*
+     * Derived, not named. This asserted `/app/people` because People was the
+     * first domain; `2P-CHAT-004` made Conversar first, and the hardcoded URL
+     * would have left this waiting thirty seconds for a navigation the product
+     * no longer performs — in a lane CI does not run, so nothing would have said
+     * so until someone ran it by hand.
+     */
+    const first = DOMAINS[0]!;
     await panels.first().getByRole("link").first().click();
-    await page.waitForURL(/\/app\/people$/, { timeout: 30_000 });
+    await page.waitForURL(new RegExp(`/app/${first.route}$`), { timeout: 30_000 });
     await expect(page.locator("h1")).toBeVisible();
   });
 });

@@ -2,6 +2,38 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Slice 2P.2: Conversation repaired at the boundary that was broken, and every failure made nameable
+
+- `2P-CHAT-001` … `-007`. **Zero migrations**; 97 local = 97 hosted, parity
+  `202608160097` unchanged. No provider call and no BYOK spend.
+- Root cause was not the provider. `guard()` in `task-commands/actions.ts`
+  rethrew every undeclared fault, and the default Conversation route runs
+  `runTaskCommand` first, so it escaped onto the app error boundary and took the
+  pending command with it. `guard` now calls `unstable_rethrow` first, records one
+  `error_events` row, and renders the unchanged refusal plus its correlation id.
+  Proved by restoring the old branch: exactly the new test failed.
+- New `features/chat/diagnostics.ts` maps the sink's fourteen reasons onto five
+  distinct recovery classes plus an honest `unexpected`, as a `Record` so a new
+  reason is a type error rather than a silent fallthrough. `provider_rate_limited`
+  is deliberately not `quota`. `answerUnavailable` deleted.
+- `sendChatMessage` records on the gate, embedding and answer paths, with
+  `embed_text` and `chat_answer` distinguished. Its `console.error` no longer
+  prints `error.message`. `record_error_event` was verified hosted first: granted
+  to `authenticated`, definer, stamps `user_id = auth.uid()`, and has no
+  free-text column — so `T-11` closes by construction.
+- `error.tsx` stops claiming the product has no error sink, false since
+  `202608070080`.
+- Conversas becomes the first Brain domain lens (`OD-2P-7`), with `overview`
+  still at position zero and every href unchanged. The requirement's word
+  "remains" was inaccurate: chat was last, by a deliberate prior decision.
+- New contextual entry into a conversation on the person, project, organization
+  and context workspaces, carrying `type:id` only — the name is re-read under RLS
+  at render time, so no copy travels and an unowned id renders as absent.
+- Two named remainders, neither absorbed: `2P-CHAT-004-MOBILE` (no mobile bar
+  slot; the fifth slot frees only when the account menu reaches the mobile
+  header — slice 2P.5) and `2P-CHAT-007-JOURNEY` (browser journeys NOT EXECUTED —
+  slice 2P.8 plus an owner decision on spending one live answered turn).
+
 ## 2026-08-18 - Phase 2P implementation authorized (ADR-122); slice 2P.0 measures both broken loops
 
 - ADR-122 authorizes slices 2P.0 … 2P.8 over the package ADR-121 accepted.

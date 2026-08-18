@@ -1,3 +1,4 @@
+import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
 import { ArrowLeft, FolderKanban } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
@@ -326,7 +327,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="content-page entity-workspace">
-      <Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{copy.allProjects}</Link>
+      <div className="entity-workspace-actions">
+        <Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{copy.allProjects}</Link>
+        {/* `2P-CHAT-005`. See the person workspace for why only `project:<id>` travels. */}
+        <AskAboutLink locale={locale} name={project.name} about={{ type: "project", id: project.id }} />
+      </div>
 
       <header className="entity-hero">
         <FolderKanban size={28} />

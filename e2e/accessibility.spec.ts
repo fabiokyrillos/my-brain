@@ -254,8 +254,19 @@ function searchSurface() {
  * three times.
  */
 function brainSurface() {
+  /*
+   * `2P-CHAT-004`. Conversar moved to the front of the domains, and this
+   * hand-written fixture is updated with it.
+   *
+   * The axe scan does not care about order, so this would **not** have failed —
+   * which is exactly why it is worth changing. A fixture that quietly stops
+   * describing the surface it stands in for is the shape of defect this suite has
+   * already been bitten by twice: the lane keeps passing while it measures
+   * something the product no longer renders.
+   */
   const lenses = [
     "Visão geral",
+    "Conversar",
     "Pessoas",
     "Projetos",
     "Empresas",
@@ -263,7 +274,6 @@ function brainSurface() {
     "Memórias",
     "Arquivos",
     "Relações",
-    "Conversar",
   ];
   const strip = `<nav class="brain-lenses" aria-label="Lentes do Brain">`
     + lenses

@@ -47,6 +47,7 @@ export function AssistantComposer({
   locale,
   agentName,
   conversationId,
+  initialText,
 }: {
   action: AssistantComposerAction;
   /**
@@ -65,6 +66,19 @@ export function AssistantComposer({
   /** The assistant’s configured name (UX-06). Passed in, never read here: this is a client component. */
   agentName: string;
   conversationId?: string;
+  /**
+   * `2P-CHAT-005`. A starting sentence, seeded on first mount only.
+   *
+   * Set when the owner arrived from a contextual page through "ask about this".
+   * It is **a seed, not a submission**: the field is still uncontrolled, the
+   * owner edits or clears it, and only an explicit send does anything — the same
+   * rule the capture composer follows for a transcript.
+   *
+   * Seeding stops the moment a turn resolves, which is what `state.route` gates
+   * below. Without that, a failed turn would restore the owner's own text from
+   * `echo` and then a re-render would put the seed back over it.
+   */
+  initialText?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, idleAssistantComposerState);
   const copy = getAssistantCopy(locale);
@@ -108,6 +122,18 @@ export function AssistantComposer({
     : null;
 
   /**
+   * `2P-CHAT-005`. The seed, and why it is `idle`-only.
+   *
+   * `idle` is the one route that means "nothing has been submitted yet". On every
+   * other route the owner has acted, and re-seeding would either overwrite the
+   * text a failed turn just restored or refill a field they deliberately
+   * emptied. Ordered *after* `restored` in the value below for the same reason:
+   * a restored echo is the owner's own words and always wins.
+   */
+  const seeded = state.route === "idle" && initialText ? initialText : null;
+  const initial = restored ?? seeded ?? "";
+
+  /**
    * Enter sends; Shift+Enter breaks the line.
    *
    * `isComposing` is the correctness part rather than a nicety: an IME is
@@ -145,10 +171,16 @@ export function AssistantComposer({
         <div className="assistant-composer-row">
           <textarea
             aria-describedby={hintId}
-            defaultValue={restored ?? ""}
+            defaultValue={initial}
             disabled={pending}
             id={fieldId}
-            key={restored === null ? "empty" : `restored:${restored.length}:${state.route}`}
+            key={
+              restored !== null
+                ? `restored:${restored.length}:${state.route}`
+                : seeded !== null
+                  ? `seeded:${seeded.length}`
+                  : "empty"
+            }
             maxLength={12000}
             name="composerText"
             onKeyDown={onKeyDown}

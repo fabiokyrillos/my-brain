@@ -24,11 +24,18 @@
  *    `buildTaskCommandPreview`'s `expected`. Without it 2E-PREVIEW-006 is
  *    structurally unreachable and the apply silently recompute-and-applies,
  *    which PRD §12.6 forbids by name.
- * 4. **Nothing throws out of a Server Action.** `creation.ts`,
- *    `confirmation.ts`, `apply.ts` and `candidates.ts` all signal precondition
- *    faults by throwing; an uncaught one drops the user's pending command,
- *    which 2E-UX-002 forbids. `guard` maps every one of them onto a rendered
- *    state.
+ * 4. **Nothing throws out of a Server Action**, and since Phase 2P slice 2P.2
+ *    that is finally true. `creation.ts`, `confirmation.ts`, `apply.ts` and
+ *    `candidates.ts` all signal precondition faults by throwing; an uncaught one
+ *    drops the user's pending command, which 2E-UX-002 forbids. `guard` mapped
+ *    the four declared classes onto a rendered state and **rethrew everything
+ *    else** — so this property held for the faults it named and failed for the
+ *    ones it did not. Slice 2P.0 measured where that landed: the default
+ *    Conversation route runs `runTaskCommand` first, so an undeclared fault
+ *    escaped onto the app error boundary, whose only record is a browser
+ *    console line. `guard` now records every thrown value to `error_events` and
+ *    renders a refusal carrying its correlation id, and rethrows only Next's own
+ *    control flow (`unstable_rethrow`), which must never be caught.
  *
  * The timezone comes from `profiles.timezone` server-side and never from the
  * envelope (2E-I18N-002). A client-supplied zone would decide what "next
@@ -37,9 +44,12 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { unstable_rethrow } from "next/navigation";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
+
+import { classifyError, recordErrorEvent } from "@/lib/observability/error-sink";
 
 import { getByokCopy } from "@/features/byok/copy";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
@@ -277,21 +287,71 @@ function emit(
  * something to put in front of a user, and both are already the message of a
  * server-side throw that logging will capture.
  */
-function guard(
+async function guard(
   error: unknown,
-  copy: TaskCommandCopy,
+  context: Pick<CommandContext, "supabase" | "copy">,
   session: TaskCommandSession | null,
-): TaskCommandConsoleState {
+): Promise<TaskCommandConsoleState> {
+  /*
+   * `2P-CHAT-001`. Framework control flow first, at the top of the block.
+   *
+   * `redirect()` and `notFound()` signal by throwing, and this function now
+   * answers *every* thrown value rather than four declared classes. Without
+   * this line, a `redirect()` raised anywhere under a command round — the
+   * lifecycle gate being the obvious future one — would be quietly converted
+   * into a rendered refusal, and the navigation would simply never happen. Next
+   * documents `unstable_rethrow` for exactly this position.
+   */
+  unstable_rethrow(error);
+
+  const { copy } = context;
   const known =
     error instanceof TaskCommandApplyError
     || error instanceof TaskCandidateQueryError
     || error instanceof TaskMatchInputError
     || error instanceof TaskPreviewInputError;
-  if (!known) throw error;
+
+  /*
+   * `2P-CHAT-001`, `2P-CHAT-003`. The rethrow is gone, and this is why.
+   *
+   * This branch used to be `if (!known) throw error;`, which contradicted
+   * property 4 at the top of this module — *"Nothing throws out of a Server
+   * Action"* — for every fault the four classes above do not name. Slice 2P.0
+   * measured the consequence: the default Conversation route runs
+   * `runTaskCommand` *before* the knowledge path, so an undeclared fault
+   * escaped `runAssistantTurn`, React rendered the app error boundary, and the
+   * user's pending command was gone. That boundary is a Client Component whose
+   * only record is a browser `console.error`, so the failure reached no server
+   * log either. The generic screen was the entire artifact.
+   *
+   * An undeclared fault is still a caller defect and still must be findable, so
+   * it is **recorded rather than rethrown**: one `error_events` row, classified
+   * by the sink's own classifier, with a correlation id the surface can quote.
+   * The four declared classes keep their existing rendered outcome exactly, and
+   * are recorded too — a precondition fault nobody can count is a precondition
+   * fault nobody fixes.
+   *
+   * The thrown value is still not echoed. `TaskCandidateQueryError` carries a
+   * column path and `TaskCommandApplyError` a bound; neither belongs in front of
+   * a user, and `error_events` has no column that could hold either.
+   */
+  const reason = classifyError(error);
+  const { correlationId } = await recordErrorEvent(context.supabase, {
+    surface: "server_action",
+    operation: "other",
+    reason,
+  });
+  console.error("Task command precondition failed", { known, reason, correlationId });
+
   return resolved({
     heading: copy.outcomes.refused.title,
     detail: copy.outcomes.refused.description,
-    reason: copy.console.unexpected,
+    /*
+     * The reason line gains the reference and nothing else. `console.unexpected`
+     * is the same honest sentence it has always been; what changes is that the
+     * owner can now name the failure they hit when they report it.
+     */
+    reason: `${copy.console.unexpected} ${correlationId}`,
     session: session === null ? null : serializeTaskCommandSession(session),
     retryable: true,
   });
@@ -926,7 +986,7 @@ export async function startTaskCommand(
     try {
       return (await createIntentRound(context, session)).state;
     } catch (error) {
-      return guard(error, copy, session);
+      return guard(error, context, session);
     }
   }
   if (normalized.kind === "unsupported") {
@@ -957,7 +1017,7 @@ export async function startTaskCommand(
   try {
     return (await runCommandRound(context, session)).state;
   } catch (error) {
-    return guard(error, copy, session);
+    return guard(error, context, session);
   }
 }
 
@@ -995,7 +1055,7 @@ export async function selectTaskCommandCandidate(
     );
     return round.state;
   } catch (error) {
-    return guard(error, context.copy, session);
+    return guard(error, context, session);
   }
 }
 
@@ -1119,7 +1179,7 @@ async function writeRound(
     }
     return presentFailure(context, session, applied);
   } catch (error) {
-    return guard(error, context.copy, session);
+    return guard(error, context, session);
   }
 }
 
@@ -1166,7 +1226,7 @@ export async function clarifyTaskCommand(
   try {
     return (await runCommandRound(context, session)).state;
   } catch (error) {
-    return guard(error, context.copy, session);
+    return guard(error, context, session);
   }
 }
 
@@ -1242,7 +1302,7 @@ export async function editTaskCommand(
   try {
     return (await runCommandRound(context, edited)).state;
   } catch (error) {
-    return guard(error, context.copy, edited);
+    return guard(error, context, edited);
   }
 }
 
@@ -1328,7 +1388,7 @@ export async function createTaskFromCommand(
       terminal: true,
     });
   } catch (error) {
-    return guard(error, context.copy, session);
+    return guard(error, context, session);
   }
 }
 
@@ -1580,7 +1640,7 @@ export async function restoreCancelledTask(
   try {
     return (await runCommandRound(context, session, { selectedTaskId: taskId.data })).state;
   } catch (error) {
-    return guard(error, context.copy, session);
+    return guard(error, context, session);
   }
 }
 

@@ -1,3 +1,4 @@
+import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
 import { ArrowLeft, UserRound } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
@@ -370,7 +371,15 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
 
   return (
     <div className="content-page entity-workspace">
-      <Link className="back-link" href={`/${locale}/app/people`}><ArrowLeft size={16} />{pt ? "Pessoas" : "People"}</Link>
+      <div className="entity-workspace-actions">
+        <Link className="back-link" href={`/${locale}/app/people`}><ArrowLeft size={16} />{pt ? "Pessoas" : "People"}</Link>
+        {/*
+          `2P-CHAT-005`. Asking about this person, from this person's page.
+          Carries `person:<id>` and nothing else — the name is re-read on the
+          conversation surface under RLS, so no copy of it travels in a URL.
+        */}
+        <AskAboutLink locale={locale} name={person.name} about={{ type: "person", id: person.id }} />
+      </div>
 
       <header className="entity-hero">
         <UserRound size={28} />
