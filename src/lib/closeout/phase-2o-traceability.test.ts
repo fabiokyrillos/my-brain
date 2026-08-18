@@ -36,8 +36,10 @@ import {
   evidenceWithoutSubject,
   namesDestination,
   normalizeClass,
+  normalizeNewlines,
   readRowKey,
   remainderIsVacuous,
+  render,
   resolveClassifications,
 } from "../../../scripts/generate-phase-2o-traceability.mjs";
 
@@ -438,6 +440,40 @@ describe("the repository itself — the positive control", () => {
     for (const entry of result.resolved.values()) {
       expect(CLASSES).toContain(entry.classification);
     }
+  });
+
+  it("matches its sources through --check, on a working copy git may have converted", () => {
+    /*
+     * The gap that let a real defect through. This suite asserted the matrix
+     * *contained* some markers, which is not what `--check` does — `--check`
+     * compares the whole document, and it was comparing raw bytes.
+     *
+     * The repository stores LF and the generator writes LF, but `core.autocrlf`
+     * checks the file out with **CRLF on Windows**, so `--check` refused a tree
+     * that was completely correct and passed in CI, where nothing converts. It
+     * only surfaced when `--check` ran after a `git checkout` rather than after
+     * the generator's own write.
+     *
+     * Both directions, because normalising is a narrowing and a narrowing needs
+     * a control: a CRLF copy of the right document matches, and a copy with one
+     * real change does not.
+     */
+    const rendered = render(audit());
+    const asCheckedOutOnWindows = rendered.replace(/\n/g, "\r\n");
+
+    expect(normalizeNewlines(asCheckedOutOnWindows)).toBe(normalizeNewlines(rendered));
+
+    const handEdited = rendered.replace("| `built` | 106 |", "| `built` | 107 |");
+    expect(handEdited, "the control must actually change the document").not.toBe(rendered);
+    expect(normalizeNewlines(handEdited)).not.toBe(normalizeNewlines(rendered));
+  });
+
+  it("still refuses a matrix whose content moved, whatever its line endings", () => {
+    // The narrowing must not become "any difference is a line ending".
+    const rendered = render(audit());
+    const plantedRow = "| `2O-GHOST-001` | `built` | 2O.8 | planted |";
+    const reordered = `${rendered.replace(/\n/g, "\r\n")}${plantedRow}\r\n`;
+    expect(normalizeNewlines(reordered)).not.toBe(normalizeNewlines(rendered));
   });
 
   it("keeps the generated matrix in step with its sources", () => {

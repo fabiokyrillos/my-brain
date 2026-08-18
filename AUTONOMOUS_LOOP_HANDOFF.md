@@ -8533,3 +8533,32 @@ authorized successor.
 failing gates and two unsigned ones, and the rollout script has no path that
 reports otherwise. What the next unit is, and whether it opens anything, is the
 owner's decision and belongs in its own ADR.
+
+### Addendum — a fifth defect, found by running `--check` on `main` after the merge
+
+The closeout's own `--check` **refused a completely correct tree**, and it did so
+only after a `git checkout`.
+
+The repository stores LF and the generator writes LF, but `core.autocrlf` checks
+the file out with **CRLF on Windows**. `--check` compared **raw bytes**, so it
+compared the generator's LF output against a CRLF working copy and refused. **CI
+was green throughout and correctly so** — nothing converts on Linux, and the
+committed content was right the whole time.
+
+It hid for the same reason the fourth defect hid: **the guard asserted the wrong
+thing.** It checked that the matrix *contained* some markers, which is not what
+`--check` does. Nothing exercised the comparison itself, so the one behaviour
+that could fail on a correct tree was the one behaviour untested.
+
+**A gate that fails on correct code is the one that gets weakened later**, and
+the temptation here was concrete: regenerating clears the refusal, rewrites the
+file as LF, and leaves the working tree looking dirty against a checkout git
+considers identical — which teaches the next reader that the check is noise.
+
+The comparison now normalises line endings, which narrows it to exactly what is
+committed, and the guard proves the narrowing in **both** directions: a CRLF copy
+of the right document matches, and a document with one changed count does not.
+
+**Three of this closeout's five defects were in the machinery that checks the
+work rather than in the work.** That ratio is the thing to carry, not any one of
+them.
