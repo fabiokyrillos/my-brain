@@ -2,6 +2,74 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Phase 2O closeout: readiness, telemetry, security, traceability
+
+**`2O-READY-001` … `-005`, `2O-METRICS-001` … `-005`, `2O-SEC-001` … `-005`,
+`2O-CLOSE-001` … `-004`. PHASE 2O IS COMPLETE — 116 declared, 116 classified,
+0 undelivered. ZERO migrations for the whole phase; 97 local = 97 hosted, parity
+`202608160097`. Both allocations close unspent. Signup closed, rollout gate
+25 · 3 · 2, unchanged.**
+
+Final counts, re-derived from the generated matrix rather than transcribed:
+**106 built · 3 baseline · 2 partial · 5 not-built-by-rule · 0 undelivered.**
+
+The full account is `docs/reports/phase-2o/PHASE_2O_CLOSING_REPORT.md` and
+`..._SLICE_08_ACCEPTANCE.md`; this entry records the change rather than
+duplicating it.
+
+### Added
+
+- `scripts/generate-phase-2o-traceability.mjs` — the fail-closed traceability
+  generator, with a `--check` mode that compares the committed matrix against
+  its sources byte for byte. It reads the PRD for what was declared and the
+  eight acceptance records for what was evidenced, tolerates the four row shapes
+  the records actually use, and refuses rather than writing a partial matrix.
+- `src/lib/closeout/phase-2o-traceability.test.ts` — the mutation proof. Each
+  refusal gets a planted defect in a disposable copy of the tree, plus a
+  positive control asserting the real inputs still pass. It locks the five
+  counts every other document must re-derive.
+- `npm run docs:phase-2o:traceability`.
+- `docs/reports/phase-2o/PHASE_2O_TRACEABILITY_MATRIX.md` — **generated**,
+  carrying `Do not edit by hand`.
+- `docs/reports/phase-2o/PHASE_2O_READINESS_DOSSIER.md` — the rollout gate's own
+  output transcribed whole, with the five unsatisfied gates restated and their
+  actors named.
+- `docs/reports/phase-2o/PHASE_2O_SLICE_8_M1_VERDICT.md` — the measurement that
+  closes M1 unspent: five activation questions written before any event name,
+  the producer searched for and absent, the consumer searched for and absent.
+- `docs/reports/phase-2o/PHASE_2O_SECURITY_DISPOSITION.md` — the threat model
+  executed against the tree the phase leaves; sixteen threats disposed.
+- `docs/reports/phase-2o/PHASE_2O_CLOSING_REPORT.md` and
+  `..._SLICE_08_ACCEPTANCE.md`.
+
+### Changed
+
+- **ADR-120** corrects `2O-NOTIFY-005` in place: the product has no
+  important-reminder override, quiet hours always wins, the daily cap continues
+  to apply, and the surface states the absence explicitly — which it already did
+  in both locales. The identifier is unchanged, **nothing was renumbered**, and
+  the superseded sentence is quoted beneath the new one in the PRD.
+- `docs/reports/phase-2o/PHASE_2O_TRACEABILITY_CONTRACT.md` §3.1 records the
+  correction as a governance event; slices 2O.6's and 2O.7's acceptance records
+  are **untouched**, following ADR-119's pattern.
+- `2O-PREF-002` is adjudicated from `partial` to **built**. Its remainder — the
+  account's own acceptance history had no surface — closed in slice 2O.5, which
+  mounted `ConsentSection` on Ajustes at `settings/page.tsx:180`, and no record
+  re-classified it. Verified in the tree rather than read off the claim.
+
+### Not changed, deliberately
+
+- **No migration.** The phase ends with zero; a third was a stop condition and
+  never came near firing.
+- **No telemetry event, no producer, no vocabulary widening.** The
+  `product_events` vocabulary stands at 39 names, and its hosted check
+  constraint and TypeScript contract were verified identical.
+- **Signup, the rollout gate, `config.toml`, secrets and the CSP** — untouched.
+  No gate closed by writing a file.
+- **`2O-ACCESS-006` not promoted.** The screen-reader session is `NOT EXECUTED`.
+- **A13 not retargeted**, and the roadmap successor is re-audited and not
+  started.
+
 ## 2026-08-18 - Slice 2O.7: mobile activation and accessibility
 
 **`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` … `-006` — 10 built, 1 partial, 0
