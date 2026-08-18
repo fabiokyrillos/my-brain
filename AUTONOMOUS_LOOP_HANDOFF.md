@@ -8100,7 +8100,7 @@ regression on either is caught by CI rather than by the owner.
 
 ## §86 — Slice 2O.7 ships, and measuring a rendered page found six defects no other gate can see (2026-08-18)
 
-PR **#248**, merged at **`MERGE_SHA`**; head at merge **`HEAD_SHA`**, **CI green
+PR **#248**, merged at **`d35fb2e`**; head at merge **`89c338f`**, **CI green
 on all three job families on the head**. `main` local equals `origin/main`,
 worktree clean, no open PR.
 
