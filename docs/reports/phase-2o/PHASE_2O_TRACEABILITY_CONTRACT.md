@@ -242,6 +242,29 @@ At closeout every one of the 116 requirements takes exactly one:
 closeout produced two and had to be corrected the same day; the generator has
 refused them since.
 
+### 3.1 One requirement was corrected in place at closeout, and none was renumbered
+
+**`2O-NOTIFY-005` described a capability the product has never had.** It asked
+for an *important-reminder override* to be stated where consent is given; slice
+2O.6 went looking for the object and found none, and `decideDelivery` refuses
+inside quiet hours with no exemption for type, priority or urgency.
+
+**ADR-120 corrects the requirement rather than building the capability**, which
+is the direction this contract has taken every time the two disagreed. The
+identifier keeps its number and its position, the superseded sentence is quoted
+beneath the new one, and the classification is re-derived from the corrected
+rule and the real evidence — closing `built`, as slice 2O.6 had it, but now
+`built` against a requirement that asks for what the product does.
+
+**Neither slice 2O.6's nor slice 2O.7's acceptance record is edited.** A record
+states what was true when it was written, and rewriting one to agree with a
+later decision destroys the only evidence of what was believed at the time. The
+correction is recorded in slice 2O.8's record instead — the pattern ADR-119 set
+for `2O-PRIVACY-001`, applied a second time.
+
+**This is not a renumbering and does not move the total.** 116 declared before
+the correction, 116 after, asserted by the generator on every run.
+
 ---
 
 ## 4. What a correct close looks like

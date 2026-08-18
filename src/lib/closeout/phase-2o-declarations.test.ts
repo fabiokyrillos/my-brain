@@ -642,6 +642,11 @@ describe("Phase 2O: every delivered slice leaves an acceptance record", () => {
       "PHASE_2O_SLICE_01_ACCEPTANCE.md",
       "PHASE_2O_SLICE_02_ACCEPTANCE.md",
       "PHASE_2O_SLICE_03_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_04_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_05_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_06_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_07_ACCEPTANCE.md",
+      "PHASE_2O_SLICE_08_ACCEPTANCE.md",
     ];
     for (const record of DELIVERED) {
       expect(reports, `a delivered slice left no acceptance record: ${record}`).toContain(record);
@@ -654,18 +659,56 @@ describe("Phase 2O: every delivered slice leaves an acceptance record", () => {
       .toHaveLength(1);
   });
 
-  it("carries no matrix, closing report or deployment record while the phase is mid-flight", () => {
-    // The half of the old refusal that is still live, and the one Phase 2M's
-    // guard was built for. It inverts at closeout, in 2O.8's own commit.
+  it("carries the closing artifacts now that the phase has closed, and still no deployment record", () => {
+    /*
+     * **Inverted here, in slice 2O.8's own commit**, exactly as the traceability
+     * contract said it would be: *"the phase-closing artifacts stay refused
+     * until 2O.8 … that half inverts in 2O.8's own commit."*
+     *
+     * The refusal was correct for as long as eight slices were unbuilt — a
+     * matrix mid-flight is a phase claiming to be finished. All nine have
+     * shipped, so the **absence** of the matrix and the closing report is now
+     * the defect, and requiring their absence would force the guard to deny a
+     * delivery the owner authorized. This is the same assertion moving with the
+     * facts that `R-2O-7`, `R-2O-8` and the milestone line have each made.
+     *
+     * *Superseded form, retained rather than deleted: "carries no matrix,
+     * closing report or deployment record while the phase is mid-flight" —
+     * asserting `[/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]`
+     * each matched nothing.*
+     *
+     * **The deployment record does not invert, and its reason changed.** It was
+     * refused because the phase was mid-flight; it stays refused because
+     * **Phase 2O created zero migrations and deployed nothing**. A deployment
+     * record here would describe a deployment that never happened, which is a
+     * worse artifact than a missing one. That refusal is now permanent for this
+     * phase rather than conditional on its progress.
+     */
     const directory = join(REPO, "docs", "reports", "phase-2o");
     const reports = existsSync(directory) ? readdirSync(directory) : [];
-    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
-      const offenders = reports.filter((name) => forbidden.test(name));
-      expect(offenders, `a phase-closing artifact exists mid-flight: ${offenders.join(", ")}`).toEqual([]);
+
+    for (const required of ["PHASE_2O_TRACEABILITY_MATRIX.md", "PHASE_2O_CLOSING_REPORT.md"]) {
+      expect(reports, `the closed phase left no ${required}`).toContain(required);
     }
-    // Non-vacuous: the filters really match the shapes they forbid.
-    expect(["PHASE_2O_TRACEABILITY_MATRIX.md"].filter((name) => /TRACEABILITY_MATRIX/i.test(name))).toHaveLength(1);
+
+    const deployments = reports.filter((name) => /DEPLOYMENT/i.test(name));
+    expect(deployments, `the phase deployed nothing, so a deployment record would be false: ${deployments.join(", ")}`)
+      .toEqual([]);
+
+    // Non-vacuous in both directions: the filter really matches the shape it
+    // forbids, and the listing really is a directory rather than an empty array.
     expect(["PHASE_2O_DEPLOYMENT_RECORD.md"].filter((name) => /DEPLOYMENT/i.test(name))).toHaveLength(1);
+    expect(reports.length).toBeGreaterThanOrEqual(9);
+  });
+
+  it("keeps the generated matrix generated, and never hand-written", () => {
+    // `2O-CLOSE-002`. The marker is what tells the next reader that editing this
+    // file is pointless — `--check` will overwrite the edit or fail the build.
+    const matrix = read("docs/reports/phase-2o/PHASE_2O_TRACEABILITY_MATRIX.md");
+    expect(matrix).toContain("Do not edit by hand");
+    expect(matrix).toContain("scripts/generate-phase-2o-traceability.mjs");
+    expect(matrix, "the phase closes with every declared requirement classified")
+      .toContain("**116 declared · 116 classified · 0 unclassified.**");
   });
 
   it("records ADR-118 as an accepted implementation authorization that names no successor", () => {
