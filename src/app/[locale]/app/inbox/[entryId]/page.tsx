@@ -15,10 +15,11 @@ import { loadEntryOutcomeProjection } from "@/features/daily-cycle/entry-outcome
 import { loadEntryReviewProjection } from "@/features/daily-cycle/review-projection";
 import { TechnicalDetails } from "@/features/daily-cycle/technical-details";
 import { loadEntryTechnicalDetailsProjection } from "@/features/daily-cycle/technical-details-projection";
-import { correctInterpretation, reprocessEntry, undoInterpretationCorrection } from "@/features/interpretations/actions";
+import { correctInterpretation, reprocessEntry, undoInterpretationCorrection, confirmInterpretation, undoInterpretationConfirmation } from "@/features/interpretations/actions";
 import { getInterpretationCopy } from "@/features/interpretations/copy";
 import { resolvePersonCandidates } from "@/features/interpretations/person-candidate-actions";
 import { PersonCandidateForm } from "@/features/interpretations/person-candidate-form";
+import { ConfirmationPanel } from "@/features/interpretations/confirmation-panel";
 import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/interpretations/revision-editor";
 import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
@@ -88,6 +89,20 @@ export default async function EntryDetailPage({
   const canCorrect = view.availableActions.some((action) => action.id === "correct_interpretation");
   const canUndoCorrection = view.availableActions.some((action) => action.id === "undo_correction");
   const canConfirmCandidates = view.availableActions.some((action) => action.id === "confirm_existing_candidates");
+  /*
+   * `2P-ATTENTION-004`. The panel below must never say "nothing left to
+   * decide" while something is. `list_needs_attention` resolves the status
+   * branch BEFORE `answer_existing_question`, so `attentionReason` alone
+   * cannot tell an unanswered question from a settled one -- and the
+   * interpretation JSON keeps a question after it is answered. The open
+   * count is therefore read from the table that actually holds the answer.
+   * RLS scopes it to the owner; the database contract refuses regardless.
+   */
+  const { count: openQuestionCount } = await supabase
+    .from("pending_questions")
+    .select("id", { count: "exact", head: true })
+    .eq("entry_id", entryId)
+    .eq("status", "open");
 
   const attentionReason = view.attentionItems[0]?.reason;
   const attentionDetail = attentionReason === "answer_existing_question"
@@ -157,6 +172,19 @@ export default async function EntryDetailPage({
           locale={locale}
           operationKey={randomUUID()}
           undoAction={undoAgentAction}
+        />
+      )}
+      {!editableCurrent.isRecordOnly
+        && attentionReason === "review_interpretation"
+        && !canConfirmCandidates
+        && pendingPersonCandidates.length === 0
+        && (openQuestionCount ?? 0) === 0 && (
+        <ConfirmationPanel
+          confirmAction={confirmInterpretation}
+          entryId={entryId}
+          interpretationId={editableCurrent.interpretationId}
+          locale={locale}
+          undoAction={undoInterpretationConfirmation}
         />
       )}
       {canCorrect && (

@@ -177,6 +177,13 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       "202608160095_entry_person_candidate_suggestions.sql",
       "202608160096_fix_person_candidate_fingerprint.sql",
       "202608160097_fix_person_candidate_undo_json_uuid.sql",
+      // Phase 2P slice 2P.1. Relevant to THIS guard: it registers no retention
+      // window, mints no retention value and schedules nothing. Its only
+      // durable new row is an `undo_operations` confirmation, which expires
+      // through that table's existing 24-hour default and is reaped by the
+      // sweep `202607250052` already ships -- a reused signed value, not a
+      // minted one.
+      "202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
     ]);
   });
 });

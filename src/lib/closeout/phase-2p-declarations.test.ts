@@ -125,14 +125,25 @@ describe("Phase 2P declarations", () => {
     expect(read("docs/DECISIONS.md")).toMatch(/remain \*\*forbidden until slice 2P\.8\*\*/);
   });
 
-  it("keeps every Phase 2P migration unspent", () => {
-    // Decision 3: no allocation has been authorized and spent. A migration
-    // named for this phase appearing here means one was created without one.
+  it("spends exactly the one migration slice 2P.1 was authorized", () => {
+    /*
+      Retargeted, not relaxed, and this is the passage 2P.0 built the pin for.
+
+      ADR-122 Decision 3 funded one conditional allocation and Decision 4
+      recorded that its condition failed, so before this slice the correct
+      assertion was "zero". The owner then issued a replacement authorization:
+      ONE migration for slice 2P.1, covering the twelve resolution functions
+      through a central re-derivation contract, written from nothing.
+
+      "Exactly one" is the whole point. A second Phase 2P migration is a stop
+      condition, and this is what makes it fail loudly rather than accumulate.
+    */
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2p/i.test(name))).toEqual([]);
-    // The rejected candidate is not copied forward under any name.
+    const phaseMigrations = migrations.filter((name) => /phase[_-]?2p/i.test(name));
+    expect(phaseMigrations).toEqual(["202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql"]);
+    // The rejected candidate is not copied forward under any name. Unchanged.
     expect(migrations.filter((name) => name.startsWith("202608170098"))).toEqual([]);
-    expect(migrations).toHaveLength(97);
+    expect(migrations).toHaveLength(98);
   });
 
   it("records the candidate as evaluated and rejected, not as pending", () => {

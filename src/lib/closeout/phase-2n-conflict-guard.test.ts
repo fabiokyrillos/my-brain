@@ -231,8 +231,9 @@ describe("the new reason is neither a producer without a consumer nor the revers
 describe("2N.4 spends no migration, no RPC and no new authority", () => {
   it("creates no migration", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((file) => file.endsWith(".sql"));
-    expect(migrations).toHaveLength(97);
-    expect(migrations[migrations.length - 1]).toBe("202608160097_fix_person_candidate_undo_json_uuid.sql");
+    // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
+    expect(migrations).toHaveLength(98);
+    expect(migrations[migrations.length - 1]).toBe("202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql");
     for (const file of migrations) {
       expect(file, "no migration may belong to this slice").not.toContain("phase_2n_slice_4");
     }

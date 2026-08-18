@@ -10,6 +10,7 @@ import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import type { RevisionActionState } from "./revision-editor";
+import type { ConfirmationActionState } from "./confirmation-panel";
 import { parseCorrectionFormData } from "./form-parser";
 import { buildCorrectionElementTrust } from "./trust-builders";
 import { getAgentName } from "@/features/profile/agent-identity";
@@ -172,4 +173,96 @@ export async function reprocessEntry(
 
   refreshEntry(locale.data, entryId.data);
   return { status: "success", message: getDailyCycleCopy(locale.data, await getAgentName()).messages.reprocessing_queued };
+}
+
+/**
+ * Slice 2P.1 — the owner's positive act on an interpretation that has nothing
+ * left to decide.
+ *
+ * There is no client-side status write and no second authority: this hands the
+ * decision to `confirm_entry_interpretation`, which re-derives the entry's
+ * lifecycle through the one central contract and refuses while any other
+ * decision remains. The action never invents a status of its own.
+ */
+export async function confirmInterpretation(
+  _state: ConfirmationActionState,
+  formData: FormData,
+): Promise<ConfirmationActionState> {
+  const entryId = uuidSchema.safeParse(formData.get("entryId"));
+  const interpretationId = uuidSchema.safeParse(formData.get("interpretationId"));
+  const operationKey = z.string().min(8).max(260).safeParse(formData.get("operationKey"));
+  const locale = localeSchema.safeParse(formData.get("locale"));
+  if (!entryId.success || !interpretationId.success || !operationKey.success || !locale.success) {
+    return {
+      status: "error",
+      message: localized(resolveLocale(formData.get("locale")), "Ação inválida.", "Invalid action."),
+    };
+  }
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
+  }
+  await assertActiveAccount(supabase, user.id, locale.data);
+
+  const { data, error } = await supabase.rpc("confirm_entry_interpretation", {
+    p_entry_id: entryId.data,
+    p_expected_interpretation_id: interpretationId.data,
+    p_operation_key: operationKey.data,
+  });
+  if (error) {
+    // 55P03 is the only refusal the owner can act on, and it means either the
+    // interpretation moved underneath them or a real decision is still open.
+    const stale = error.code === "55P03";
+    return {
+      status: "error",
+      message: stale
+        ? localized(locale.data, "Ainda há algo a decidir nesta entrada.", "Something here still needs a decision.")
+        : localized(locale.data, "Não foi possível confirmar.", "Could not confirm."),
+    };
+  }
+
+  const result = (data ?? {}) as { undoId?: string; status?: string };
+  // Deliberately NOT revalidating this entry's own page: refreshing the page
+  // the owner is standing on destroys the undo control before it can be
+  // pressed. The queue the entry has just left is refreshed; the terminal
+  // state is reported here.
+  revalidatePath(`/${locale.data}/app`);
+  revalidatePath(`/${locale.data}/app/inbox`);
+  return {
+    status: "success",
+    message: localized(locale.data, "Tudo resolvido nesta entrada.", "Everything here is resolved."),
+    undoId: typeof result.undoId === "string" ? result.undoId : undefined,
+  };
+}
+
+export async function undoInterpretationConfirmation(
+  _state: ConfirmationActionState,
+  formData: FormData,
+): Promise<ConfirmationActionState> {
+  const entryId = uuidSchema.safeParse(formData.get("entryId"));
+  const undoId = uuidSchema.safeParse(formData.get("undoId"));
+  const locale = localeSchema.safeParse(formData.get("locale"));
+  if (!entryId.success || !undoId.success || !locale.success) {
+    return {
+      status: "error",
+      message: localized(resolveLocale(formData.get("locale")), "Ação inválida.", "Invalid action."),
+    };
+  }
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { status: "error", message: localized(locale.data, "Sua sessão expirou.", "Your session expired.") };
+  }
+  await assertActiveAccount(supabase, user.id, locale.data);
+  const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
+  if (error) {
+    return { status: "error", message: localized(locale.data, "Não foi possível desfazer.", "Could not undo.") };
+  }
+  refreshEntry(locale.data, entryId.data);
+  return {
+    status: "success",
+    message: localized(locale.data, "Confirmação desfeita.", "Confirmation undone."),
+  };
 }

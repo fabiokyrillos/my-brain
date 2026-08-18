@@ -249,7 +249,8 @@ describe("2O-ACTIVATION-002 is absolute: the path stores no progress", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((name) =>
       name.endsWith(".sql"),
     );
-    expect(migrations).toHaveLength(97);
+    // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
+    expect(migrations).toHaveLength(98);
     expect(migrations.some((name) => /onboard/i.test(name))).toBe(false);
   });
 

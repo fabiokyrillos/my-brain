@@ -3097,6 +3097,14 @@ export type Database = {
         Args: { p_claim_token: string; p_user_id: string }
         Returns: Json
       }
+      confirm_entry_interpretation: {
+        Args: {
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
+        Returns: Json
+      }
       confirm_entry_task_candidates: {
         Args: {
           p_candidate_indexes: number[]

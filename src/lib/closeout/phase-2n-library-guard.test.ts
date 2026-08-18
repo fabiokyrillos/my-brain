@@ -175,9 +175,10 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     // M1 (`…0093`) and M3 (`…0094`) are spent and deployed; M2 is reserved for
     // 2N.7 and a fourth is a stop condition. So the newest migration in the tree
     // is still M3's.
-    expect(migrations.length).toBe(97);
+    // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
+    expect(migrations.length).toBe(98);
     expect(migrations.sort().at(-1)).toBe(
-      "202608160097_fix_person_candidate_undo_json_uuid.sql",
+      "202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
     );
   });
 

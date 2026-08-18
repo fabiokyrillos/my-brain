@@ -138,7 +138,8 @@ const REPO = resolve(__dirname, "../../..");
 // deletion `2N-CORRECT-012` forbids. Moved deliberately and visibly in the same
 // commit that adds the migration, which is the only way this pin is allowed to
 // change.
-const AUTHORIZED_MIGRATION_HEAD = "202608160097";
+// Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
+const AUTHORIZED_MIGRATION_HEAD = "202608180098";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
