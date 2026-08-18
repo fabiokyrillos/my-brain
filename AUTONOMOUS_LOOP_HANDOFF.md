@@ -8611,10 +8611,18 @@ candidate, never as delivered work. The three actions the plan names for reuse
 (`captureEntry`, `uploadAttachment`, `transcribeRecording`) exist under exactly
 those names.
 
-**One divergence was found and it is this section**: the durable handoff had no
-record of the authorization, against the precedent §37, §49 and §74 set for
-every prior planning authorization. Nothing else in the package needed
-correction.
+**Two divergences were found.** First, the durable handoff had no record of the
+authorization, against the precedent §37, §49 and §74 set for every prior
+planning authorization — this section is that correction. Second, **the
+retarget broke a guard the package never ran**: `phase-2o-declarations.test.ts`
+pins the A13 detector's target literally as proof the detector moved off 2O
+*in ADR-115's own commit*, and ADR-121's retarget moved the target again
+without passing through that pin — the full suite fails on it, and no CI ever
+ran on the branch because a branch push triggers none. The pin was updated to
+the current target and given its missing negative half (the detector never
+points back at 2O), so the next retarget must consciously pass through the
+same gate instead of discovering it the way this one did. Nothing else in the
+package needed correction.
 
 ### Open for the owner at the implementation checkpoint
 

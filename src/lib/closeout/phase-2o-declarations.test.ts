@@ -742,10 +742,21 @@ describe("Phase 2O: A13 has moved off this phase, in this same commit", () => {
     // the PRD and the plan above would each be signal 1 and every declared
     // requirement signal 2 — so this assertion and the package are the same
     // change by construction.
+    //
+    // ADR-115 moved the detector off 2O and onto this phase's then-unnamed
+    // successor, and this test pinned that target literally. ADR-121 then
+    // authorized that successor and moved the detector again, in its own
+    // commit, so the pin moves with it. The property this test holds forever
+    // is the negative half — the detector never points back at 2O — asserted
+    // explicitly below so the pin update can never satisfy this test by
+    // accident. The literal pin on the current target is kept deliberately:
+    // every future retarget must consciously pass through here, which is how
+    // this defect was caught when ADR-121's retarget missed it.
     const guard = read("src/lib/closeout/phase-2f-documentation.test.ts");
-    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2P_/);
-    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2P-/);
-    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2p\/i;/);
+    expect(guard).not.toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2O_/);
+    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2Q_/);
+    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2Q-/);
+    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2q\/i;/);
   });
 
   it("records Phase 2O's start as an authorization rather than an accident", () => {
