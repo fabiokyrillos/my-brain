@@ -2,6 +2,49 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-17 - Visual polish of the notifications page and the BYOK block (between slices 2O.6 and 2O.7)
+
+**Owner-requested, strictly visual. No requirement claimed, no slice advanced,
+zero migrations. 97 local = 97 hosted, parity `202608160097`. Signup closed,
+rollout gate unchanged at 25 · 3 · 2.**
+
+### The finding
+
+`.notification-settings`, `.push-controls`, `.push-preferences`,
+`.settings-section` and every `.byok-*` class had **no rule anywhere in the
+twenty-six stylesheets**, so both surfaces were drawn entirely by the
+user-agent default. Every reported symptom — checkboxes touching their labels,
+time fields with no shape, a save button with no more weight than the sentence
+beside it, and the BYOK status running into the keyed digest — follows from that
+one fact.
+
+### Fixed
+
+- The notifications page had **two page-level headings**, with the `<h1>`
+  arriving in the middle: it mounted `NotificationSettings`, which opens with an
+  `<h2>`, above its own `<header>`. The `<h1>` moves to the top and the feed
+  below it becomes a named section (`historyHeading`, the pass's only new
+  sentence, in both locales through the typed copy record).
+- The governance surface renders as panels and the controls as four cards with a
+  save bar. Each option row is a 44px `<label>` that wraps its own input.
+- The BYOK panel is a card matching the rest of Ajustes. Badge, masked
+  identifier and validity are three elements on three lines rather than three
+  inline children of one `<p>`. The removal control carried `className="danger"`
+  — which matches nothing; only `.reminder-button.danger` and
+  `.reminder-panel.danger` exist — and is now an outlined destructive action
+  separated from the primary one by a rule.
+- `settings-extended.css` was missing from `STYLESHEETS` in
+  `e2e/daily-surfaces.spec.ts`, so that lane had been measuring touch targets and
+  reflow against the browser default. Added, with new 44px assertions proved live
+  by removing it again.
+
+### Unchanged, deliberately
+
+No encryption, validation, storage, Server Action, schema, migration,
+`embedding_model`, `ai_provider`, model or price. One BYOK mount point and one
+write path. The HTTP 403 push track was not investigated or touched, no
+permission is requested automatically, and nothing claims delivery works.
+
 ## 2026-08-16 - PHASE 2O SLICE 2O.6 — the product recovers in one language, and notifications say three things
 
 **`2O-NOTIFY-001` … `-007`, `2O-RECOVER-001` … `-007` — 14 built, 0 partial, 0
