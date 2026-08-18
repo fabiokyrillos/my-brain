@@ -166,7 +166,7 @@ function toColumn(field: string): string {
  * does not swallow a real control along with it.
  */
 function renderedControlNames(source: string): string[] {
-  const withoutHidden = source.replace(/<input[^>]*type="hidden"[^>]*\/>/g, "");
+  const withoutHidden = stripComments(source).replace(/<input[^>]*type="hidden"[^>]*\/>/g, "");
   return [...new Set([...withoutHidden.matchAll(/\bname="([A-Za-z][A-Za-z0-9]*)"/g)].map((match) => match[1]))];
 }
 
@@ -205,23 +205,128 @@ const GOVERNED_CONTROLS: ReadonlySet<string> = new Set<string>(
  */
 const SETTINGS_PAGE = "src/app/[locale]/app/settings/page.tsx";
 
+/**
+ * Comments removed, because a comment is not a control.
+ *
+ * Slice 2O.5 recorded *an authority guard must forbid the act, not the word*
+ * after a guard failed on the sentence explaining why a call was forbidden.
+ * The same shape reaches this file from the other side: `credential-panel.tsx`
+ * documents the absent reveal control in prose that contains `type` and
+ * `name`, and `export-control.tsx` explains the `blob:` anchor it builds. A
+ * scanner reading raw source counts both as markup.
+ *
+ * ## Two rules, not three, and the third one is why
+ *
+ * JSX comments its children as `{/* … *␘/}`, so the obvious first rule is a
+ * pattern for exactly that shape. **It is a trap, and this stripper fell into
+ * it before the guard ran once.** `{\s*\/\*[\s\S]*?\*\/\s*\}` requires the
+ * closing `*␘/` to be followed by `}` — and a function body's own opening brace
+ * followed by a JSDoc block matches its *opening* half, so the lazy scan runs
+ * on to the next `*␘/}` anywhere below. In `settings-form.tsx` that swallowed
+ * **7,804 characters**, including the only `<form>` in the file, and the guard
+ * then reported the save button as a submit reaching no Server Action — a
+ * defect in correct code, which is how a guard gets weakened.
+ *
+ * Removing plain block comments alone handles both shapes: `{/* x *␘/}` becomes
+ * `{}`, which contains no markup and needs no second rule. String literals are
+ * left alone deliberately — a `//` inside a URL is not a comment — and the two
+ * planted controls below prove the stripping neither misses a comment nor
+ * swallows markup beside one.
+ */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/.*$/gm, "");
+}
+
+/**
+ * The opening tag starting at `index`, brace-aware.
+ *
+ * `<button[^>]*>` is the obvious form and it is wrong here: JSX attribute
+ * values are expressions, and `disabled={count > 0}` ends the match in the
+ * middle of the tag. This walks forward tracking brace depth and quoting, so
+ * the tag ends at the first `>` that is genuinely a tag terminator.
+ */
+function openingTag(source: string, index: number): string {
+  let depth = 0;
+  let quote: string | null = null;
+  for (let cursor = index; cursor < source.length; cursor += 1) {
+    const character = source[cursor];
+    if (quote) {
+      if (character === quote) quote = null;
+      continue;
+    }
+    if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+      continue;
+    }
+    if (character === "{") depth += 1;
+    else if (character === "}") depth -= 1;
+    else if (character === ">" && depth === 0) return source.slice(index, cursor + 1);
+  }
+  return source.slice(index);
+}
+
+/** `"@/features/x/y"` or `"./y"`, resolved to a repository-relative file. */
+function resolveSpecifier(fromFile: string, specifier: string): string | null {
+  const base = specifier.startsWith("@/")
+    ? specifier.replace(/^@\//, "src/")
+    : specifier.startsWith(".")
+      ? join(fromFile, "..", specifier).replace(/\\/g, "/")
+      : null;
+  if (!base) return null;
+  for (const candidate of [`${base}.tsx`, `${base}.ts`]) {
+    if (existsSync(join(REPO, candidate))) return candidate;
+  }
+  return null;
+}
+
+/**
+ * `2O-PREF-008`: **the whole preferences centre**, and *whole* means transitive.
+ *
+ * ## The blind spot this replaces, which had two halves rather than one
+ *
+ * §84 recorded that three action buttons were invisible to direction B because
+ * they carry no `name="…"`. Re-auditing it against this tree found a **second**
+ * reason nobody had recorded, and it is the one that mattered more: the scan
+ * was **one level deep**. It read the components the settings page mounts
+ * directly, and `ExportControl` and `GlobalSignOut` are children of
+ * `PrivacySection` — so their files were never opened at all. Repairing only
+ * the extractor would have left them invisible for a different reason and the
+ * guard would have looked fixed.
+ *
+ * The rule is unchanged and applied recursively: a file is in the centre when
+ * something already in the centre both **imports** and **mounts** it. That
+ * terminates at leaves by construction and cannot be extended by editing a
+ * list, which is what let `OnboardingRestore` go uncovered between slices 2O.2
+ * and 2O.3.
+ *
+ * Test files are excluded, for the reason `productSources` excludes them: a
+ * control that exists only in a fixture is not offered to anyone, and counting
+ * it would let a component prove itself by being rendered in its own test.
+ */
 function centreControlSources(): readonly string[] {
-  const page = readFileSync(join(REPO, SETTINGS_PAGE), "utf8");
-  const mounted = new Set([...page.matchAll(/<([A-Z][A-Za-z]*)\b/g)].map((match) => match[1]));
-  const imports = [...page.matchAll(/import\s*\{([^}]+)\}\s*from\s*"([^"]+)"/g)];
-  const files: string[] = [];
-  for (const [, names, specifier] of imports) {
-    if (!specifier.startsWith("@/")) continue;
-    if (!names.split(",").some((name) => mounted.has(name.trim()))) continue;
-    const relative = specifier.replace(/^@\//, "src/");
-    for (const candidate of [`${relative}.tsx`, `${relative}.ts`]) {
-      if (existsSync(join(REPO, candidate))) {
-        files.push(candidate);
-        break;
-      }
+  const found = new Set<string>();
+  const queue = [SETTINGS_PAGE];
+
+  while (queue.length > 0) {
+    const file = queue.shift()!;
+    const source = stripComments(readFileSync(join(REPO, file), "utf8"));
+    const mounted = new Set([...source.matchAll(/<([A-Z][A-Za-z0-9]*)\b/g)].map((match) => match[1]));
+    const imports = [
+      ...source.matchAll(/import\s*\{([^}]+)\}\s*from\s*"([^"]+)"/g),
+      ...source.matchAll(/import\s+(?:type\s+)?([A-Z][A-Za-z0-9]*)\s+from\s+"([^"]+)"/g),
+    ];
+    for (const [, names, specifier] of imports) {
+      if (!names.split(",").some((name) => mounted.has(name.replace(/^type\s+/, "").trim()))) continue;
+      const resolved = resolveSpecifier(file, specifier);
+      if (!resolved) continue;
+      if (/\.test\.tsx?$/.test(resolved)) continue;
+      if (found.has(resolved)) continue;
+      found.add(resolved);
+      queue.push(resolved);
     }
   }
-  return files;
+
+  return [...found];
 }
 
 describe("2O-ACTIVATION-005 direction B: a rendered control may not exist without a row", () => {
@@ -314,6 +419,319 @@ describe("2O-ACTIVATION-005 direction B: a rendered control may not exist withou
       '<input type="hidden" name="locale" /><input name="quietStart" type="time" />',
     );
     expect(mixed).toEqual(["quietStart"]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `2O-ACTIVATION-005` direction B, widened past `name="…"` — slice 2O.7.
+ *
+ * ## Why the predicate had to change rather than the product
+ *
+ * §83 carried this and §84 named its three subjects: the two export buttons and
+ * the global sign-out, all `<button>` elements with nothing to name. Adding a
+ * `name` attribute purely so a guard could see them was **refused twice**, and
+ * the refusal is the right one — a `name` on a button that submits no value is
+ * product code shaped to a test, and it would have made the guard pass while
+ * leaving it unable to see the next such control.
+ *
+ * The requirement says *a rendered control has no row*. It does **not** say
+ * every control is a preference, and reading it that way is what produced a
+ * predicate that could only see form fields. A control is anything a person can
+ * operate; **what it owes depends on what kind of thing it is**, and each kind
+ * owes something real and checkable:
+ *
+ * | Kind | Recognised by | Obligation |
+ * |---|---|---|
+ * | `persistent` | a non-hidden `name` on `input`/`select`/`textarea` | a registry row governs it, by column or by control name |
+ * | `destructive` | `danger` in its class, or a `window.confirm` guarding its form | an explicit confirmation exists in the same file |
+ * | `submit` | `type="submit"` | its enclosing form binds an `action`, so pressing it reaches a Server Action rather than a page reload |
+ * | `client-action` | `type="button"` with an `onClick` | the handler is defined in the same file |
+ * | `navigation` | `Link`/`a` with an `href` | the destination is non-empty |
+ *
+ * **The taxonomy is total and closed, and that is what stops it being an
+ * exemption list.** An operable element that matches no kind is a failure, not
+ * a pass — so a control shaped in some way nobody anticipated fails loudly
+ * instead of falling through. The planted fixtures below construct one of each
+ * kind **and** one that classifies as none.
+ */
+
+type ControlKind = "persistent" | "destructive" | "submit" | "client-action" | "navigation";
+
+type DiscoveredControl = Readonly<{
+  kind: ControlKind | "unclassified";
+  anchor: string;
+  /** The obligation this control's kind carries, already evaluated. */
+  discharged: boolean;
+}>;
+
+/**
+ * Every operable element in one source, classified.
+ *
+ * Comments are stripped first, so the prose in `credential-panel.tsx` that
+ * describes the reveal control it deliberately does **not** have contributes
+ * nothing — and neither does this file's own table above, when the guard is
+ * pointed at itself by the non-vacuity check below.
+ */
+function discoverControls(source: string): DiscoveredControl[] {
+  const markup = stripComments(source);
+  const controls: DiscoveredControl[] = [];
+
+  // The file-level facts each obligation is resolved against.
+  const confirms = /window\.confirm\s*\(/.test(markup);
+  const formActions = [...markup.matchAll(/<form\b[^]*?\baction=\{/g)].length;
+  /**
+   * Every binding a handler could name, from all four shapes this tree uses.
+   *
+   * The destructured one is not a concession: `const [pending, startTransition]
+   * = useTransition()` binds `startTransition` in the file exactly as a `const`
+   * arrow does, and `consent-revocation.tsx` calls it from `onClick`. A
+   * collector that only understood `const x =` reported that button as having
+   * no handler — a defect in correct code, and the second time in this file
+   * that a too-narrow pattern accused the product.
+   *
+   * Imports count for the same reason: a handler imported from another module
+   * is defined, and the failure being caught is a name bound **nowhere**, which
+   * is what a typo or a deleted function looks like.
+   */
+  const handlers = new Set([
+    ...[...markup.matchAll(/function\s+([A-Za-z][A-Za-z0-9]*)\s*\(/g)].map((match) => match[1]),
+    ...[...markup.matchAll(/const\s+([A-Za-z][A-Za-z0-9]*)\s*=/g)].map((match) => match[1]),
+    ...[...markup.matchAll(/(?:const|let)\s*\[([^\]]+)\]\s*=/g)].flatMap((match) =>
+      match[1].split(",").map((binding) => binding.trim()),
+    ),
+    ...[...markup.matchAll(/import\s*\{([^}]+)\}\s*from/g)].flatMap((match) =>
+      match[1].split(",").map((binding) => binding.replace(/^type\s+/, "").trim()),
+    ),
+  ]);
+
+  for (const match of markup.matchAll(/<(input|select|textarea|button|a|Link)\b/g)) {
+    const tag = openingTag(markup, match.index!);
+    const element = match[1];
+
+    if (element === "a" || element === "Link") {
+      const href = tag.match(/href=(?:"([^"]*)"|\{)/);
+      controls.push({ kind: "navigation", anchor: tag.slice(0, 40), discharged: href !== null });
+      continue;
+    }
+
+    if (element !== "button") {
+      if (/type="hidden"/.test(tag)) continue;
+      const name = tag.match(/\bname="([A-Za-z][A-Za-z0-9]*)"/);
+      // An unnamed field submits nothing and persists nothing; it is markup, not
+      // a control. `type="hidden"` above is the routing case and is excluded for
+      // the reason the named-field extractor excludes it.
+      if (!name) continue;
+      controls.push({
+        kind: "persistent",
+        anchor: name[1],
+        discharged: GOVERNED_COLUMNS.has(toColumn(name[1])) || GOVERNED_CONTROLS.has(name[1]),
+      });
+      continue;
+    }
+
+    const destructive = /\bdanger\b/.test(tag) || (confirms && /type="submit"/.test(tag));
+    if (destructive) {
+      controls.push({ kind: "destructive", anchor: tag.slice(0, 40), discharged: confirms });
+      continue;
+    }
+    if (/type="submit"/.test(tag)) {
+      controls.push({ kind: "submit", anchor: tag.slice(0, 40), discharged: formActions > 0 });
+      continue;
+    }
+    if (/type="button"/.test(tag)) {
+      const click = tag.match(/onClick=\{\s*(?:\(\)\s*=>\s*)?([A-Za-z][A-Za-z0-9]*)/);
+      controls.push({
+        kind: "client-action",
+        anchor: tag.slice(0, 40),
+        discharged: click !== null && handlers.has(click[1]),
+      });
+      continue;
+    }
+    // A `<button>` with no `type` and no handler. It defaults to `submit` inside
+    // a form and to nothing outside one, which is precisely the ambiguity this
+    // refuses to resolve on the author's behalf.
+    controls.push({ kind: "unclassified", anchor: tag.slice(0, 60), discharged: false });
+  }
+
+  return controls;
+}
+
+describe("2O-ACTIVATION-005 direction B: every control in the centre is seen, and each owes something", () => {
+  const sources = centreControlSources();
+
+  it("reaches the components the old one-level scan could not", () => {
+    // The second half of the blind spot, asserted as the fact it is. These two
+    // files are children of `PrivacySection`, so a scan that stops at the
+    // settings page's own imports never opens them — and the three buttons §84
+    // named live in exactly these two.
+    expect(sources).toContain("src/features/privacy/privacy-section.tsx");
+    expect(sources, "the transitive walk did not reach ExportControl").toContain(
+      "src/features/privacy/export-control.tsx",
+    );
+    expect(sources, "the transitive walk did not reach GlobalSignOut").toContain(
+      "src/features/privacy/global-sign-out.tsx",
+    );
+    // …and still reaches everything the one-level scan did.
+    expect(sources).toContain(PREFERENCES_FORM);
+    expect(sources).toContain("src/features/appearance/appearance-control.tsx");
+    expect(sources).toContain("src/features/onboarding/onboarding-restore.tsx");
+  });
+
+  it("sees the three buttons that carried no `name`, and classifies each", () => {
+    const byFile = (path: string) => discoverControls(readFileSync(join(REPO, path), "utf8"));
+
+    const exportControls = byFile("src/features/privacy/export-control.tsx");
+    expect(exportControls.filter((control) => control.kind === "submit")).toHaveLength(1);
+    expect(exportControls.filter((control) => control.kind === "client-action")).toHaveLength(1);
+
+    const signOut = byFile("src/features/privacy/global-sign-out.tsx");
+    expect(signOut.filter((control) => control.kind === "submit")).toHaveLength(1);
+  });
+
+  it("discharges every obligation across the whole centre", () => {
+    let seen = 0;
+    for (const path of sources) {
+      for (const control of discoverControls(readFileSync(join(REPO, path), "utf8"))) {
+        seen += 1;
+        expect(
+          control.discharged,
+          `${path} renders a \`${control.kind}\` control (\`${control.anchor.replace(/\s+/g, " ")}\`) whose obligation is not discharged`,
+        ).toBe(true);
+      }
+    }
+    // Non-vacuity. An extractor that stopped matching would make every
+    // assertion above pass over an empty list, which is the failure this whole
+    // file is shaped around.
+    expect(seen, "no control was discovered in the centre at all").toBeGreaterThan(20);
+  });
+
+  it("finds every kind in the real tree, so no branch is dead code", () => {
+    const kinds = new Set(
+      sources.flatMap((path) => discoverControls(readFileSync(join(REPO, path), "utf8"))).map((control) => control.kind),
+    );
+    for (const kind of ["persistent", "destructive", "submit", "client-action", "navigation"] as const) {
+      expect(kinds, `no \`${kind}\` control exists in the centre, so its branch is never exercised`).toContain(kind);
+    }
+    expect(kinds, "an unclassified control reached the tree").not.toContain("unclassified");
+  });
+
+  describe("the planted divergences — one per kind, and one that matches none", () => {
+    it("fails a persistent control no row governs", () => {
+      const planted = discoverControls('<input name="favouriteColour" type="text" />');
+      expect(planted).toEqual([{ kind: "persistent", anchor: "favouriteColour", discharged: false }]);
+    });
+
+    it("passes a persistent control a row does govern, so the rejection is not blanket", () => {
+      const known = discoverControls('<input name="quietStart" type="time" />');
+      expect(known[0]?.kind).toBe("persistent");
+      expect(known[0]?.discharged).toBe(true);
+    });
+
+    it("fails a destructive control with no confirmation", () => {
+      const planted = discoverControls('<button type="submit" className="danger">Apagar</button>');
+      expect(planted[0]?.kind).toBe("destructive");
+      expect(planted[0]?.discharged).toBe(false);
+    });
+
+    it("passes a destructive control that confirms", () => {
+      const guarded = discoverControls(
+        'onSubmit={() => { if (!window.confirm(m)) return; }}<button type="submit" className="danger">Apagar</button>',
+      );
+      expect(guarded[0]?.kind).toBe("destructive");
+      expect(guarded[0]?.discharged).toBe(true);
+    });
+
+    it("fails a submit outside any form that binds an action", () => {
+      const planted = discoverControls('<button type="submit">Exportar</button>');
+      expect(planted[0]).toEqual({ kind: "submit", anchor: '<button type="submit">', discharged: false });
+    });
+
+    it("fails a client action whose handler does not exist in the file", () => {
+      const planted = discoverControls('<button type="button" onClick={saveIt}>Salvar</button>');
+      expect(planted[0]?.kind).toBe("client-action");
+      expect(planted[0]?.discharged).toBe(false);
+    });
+
+    it("fails a button that classifies as nothing at all", () => {
+      // The closure property. A control shaped in a way nobody anticipated is a
+      // failure rather than a silent pass, which is the difference between a
+      // taxonomy and an exemption list.
+      const planted = discoverControls("<button>Talvez</button>");
+      expect(planted[0]?.kind).toBe("unclassified");
+      expect(planted[0]?.discharged).toBe(false);
+    });
+
+    it("does not count a comment as a control", () => {
+      // §84's lesson from the other side: a census keyed on a token counts the
+      // prose that explains the token. Every shape of comment JSX has, each
+      // holding markup that would otherwise classify.
+      const commented = discoverControls(`
+        /* <button type="submit">Bloco</button> */
+        // <input name="linha" />
+        {/* <button className="danger">JSX</button> */}
+      `);
+      expect(commented).toEqual([]);
+    });
+
+    it("does not swallow real markup sitting beside a comment", () => {
+      // The other half of the stripping control. A remover that took the rest
+      // of the file with the comment would make the assertion above pass for
+      // the wrong reason, and every file-level scan pass over nothing.
+      const mixed = discoverControls('{/* explained */}<input name="quietStart" type="time" />');
+      expect(mixed).toEqual([{ kind: "persistent", anchor: "quietStart", discharged: true }]);
+    });
+
+    it("does not let a brace before a doc comment swallow the markup below it", () => {
+      // The regression this stripper actually had, kept as a fixture rather
+      // than as a sentence. A `{`-anchored JSX-comment rule matches the opening
+      // half here and runs to the next `*/}` far below, taking the form with
+      // it — and the guard then reports a correct submit button as reaching no
+      // action. Two controls survive stripping, and the second one is inside
+      // the region that was being eaten.
+      const shaped = discoverControls(`
+        function Settings() {
+          /** A doc comment directly after an opening brace. */
+          const submit = 1;
+          return <form action={submit}>
+            <input name="quietStart" type="time" />
+            {/* a real JSX comment, whose closing brace ended the runaway match */}
+            <button type="submit">Salvar</button>
+          </form>;
+        }
+      `);
+      expect(shaped.map((control) => control.kind)).toEqual(["persistent", "submit"]);
+      expect(shaped.every((control) => control.discharged)).toBe(true);
+    });
+
+    it("does not count this guard's own prose, nor a test's fixtures, as controls", () => {
+      // Pointed at itself. Every `<button …>` above lives in a string literal or
+      // in the documentation table, and the centre's own walk excludes
+      // `*.test.tsx` — so the corpus this guard reasons about can never include
+      // the guard.
+      expect(sources.filter((path) => /\.test\.tsx?$/.test(path))).toEqual([]);
+
+      /*
+        The needle is assembled rather than written, and that is not a
+        flourish. Spelled literally it appears in this assertion's own source,
+        survives comment-stripping because an expression is not a comment, and
+        the check fails against a stripper that works perfectly —
+        `a-check-can-pass-by-containing-its-own-subject`, arriving from the
+        failing side for once.
+      */
+      const rowMarker = ["|", " `persistent` ", "|", " a non-hidden"].join("");
+      const own = readFileSync(join(REPO, "src/lib/closeout/capability-registry-guard.test.ts"), "utf8");
+      expect(own, "the documentation row this asserts about has been reworded").toContain(rowMarker);
+      expect(stripComments(own), "this guard's own table survived stripping").not.toContain(rowMarker);
+    });
+
+    it("reads a tag whose attribute expression contains a `>`", () => {
+      // `<button[^>]*>` ends here in the middle of the tag, classifies the
+      // fragment as unclassified, and reports a defect in correct code.
+      const awkward = discoverControls("<button type=\"submit\" disabled={count > 0}>Enviar</button>");
+      expect(awkward[0]?.kind).toBe("submit");
+    });
   });
 });
 

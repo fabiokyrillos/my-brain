@@ -13,6 +13,7 @@ import { readPushConsent } from "@/features/notifications/consent-reader";
 import { restoreOnboarding } from "@/features/onboarding/actions";
 import { OnboardingRestore } from "@/features/onboarding/onboarding-restore";
 import { readDismissal } from "@/features/onboarding/onboarding-view";
+import { InstallSection } from "@/features/pwa/install-section";
 import { loadPrivacyCensus } from "@/features/privacy/census";
 import { loadConsentRecord } from "@/features/privacy/consent-record";
 import { ConsentSection } from "@/features/privacy/consent-section";
@@ -112,6 +113,17 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       */}
       <AppearanceControl locale={locale} />
       <CapabilitySummary locale={locale} />
+      {/*
+        `2O-MOBILE-004`. Directly after the appearance choice and the capability
+        summary: this is where the page stops being about what the product does
+        with your data and starts being about how you use it.
+
+        Not beside notifications, which was the alternative and is worse in the
+        way that matters — it would read as a step toward turning alerts on, and
+        that is the claim `OD-2O-11` forbids. The section says so itself rather
+        than relying on its position to avoid the implication.
+      */}
+      <InstallSection locale={locale} />
       {/*
         `2O-AICONFIG-001` … `-005` and `-008`. What the product does with a
         model, stated after the controls that change it.

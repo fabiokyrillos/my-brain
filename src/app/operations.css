@@ -360,7 +360,7 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 /* Phase 2X.11: Needs Attention on Home and Caixa */
 .attention-panel .count{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}
 .needs-attention-row .list-attention-hint,.needs-attention-action-hint{color:var(--link);font-weight:700}
-.panel-view-all{display:inline-block;margin-top:16px;color:var(--link);font:var(--type-mono)}
+.panel-view-all{display:inline-flex;align-items:center;margin-top:16px;color:var(--link);font:var(--type-mono)}
 .panel-view-all:hover{text-decoration:underline}
 .needs-attention-list{margin-top:4px}
 .load-more-button{width:auto;margin:6px auto 0}
@@ -743,7 +743,12 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .work-protected-toggle{min-height:44px}
 /* `.panel-view-all` is shared with the Hoje and Registros panels; it measured
    18px. Raising it to the standard is safe everywhere a link is a link. */
-.panel-view-all{display:inline-flex;align-items:center;min-height:24px}
+.panel-view-all{display:inline-flex;align-items:center;min-height:var(--touch-target)}
+/* 24px was slice 2L's reading of "the standard" — WCAG 2.5.8 at AA. This
+   link renders on the cockpit, which this phase built, and `2O-MOBILE-002`
+   asks for 44. Measured at 24px on the rendered page in both locales, and
+   the declaration two hundred lines above naming the same class lost to this
+   one on source order — so the number is corrected where it actually wins. */
 /* The relation filter's escape hatch sits inside a sentence, so it inherits the
    sentence's 11px. Inline-flex with the minimum keeps it a real target without
    breaking the line it lives in. */

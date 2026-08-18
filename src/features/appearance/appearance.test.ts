@@ -1,12 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   APPEARANCE_ATTRIBUTE,
   APPEARANCE_SCRIPT,
   APPEARANCE_STORAGE_KEY,
+  APPEARANCE_THEME_COLOR_MARKER,
   appearanceAttributeValue,
   appearanceChoices,
   applyAppearanceChoice,
+  applyAppearanceThemeColor,
   explicitAppearanceChoices,
   parseAppearanceChoice,
   type AppearanceChoice,
@@ -216,4 +218,108 @@ describe("`2O-PREF-015` — an explicit choice beats the machine in both directi
       expect(run(choice)).toBe(attribute);
     });
   }
+});
+
+/**
+ * The browser chrome — the divergence slices 2O.3 and 2O.4 both routed to 2O.7.
+ *
+ * `viewport.themeColor` emits two `media`-keyed tags and Next offers no other
+ * shape, so an explicit `light` on a dark machine left the status bar dark
+ * above a light page. Both entry points are asserted here: the pre-paint script
+ * for a load, and `applyAppearanceThemeColor` for a change with no reload.
+ */
+describe("`viewport.themeColor` follows the choice, not only the machine", () => {
+  /** Exactly what the production `<head>` carries, verified against the served HTML. */
+  function plantFrameworkMetas() {
+    document.head.innerHTML =
+      '<meta charSet="utf-8" />' +
+      '<meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)" />' +
+      '<meta name="theme-color" content="#141311" media="(prefers-color-scheme: dark)" />';
+  }
+
+  const owned = () =>
+    document.querySelector(`meta[name="theme-color"][${APPEARANCE_THEME_COLOR_MARKER}]`);
+  const all = () => [...document.querySelectorAll('meta[name="theme-color"]')];
+
+  beforeEach(plantFrameworkMetas);
+  afterEach(() => {
+    document.head.innerHTML = "";
+  });
+
+  describe("the shipped script, executed against the real head", () => {
+    for (const [choice, colour] of [
+      ["light", "#f7f6f3"],
+      ["dark", "#141311"],
+    ] as const) {
+      it(`states the chosen ${choice} colour unconditionally`, () => {
+        run(choice);
+        expect(owned()?.getAttribute("content")).toBe(colour);
+        // First in tree order, because the specification says the browser uses
+        // the earliest matching tag. Appended, it would lose to the framework's
+        // own light tag on a light machine and change nothing.
+        expect(all()[0]).toBe(owned());
+        // Unconditional: no `media`, so no machine setting can override it.
+        expect(owned()?.hasAttribute("media")).toBe(false);
+      });
+    }
+
+    it("adds nothing for `system`, which is what following the machine means", () => {
+      run("system");
+      expect(owned()).toBeNull();
+      expect(all()).toHaveLength(2);
+    });
+
+    it("leaves the framework's own two tags byte-identical", () => {
+      // The reason this adds a tag rather than rewriting `media` on Next's: the
+      // metadata system owns those nodes. A guard that let this script edit
+      // them would be asserting a tug-of-war it cannot win.
+      const before = all().map((meta) => meta.outerHTML);
+      run("dark");
+      expect(all().filter((meta) => !meta.hasAttribute(APPEARANCE_THEME_COLOR_MARKER)).map((meta) => meta.outerHTML)).toEqual(before);
+    });
+
+    it("does nothing at all when the framework emits no theme colour", () => {
+      // `viewport.themeColor` could be removed or reduced to a single unkeyed
+      // tag. Neither is this script's business, and inventing a colour here
+      // would put a second copy of the palette in a string.
+      document.head.innerHTML = '<meta charSet="utf-8" />';
+      run("dark");
+      expect(all()).toHaveLength(0);
+    });
+  });
+
+  describe("`applyAppearanceThemeColor`, for a change with no reload", () => {
+    it("replaces its own tag rather than accumulating them", () => {
+      // Idempotence, asserted rather than assumed: the control calls this on
+      // every gesture, and a reader flipping light → dark → light three times
+      // would otherwise leave six tags and the first one winning forever.
+      for (const choice of ["dark", "light", "dark"] as const) {
+        applyAppearanceThemeColor(document, choice);
+      }
+      expect(all()).toHaveLength(3);
+      expect(owned()?.getAttribute("content")).toBe("#141311");
+    });
+
+    it("removes its tag when the reader goes back to following the machine", () => {
+      applyAppearanceThemeColor(document, "dark");
+      expect(owned()).not.toBeNull();
+      applyAppearanceThemeColor(document, "system");
+      expect(owned()).toBeNull();
+      expect(all()).toHaveLength(2);
+    });
+
+    it("agrees with the script on every choice, which is the property that matters", () => {
+      // Two implementations of one rule — a string that runs before React and a
+      // function that runs after it — is exactly the shape that drifts. This
+      // compares their outputs rather than their sources.
+      for (const choice of appearanceChoices) {
+        plantFrameworkMetas();
+        run(choice);
+        const fromScript = owned()?.getAttribute("content") ?? null;
+        plantFrameworkMetas();
+        applyAppearanceThemeColor(document, choice);
+        expect(owned()?.getAttribute("content") ?? null, `${choice} diverges`).toBe(fromScript);
+      }
+    });
+  });
 });

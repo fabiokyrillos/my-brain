@@ -353,3 +353,42 @@
 .memory-conflict .conflict-dates {
   margin: 0;
 }
+
+/* -------------------------------------------------------------------------
+   `2O-MOBILE-003` — the 21px target, and it was never the chevron.
+
+   `OD-2O-11` admits exactly this one residual and ADR-116 makes it
+   unconditional, so it is the single place Phase 2O changes a surface it did
+   not create. Measured against the hosted project on a Pixel 7 before any of
+   this was written: **21.59px**, reproduced unchanged since 2N.3.
+
+   The cause is a shape, not a missing number. The title is an inline `<a>`
+   wrapping a block `<strong>`, so the anchor's own box is one line of text —
+   about 21px — while the row around it is comfortably tall. Everything looked
+   right and the thing a thumb has to hit was half the minimum. Making the
+   anchor a flex box gives it the row's height instead of the text's, without
+   moving a pixel of what is drawn.
+
+   `.work-title-link` is the same link when `ProtectedContent` masks the title:
+   it substitutes its own anchor, and a fix that only covered the unmasked
+   branch would leave every sensitive memory below the minimum — which is the
+   half a screenshot of a test account never shows.
+
+   `.memory-row-chevron-link` had **no rule in any stylesheet**, so it was drawn
+   at the icon's intrinsic 16px. That is §85's finding recurring on a third
+   surface, and it is why the class-coverage guard exists now.
+   ------------------------------------------------------------------------- */
+.memory-row-title,
+.memory-row .work-title-link {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+}
+
+.memory-row-chevron-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+}

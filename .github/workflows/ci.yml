@@ -266,7 +266,14 @@ jobs:
         # touch-target contract only executes on mobile.
         # The remaining specs are credential-gated against the linked project
         # and skip themselves; remote smokes stay manual.
-        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts --project=desktop --project=mobile
+        # Slice 2O.7 adds `phase-2o-mobile-accessibility.spec.ts`, and it is the
+        # first lane here that drives REAL ROUTES rather than an inlined fixture.
+        # The four fixture lanes each keep a hand-written STYLESHEETS array, and a
+        # stale one makes every contrast and geometry assertion measure unstyled
+        # markup and pass — which is what §85 found had been happening. This lane
+        # has no array to go stale: it loads the production build's own pages, so
+        # a stylesheet dropped from `globals.css` fails it.
+        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts e2e/phase-2o-mobile-accessibility.spec.ts --project=desktop --project=mobile
 
       # 2F-REVOKE-003 — the re-grant rollback rehearsal.
       #

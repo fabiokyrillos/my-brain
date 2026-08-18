@@ -8097,3 +8097,257 @@ Unchanged: **slice 2O.7**, from §84. This section adds nothing to its scope and
 removes nothing from it. The two surfaces it may touch now have stylesheets, a
 page-outline guard and touch-target assertions that did not exist before, so a
 regression on either is caught by CI rather than by the owner.
+
+## §86 — Slice 2O.7 ships, and measuring a rendered page found six defects no other gate can see (2026-08-18)
+
+PR **#248**, merged at **`MERGE_SHA`**; head at merge **`HEAD_SHA`**, **CI green
+on all three job families on the head**. `main` local equals `origin/main`,
+worktree clean, no open PR.
+
+**`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` … `-006` — 10 `built`, 1 `partial`,
+0 `undelivered`. Zero migrations created. 97 local = 97 hosted, parity
+`202608160097`. Signup closed. Rollout gate 25 · 3 · 2, re-read by running
+`rollout:verify`. CSP unchanged. `embedding_model` untouched. A13 not
+retargeted. M2 unspent and unallocated.**
+
+**98 of 116 requirements delivered.** Slices 2O.0 – 2O.7; one remains.
+
+### The re-audit caught §84 once, and the correction is a rule
+
+§84 read ADR-116's *"the 21px target at `online-memories.spec.ts:85` **is
+fixed**"* against a tree where that line says `toBeGreaterThanOrEqual(44)`, and
+concluded the object might already be repaired.
+
+`git log -S` shows **no commit ever wrote 21 into that file**: `36ec2ad`
+introduced the assertion already at 44, over a product that measured 21. Running
+it against the hosted project returned **`21.59375`**, unchanged since 2N.3.
+
+**An assertion naming the right number is not evidence the product meets it.**
+The finding was a reasonable reading of the line, and acting on it would have
+closed the phase's one admitted residual by looking at a test.
+
+### The blind spot §84 named had a second half nobody had recorded
+
+`2O-ACTIVATION-005` direction B could not see three buttons, and §84 gave the
+reason: they carry no `name`. True, and second. `centreControlSources()` was
+**one level deep** — it read what `settings/page.tsx` mounts directly, and
+`ExportControl` and `GlobalSignOut` are children of `PrivacySection`, so **their
+files were never opened**. Repairing only the extractor would have left them
+invisible for a different reason and the guard would have looked fixed.
+
+**No `name` was added to any button.** The predicate walks the mount tree
+transitively and classifies every operable element into a **total and closed**
+taxonomy — `persistent` · `destructive` · `submit` · `client-action` ·
+`navigation` — each owing something checkable, and **an element matching no kind
+fails**. That closure is what separates a taxonomy from an exemption list.
+
+### Measuring the rendered product is the whole slice, and it is new here
+
+Four Playwright lanes build a fixture by inlining `src/app/*.css` by hand. §85
+found `settings-extended.css` missing from one, so two surfaces had been
+measured against the user-agent default for as long as assertions existed over
+them — green for the one reason a lane must never be green.
+
+Slice 2O.7 adds two lanes that drive **the production build over real routes**.
+Nine public surfaces gate in **CI on every push**; ten authenticated surfaces run
+against the hosted project. Both locales, light and dark, desktop and mobile.
+**Neither has a `STYLESHEETS` array to go stale.**
+
+**Six defects, none visible to lint, typecheck, unit tests or a fixture lane:**
+
+1. **Ajustes' entire mobile layout was dead.** `@media(max-width:600px)` sat
+   above most of the file, and CSS resolves a specificity tie by **source
+   order** — so slice 2O.3's `.appearance-options{grid-template-columns:repeat(3,1fr)}`
+   written below it silently won. Three radio cards stayed in three columns at
+   320px and the page scrolled sideways by 53px. **The stylesheet contained a
+   correct mobile layout the browser never applied.** Both blocks moved to the
+   end; not one declaration changed.
+2. **Seven onboarding controls had no focus indicator at all.** `outline:
+   var(--focus-ring)` — and `--focus-ring` is a **colour**. A shorthand given
+   only a colour leaves `outline-style` at `none`. Valid CSS painting nothing,
+   with `:focus-visible` matching correctly the whole time. This is the `font:`
+   shorthand trap arriving through `outline:`.
+3. **The capture composer had none either** — `outline:0` on `:focus` with no
+   `:focus-visible` counterpart, on the product's primary input.
+4. **`opacity:.72`** on a satisfied onboarding step failed contrast in **both**
+   themes: opacity composites the whole subtree and drags a token that passes AA
+   everywhere else below threshold.
+5. **Eleven targets below 44px**, including `Gerar exportação` and `Sair de
+   todos os dispositivos` at **22px with no CSS rule at all** — §85's finding on
+   a third surface.
+6. **`2O-MOBILE-003`, at 21.59px.** The cause was a shape: an inline `<a>`
+   wrapping a block `<strong>` has a one-line box, so the row looked right and
+   the thing a thumb hits was half the minimum. Both branches repaired, because
+   `ProtectedContent` substitutes its own anchor and a fix covering one leaves
+   every sensitive memory short.
+
+### `viewport.themeColor` is resolved, and the risk was asserted rather than argued
+
+The served HTML settles the mechanism: **Next emits both media-keyed metas above
+the pre-paint script**. So the script adds **one** unkeyed tag first in `<head>`
+— the specification says the browser uses the earliest match — with the colour
+**read off** whichever of Next's two names the chosen scheme. It invents no
+colour, edits neither framework tag, does nothing for `system`, is idempotent,
+and needs no CSP change.
+
+**A browser test proves no hydration error and that the tag survives
+hydration.** Had it not, this would have been recorded as impossible rather than
+shipped.
+
+### Five defects were mine, and the fifth is the one to carry
+
+1. Signing in on **every navigation** → `429 over_request_rate_limit`, four
+   tests failing for a reason with nothing to do with the product.
+2. `addInitScript` re-runs on every navigation, so the dark control stored
+   `dark`, reloaded, had `light` written straight back — **the control failing
+   against a correct product**.
+3. `.account-data-strip` is a **filename**; the class is `.data-ai-tabs`. §84's
+   table cited the file, and reading a class off a filename sent an assertion
+   looking for an element that has never existed.
+4. `getComputedStyle` after a Tab is not a reading of a composite field:
+   `type="time"` focuses a segment in its own shadow tree, and a direct probe
+   showed the host's `:focus` rule painting a correct ring while the loop read
+   `none`.
+5. **Measuring inside the entrance animation.** `.panel`, `.capture-card` and
+   every cost card carry a 220ms `rise` with `animation-fill-mode: both`, so
+   before it runs they hold `opacity: 0`. Axe composites against what is painted
+   and failed the whole cost page with `color-contrast 1.66`, naming foreground
+   colours (`#c6c3c0`) that appear in **no stylesheet and no token**. Reading
+   the computed style settled it: `["0.305","0","0","0"]` at load,
+   `["1","1","1","1"]` two seconds later.
+
+**A contrast scan that runs before a page finishes arriving measures a frame
+nobody sees** — and it failed loudly only because these surfaces animate. On a
+page with no entrance it would have passed, quietly, for the wrong reason. Both
+lanes now wait on `document.getAnimations()` rather than on a clock.
+
+And one in the guard: the obvious JSX-comment pattern matched the opening half
+of **any** `{` followed by a doc comment and ran to the next closing brace,
+swallowing **7,804 characters** of `settings-form.tsx` including its only
+`<form>` — so a correct submit button was reported as reaching no Server Action.
+
+### The new guard, and the debt it makes visible
+
+`stylesheet-class-coverage.test.ts` asks the precise question §85 raises — not
+*does every class have a rule* (61 do not, mostly harmlessly) but **is there an
+element whose every class matches nothing**. **Forty-nine**, across twenty-odd
+surfaces and six phases, **eight of them slice 2O.5's privacy block**. Recorded
+as a ratchet with a planted control; **not restyled**, because on the rendered
+page they pass contrast, reflow and target size — plain, not broken — and
+styling them is a redesign this slice was told not to do.
+
+### What is carried, with destinations
+
+- **`2O-ACCESS-006` closes `partial`. The screen-reader session is `NOT
+  EXECUTED`.** A twenty-minute VoiceOver script naming the exact screens and
+  sentences ships at `docs/reports/phase-2o/PHASE_2O_SCREEN_READER_SCRIPT.md`
+  with the device table to fill in. **ADR-118 Decision 8: it may never be
+  promoted to a pass by documentation, an emulator, an automated scan, or
+  inference from one** — and this slice's nineteen-surface axe coverage is
+  exactly such an inference. → **owner**.
+- **Four target exceptions, each with a liveness check that fails when the
+  finding stops reproducing:** `legal/*`'s two links (18px), and the shell's
+  `skip-link` (39px) and `palette-trigger` (38px). `git diff 57beb06..a58af08`
+  proves Phase 2O touched none of them, and ADR-116 Decision 2 spends the
+  phase's one licence on `2O-MOBILE-003`. → **owner**.
+- **Forty-nine elements no stylesheet reaches**, eight in the privacy block. →
+  **owner**.
+- **`2O-NOTIFY-005`'s third bound has no object** → owner, unchanged.
+- **`2O-ONBOARD-003`** stays `partial`, untouched.
+- **`defaultAgentPreferences.tone`** still says `direct` against a column
+  defaulting to `informal`.
+- Every Phase 2N residual `OD-2O-11` declined stays unclaimed; push still fails
+  with **HTTP 403 on a real iPhone** and has **never been executed on Android**;
+  ADR-055 neither satisfied nor superseded, expiring **2026-10-27**. **No
+  retention sweep scheduled.**
+
+### The re-audit of slice 2O.8, done and recorded
+
+**Three findings against this `main`. Treat them as a starting point and re-run
+them — §82, §83, §84 and this section all exist because a recorded finding was
+wrong.**
+
+1. **The rollout gate is unchanged and was re-read by running it**, not quoted:
+   **25 pass · 3 fail · 2 owner-signature**, with `RG-QUO-3`, `RG-DEP-1` and
+   `RG-DEP-3` failing and `RG-LEG-4` and `RG-DEP-4` unsigned. `RG-DEP-3` and
+   `RG-DEP-4` **must never be closed by writing a file** — one needs a restore
+   into a disposable project, the other an owner signature.
+2. **`2O-METRICS` has no producer today.** Nothing in `src/features/activation/`
+   writes a product event. `OD-2O-8` **A** and ADR-118 Decision 3 make M1
+   conditional on a **real producer and a real consumer both shipping**; absent
+   either, `2O-METRICS-001` … `-005` close **`not-built-by-rule`** and M1 closes
+   unspent. That is the expected close, not an omission.
+3. **`product_events` has had three copies of its vocabulary**, and the writer's
+   own list froze at `202607280061` once before and silently refused newer
+   events. If 2O.8 does ship telemetry, **every copy widens in one change** and
+   the producer is proved against **both** validators.
+
+### Where this stops
+
+**Between slices, with `main` clean.** The next unit is **slice 2O.8 —
+readiness, telemetry, security and closeout** (`2O-READY-001` … `-005`,
+`2O-METRICS-001` … `-005`, `2O-SEC-001` … `-005`, `2O-CLOSE-001` … `-004`,
+nineteen requirements, **at most one migration — M1, and only under its signed
+condition**).
+
+### The prompt for slice 2O.8
+
+> Continue the autonomous implementation of Phase 2O from **slice 2O.8 —
+> readiness, telemetry, security and closeout** (`2O-READY-001` … `-005`,
+> `2O-METRICS-001` … `-005`, `2O-SEC-001` … `-005`, `2O-CLOSE-001` … `-004`,
+> nineteen requirements).
+>
+> **Baseline to prove, not presume:** `main` = `origin/main` = the merge SHA at
+> the top of §86, worktree clean, **no open PR**, CI green on all three job
+> families at that SHA, **97 local = 97 hosted, parity `202608160097`**, **98 of
+> 116 delivered**, rollout gate **25 pass · 3 fail · 2 owner-signature** re-read
+> by running `npm run rollout:verify`, signup closed, **M1 live and
+> conditional**, **M2 without a destination and unspendable**, A13 not
+> retargeted, `embedding_model` untouched.
+>
+> **Before acting:** read `AUTONOMOUS_LOOP_HANDOFF.md` §§83–86 in full; read the
+> acceptance records for slices 2O.0 – 2O.7 under `docs/reports/phase-2o/`;
+> re-read the PRD, the implementation plan, the threat model, the traceability
+> contract and **ADR-115 through ADR-119**. **Re-run the 2O.8 re-audit against
+> whatever `main` actually is.** §86's three findings are a starting point and
+> never a substitute — §86's own re-audit found §84 had read a test assertion as
+> evidence about the product.
+>
+> **Five things this slice must not discover late.** **M1 is conditional on a
+> real producer AND a real consumer both shipping**; absent either,
+> `2O-METRICS-001` … `-005` close `not-built-by-rule` and M1 closes unspent —
+> that is the correct close, not a failure. **`product_events` has had three
+> copies of its vocabulary** and the writer's own list froze once and silently
+> refused newer events: widen every copy in one change and prove the producer
+> against **both** validators. **`RG-DEP-3` and `RG-DEP-4` may never be closed
+> by writing a file.** **M2 may not be spent here or anywhere**, and a third
+> migration is a STOP CONDITION. **`2O-ACCESS-006` is `partial` and stays
+> `partial` unless a real screen-reader session is executed and recorded with
+> device, software and version** — the script is written and waiting; the
+> nineteen-surface axe coverage 2O.7 shipped is an inference and ADR-118
+> Decision 8 forbids promoting it by one.
+>
+> Then: **2O.8 → merge → CI green on the merge SHA → the closing report and the
+> traceability matrix → re-audit the successor and do not start it.**
+>
+> **If context runs short:** finish the current unit entirely, get CI green on
+> the merge SHA, update this handoff, leave `main` clean with no open PR, and
+> stop.
+>
+> **Run the whole command CI runs when you touch anything shared.**
+> `npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts
+> e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts
+> e2e/phase-2o-mobile-accessibility.spec.ts --project=desktop --project=mobile`.
+> For the authenticated lane, start `npm run start` first and run `node
+> scripts/online-playwright.mjs <spec> --project=desktop --workers=1`; restart
+> the server after every rebuild and **kill port 3000 explicitly**. **Sign in
+> once per test, not once per navigation** — the hosted project answers
+> `429 over_request_rate_limit`, and slice 2O.7 lost a run to it.
+>
+> Check in, in Portuguese, saying what you are doing, what is done, what you
+> found, the state of branch/PR/CI/migrations, what remains, whether you need
+> the owner, and whether you are working or waiting.
+>
+> **Do not** absorb a declined residual, reallocate **M2**, or create a
+> migration outside the signed conditions. **Do not** open signup, resume the
+> push HTTP 403 track, or start the successor phase.

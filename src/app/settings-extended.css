@@ -1,8 +1,6 @@
-.compound-field{display:grid;grid-template-columns:1.5fr 1fr;gap:7px}.settings-checkbox{display:flex!important;align-items:center;grid-auto-flow:column;justify-content:start;padding-top:24px}.settings-checkbox input{width:18px!important;min-height:18px!important}.settings-checkbox span{line-height:1.45}
-.settings-advanced{margin:0;border-top:1px solid var(--border-default)}.settings-advanced>summary{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;min-height:56px;padding:12px 30px;cursor:pointer;list-style:none}.settings-advanced>summary::-webkit-details-marker{display:none}.settings-advanced>summary>span{font: var(--type-eyebrow);color:var(--text-secondary)}.settings-advanced>summary>div{display:grid;gap:4px}.settings-advanced>summary strong{font: var(--type-body)}.settings-advanced>summary small{color:var(--text-secondary);font: var(--type-caption);line-height:1.45}.settings-advanced>summary:focus-visible{outline:3px solid var(--focus-ring);outline-offset:-3px}.settings-advanced[open]>summary{background:var(--background-subtle)}.settings-advanced-content{padding-top:24px}.ai-routes-heading a{display:inline-block;margin-top:10px;color:var(--action-primary-text);font: var(--type-caption);font-weight:750;text-decoration:underline;text-underline-offset:3px}
-.ai-profile-fieldset{border:0;margin:0;padding:0 30px 28px}.ai-profile-fieldset legend{padding:0 0 12px;font: var(--type-caption);font-weight:800}.ai-profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ai-profile-card{position:relative;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start;min-height:112px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas);cursor:pointer;transition:border-color var(--motion-standard) var(--ease-enter),background var(--motion-standard) var(--ease-enter),transform var(--motion-standard) var(--ease-enter)}.ai-profile-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}.ai-profile-card.active{border-color:var(--link);background:var(--tone-information-bg);box-shadow:inset 0 0 0 1px var(--tone-information-line)}.ai-profile-card input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link)}.ai-profile-card span{display:grid;gap:6px}.ai-profile-card strong{font: var(--type-caption);line-height:1.25}.ai-profile-card small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-routes{margin:0 30px 30px;border:1px solid var(--border-default);border-radius: var(--radius-lg);overflow:hidden;background:var(--background-surface)}.ai-routes-heading{padding:18px 20px;background:var(--text-primary);color:var(--action-primary-text)}.ai-routes-heading span{font: var(--type-eyebrow);letter-spacing:.12em;color:var(--text-inverse)}.ai-routes-heading p{margin:7px 0 0;color:var(--text-inverse);font: var(--type-caption);line-height:1.5}.ai-route{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,.8fr);gap:24px;align-items:center;padding:16px 20px;border-top:1px solid var(--border-default)}.ai-route-copy{display:grid;gap:4px}.ai-route-copy strong,.ai-route-copy label{font: var(--type-caption);font-weight:750}.ai-route-copy small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-route-control select{width:100%;min-height:42px;border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:9px 11px;background:var(--background-surface);color:var(--text-primary);font: var(--type-caption)}.ai-route-fixed{background:var(--background-subtle)}.embedding-chip{justify-self:end;border-radius: var(--radius-full);padding:7px 10px;background:var(--background-surface);border:1px solid var(--border-default);color:var(--text-secondary);font: var(--type-eyebrow)}
-@media(max-width:850px){.ai-profile-grid{grid-template-columns:1fr 1fr}.ai-route{grid-template-columns:1fr;gap:10px}.embedding-chip{justify-self:start}}
-@media(max-width:600px){.appearance-options{grid-template-columns:1fr}.appearance-option{min-height:44px}.compound-field{grid-template-columns:1fr}.settings-advanced>summary{min-height:56px;padding:10px 20px}.ai-profile-fieldset{padding:0 20px 24px}.ai-profile-grid{grid-template-columns:1fr}.ai-profile-card{min-height:44px}.ai-routes{margin:0 20px 24px}.ai-route{padding:15px}.ai-route-control select{font: var(--type-caption)}.embedding-chip{max-width:100%;white-space:normal;line-height:1.5}}
+.compound-field{display:grid;grid-template-columns:1.5fr 1fr;gap:7px}.settings-checkbox{display:flex!important;align-items:center;grid-auto-flow:column;justify-content:start;min-height:var(--touch-target);padding-top:24px}.settings-checkbox input{width:18px!important;min-height:18px!important}.settings-checkbox span{line-height:1.45}
+.settings-advanced{margin:0;border-top:1px solid var(--border-default)}.settings-advanced>summary{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;min-height:56px;padding:12px 30px;cursor:pointer;list-style:none}.settings-advanced>summary::-webkit-details-marker{display:none}.settings-advanced>summary>span{font: var(--type-eyebrow);color:var(--text-secondary)}.settings-advanced>summary>div{display:grid;gap:4px}.settings-advanced>summary strong{font: var(--type-body)}.settings-advanced>summary small{color:var(--text-secondary);font: var(--type-caption);line-height:1.45}.settings-advanced>summary:focus-visible{outline:3px solid var(--focus-ring);outline-offset:-3px}.settings-advanced[open]>summary{background:var(--background-subtle)}.settings-advanced-content{padding-top:24px}.ai-routes-heading a{display:inline-flex;align-items:center;min-height:var(--touch-target);margin-top:10px;color:var(--action-primary-text);font: var(--type-caption);font-weight:750;text-decoration:underline;text-underline-offset:3px}
+.ai-profile-fieldset{border:0;margin:0;padding:0 30px 28px}.ai-profile-fieldset legend{padding:0 0 12px;font: var(--type-caption);font-weight:800}.ai-profile-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.ai-profile-card{position:relative;display:grid;grid-template-columns:18px 1fr;gap:10px;align-items:start;min-height:112px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas);cursor:pointer;transition:border-color var(--motion-standard) var(--ease-enter),background var(--motion-standard) var(--ease-enter),transform var(--motion-standard) var(--ease-enter)}.ai-profile-card:hover{border-color:var(--border-strong);transform:translateY(-1px)}.ai-profile-card.active{border-color:var(--link);background:var(--tone-information-bg);box-shadow:inset 0 0 0 1px var(--tone-information-line)}.ai-profile-card input{width:16px;height:16px;margin:1px 0 0;accent-color:var(--link)}.ai-profile-card span{display:grid;gap:6px}.ai-profile-card strong{font: var(--type-caption);line-height:1.25}.ai-profile-card small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-routes{margin:0 30px 30px;border:1px solid var(--border-default);border-radius: var(--radius-lg);overflow:hidden;background:var(--background-surface)}.ai-routes-heading{padding:18px 20px;background:var(--text-primary);color:var(--action-primary-text)}.ai-routes-heading span{font: var(--type-eyebrow);letter-spacing:.12em;color:var(--text-inverse)}.ai-routes-heading p{margin:7px 0 0;color:var(--text-inverse);font: var(--type-caption);line-height:1.5}.ai-route{display:grid;grid-template-columns:minmax(220px,1fr) minmax(280px,.8fr);gap:24px;align-items:center;padding:16px 20px;border-top:1px solid var(--border-default)}.ai-route-copy{display:grid;gap:4px}.ai-route-copy strong,.ai-route-copy label{font: var(--type-caption);font-weight:750}.ai-route-copy small{color:var(--text-secondary);font: var(--type-caption);line-height:1.5}.ai-route-control select{width:100%;min-height:var(--touch-target);border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:9px 11px;background:var(--background-surface);color:var(--text-primary);font: var(--type-caption)}.ai-route-fixed{background:var(--background-subtle)}.embedding-chip{justify-self:end;border-radius: var(--radius-full);padding:7px 10px;background:var(--background-surface);border:1px solid var(--border-default);color:var(--text-secondary);font: var(--type-eyebrow)}
 
 /* ---- 2O-ACTIVATION-004: what the visible preferences actually change -------
    A statement, not a form. It sits between the controls and Dados e IA and is
@@ -565,4 +563,155 @@
   .byok-body { padding: 0 20px 24px; }
   .byok-submit, .byok-destructive, .byok-pending-submit { width: 100%; }
   .byok-pending { justify-items: stretch; }
+}
+
+/* -------------------------------------------------------------------------
+   `2O-MOBILE-004` — installing the product as an app.
+
+   Written because §85 found the notifications and BYOK surfaces emitting
+   classes that no stylesheet matched, so both were drawn entirely by the
+   user-agent default. Every class `install-section.tsx` renders has a rule
+   here, and `stylesheet-class-coverage` in the 2O.7 guard asserts that in
+   general rather than for these five by name.
+   ------------------------------------------------------------------------- */
+.install-body {
+  display: grid;
+  gap: var(--space-5);
+  padding: 0 30px 30px;
+}
+.install-benefits {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding-left: var(--space-5);
+  max-width: 68ch;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+.install-steps {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+/* Each platform is one card, so the gesture is read with the browser it
+   belongs to rather than as six loose lines. `align-items: start` keeps a
+   two-line instruction from stretching the platform name's row. */
+.install-step {
+  display: grid;
+  grid-template-columns: minmax(0, 13rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+.install-step dt {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+.install-step dd {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+.install-caveat { margin: 0; max-width: 68ch; }
+
+@media (max-width: 600px) {
+  .install-body { padding: 0 20px 24px; }
+  /* One column below 600px. The two-column grid holds a 13rem label beside the
+     instruction, and at 320px that leaves the instruction about nine characters
+     wide — legible in a screenshot of a wide window and unusable on the phone
+     the requirement is about. */
+  .install-step { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* -------------------------------------------------------------------------
+   The narrow-viewport layer, moved here from lines 4 and 5 — slice 2O.7.
+
+   It sat ABOVE most of the file, and CSS resolves a tie in specificity by
+   source order — so every base rule written after it silently won. Slice
+   2O.3 added `.appearance-options{grid-template-columns:repeat(3,1fr)}`
+   below it, and from that commit the phone layout was DEAD: three radio
+   cards stayed in three columns at 320px, pushing the settings page to
+   373px and giving the whole surface a horizontal scrollbar.
+
+   Nothing here is new. Both blocks are byte-identical to what they were;
+   only their position changed, and the position is the defect. A media
+   query is not a stronger selector, and a responsive layer written before
+   the layout it is meant to override is a layer that never runs.
+
+   Found by measuring the rendered page at 320px, which is the only place
+   this was visible: every rule was valid, every token resolved, and the
+   stylesheet contained a correct mobile layout the browser never applied.
+   ------------------------------------------------------------------------- */
+@media(max-width:850px){.ai-profile-grid{grid-template-columns:1fr 1fr}.ai-route{grid-template-columns:1fr;gap:10px}.embedding-chip{justify-self:start}}
+@media(max-width:600px){.appearance-options{grid-template-columns:1fr}.appearance-option{min-height:44px}.compound-field{grid-template-columns:1fr}.settings-advanced>summary{min-height:56px;padding:10px 20px}.ai-profile-fieldset{padding:0 20px 24px}.ai-profile-grid{grid-template-columns:1fr}.ai-profile-card{min-height:44px}.ai-routes{margin:0 20px 24px}.ai-route{padding:15px}.ai-route-control select{font: var(--type-caption)}.embedding-chip{max-width:100%;white-space:normal;line-height:1.5}}
+
+/* -------------------------------------------------------------------------
+   Slice 2O.5's own three controls, which had no rule anywhere — slice 2O.7.
+
+   §85 found the notifications and BYOK surfaces drawn entirely by the
+   user-agent default because their classes matched nothing. These are the same
+   shape found on a third surface: `ExportControl` and `GlobalSignOut` render
+   bare `<button>` elements with no class at all, so they were 22px tall on a
+   page whose every other control is 44 — and they are the two most consequential
+   actions on it, one producing the account's whole archive and the other ending
+   every session it has.
+
+   `2O-ACCESS-003`: the sign-out is not the destructive-red the deletion door
+   is. It ends sessions; it destroys nothing, and colouring it as a deletion
+   would teach the reader the wrong thing about a control they should feel able
+   to use.
+   ------------------------------------------------------------------------- */
+.privacy-export button,
+.privacy-sessions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+.privacy-export button:hover:not(:disabled),
+.privacy-sessions button:hover:not(:disabled) { background: var(--background-subtle); }
+.privacy-export button:disabled { opacity: .72; }
+.privacy-export p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* -------------------------------------------------------------------------
+   The appearance radios, and a target the row already looked like it had.
+
+   The three cards are 44px tall and read as the target; the thing a pointer or
+   a thumb must actually land on was the 16px radio and the one line of label
+   text beside it. Making the label fill its cell hands the row's own height to
+   the control it names — no layout moves, and the target stops being a lie
+   about what is clickable.
+   ------------------------------------------------------------------------- */
+.appearance-option label {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+}
+
+/* -------------------------------------------------------------------------
+   `type="time"` and `:focus-visible`.
+
+   Chromium moves focus to a segment inside the field's shadow tree, so the host
+   never matches `:focus-visible` and the product's own ring never painted —
+   `fv=false` while every other control on the page read `fv=true`. The browser
+   highlights the segment, so this was not invisible; it was inconsistent, and a
+   keyboard user crossing the form saw the ring vanish on two fields out of ten.
+
+   `:focus` rather than `:focus-visible`, because the host is the only element
+   this stylesheet can reach and `:focus` is what it matches.
+   ------------------------------------------------------------------------- */
+.settings-fields input[type="time"]:focus {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }

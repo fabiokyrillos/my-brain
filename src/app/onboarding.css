@@ -101,8 +101,27 @@
   border-inline-start: 3px solid var(--text-primary);
 }
 
+/* A step already done, de-emphasised **without** `opacity`.
+
+   It read `opacity: 0.72` until slice 2O.7, and that is the defect
+   `jsdom-cannot-see-contrast` records in its purest form: opacity composites
+   the whole subtree toward whatever is behind it, so `--text-secondary` — which
+   passes AA everywhere else in this product at full strength — landed below
+   4.5:1 here and nowhere else. No unit test could see it, the token was
+   correct, and the rule that broke it says nothing about colour.
+
+   Axe on the rendered page found it on the cockpit in **both themes**. What
+   replaces it changes no text colour that is not already proved: the body and
+   the state label keep `--text-secondary` at full strength, the title steps
+   down from primary to secondary, and the row's completeness is carried by a
+   fill and a border rather than by dimming. */
 .onboarding-step[data-state="satisfied"] {
-  opacity: 0.72;
+  background: var(--background-subtle);
+  border-color: var(--border-divider);
+}
+
+.onboarding-step[data-state="satisfied"] .onboarding-step-title {
+  color: var(--text-secondary);
 }
 
 .onboarding-step-head {
@@ -208,6 +227,19 @@
 .onboarding-recovery-action:focus-visible,
 .onboarding-dismiss-action:focus-visible,
 .onboarding-restore-action:focus-visible {
-  outline: var(--focus-ring);
+  /* `2px solid`, and the two missing words are the whole defect.
+
+     It read `outline: var(--focus-ring)` — and `--focus-ring` is a COLOUR
+     (`#3a6ea5`), not an outline shorthand. `outline` given only a colour leaves
+     `outline-style` at its initial `none`, so this rule was valid CSS that
+     painted **nothing**: five links and two buttons on the cockpit's onboarding
+     path had no visible focus indicator at all, and every one of them matched
+     `:focus-visible` correctly while showing the user no ring.
+
+     Nothing warns about this. It is the `font:` shorthand trap this repository
+     already recorded, arriving through `outline:` — a shorthand silently resets
+     the components it is not given. Found by tabbing through the rendered page
+     and reading `outlineStyle`, which is the only place it is observable. */
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }

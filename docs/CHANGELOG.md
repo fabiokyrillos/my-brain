@@ -2,6 +2,62 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Slice 2O.7: mobile activation and accessibility
+
+**`2O-MOBILE-001` … `-005`, `2O-ACCESS-001` … `-006` — 10 built, 1 partial, 0
+undelivered. Zero migrations. 97 local = 97 hosted, parity `202608160097`.
+Signup closed, rollout gate 25 · 3 · 2. 98 of 116 delivered.**
+
+The full account is `docs/reports/phase-2o/PHASE_2O_SLICE_07_ACCEPTANCE.md`;
+this entry records the change rather than duplicating it.
+
+### Added
+
+- `e2e/phase-2o-mobile-accessibility.spec.ts` — 9 public surfaces, both locales,
+  **added to the CI journey command**. The first lane here that drives real
+  routes instead of inlining `src/app/*.css` into a fixture, so it has no
+  `STYLESHEETS` array to go stale.
+- `e2e/online-phase-2o-mobile-accessibility.spec.ts` — 10 authenticated surfaces
+  against the hosted project.
+- `src/features/pwa/install-section.tsx` and `install-copy.ts` —
+  `2O-MOBILE-004`. Three platforms, no control, and an explicit sentence that
+  installing does not turn alerts on.
+- `src/lib/closeout/stylesheet-class-coverage.test.ts` — a ratchet over elements
+  whose **every** class matches no rule. 49 recorded, eight of them slice 2O.5's
+  privacy block.
+- `docs/reports/phase-2o/PHASE_2O_SCREEN_READER_SCRIPT.md` — a VoiceOver script.
+  `2O-ACCESS-006` closes **`partial`**; the session is **`NOT EXECUTED`**.
+- `statusRemoved` in `src/features/byok/copy.ts` — *Chave removida* / *Key
+  removed*, minted by the owner. `CredentialStatus` now maps through a `Record`,
+  so a fifth member fails the typecheck.
+
+### Fixed
+
+- **Ajustes' mobile layout was dead.** `@media(max-width:600px)` was declared
+  above the base rules; specificity ties resolve by source order, so slice
+  2O.3's `.appearance-options{grid-template-columns:repeat(3,1fr)}` silently
+  won and the page scrolled sideways 53px at 320px. Both media blocks moved to
+  the end of `settings-extended.css`; **no declaration changed**.
+- **Seven onboarding controls had no focus indicator.** `outline:
+  var(--focus-ring)` gives the shorthand only a colour, so `outline-style`
+  stayed `none`.
+- **The capture composer had no focus indicator**: `outline:0` on `:focus` with
+  no `:focus-visible` counterpart.
+- **Contrast**, in both themes: `opacity:.72` on a satisfied onboarding step;
+  and `--text-muted` on `--background-elevated` in the composer's hint.
+- **Eleven interactive targets below 44px**, including the export and global
+  sign-out buttons at 22px with no CSS rule at all, and a memory row's title at
+  **21.59px** — `2O-MOBILE-003`, measured against the hosted project, repaired
+  in both the masked and unmasked branches.
+- **`viewport.themeColor` followed the machine rather than the choice.** The
+  pre-paint script now adds one unkeyed `theme-color` meta first in `<head>`,
+  with the colour read off the framework's own tags. No CSP change, no colour
+  invented, nothing for `system`, and a browser test proves no hydration error.
+- **`2O-ACTIVATION-005`'s guard could not see three controls**, for two reasons:
+  it matched only `name="…"`, and its mount scan was one level deep. No `name`
+  was added to any button; the predicate walks the tree transitively and
+  classifies every operable element into a closed taxonomy.
+
 ## 2026-08-17 - Visual polish of the notifications page and the BYOK block (between slices 2O.6 and 2O.7)
 
 **Owner-requested, strictly visual. No requirement claimed, no slice advanced,
