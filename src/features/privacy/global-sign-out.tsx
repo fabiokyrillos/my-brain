@@ -23,7 +23,7 @@ export function GlobalSignOut({ locale }: { locale: Locale }) {
   const [state, formAction, pending] = useActionState(signOutEverywhere, idleGlobalSignOutState);
 
   return (
-    <form action={formAction}>
+    <form action={formAction} className="privacy-sessions">
       <input type="hidden" name="locale" value={locale} />
       <button type="submit" disabled={pending}>
         {copy.sessions.action}

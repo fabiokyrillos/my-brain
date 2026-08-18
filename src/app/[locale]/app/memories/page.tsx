@@ -150,7 +150,7 @@ export default async function MemoriesPage({
                     sensitivity={deriveSubjectSensitivity(memory.id, memoryLevels)}
                     surface="memory"
                   >
-                    <Link href={href}><strong>{memory.content}</strong></Link>
+                    <Link className="memory-row-title" href={href}><strong>{memory.content}</strong></Link>
                   </ProtectedContent>
                   <p>
                     {copy.kinds[asMemoryKind(memory.kind)]}
