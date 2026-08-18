@@ -8666,3 +8666,170 @@ slices are unchanged; no ID was renumbered, reused or removed.** The
 declaration guard's locked counts moved with it (`TOTAL` 87, `SETTINGS` 8).
 Still zero product code, zero migrations, zero deploy — and implementation
 remains a separate, unrecorded authorization.
+
+## §89 — Phase 2P implementation is AUTHORIZED (ADR-122), slice 2P.0 measures both broken loops, and the measurement rejected the migration it was meant to bless (2026-08-18)
+
+**ADR-122.** Baseline `main` `6a7bf21`, equal to `origin/main`, worktree clean,
+no open PR, **CI green on the exact merge SHA** (`6a7bf21`, three jobs, all
+`success`). **97 local = 97 hosted, parity `202608160097`**, read live. Signup
+**closed**; rollout **25 pass · 3 fail · 2 owner-signature** — run, not quoted.
+
+**Slice 2P.0 changes no product behaviour.** No Server Action, RPC, policy,
+schema, route, copy string or rendered control moved. **Zero migrations.**
+
+### The baseline the package names does not exist on `main`, and that is fine
+
+The PRD, plan, audit and §88 all say `27f9f77`. `main` is `6a7bf21`. `27f9f77`
+is an ancestor, and the delta is the package's own merge: **three guard test
+files and zero product surfaces**. So every audit finding still described the
+tree it was written against and none had to be re-executed. The governing pair
+now names both commits rather than overwriting the one it was authored against
+— §88's own rule, that an earlier line is not rewritten to agree with what
+followed it.
+
+### Conversation is not broken where everyone assumed
+
+The hosted record says the grounded-answer path **works**: 2 questions, 2
+answers, 2 `chat_answered` audit rows, 2 `chat` usage rows, both citation
+envelopes well-formed (`v`, `evidence`, `explanation`, `reach`, `sources`).
+`sendChatMessage` reached its `redirect()` on both turns. **No repair belongs
+in retrieval or in the model call.**
+
+What is broken is that **no failure of that path is recorded anywhere**, so the
+generic boundary is the only artifact it can produce — which is `2P-CHAT-003`
+being false in the shipped product. Three causes, each reproduced:
+
+1. `task-commands/actions.ts:290` — `if (!known) throw error;`. The module's own
+   header states *"Nothing throws out of a Server Action."* `guard()` upholds
+   that for four declared classes and rethrows everything else. The default
+   Conversation route runs `runTaskCommand` **before** the knowledge path, so an
+   undeclared fault escapes `runAssistantTurn` onto the boundary.
+2. `error.tsx:20` still says *"There is no error sink in this product yet."*
+   The sink shipped in `202608070080`. And the boundary's only record is a
+   `console.error` inside a **Client Component** `useEffect` — the browser
+   console, never a server log. In production Next replaces `error.message`, so
+   the digest on screen is the whole durable artifact.
+3. `recordErrorEvent` has exactly **one** production caller in the repository,
+   `rate-limits/server.ts:76`. The chat path has none. Hosted `error_events`
+   holds **1 row, dated 2026-08-07** — a Phase 2H artifact.
+
+**No provider call was made and no BYOK credential was spent to establish any of
+this.** Static reading plus content-free hosted counts.
+
+### Needs You: the status is derived once and never re-derived
+
+`interpretation_lifecycle_status` is `IMMUTABLE` and reads **only the
+interpretation's own JSON** — pending questions, `element_trust`, record-only.
+It has no entry id and no owner id, so it cannot know what the owner has since
+resolved. Read live from `pg_proc`:
+
+- **Three** functions call it: `persist_entry_interpretation`,
+  `persist_reprocessed_entry_interpretation`, `correct_entry_interpretation`.
+- **Nine** functions record the owner's resolutions and touch neither `entries`
+  nor the derivation: `confirm_entry_task_candidates` and `_v2`…`_v6`,
+  `confirm_entry_tasks`, `record_entry_task_candidate_confirmation`,
+  `resolve_pending_question_v1`/`_v2`/`_v3`, `resolve_entry_person_candidates`.
+
+And `list_needs_attention` resolves `when entry_status in ('awaiting_review',
+'partially_processed') then 'review_interpretation'` — **unconditional on the
+status**, evaluated before the finer predicates. Those finer predicates
+(`has_open_question`, `has_unconfirmed_candidate`, `record_only`,
+`candidate_count`) are already correct and already derive from every unresolved
+class; they are simply **unreachable** while the status cannot move. So 2P.1
+needs no projection change once the status can move — which is the useful half
+of this measurement.
+
+### The migration the plan hoped to bless does not pass
+
+`202608170098_confirm_entry_interpretation.sql` on `codex/fix-needs-attention-confirmation`
+(`2bfbe91`) is genuinely well built where it is built: `55P03` rather than the
+`40001` that hangs the gateway, `security definer` with `set search_path = ''`
+and every reference qualified, `revoke`/`grant` least privilege, `for update`
+before any decision, ownership proved against `auth.uid()`, optimistic
+concurrency on `current_interpretation_id`, and a terminal-state replay that
+returns `idempotent: true`.
+
+It still fails, on five counts:
+
+1. **Accepts only `awaiting_review`.** An entry in `partially_processed` whose
+   questions are all answered stays stuck. It does not fix the defect it names.
+2. **Registers no undo** against the `undo_operation` handler registry
+   (migration `052`), so confirmation is irreversible — `2P-ATTENTION-007`.
+3. It is a **manual override, not a re-derivation**: it forces `completed`
+   while `element_trust` may still demand review. That is threat `T-10`'s
+   shape, mitigated only accidentally by the projection's finer predicates.
+4. `entity_id` left **null** in the audit row — the row describes an entry and
+   does not point at it.
+5. `reason` carries `'operation:' || key` — the human-readable audit reason used
+   as an idempotency marker.
+
+Under the owner's condition — *apply it only if the re-audit proves it still
+correct* — **it does not pass. It is not applied and not copied forward.**
+ADR-122 Decision 4 records that, so nobody re-litigates it from the branch's
+existence.
+
+### Telemetry needed no migration, and the vocabulary was already waiting
+
+All four classes `2P-FOUNDATION-005` names map onto **deployed** check
+constraints, read live:
+
+| Class | Home | Migration |
+|---|---|---|
+| failure class | `error_events` — 5 surfaces, 16 operations (incl. `chat_answer`, `embed_text`), 14 reasons, **no free-text column** | none |
+| queue reason | `product_events` — `attention_item_resolved`, `needs_attention_*`, plus `properties` jsonb | none |
+| automation decision | `audit_logs` — **`action_type` carries no check constraint**; only `actor` is closed | none |
+| undo outcome | `audit_logs` + the `undo_operation` registry | none |
+
+Every one of `2P-CHAT-002`'s five distinguishable failures already has a
+deployed reason. **The vocabulary was built for the chat path and never wired to
+it.** What is missing is a producer.
+
+One gap named rather than papered over: `product_events` has no name meaning
+"the agent decided to write automatically". `audit_logs` covers
+`2P-AUTONOMY-009` without a migration; a *product analytics funnel* for
+automation would be a new deployed vocabulary value and therefore a stop
+condition, and 2P.4 must not discover that late.
+
+### What the guards now pin, and the proof they can fail
+
+`phase-2p-foundation-guard.test.ts` is new. It reads SQL as **the latest
+definition wins** — `latestDefinition` finds the last migration that redefines a
+function and bounds the body at the next definition in the same file, because
+migrations are append-only and scanning the whole corpus answers "did this ever
+look like X", which is not the question. It locks the three re-derivers, asserts
+the nine resolvers do **not** re-derive, and carries the message *"move it to
+REDERIVERS and say so in the slice record"* so 2P.1 passes through the pin
+consciously instead of discovering it the way ADR-121's A13 retarget discovered
+the 2O pin.
+
+`phase-2p-declarations.test.ts` is **flipped, not relaxed**: the slice
+acceptance record is now legal, the matrix and closing report stay forbidden
+*until slice 2P.8 by a decision that names when that ends*, and the migration
+count is pinned at 97 with the rejected candidate forbidden under any name.
+
+**Both were proved non-vacuous against a planted violation**, not merely
+against fixtures: a synthetic migration redefining `resolve_pending_question_v3`
+to call the derivation made exactly the three intended assertions fail — the
+resolver pin, the 97-migration pin and the chain-length pin — and removing it
+returned all 24 to green with 97 migrations and a clean worktree.
+
+### Where this stops
+
+**At an owner checkpoint, and it is the first one the phase reaches.** Slice
+2P.1's correction lives in deployed SQL: nine resolution functions must
+re-derive the entry lifecycle, and `list_needs_attention`'s unconditional status
+branch is what keeps a resolved entry in the queue. Neither is reachable from
+the application layer without a second entry-status write path or a client-side
+status write, both of which the standards and the plan's own stop conditions
+forbid. ADR-122 Decision 3 funds exactly one conditional allocation, Decision 4
+records that the condition failed, and **a corrected migration is therefore
+unfunded.** It is raised here, at the end of the measurement slice, with the
+evidence — not discovered mid-implementation.
+
+Everything after 2P.1 is unblocked and needs no migration: 2P.2 needs a
+producer, not a schema; 2P.3 finds Today and Capture already sharing one write
+path, one action, one draft store and two `captureSource` scopes. Push HTTP
+403/Android, retention scheduling, SMTP, the restore drill, the unexecuted
+screen-reader session and every other inherited residual stay exactly where §87
+and §88 left them. **This section deliberately does not name what comes after
+Phase 2P.**

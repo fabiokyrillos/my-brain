@@ -1,10 +1,15 @@
 # Phase 2P — Trustworthy capture and everyday UX (Implementation Plan)
 
-**Status:** planning complete, owner direction signed by ADR-121;
-**implementation not yet authorized**.
+**Status:** planning complete and owner direction signed by ADR-121;
+**implementation authorized by ADR-122** (2026-08-18), slices 2P.0 … 2P.8 in
+sequence. Migrations remain unfunded except the single conditional allocation
+ADR-122 Decision 3 names — and Decision 4 records that the condition was
+evaluated and the candidate rejected.
 
-**Baseline:** `main` `27f9f77`; 97 local = 97 hosted migrations, parity
-`202608160097`; signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+**Baseline:** authored against `main` `27f9f77`; **implementation baseline is
+`main` `6a7bf21`** (this package's own merge; zero product surfaces changed
+between them). 97 local = 97 hosted migrations, parity `202608160097`; signup
+closed; rollout 25 pass · 3 fail · 2 owner-signature.
 
 ## 1. Sequencing
 

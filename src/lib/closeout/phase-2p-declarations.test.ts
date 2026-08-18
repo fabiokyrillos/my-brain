@@ -1,9 +1,29 @@
 /**
- * Phase 2P planning-only declaration guard.
+ * Phase 2P declaration guard.
  *
- * ADR-121 authorizes the package and signs its direction, not implementation.
- * This file therefore protects both halves: the package is complete and
- * coherent, and implementation-only artifacts do not exist yet.
+ * ## Two postures, and why this file changed rather than being deleted
+ *
+ * ADR-121 authorized the package and signed its direction, not implementation,
+ * and this guard asserted that in both directions: the package is complete and
+ * coherent, and nothing that only exists *after* implementation exists yet.
+ *
+ * **ADR-122 authorized implementation**, so one of those absences had to move —
+ * a slice acceptance record is now legal. The file is *flipped*, not relaxed,
+ * for the reason Phase 2N's equivalent was inverted at closeout rather than
+ * deleted: an absence that nobody asserts is an absence nobody notices
+ * disappearing. The matrix, the closing report and any Phase 2P migration stay
+ * forbidden, and each is now forbidden *by a decision that names when it stops
+ * being forbidden* rather than by the phase not having started.
+ *
+ * ## The pin this file carries
+ *
+ * The 87/14 counts, the family sequence and the twelve signed decisions are
+ * unchanged and still locked. What is added is the authorization chain itself:
+ * ADR-122 must exist, must authorize implementation, and must record that the
+ * migration candidate was *evaluated and rejected* rather than left pending.
+ * A later slice that wants a migration has to pass through this pin
+ * consciously, instead of discovering it the way ADR-121's A13 retarget
+ * discovered the 2O guard.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -83,21 +103,60 @@ describe("Phase 2P declarations", () => {
     expect(decisions).toMatch(/declares 87 requirements/);
   });
 
-  it("keeps implementation-only Phase 2P artifacts absent", () => {
+  it("records the implementation authorization and what it does not authorize", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/ADR-122 — The owner authorizes Phase 2P implementation/);
+    // ADR-121 deferred implementation to "a separate decision". ADR-122 is that
+    // decision, and the two must never be readable as one: 121 still says it
+    // authorizes nothing, and 122 still says the migration budget is one
+    // conditional allocation rather than an open door.
+    expect(decisions).toMatch(/\*\*It authorizes no migration beyond the single conditional allocation named below/);
+    expect(decisions).toMatch(/stop condition\*\* requiring a separate owner authorization/);
+  });
+
+  it("keeps closeout-only Phase 2P artifacts absent until slice 2P.8", () => {
+    // The slice acceptance record is deliberately NOT in this list any more —
+    // ADR-122 Decision 2 made it legal. These two are still forbidden, and the
+    // decision names when that stops being true.
     for (const file of [
       "docs/reports/phase-2p/PHASE_2P_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2p/PHASE_2P_CLOSING_REPORT.md",
-      "docs/reports/phase-2p/PHASE_2P_SLICE_00_ACCEPTANCE.md",
     ]) expect(exists(file), file).toBe(false);
-
-    const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2p/i.test(name))).toEqual([]);
+    expect(read("docs/DECISIONS.md")).toMatch(/remain \*\*forbidden until slice 2P\.8\*\*/);
   });
 
-  it("keeps the migration candidate a candidate rather than a spend", () => {
-    const corpus = `${read(PRD)}\n${read(PLAN)}\n${read(AUDIT)}`;
-    expect(corpus).toContain("codex/fix-needs-attention-confirmation");
-    expect(corpus).toMatch(/re-audit|required/i);
-    expect(corpus).not.toMatch(/098[^\n]*(deployed|applied|spent)/i);
+  it("keeps every Phase 2P migration unspent", () => {
+    // Decision 3: no allocation has been authorized and spent. A migration
+    // named for this phase appearing here means one was created without one.
+    const migrations = readdirSync(join(REPO, "supabase/migrations"));
+    expect(migrations.filter((name) => /phase[_-]?2p/i.test(name))).toEqual([]);
+    // The rejected candidate is not copied forward under any name.
+    expect(migrations.filter((name) => name.startsWith("202608170098"))).toEqual([]);
+    expect(migrations).toHaveLength(97);
+  });
+
+  it("records the candidate as evaluated and rejected, not as pending", () => {
+    // Before ADR-122 this asserted the candidate was still merely a candidate.
+    // It has now been re-audited, so leaving it "pending" would be the drift:
+    // the rejection and its reasons must be recorded where the next slice reads.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toContain("202608170098_confirm_entry_interpretation.sql");
+    expect(decisions).toMatch(/\*\*not applied and not copied forward\*\*/);
+    const record = read("docs/reports/phase-2p/PHASE_2P_SLICE_00_ACCEPTANCE.md");
+    expect(record).toContain("codex/fix-needs-attention-confirmation");
+    expect(record).toMatch(/registers no undo/i);
+    expect(record).toMatch(/partially_processed/);
+  });
+
+  it("is not vacuous: every extractor above answers differently on a fixture", () => {
+    // An assertion over an empty read passes trivially, and three of the
+    // extractors above are regex reads over prose. Each is exercised against a
+    // string that must produce the opposite answer.
+    expect(DECLARATION.test("")).toBe(false);
+    DECLARATION.lastIndex = 0;
+    expect([..."- **2P-X-001:** a\n- **2P-X-002:** b".matchAll(DECLARATION)]).toHaveLength(2);
+    expect(/ADR-122 — The owner authorizes Phase 2P implementation/.test("ADR-121 — planning")).toBe(false);
+    expect(/phase[_-]?2p/i.test("202608170098_confirm_entry_interpretation.sql")).toBe(false);
+    expect(/phase[_-]?2p/i.test("202608180098_phase_2p_lifecycle.sql")).toBe(true);
   });
 });
