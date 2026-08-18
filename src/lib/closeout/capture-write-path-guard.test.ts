@@ -126,8 +126,16 @@ describe("2J-CAPTURE-004: exactly one path creates an entry", () => {
   });
 });
 
-describe("2J-CAPTURE-002/003: the unified surface dispatches, it does not unify", () => {
-  const surface = readFileSync(join(SRC, "features", "capture", "unified-capture.tsx"), "utf8");
+describe("2J-CAPTURE-002/003 and 2P-CAPTURE-003: the unified surface dispatches, it does not unify", () => {
+  /*
+    Retargeted by slice 2P.3. The property is the same one Phase 2J wrote it
+    for -- the surface that offers every modality must not become the thing
+    that writes them -- and the surface simply moved: `unified-capture.tsx`
+    dispatched between three panels, `composer.tsx` puts all three in one row
+    over two forms. The file name changed; not one assertion below was weakened
+    to make it pass.
+  */
+  const surface = readFileSync(join(SRC, "features", "capture", "composer.tsx"), "utf8");
   /**
    * Comments stripped before every match below.
    *
@@ -153,7 +161,20 @@ describe("2J-CAPTURE-002/003: the unified surface dispatches, it does not unify"
     // is neither: the page owns both, and passes them down.
     expect(code).not.toMatch(/from "@\/features\/capture\/actions"/);
     expect(code).not.toMatch(/from "@\/features\/agent\/actions"/);
-    expect(code).toMatch(/textAction/);
-    expect(code).toMatch(/attachmentAction/);
+    expect(code).toMatch(/action: CaptureAction/);
+    expect(code).toMatch(/attachmentAction: AgentFormAction/);
+  });
+
+  it("keeps the two write paths on two form owners, not one action that branches", () => {
+    /*
+      `2P-CAPTURE-003` and `T-1`, structurally. The rendered proof is
+      `composer.test.tsx` asserting `fileInput.form !== textarea.form`; this is
+      the same property read off the source, because the way it would be lost is
+      a refactor that "simplifies" the sibling form away and moves the file input
+      into the entry form -- at which point one action starts receiving files.
+    */
+    expect(code.match(/<form/g) ?? []).toHaveLength(2);
+    // The file input and the upload submit both point back at the sibling form.
+    expect(code.match(/form=\{attachmentFormId\}/g) ?? []).toHaveLength(2);
   });
 });

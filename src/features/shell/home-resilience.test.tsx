@@ -18,8 +18,17 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
   NeedsAttentionViewed: () => null,
 }));
 vi.mock("@/features/capture/actions", () => ({ captureEntry: vi.fn() }));
-vi.mock("@/features/capture/quick-capture-form", () => ({
-  QuickCaptureForm: () => <div data-testid="capture">capture</div>,
+/*
+  Three actions now, not one. Slice 2P.3 gave Today the same composer the
+  capture page mounts, so this Server Component hands it the attachment and
+  transcription actions too -- and both of their modules import `server-only`,
+  which throws the moment jsdom reaches it. Mocking the composer alone is not
+  enough: the page imports the actions itself, before React ever renders.
+*/
+vi.mock("@/features/agent/actions", () => ({ uploadAttachment: vi.fn() }));
+vi.mock("@/features/capture/transcribe-action", () => ({ transcribeRecording: vi.fn() }));
+vi.mock("@/features/capture/composer", () => ({
+  Composer: () => <div data-testid="capture">capture</div>,
 }));
 vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: async () => "Brain" }));
 vi.mock("@/lib/auth/require-user", () => ({

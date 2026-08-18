@@ -136,8 +136,16 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
  * **Destination: the owner**, in the 2O.7 acceptance record. Raising this
  * number requires a reason in the same commit; lowering it is always welcome
  * and the liveness check below insists the number be corrected when it happens.
+ *
+ * **49 -> 45, slice 2P.3.** The liveness check did exactly what it was written
+ * to do: it failed, named the new number, and refused to let the debt be
+ * recorded as larger than it is. Four elements left the census — the composer's
+ * draft note and its discard button, which had shipped in slice 2O.3 with no
+ * rule anywhere in `src/app/*.css`, plus two the modality tabs took with them
+ * when they were deleted. Nothing was styled to move this number; it moved
+ * because the surface those classes live on was rebuilt.
  */
-const RECORDED_UNSTYLED = 49;
+const RECORDED_UNSTYLED = 45;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

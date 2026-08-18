@@ -13,7 +13,7 @@ import { kickEntryInterpretationWorker } from "@/lib/jobs/entry-worker";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { captureEntrySchema } from "./schema";
-import type { CaptureState } from "./quick-capture-form";
+import type { CaptureState } from "./composer";
 
 const captureRequestSchema = z.object({
   idempotencyKey: z.string().uuid(),

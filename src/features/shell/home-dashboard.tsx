@@ -1,5 +1,7 @@
 import { captureEntry } from "@/features/capture/actions";
-import { QuickCaptureForm } from "@/features/capture/quick-capture-form";
+import { Composer } from "@/features/capture/composer";
+import { transcribeRecording } from "@/features/capture/transcribe-action";
+import { uploadAttachment } from "@/features/agent/actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
 import { EMPTY_HOME_AGENDA, loadHomeAgendaProjection } from "@/features/daily-cycle/home-agenda";
@@ -273,7 +275,21 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
         agentName={agentName}
         locale={locale}
         view={view}
-        capture={<QuickCaptureForm action={captureEntry} agentName={agentName} locale={locale} captureSource="home" />}
+        capture={
+          /*
+            `2P-CAPTURE-001`. The SAME component the capture page mounts, with
+            the same three actions. Today used to mount text alone, so a file or
+            a thought spoken aloud meant leaving the cockpit first.
+          */
+          <Composer
+            action={captureEntry}
+            attachmentAction={uploadAttachment}
+            transcribeAction={transcribeRecording}
+            agentName={agentName}
+            locale={locale}
+            captureSource="home"
+          />
+        }
         onboarding={
           onboarding ? (
             <OnboardingPanel locale={locale} path={onboarding} dismissAction={dismissOnboarding} />
