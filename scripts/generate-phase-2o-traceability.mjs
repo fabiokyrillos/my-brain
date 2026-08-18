@@ -573,7 +573,9 @@ export function render({ requirements, resolved, migrations }) {
     );
   }
 
-  lines.push("");
+  // One trailing newline, and not two. `join` already leaves the last row
+  // without one, so pushing an empty string here produced a blank line at EOF —
+  // which `git diff --check` reports and CI gates on.
   return `${lines.join("\n")}\n`;
 }
 
