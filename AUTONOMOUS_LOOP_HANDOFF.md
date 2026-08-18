@@ -9272,3 +9272,153 @@ remainders stay open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
 authorization). Push HTTP 403, signup, rollout and every inherited residual stay
 exactly where §87, §88 and §91 left them. **This section deliberately does not
 name what comes after Phase 2P.**
+
+## §93 — Slice 2P.3 merges, the owner grants a standing authorization, and re-running §89's census found it had undercounted its own list (2026-08-18)
+
+**Merge SHA `f16d43103941010396f0e6e6ab86496995899c3e`.** `main` synchronized and
+clean, zero open PRs, **97 local = 97 hosted, parity `202608160097`** — read live
+from `supabase_migrations.schema_migrations`, not quoted. Signup closed; rollout
+25 pass · 3 fail · 2 owner-signature.
+
+### The merge was taken on step-level evidence, twice
+
+PR #257, head `7e37eaf`. Four check-runs, **all `success`**, and the job that
+matters was read step by step at **both** points — head and merge SHA — because
+§91's trap was a job that reported four green conclusions while its browser lane
+had never run:
+
+| Step | head `7e37eaf` | merge `f16d431` |
+|---|---|---|
+| 7 whole migration chain on an empty database | `success` | `success` |
+| 8 full pgTAP suite | `success` | `success` |
+| 11–13 three concurrency proofs | `success` | `success` |
+| **15 `Install the browser`** | **`success`** | **`success`** |
+| **16 `Run the deterministic foundation journey`** | **`success`** | **`success`** |
+| 17 rollback rehearsal | `success` | `success` |
+| 18–19 artifact collectors | `skipped` — correct, they are `if: failure()` | same |
+
+Zero `cancelled` at either point.
+
+### One line in §92 preceded its evidence, and is corrected here rather than rewritten
+
+§92 says *"the slice is merged and green on its exact merge SHA"*. It was written
+**before** the merge, so at the moment of writing that sentence was an intention,
+not a measurement. It is true now — the table above is its evidence — but the
+claim ran ahead of the proof, which is the same failure mode this project keeps
+recording from the other direction. Corrected in the successor section, per the
+rule that an earlier line is not rewritten to agree with what followed it.
+
+### The owner's standing authorization
+
+Merging PR #257 was authorized under eight conditions, all executed in order:
+wait for every job on the exact head; require `success` on all of them; read the
+internal steps of `database and journey` and confirm the journey really ran;
+read the final diff and confirm no actionable comment or review (zero reviews,
+zero inline comments — the only comment is the Vercel bot's deploy metadata);
+only then merge; green CI on the exact merge SHA with the steps checked again;
+synchronize `main` and confirm a clean worktree; update this handoff.
+
+**The authorization now stands for the remaining Phase 2P slices:** after each
+slice — PR, green CI at the head, review, merge, green CI at the merge SHA,
+update this handoff, re-audit the next. It does **not** extend to anything the
+prior stop conditions cover. **2P.4 must not begin before 2P.3 is closed and
+2P.1's planned resumption is done.** Migration 098 is not to be reused.
+
+### Slice 2P.1 re-audited against `f16d431`, read live from `pg_proc`
+
+| Fact | Measured |
+|---|---|
+| `confirm_entry_interpretation` hosted | **0** — migration 098 was never applied, as ADR-122 Decision 4 recorded |
+| callers of `interpretation_lifecycle_status` | **three**: `persist_entry_interpretation`, `persist_reprocessed_entry_interpretation`, `correct_entry_interpretation` |
+| the derivation's signature | `IMMUTABLE`, arguments `(p_pending_questions jsonb, p_element_trust jsonb, p_record_only boolean)` — **no entry id, no owner id** |
+| resolution functions that `update public.entries` | **none** |
+| `list_needs_attention` | still returns `review_interpretation` on the status branch |
+| `entries.status` | nine legal values, `partially_processed` and `awaiting_review` both among them |
+
+Everything §89 measured still holds — **except one number, and it is the one the
+authorization is written around.**
+
+### §89 said "nine". There are twelve, and ten of them are reachable by the owner
+
+§89's sentence reads *"**Nine** functions record the owner's resolutions"* and
+then enumerates `confirm_entry_task_candidates` and `_v2`…`_v6`,
+`confirm_entry_tasks`, `record_entry_task_candidate_confirmation`,
+`resolve_pending_question_v1`/`_v2`/`_v3`, `resolve_entry_person_candidates`.
+**That enumeration is twelve names.** The prose undercounted its own list, and
+"nine" then propagated into ADR-122's context, §91's authorization sentence,
+`STATE.md` and `TODO.md`. All twelve exist hosted; the count was verified by
+asking the database, not by re-reading the sentence.
+
+The distribution is what makes this matter rather than pedantry:
+
+| Group | Count | Detail |
+|---|---|---|
+| exist | **12** | every name §89 listed |
+| `EXECUTE` granted to `authenticated` | **10** | including **every superseded version** — `confirm_entry_task_candidates` v1–v6, `resolve_pending_question_v1`–`v3`, `resolve_entry_person_candidates` |
+| `service_role` only | **2** | `confirm_entry_tasks`, `record_entry_task_candidate_confirmation` |
+| actually called by the application | **4** | `confirm_entry_task_candidates_v4`, `_v6`, `resolve_pending_question_v3`, `resolve_entry_person_candidates` |
+
+So there are **six resolution paths the application never calls and the owner's
+own session can still reach through PostgREST**. Repairing only the four the app
+uses would fix the defect for normal use and leave six open routes that resolve
+without re-deriving — and repairing "nine" would leave three unrepaired by
+arithmetic alone. This is the shape recorded earlier as *"a governed column can
+leak through its derivatives — census the row, not the column"*, and as *"a
+recorded re-audit can be false"*: re-running was the only way to know.
+
+**Reading forward:** the owner's authorization asks for *"a central contract that
+prevents future divergence"*, and that is exactly what covers this — one
+re-derivation reached by **every** resolution path rather than by the four that
+happen to be wired today. Slice 2P.1 therefore proceeds on the measured twelve.
+That is not a widening of scope; it is the same scope, counted correctly, and
+narrowing it to nine would defeat the stated purpose of the authorization.
+
+### Migration 098's five defects, confirmed line by line, plus a sixth precision
+
+Read from `origin/codex/fix-needs-attention-confirmation` (`2bfbe91`), sixty-six
+lines, **not copied and not to be reused**:
+
+1. **Accepts only `awaiting_review`** — `if owned_entry.status <> 'awaiting_review' then raise`.
+   A `partially_processed` entry whose questions are all answered stays stuck, so
+   it does not fix the defect it names.
+2. **Registers no undo.** Its only write beyond `entries` is an `audit_logs`
+   insert; nothing reaches the `undo_operation` handler registry from migration
+   052. Confirmation would be irreversible — `2P-ATTENTION-007`.
+3. **Forces rather than re-derives** — `set status = 'completed'` with no call to
+   `interpretation_lifecycle_status`, while `element_trust` may still demand
+   review. That is threat `T-10`'s shape.
+4. **`entity_id` is absent from the audit insert's column list**, so the row
+   describes an entry and does not point at it.
+5. **`reason` carries `'operation:' || p_operation_key::text`** — the
+   human-readable audit reason used as an idempotency marker.
+6. **New, and a sharpening of 5: `p_operation_key` is never used to deduplicate
+   anything.** The early `idempotent: true` return keys on `status = 'completed'`,
+   so two *different* operation keys answer identically on an already-completed
+   entry, and the *same* key re-executes once the status has moved. The parameter
+   is required, validated as non-null, and then only written into prose.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary.** Slice 2P.3 is merged and green on its exact merge
+SHA with the steps read; `main` is synchronized and clean; nothing is
+half-written; parity is unchanged.
+
+**Next action: slice 2P.1**, under the owner's replacement-migration
+authorization — one migration, written from nothing, beginning with the
+defect write-up above and a corrected contract **before any SQL**. It must cover
+`awaiting_review` **and** `partially_processed`, re-derive the terminal state
+after every relevant resolution path, reach every granted resolution function
+through a central contract, align `list_needs_attention` with genuinely
+unresolved state, stop a fully resolved entry reappearing, preserve owner scope,
+RLS, idempotency, concurrency and audit, provide a true undo, create no
+client-side status write and no second competing authority, preserve partially
+resolved entries while a real decision remains, prove cross-owner isolation,
+carry negative and non-vacuity controls, prove refresh / back / replay /
+pagination on the hosted path, and clean every probe residue. Hosted application
+only after the seven gates §91 names, in order.
+
+**Cumulative: 24 of 87 requirements, zero migrations spent.** Two named
+remainders stay open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
+`2P-CHAT-007-JOURNEY` (slice 2P.8). Push HTTP 403, signup, rollout and every
+inherited residual stay where §87, §88 and §91 left them. **This section
+deliberately does not name what comes after Phase 2P.**
