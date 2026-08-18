@@ -9010,3 +9010,129 @@ allowed to stand in for the journey.
 
 **Slice 2P.1 remains blocked on the owner**, exactly where §89 left it. This
 section deliberately does not name what comes after Phase 2P.
+
+## §91 — Slice 2P.2 merges, the owner unblocks both checkpoints, and a CI job reported four green conclusions while the browser journey had never run (2026-08-18)
+
+**Merge SHA `099cd57`.** `main` clean and synchronized, **zero open PRs**, 97
+migrations, parity `202608160097`. Signup closed; rollout 25 pass · 3 fail · 2
+owner-signature.
+
+### The CI lesson, because it nearly closed a slice on a proof that did not exist
+
+PR #255's head `5e31882` reported **4/4 checks complete**, and one of the four
+conclusions was **`cancelled`** rather than `success`. The prior recorded form of
+this trap is *"a cancelled job ran nothing — empty `jobs[].steps` means it never
+started"*. **This was the complement, and it is worse.** The job ran **36
+minutes** and its steps read:
+
+| Steps | Result |
+|---|---|
+| 1–14: Supabase stack, whole migration chain on an empty database, full pgTAP suite, `db lint`, three concurrency proofs, app build | **all `success`** |
+| 15 `Install the browser` | **`cancelled`** |
+| 16 `Run the deterministic foundation journey` | **`skipped`** |
+| 17–19 rollback rehearsal, Playwright report, container logs | `skipped` |
+
+So fourteen green steps made the job feel proved, and **the one gate that
+mattered for this change — the desktop and mobile Playwright journey — never
+executed**. A slice whose central change was a navigation reorder would have
+merged with its browser lane silently unrun.
+
+Re-run via `POST /actions/jobs/{id}/rerun` (a `cancelled` job is not reliably
+picked up by `gh run rerun --failed`). The second attempt read **21 `success`, 2
+`skipped`, zero `cancelled`** — steps 15 and 16 both `success`, and the two
+skips are the `if: failure()` artifact collectors, which is correct. **Only then
+was the head green**, and only then was the merge taken.
+
+**The rule this hardens:** a monitor reporting "checks complete N/N" is about
+*status*, never *conclusion*. Read the conclusions; when one is `cancelled`,
+read the step list before saying anything at all.
+
+### The owner unblocked both checkpoints, with limits
+
+**1 — one replacement migration for slice 2P.1 is AUTHORIZED.** Not a correction
+of `202608170098`: that file is to be **recorded as rejected and obsolete by the
+re-audit**, never copied, never quietly fixed, never counted as delivered work.
+The five defects and the corrected contract must be documented **before** any SQL
+is written. The migration must correct the real entry lifecycle, cover both
+`awaiting_review` **and** `partially_processed`, re-derive the terminal state
+after every relevant resolution path, repair all nine resolution functions
+**preferably through a central contract that prevents future divergence**, align
+`list_needs_attention` with genuinely unresolved state, stop a fully resolved
+entry reappearing, preserve owner scope / RLS / idempotency / concurrency /
+audit, provide a true undo (`2P-ATTENTION-007`), create **no** client-side status
+write and **no** second competing authority path, duplicate nothing, preserve
+partially resolved entries while a real decision remains, prove cross-owner
+isolation, carry negative and non-vacuity controls, prove refresh / back / replay
+/ pagination on the hosted path, and clean every probe residue.
+
+Hosted application only after, in order: **(1)** green PR on the exact head,
+**(2)** full diff review, **(3)** merge, **(4)** green CI on the exact merge SHA,
+**(5)** proof the applied bytes are byte-identical to `main`, **(6)** a dry run
+showing exactly the expected migration, **(7)** the project's backup posture.
+Then prove local = hosted parity and record the deployment. **This is the only
+authorized migration; anything further is a new stop condition.**
+
+**2 — one real answered Conversation turn on the owner's BYOK is AUTHORIZED**, to
+close `2P-CHAT-007-JOURNEY`, and it may run in slice 2P.8 rather than
+interrupting the sequence. Limits: synthetic, minimal, non-personal content; **at
+most one successful answered call**; a second attempt only if the first fails
+*before generating an answer* on a clearly transient error; no repeated paid
+tests; the key is never exposed, read, printed or persisted; record only failure
+class and a content-free correlation id; clean up conversations, messages, events
+and disposable fixtures; **prove zero owner-scoped residue**; and report that the
+proof spent BYOK **without inventing an exact cost** if it cannot be measured.
+
+Both authorizations are to be recorded as an amendment to ADR-122 by the slice
+that uses them — deliberately not folded into 2P.2's PR, which is about something
+else.
+
+**Owner-confirmed order:** 2P.2 → **2P.3** → then 2P.1 at the first safe boundary
+between slices. **2P.4 must never precede 2P.3.** Push HTTP 403, signup, rollout
+and the roadmap successor stay out of scope.
+
+### Slice 2P.3 re-audited against `099cd57`, before any edit
+
+| Requirement | State | Evidence |
+|---|---|---|
+| `-001` Today and Capture mount one contract | **not built** | Today mounts `QuickCaptureForm` directly (`home-dashboard.tsx:276`); Capture mounts `CaptureModeReporter` → `UnifiedCapture` |
+| `-002` text ready, no mode choice first | **partial** | `useState<CaptureMode>("text")` already makes text the initial panel, but a three-tab `role="tablist"` with a `Escrever` tab renders **above** it |
+| `-003` attachment action at the left, existing write path | **not built** | `UploadForm` (`agent/forms.tsx:576`) is a complete standalone form with its own label, file input and submit button |
+| `-004` microphone beside send | **not built** | the mic is a tab |
+| `-005` drag, drop and paste | **not built at all** | zero occurrences of `onDrop`, `onPaste`, `dragover` or `DataTransfer` anywhere under `src/features` |
+| `-006` transcript into the editable draft | **baseline, needs re-proof** | `VoiceComposer` already does record → transcribe → editable draft; "at the current composition boundary" may be new |
+| `-007` edit, type more, record again, discard | **baseline, needs re-proof** | same component |
+| `-008` only explicit send creates an entry | **baseline** | held by `capture-write-path-guard.test.ts` |
+| `-009` audio memory-only, discarded four ways | **baseline** | `no-durable-audio-guard.test.ts` covers schema, columns, storage buckets, retention classes **and** code paths, with non-vacuity |
+| `-010` draft stores no key, audio, bytes or replay authority | **baseline for text** | `composer-draft.ts` is `sessionStorage`, text only, no idempotency key, one consumer — must extend to whatever the unified composer stores |
+
+**The architectural constraint that decides this slice.** One `<form>` has one
+action, and there are **two** write paths that must stay separate (`T-1`):
+`captureEntry` and `uploadAttachment`. So the unified bar has to be **one visual
+surface over two forms** — HTML5's `form="…"` attribute places a control inside
+the composer row while it belongs to a sibling upload form. Merging them into one
+action that branches on whether a file is attached would be precisely the *"third
+write path with a friendly name"* the plan names as a stop condition, and
+`UnifiedCapture`'s own doc block already argues against it at length.
+
+**One deployed-vocabulary consequence to handle consciously.**
+`capture_mode_selected` is in the deployed `product_events` vocabulary and its
+**only** producer is the tablist. Removing the tabs without re-wiring it leaves a
+deployed event name with no producer — the mirror of the defect recorded earlier
+as *"a producer with no consumer is invisible"*. The fix needs **no migration**: emit
+it when the owner activates the attachment or microphone action, which is still
+truthfully "which modality was chosen".
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** Slice 2P.2 is merged and green on its
+exact merge SHA; nothing is half-written; the worktree is clean and no PR is open.
+
+**Next action:** implement slice 2P.3 from the re-audit above, on a branch off
+`099cd57`. Then slice 2P.1, using the authorization recorded above, beginning with
+the five-defect write-up and the corrected contract **before** any SQL.
+
+**Cumulative: 14 of 87 requirements, zero migrations spent.** Two named
+remainders open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
+`2P-CHAT-007-JOURNEY` (slice 2P.8, now with the owner's one-turn BYOK
+authorization). **This section deliberately does not name what comes after Phase
+2P.**
