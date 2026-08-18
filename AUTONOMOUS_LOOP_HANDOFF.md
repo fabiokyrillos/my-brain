@@ -8351,3 +8351,185 @@ condition**).
 > **Do not** absorb a declined residual, reallocate **M2**, or create a
 > migration outside the signed conditions. **Do not** open signup, resume the
 > push HTTP 403 track, or start the successor phase.
+
+## §87 — PHASE 2O IS COMPLETE: 116 of 116 classified, both allocations close unspent, and the gate that answered was worse than the three that refused (2026-08-18)
+
+PR **#250**, merged at **`141e04d`**; head at merge **`2dfd6d3`**, **CI green on
+all three job families on the head**. `main` local equals `origin/main`,
+worktree clean, no open PR.
+
+**`2O-READY-001` … `-005`, `2O-METRICS-001` … `-005`, `2O-SEC-001` … `-005`,
+`2O-CLOSE-001` … `-004` — 14 `built`, 5 `not-built-by-rule`, 0 `undelivered`.**
+
+**PHASE 2O IS COMPLETE. 116 declared · 116 classified · 0 unclassified —
+106 `built` · 3 `baseline` · 2 `partial` · 5 `not-built-by-rule` ·
+0 `undelivered`. ZERO migrations for the whole phase. 97 local = 97 hosted,
+parity `202608160097` — the number it started with. Both allocations close
+unspent. Signup closed. Rollout gate 25 · 3 · 2, re-read by running it. CSP
+unchanged. `embedding_model` untouched. A13 not retargeted. The successor is
+re-audited and NOT started.**
+
+### The three recorded findings reproduced, and re-running them found a fourth
+
+§86 said to treat its findings as a starting point. All three held: the gate
+still answers **25 · 3 · 2**; `2O-METRICS` has **no producer and no consumer**;
+and the vocabulary's three copies **agree** at 39 names, hosted check constraint
+against TypeScript contract, sorted lists identical.
+
+**The fourth was nobody's finding.** `2O-PREF-002` had been `partial` since slice
+2O.3 because the consent record had no surface. **Slice 2O.5 built one** —
+`ConsentSection`, mounted on Ajustes at `settings/page.tsx:180` — and said so in
+prose, but its classification table covered a different family, so **nothing
+re-classified the requirement**. The last recorded class stayed `partial` over
+work that had shipped three slices earlier.
+
+**This repository's standing risk is over-stating shipped UX** — Phase 2I's audit
+did it three times, and most guards point that way. **Here the matrix would have
+under-stated it**, and understating reads as caution, which is what makes it
+harder to see. Both directions are wrong, and only a closeout that re-derives
+from source catches the second.
+
+### The generator found four defects, and the one that did not refuse is the lesson
+
+Three produced refusals — the machine working, and self-announcing.
+
+1. **The row key was read from anywhere on the line.** Slice 2O.2's `-003` row
+   cites `2O-ACTIVATION-001` in its evidence, so the scan keyed the row to it and
+   reported a conflict between two records that never disagreed. **An evidence
+   cell routinely cites other requirements, and citing one is not classifying
+   it.** The key is now positional.
+2. **A prose row got an empty evidence string**, because the cell slice ran
+   unconditionally — so a prose `partial` would have failed a destination check
+   it never actually took. Latent: 2O.0 and 2O.1 classify in prose and happen to
+   carry no `partial`.
+3. **The separator character lives inside a class name.** Stripping every dash to
+   resolve a prose class turned `not-built-by-rule` into `not built by rule` and
+   made five requirements unclassifiable at once. **The separator is what must be
+   narrowed, never the class.**
+
+**The fourth answered.** The adjudications were first written in their own table
+— `| Requirement | Was | Now | Why |` — because *was* and *now* is how a human
+reads an overturned classification. The generator reads a class **positionally,
+from the second cell**, and in that shape the second cell is **`Was`**. It read
+`2O-PREF-002` as the class the adjudication exists to overturn and **wrote a
+matrix saying so**. No refusal, no warning. **105/3 where the truth was 106/2**,
+and nothing but rendering the row and reading it distinguished them.
+
+**The fix was not a smarter parser but one row shape per record.** A second shape
+is a second thing to get wrong, and a positional rule is only sound while the
+positions are the same everywhere.
+
+**Two of my own edit scripts made the mirror error within the hour**, taking a
+literal `---` for a section break when it matched a **markdown table separator**
+— leaving a fragment of the old table behind that the generator then read as a
+second classification.
+
+**The rule worth carrying: a gate that refuses is telling you something; a gate
+that answers is only telling you something if you check the answer against the
+thing itself.**
+
+### `2O-NOTIFY-005` was corrected, not built
+
+It named an **important-reminder override**. There is none: `decideDelivery`
+runs consent → type → frequency → **quiet hours** → duplicate → cooldown → daily
+cap with **no exemption branch anywhere in it**, and *important*, *priority* and
+*urgent* appear nowhere in the governance module.
+
+**ADR-120** signs the product's rule as the true one — quiet hours always wins,
+the daily cap continues to apply, no type or urgency passes either, and the
+surface states the absence explicitly, which **it already did in both locales**.
+
+**Nothing was built.** No override, no priority field, no exemption path, no
+migration, no vocabulary change, no edit to the delivery engine. The identifier
+keeps its number and position, the superseded sentence is quoted beneath the new
+one, and **116 declared before the correction and 116 after**. Slices 2O.6's and
+2O.7's records are **untouched** — ADR-119's pattern, applied a second time.
+
+**The correct response to a requirement describing a capability the product does
+not have is to correct the requirement, not to build the capability to match the
+sentence.**
+
+### Both allocations closed unspent, for two reasons that must not be collapsed
+
+**M1 by measurement.** `OD-2O-8` **A** required a **real producer AND a real
+consumer**. A search for `recordProductEvent` across `src/features/activation/`
+and `src/features/onboarding/` returns **zero**; `scripts/` holds funnel readers
+for 2F, 2J, 2K and 2M and **none for 2O**. `2O-METRICS-001` … `-005` close
+**`not-built-by-rule`**, which is the outcome the condition exists to permit.
+
+**M2 by construction.** It lost its only destinations at ADR-116 and never had
+anything to do.
+
+**Nothing was invented to spend either.** No event, no artificial producer, no
+documentary code called a consumer — the last of which slice 2O.6 caught slice
+2O.5 doing once, and the lesson was applied rather than re-learned. The five
+activation questions the phase *wanted* answered are written down in the M1
+verdict **before any event name**, so a later phase inherits the thinking rather
+than the omission.
+
+### One guard inverted, exactly where the contract said it would
+
+`phase-2o-declarations.test.ts` refused a matrix, a closing report or a
+deployment record "while the phase is mid-flight". The traceability contract
+says that half **inverts in 2O.8's own commit**, and this is that commit: the
+matrix and the closing report are now **required**, and the superseded assertion
+is quoted rather than deleted.
+
+**The deployment record did not invert, and its reason changed.** It was refused
+because the phase was mid-flight; it stays refused because **Phase 2O deployed
+nothing**. A record describing a deployment that never happened is worse than a
+missing one, so that refusal is now permanent for this phase rather than
+conditional on its progress.
+
+### What is carried, with destinations — nothing absorbed
+
+**Owner:** the screen-reader session is **`NOT EXECUTED`** and `2O-ACCESS-006`
+closes `partial` — the VoiceOver script waits at
+`PHASE_2O_SCREEN_READER_SCRIPT.md`, and **ADR-118 Decision 8 forbids promoting it
+by documentation, an emulator, an automated scan, or inference from one**. Push
+**fails HTTP 403 on a real iPhone** and has **never been executed on Android**.
+Four inherited target exceptions, each with a liveness check: `legal/*`'s two
+links (18px), `skip-link` (39px), `palette-trigger` (38px). `RG-LEG-4` and
+`RG-DEP-4` are signatures. ADR-055 expires **2026-10-27**.
+
+**Operator:** `RG-QUO-3` — sweeps built and dry-run, **not scheduled**, and
+**scheduling is authorization**, so it is armed by an operator script and never
+by a migration. `RG-DEP-1` — production SMTP. `RG-DEP-3` — a restore into a
+disposable project, which **cannot be closed by writing a file**, and this
+slice's dossier is the file that would have been the temptation.
+
+**Backlog:** 49 elements no stylesheet reaches, eight in slice 2O.5's privacy
+block — a ratchet with a planted control, **not restyled**, because on the
+rendered page they pass contrast, reflow and target size. `entity_attachments`
+has a reader and no writer. `2O-ONBOARD-003` stays `partial`.
+`defaultAgentPreferences.tone` still says `direct` against a column defaulting to
+`informal`. Every Phase 2N residual `OD-2O-11` declined stays unclaimed.
+
+**Outside the phase entirely:** branch `codex/fix-needs-attention-confirmation`
+and migration `202608170098_confirm_entry_interpretation.sql` are **not
+incorporated, applied, merged, rebased or counted**. At close, the branch was
+unmerged, the migration absent from both chains, parity `202608160097`.
+
+### The successor, re-audited and not started
+
+No `2P-*` requirement anywhere — the one file containing the string is the A13
+detector, and **a guard naming what it forbids is not the thing it forbids**. No
+`PHASE_2P_*` artifact, no `phase-2p` directory, no accepted ADR naming the
+successor in its heading, no source or migration marked as successor
+implementation. **A13 returns an empty start-signal list and was NOT retargeted
+by this closeout** — `R-2O-24` and ADR-118 Decision 6 put any retarget in the
+next authorization's own commit.
+
+**This section deliberately does not name what comes next.** A closeout that
+named the successor would start it in the act of describing it.
+
+### Where this stops
+
+**At the end of the phase, with `main` clean and no open PR.** The roadmap's
+lettered sequence **ends at 2O**. There is no next slice, and there is no
+authorized successor.
+
+**A completed phase is not an authorized opening.** Signup stays closed on three
+failing gates and two unsigned ones, and the rollout script has no path that
+reports otherwise. What the next unit is, and whether it opens anything, is the
+owner's decision and belongs in its own ADR.
