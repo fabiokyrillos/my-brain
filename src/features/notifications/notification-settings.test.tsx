@@ -248,6 +248,116 @@ describe("2M-NOTIFY-008: content stays where it already is", () => {
   });
 });
 
+/**
+ * The polish pass between slices 2O.6 and 2O.7.
+ *
+ * Presentation only — every assertion here is about grouping, and every one of
+ * them is paired with the contract it must not break. The surface had no rule
+ * anywhere in the stylesheets, so it was drawn as running text; grouping it is
+ * what makes the seams visible, and grouping is exactly the kind of change that
+ * quietly moves a control past the sentence that was required to precede it.
+ */
+describe("the governance surface reads as panels, and the contracts survive them", () => {
+  it("groups the section into panels rather than a run of bare children", () => {
+    const { container } = mount({ state: "granted" });
+    expect(container.querySelectorAll(".notification-settings > .notification-panel"))
+      .toHaveLength(3);
+  });
+
+  it("keeps the benefit and the payload promise in the first panel", () => {
+    // `2M-NOTIFY-003` asks for them above the control that prompts. A panel that
+    // held one and not the other would still satisfy the ordering test above
+    // while splitting a single argument across two boxes.
+    const { container } = mount({ state: "granted" });
+    const first = container.querySelector(".notification-settings > .notification-panel");
+    expect(first?.textContent).toContain(copy.benefit);
+    expect(first?.textContent).toContain(copy.contentPromise);
+  });
+
+  it("keeps the bounds ahead of the control region, as their own panel", () => {
+    // `2O-NOTIFY-005`'s reason is that the bounds are what a reader weighs
+    // BEFORE consenting, so this is a DOM-order claim and is asserted as one.
+    const { container } = mount({ state: "granted" });
+    const bounds = container.querySelector("[data-notification-bounds]");
+    const controls = container.querySelector(".push-controls");
+    expect(bounds).not.toBeNull();
+    expect(controls).not.toBeNull();
+    expect(bounds!.compareDocumentPosition(controls!) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .not.toBe(0);
+  });
+
+  it("leaves the closing note out of `.quiet-state`, and the no-prompt line in it", () => {
+    /*
+     * Not cosmetic. `online-notifications-and-recovery.spec.ts` finds the
+     * control region with `.push-controls` and falls back to
+     * `.quiet-state:last-of-type` for a deployment with no sender key. If the
+     * in-app note kept that class it would become the last such paragraph in
+     * the section and that spec would measure a closing sentence instead of a
+     * control.
+     */
+    const { container } = mount({ state: "granted" });
+    const note = container.querySelector(".notification-inapp-note");
+    expect(note?.textContent).toBe(copy.inAppNote);
+    expect(note?.classList.contains("quiet-state")).toBe(false);
+    expect(container.querySelector(".notification-no-prompt")?.classList.contains("quiet-state"))
+      .toBe(true);
+  });
+
+  it("gives the no-key branch the fallback class that spec depends on", () => {
+    const { container } = mount({ pushPublicKey: null });
+    const unavailable = container.querySelector(".push-unavailable");
+    expect(unavailable?.textContent).toBe(copy.notAvailableYet);
+    expect(unavailable?.classList.contains("quiet-state")).toBe(true);
+  });
+});
+
+describe("the controls read as cards, and every option row is a target", () => {
+  it("wraps each option in its own label, so the row is the hit area", () => {
+    // A checkbox's own box is 13-16px on every browser. The label is what can
+    // carry a 44px target (`2M-MOBILE-004`), and it can only do that if the
+    // input is inside it — which is also what makes the text clickable.
+    const { container } = mount({ state: "granted" });
+    const options = [...container.querySelectorAll(".push-option")];
+    expect(options).toHaveLength(7);
+    for (const option of options) {
+      expect(option.tagName).toBe("LABEL");
+      expect(option.querySelector("input")).not.toBeNull();
+    }
+  });
+
+  it("keeps exactly the three groups that have a legend, and no fourth", () => {
+    /*
+     * The daily cap is one labelled control, not a group. Wrapping it in a
+     * fieldset to make it match the others visually would announce its name
+     * twice to a screen reader — so it is a card and not a fieldset, and this
+     * asserts the distinction rather than leaving it to the next author.
+     */
+    const { container } = mount({ state: "granted" });
+    expect(container.querySelectorAll(".push-preferences > fieldset.push-card")).toHaveLength(3);
+    expect(container.querySelectorAll(".push-preferences > .push-card")).toHaveLength(4);
+    expect(container.querySelector(".push-cap")?.tagName).toBe("LABEL");
+  });
+
+  it("gives the save action a bar of its own, after every group it saves", () => {
+    const { container } = mount({ state: "granted" });
+    const save = container.querySelector(".push-save");
+    expect(save?.querySelector("button.push-submit")?.textContent).toBe(copy.savePreferences);
+    expect(save).toBe(container.querySelector(".push-preferences")?.lastElementChild);
+  });
+
+  it("gives the enable and disable controls different shapes and the same reach", () => {
+    // Turning alerts off must not be harder to find than turning them on;
+    // it must only be less loud. Both are the same element with the same
+    // handler, and both are `.push-action`.
+    const { container } = mount({ state: "granted" });
+    const off = container.querySelector("button.push-action");
+    expect(off?.classList.contains("push-action-off")).toBe(true);
+    cleanup();
+    const on = mount({ state: "revoked" }).container.querySelector("button.push-action");
+    expect(on?.classList.contains("push-action-off")).toBe(false);
+  });
+});
+
 describe("i18n: both locales, no ternary in the component", () => {
   it("renders the Portuguese copy for pt-BR", () => {
     mount({ locale: "pt-BR", state: "granted" });

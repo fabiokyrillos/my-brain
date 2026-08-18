@@ -4,6 +4,7 @@ import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { markNotification } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { readPushConsent, readVapidPublicKey } from "@/features/notifications/consent-reader";
+import { getNotificationSettingsCopy } from "@/features/notifications/copy";
 import { NotificationSettings } from "@/features/notifications/notification-settings";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -45,17 +46,28 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load notifications") ?? []);
 
   const consent = await readPushConsent(supabase, user.id);
+  const notifyCopy = getNotificationSettingsCopy(locale);
 
   return <div className="content-page">{/*
     `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
-    came from. It is first, above the governance section, because a reader who
-    arrived from a deep link or from the bell needs the orientation before the
-    content, not after it.
+    came from. It is first, above everything, because a reader who arrived from a
+    deep link or from the bell needs the orientation before the content, not
+    after it.
 
-    Nothing else about the route changes: the pagination, the `?page` deep link
-    and the owner-scoped read are untouched, which is the half of the Dados e IA
+    Nothing about the route changes: the pagination, the `?page` deep link and
+    the owner-scoped read are untouched, which is the half of the Dados e IA
     pattern that matters — no route is redirected and no route ends.
   */}<AccountDataStrip locale={locale} route="notifications" />{/*
+    The page's ONE heading, and the polish pass between slices 2O.6 and 2O.7
+    moved it here.
+
+    It used to sit below `NotificationSettings`, whose own `<h2>Notificações no
+    aparelho</h2>` therefore opened the document at level two — and then the
+    `<h1>Notificações</h1>` arrived in the middle of the page, so the word
+    appeared twice and the second one read as the start of a different page. The
+    heading order is now h1 → h2, which is both what a screen reader announces
+    as an outline and what a sighted reader takes as "one page, two sections".
+  */}<header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div></header>{/*
     `2M-NOTIFY-003`/`-008`. The governance section sits above the list it makes
     a promise about, so the promise and the thing it is a promise about are read
     together.
@@ -72,5 +84,11 @@ export default async function NotificationsPage({ params, searchParams }: { para
     quietStart={consent.quietStart ?? "22:30"}
     quietEnd={consent.quietEnd ?? "07:00"}
     dailyCap={consent.dailyCap}
-  /><header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div></header>{items.length ? <div className="list-stack">{items.map((item) => <article className={`list-row notification-row ${item.status}`} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta"><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link className="row-action" href={item.action_url}>{pt ? "Abrir" : "Open"}</Link>}<form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form></div></article>)}</div> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></div>;
+  />{/*
+    The feed, as a named section of this page rather than as an unlabelled tail
+    of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
+    where notification CONTENT lives, behind the login — and the section keeps
+    its pagination, its `?page` deep link and its empty state exactly as they
+    were. Only the name above it is new.
+  */}<section aria-labelledby="notification-history-heading" className="notification-history"><h2 id="notification-history-heading">{notifyCopy.historyHeading}</h2>{items.length ? <div className="list-stack">{items.map((item) => <article className={`list-row notification-row ${item.status}`} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta"><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link className="row-action" href={item.action_url}>{pt ? "Abrir" : "Open"}</Link>}<form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form></div></article>)}</div> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

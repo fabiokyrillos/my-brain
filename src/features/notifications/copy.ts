@@ -88,6 +88,21 @@ export type NotificationSettingsCopy = {
    */
   readonly boundsNoOverride: string;
 
+  /**
+   * The name of the in-app feed's own section.
+   *
+   * Added by the polish pass between slices 2O.6 and 2O.7, and it is the only
+   * new sentence that pass introduces. The page carried **two** page-level
+   * headings — the governance section's `<h2>` and the list's `<h1>` — with the
+   * `<h1>` arriving in the middle of the page, so the document opened at level
+   * two and "Notificações" appeared twice. The `<h1>` moved to the top where a
+   * page title belongs, which left the list below with no name at all; this is
+   * that name. It is a label for something that already shipped, not a new
+   * capability, and it goes through the typed copy record rather than through a
+   * locale ternary because that is the mechanism this repository has settled on.
+   */
+  readonly historyHeading: string;
+
   /** `2O-NOTIFY-002` — the invitation at a moment of demonstrated value. */
   readonly inviteHeading: string;
   readonly inviteBody: string;
@@ -167,6 +182,8 @@ const PT_BR: NotificationSettingsCopy = {
   boundsDailyCap: "Máximo por dia: ao atingir o número que você definir, o resto do dia é recusado. Aparelho e app são contados separadamente.",
   boundsNoOverride: "Não existe exceção. Nenhum aviso — de nenhum tipo, com nenhuma urgência — passa por cima do período silencioso ou do máximo diário. Se algo importante for recusado, ele continua esperando aqui dentro em vez de tocar o aparelho.",
 
+  historyHeading: "Avisos recebidos",
+
   inviteHeading: "Quer ser avisado quando chegar a hora?",
   inviteBody: "Você acabou de agendar algo. Se quiser, o Brain pode avisar no aparelho quando chegar a hora — sem carregar o conteúdo no aviso.",
   inviteAction: "Ver como funciona",
@@ -244,6 +261,8 @@ const EN: NotificationSettingsCopy = {
   boundsQuietHours: "Quiet period: nothing is sent inside the window you set. The same period applies to in-app alerts.",
   boundsDailyCap: "Daily maximum: once you hit the number you set, the rest of the day is refused. Device and app are counted separately.",
   boundsNoOverride: "There is no exception. No alert — of any type, at any urgency — overrides the quiet period or the daily maximum. If something important is refused, it keeps waiting in here rather than sounding on your device.",
+
+  historyHeading: "Alerts you received",
 
   inviteHeading: "Want to be told when the time comes?",
   inviteBody: "You have just scheduled something. If you want it, Brain can tell you on your device when the time comes — without carrying the content in the alert.",
