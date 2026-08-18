@@ -491,7 +491,10 @@ select ok(
      where n.nspname in ('public', 'private')
        and p.proname in ('confirm_entry_interpretation', 'undo_confirm_entry_interpretation',
                          'rederive_entry_lifecycle', 'entry_pending_decisions')
-       and pg_get_functiondef(p.oid) like '%40001%'
+       -- The ACT, not the word: pg_get_functiondef includes the body's own
+       -- comments, and this contract has one explaining why 40001 is
+       -- forbidden. Scanning for the string fails on the explanation.
+       and pg_get_functiondef(p.oid) ~ 'errcode\s*=\s*''40001'''
    )),
   'no function in this contract raises SQLSTATE 40001'
 );

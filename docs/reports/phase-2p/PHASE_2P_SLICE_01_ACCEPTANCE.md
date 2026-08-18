@@ -190,3 +190,104 @@ completing an entry whose people the owner never resolved — is the larger one.
 ## 8. Where this stops
 
 *(completed after implementation)*
+
+---
+
+## 5. Where this stopped, and the three findings that stopped it
+
+**Status: NOT MERGED, NOT DEPLOYED.** Branch `codex/phase-2p-slice-1`, PR #259,
+head `b115431`. **97 hosted, parity `202608160097` — unchanged. Nothing was
+applied.** No hosted residue: every hosted probe ran inside a transaction that
+was rolled back, and absence was then proved by querying for the functions
+rather than assumed.
+
+### CI, read step by step
+
+| Head | `application` | `edge worker` | `database and journey` |
+|---|---|---|---|
+| `0d26863` | `success` | `success` | **failure** at step 6, `Start the local Supabase stack` — before one line of this slice ran |
+| `b115431` | `success` | `success` | **failure** at step 8, `Run the pgTAP suite`; steps 6 and 7 (`Start the stack`, `Apply the whole migration chain to an empty database`) now `success` |
+
+So **the chain applies to an empty database**. What fails is behaviour, and the
+failures are informative rather than mysterious.
+
+### Finding 1 — fixed: the handler registry has a third required column
+
+`private.undo_operation_handlers.description` is `not null` with no default.
+`supabase db reset` failed while applying `202608070080`. The whole class was
+then swept rather than the instance: every `not null`-without-default column on
+`audit_logs` and `undo_operations` was read from the deployed schema and checked
+against this migration's inserts. Those two were already complete.
+
+### Finding 2 — fixed: a guard that forbade the word instead of the act
+
+`no function in this contract raises SQLSTATE 40001` failed **on the comment
+explaining why 40001 is forbidden**, because `pg_get_functiondef` returns the
+body's own comments. Now matched as `errcode = '40001'`. This is the same shape
+already recorded as *"an authority guard must forbid the act, not the word"* —
+and it reproduced anyway, in a test written by someone who knew the rule.
+
+### Finding 3 — OPEN, and it is a design decision, not a typo
+
+**Eight existing pgTAP assertions fail, in two distinct groups.**
+
+**(a) The generic status branch now swallows the queue's specific reasons.**
+`list_needs_attention` resolves `entry_status in ('awaiting_review',
+'partially_processed') -> 'review_interpretation'` **before** the finer
+predicates. While the status could never move, that branch was only reachable
+by an entry nobody had resolved. Now that the status *does* move, an entry with
+one unconfirmed candidate becomes `awaiting_review` and the queue reports the
+generic `review_interpretation` instead of `confirm_existing_candidates`.
+Failing assertions: *"partial confirmation keeps the unselected candidate
+actionable"*, *"an open question takes precedence over an unconfirmed candidate
+on the same entry"*, *"confirming only one of two current candidates keeps the
+entry listed (migration 031 regression)"*, *"a partially resolved entry remains
+in Needs Attention"*, *"Needs Attention reappears after undo restores one
+candidate to pending"*.
+
+**The entry never wrongly leaves the queue.** It stays, under a less specific
+reason — which is a real regression against `2P-ATTENTION-004` ("the entry page
+states exactly what remains unresolved") and must not be merged.
+
+**§89's reading was half right.** It said 2P.1 needs no projection change once
+the status can move. The finer predicates *are* correct — but they are gated on
+`entry_status = 'completed'` and sequenced *after* the status branch, so making
+the status truthful makes them **less** reachable, not more. The correction is
+to evaluate the finer predicates first and let `review_interpretation` mean what
+it now genuinely means: *only the interpretation-wide confirmation is left.*
+That is a redefinition of `list_needs_attention` inside the same authorized
+migration, and `phase-2p-foundation-guard`'s new assertion currently forbids
+exactly that — it must be replaced with one that pins the **new order**, not
+retargeted quietly.
+
+**(b) The re-derivation reorders the queue.** `list_needs_attention` orders by
+`entries.updated_at`, and `entries_updated_at` is a `before update` trigger
+running `new.updated_at = now()` unconditionally. `now()` is **transaction**
+time, so a re-derivation collapses distinct fixture timestamps onto one value
+and the deterministic ordering degenerates to the `entry_id` tiebreak. Failing
+assertions: *"ordering is deterministic"*, *"first keyset page"*, *"second
+keyset page"*.
+
+This one needs an owner-visible decision, because every cheap fix is worse than
+it looks: `set_updated_at` is shared by many tables and must not be weakened; a
+second `before update` trigger on `entries` gated by a session flag adds a
+second authority over the column; and changing the projection's sort key
+changes what "most recent" means in the queue. The honest options are (i)
+preserve `updated_at` across a re-derivation via a narrowly scoped mechanism,
+or (ii) accept that a status change is a real update and re-baseline the three
+ordering assertions — which is a product decision about whether re-deriving an
+entry should move it to the top of Needs You.
+
+### What is proved, and what is not
+
+**Proved:** the whole migration chain applies to an empty database; the central
+contract's logic returns the right census against real hosted data (`A` and `C`
+have only `element_policy` left, `B` correctly has `task_candidate`,
+`person_candidate`, `element_policy`); `element_policy` is stored flattened
+while the derivation reads the nested form, so feeding the column straight back
+would have silently completed every entry; `model_only_element_trust` returns
+`block_until_confirmation` at every confidence from 0.10 to 1.00, so there is no
+write-time divergence; 8353/8353 unit tests, typecheck, build and lint clean.
+
+**Not proved, and not claimed:** the pgTAP suite as a whole; the queue journeys;
+anything hosted. **The slice is not delivered.**
