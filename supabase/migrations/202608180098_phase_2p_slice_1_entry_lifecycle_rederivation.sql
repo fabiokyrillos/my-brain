@@ -629,9 +629,15 @@ $$;
 
 revoke all on function private.undo_confirm_entry_interpretation(uuid, uuid) from public, anon, authenticated;
 
-insert into private.undo_operation_handlers (action_type, handler_function)
-values ('confirm_entry_interpretation', 'undo_confirm_entry_interpretation')
-on conflict (action_type) do update set handler_function = excluded.handler_function;
+insert into private.undo_operation_handlers (action_type, handler_function, description)
+values (
+  'confirm_entry_interpretation',
+  'undo_confirm_entry_interpretation',
+  'Withdraws the owner''s interpretation confirmation and re-derives the entry lifecycle from the decisions that genuinely remain.'
+)
+on conflict (action_type) do update
+  set handler_function = excluded.handler_function,
+      description = excluded.description;
 
 -- ---------------------------------------------------------------------------
 -- 7. The entries the defect already stranded.
