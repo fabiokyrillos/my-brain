@@ -9136,3 +9136,139 @@ remainders open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
 `2P-CHAT-007-JOURNEY` (slice 2P.8, now with the owner's one-turn BYOK
 authorization). **This section deliberately does not name what comes after Phase
 2P.**
+
+## §92 — Slice 2P.3 ships: capture becomes one composer over two forms, and the easy version of it was a third write path (2026-08-18)
+
+**Baseline `main` `f37dce42`**, clean, no open PR, **CI green on both merge SHAs
+it is built from** (`099cd57` and `f37dce42`). **97 local = 97 hosted, parity
+`202608160097`, unchanged. Zero migrations.** Signup closed; rollout 25 pass · 3
+fail · 2 owner-signature. **No provider call, no BYOK spend, no hosted residue.**
+
+`f37dce42` adds only the §91 handoff to `099cd57`, so §91's re-audit still
+described the tree it was written against and none of it had to be re-executed.
+Confirmed by reading the delta, not assumed.
+
+### The constraint decided the whole slice
+
+One `<form>` has one action, and `captureEntry` and `uploadAttachment` must stay
+separate (`T-1`). So the composer is **one visual surface over two sibling form
+elements**, joined by HTML's `form="…"` attribute: the file input and the upload
+submit sit *inside* the composer's action row and belong to the *other* form.
+
+The rejected alternative is the one that would have passed review — a single
+action that inspects the FormData and branches on whether a file is present.
+That is the *"third write path with a friendly name"*, and it would have been
+invisible in a diff. So the property is asserted three ways rather than
+described: `fileInput.form !== textarea.form` in the component test, a source pin
+in `capture-write-path-guard.test.ts` (**retargeted, no assertion weakened, two
+added — two `<form` elements and two `form={attachmentFormId}` references**), and
+the same property read off the **rendered page in a real browser**, on both
+mounts.
+
+### §91's re-audit had understated one thing, and it changed the design
+
+`-006`/`-007` were recorded as *"baseline, needs re-proof"*. They were **not
+baseline.** `VoiceComposer` owned a *separate* draft textarea, so a transcript
+could never join a sentence the owner had already begun — "at the current
+composition boundary" was unreachable by construction, not merely unproven.
+
+So the microphone got **smaller**. `VoiceComposer` stopped owning a draft and a
+form and became a control that calls `onTranscript`; the composer inserts at the
+caret. That also removed a second `<form>` that could create entries.
+
+The caret is **remembered on select/change, not read at insertion time.**
+`selectionStart` survives blur and would usually work — and reads `0` on a field
+that was never focused, which is exactly a draft restored from a previous visit.
+Inserting a transcript at position 0 of text the owner wrote yesterday looks like
+corruption, so `null` means "no boundary was placed" and it goes to the end.
+
+### Two silent traps in the cascade, and one absence that predates the slice
+
+- **`.capture-actions span` would have made screen-reader-only text visible.**
+  The icon-only attachment and microphone carry their names in `sr-only` spans,
+  and `.capture-actions span` (0-1-1) outranks `.sr-only` (0-1-0). Nothing in
+  jsdom can see this; it is a specificity fact.
+- **`.capture-actions button` painted every button in the row as the primary
+  action** — the microphone included. Narrowed to `button[type=submit]`.
+- **`.capture-draft-note` and `.capture-draft-discard` had no rule anywhere in
+  `src/app/*.css`.** Shipped unstyled in slice 2O.3. Third instance of the shape
+  first recorded when Notificações and BYOK were found to have classes and no
+  stylesheet — *grep the sheets before theorising*. Repaired here rather than
+  logged, because this slice moves both into the new composer.
+  `RECORDED_UNSTYLED` 49 → **45**, the liveness check having failed and named the
+  number itself.
+
+### A deployed vocabulary kept its producer, with no migration
+
+The tablist was `capture_mode_selected`'s **only** writer. Re-wired: `attachment`
+on a chosen file (picker, drop or paste), `voice` on record, `text` on first
+writing, once per modality per mount. All three deployed values keep a writer,
+and each now fires when the owner actually engages that modality — a **better**
+signal than the tabs gave, since `text` was the initial panel and was recorded
+only when returned to.
+
+The surface was hardcoded `capture`. The composer also mounts on Today, so it is
+now derived from `captureSource` exactly as `recordCaptureStarted` already does.
+Read live before relying on any of it: key whitelist `array['captureMode']`, enum
+`array['text','attachment','voice']`, and `product_events_surface_check` carries
+both `home` and `capture`. **Nothing deployed had to change.**
+
+### The lane that exists because nothing else could see it
+
+`Composer` is a Client Component now receiving **three** Server Actions from
+**two** Server Components, one of which previously imported one. A bad RSC
+boundary there fails no `tsc`, no `vitest` and no `next build` — it fails at
+request time with a blank surface, and **that defect has shipped twice in this
+project**. The CI journey lane cannot catch it: every spec it runs is
+unauthenticated or renders its own fixture markup, and both mounts are behind a
+session.
+
+`e2e/online-phase-2p-composer.spec.ts` runs against `next start` over the hosted
+Supabase — **8 passed, desktop and mobile**. It asserts the field **present
+before** it asserts the tablist absent, so a blank page fails instead of passing
+every absence check. It includes an axe scan, which is the only thing that can
+see contrast on a slice that rewrote a stylesheet and added two icon-only
+controls.
+
+**Its first draft was wrong, and the correction is the useful part.** It asserted
+"choosing a file makes no POST" and failed — because every Server Action is a
+POST to the current route, and the composer legitimately makes one the moment a
+file is chosen: that is the re-wired modality event. The narrowed detector
+separates "the owner picked a file" from "the file left the browser" by content
+type, and **the POST that broke the first draft is now its liveness control**,
+proving both that the listener is attached and that the re-wiring reaches the
+server from a real page.
+
+**It sends nothing.** A capture would enqueue `interpret_entry`, the worker would
+call the provider, and that is the owner's BYOK credential spent on a proof
+nobody authorized. So the lane reads: no entry, no attachment, no job, and
+therefore no residue to clean.
+
+### Limits, stated rather than glossed
+
+**jsdom has no `DataTransfer` and no assignable `input.files`** — both measured,
+not assumed; `Object.setPrototypeOf` onto `FileList.prototype` is rejected too.
+The unit tests shim both and prove the composer's **decision**; that the browser
+then submits the input is the platform's contract. `userEvent.upload` also
+refuses a file its `accept` excludes, so the refusal path is driven through
+`change` instead — a real dialog is not that strict, and the helper's strictness
+is the artefact. **`MediaRecorder`/`getUserMedia` are still faked**, so `G-2J.4b`
+is **not** discharged. The recording controls are **not** axe-scanned: reaching
+them needs a microphone permission the lane cannot grant.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** Nothing is half-written, the worktree
+is clean, and the slice is merged and green on its exact merge SHA.
+
+**Next action: slice 2P.1**, using the replacement-migration authorization
+recorded in §91 — beginning with the five-defect write-up of `202608170098` and
+the corrected contract, **before any SQL is written**. 2P.4 remains sequenced
+after 2P.3 and may now follow it.
+
+**Cumulative: 24 of 87 requirements, zero migrations spent.** Two named
+remainders stay open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
+`2P-CHAT-007-JOURNEY` (slice 2P.8, with the owner's one-turn BYOK
+authorization). Push HTTP 403, signup, rollout and every inherited residual stay
+exactly where §87, §88 and §91 left them. **This section deliberately does not
+name what comes after Phase 2P.**

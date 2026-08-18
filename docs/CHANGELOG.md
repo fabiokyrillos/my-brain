@@ -2,6 +2,60 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Slice 2P.3: one composer on both surfaces, over two forms
+
+- `2P-CAPTURE-001` … `-010`. **Zero migrations**; 97 local = 97 hosted, parity
+  `202608160097` unchanged. No provider call and no BYOK spend.
+- The modality tablist is deleted. Text is ready on arrival; the attachment
+  control sits at the left of the action row and the microphone beside send, on
+  both `/app` and `/app/capture`, which now mount the same `Composer`.
+- **One visual surface over two `<form>` elements.** `captureEntry` and
+  `uploadAttachment` must stay separate (`T-1`), and one form has one action, so
+  the file input and the upload submit sit inside the composer row and belong to
+  a sibling form through HTML's `form=` attribute. The rejected alternative — a
+  single action branching on whether a file is attached — is the third write path
+  the plan names as a stop condition. `fileInput.form !== textarea.form` is
+  asserted in the component test, pinned in `capture-write-path-guard.test.ts`
+  (retargeted to `composer.tsx`, no assertion weakened, two added) and proved in a
+  real browser on both mounts.
+- `VoiceComposer` is now a control, not a panel: it records, transcribes and
+  calls `onTranscript`. It owns no draft, renders no textarea and submits nothing,
+  so one fewer form can create entries. The transcript lands **at the caret** of
+  the shared field. The caret is remembered on select/change rather than read at
+  insertion time, because `selectionStart` reads 0 on a restored draft that was
+  never focused — which would insert into the middle of yesterday's text.
+- Drag, drop and paste write the file into the **same input the picker fills**
+  via `DataTransfer`, so they reach the same form, action and server checks. One
+  predicate validates all three routes, reading `ATTACHMENT_LIMITS.mimeAllowlist`
+  — the constant `uploadAttachment` enforces — and the picker's `accept` is
+  derived from it rather than hand-written. Only files are intercepted on paste.
+- `recordCaptureModeSelected` keeps its producer without a migration: the tablist
+  was the deployed event's only writer. `attachment` fires on a chosen file,
+  `voice` on record, `text` on first writing, once per modality per mount; the
+  surface is now derived from `captureSource`, so Today's captures stop being
+  filed under `capture`. The deployed key whitelist, value enum and surface check
+  were read live and needed no change.
+- Two silent cascade traps fixed: `.capture-actions span` (0-1-1) outranked
+  `.sr-only` (0-1-0) and would have made the icon buttons' screen-reader-only
+  names visible; `.capture-actions button` painted every button in the row as the
+  primary action. Both are now scoped.
+- **A slice 2O.3 defect repaired in passing:** `.capture-draft-note` and
+  `.capture-draft-discard` had shipped with no rule anywhere in `src/app/*.css`.
+  `RECORDED_UNSTYLED` falls 49 → 45; the liveness check failed and named the
+  number itself.
+- The file input's `required` is removed. It was inherited from the standalone
+  upload form and unreachable here, since the only control that submits that form
+  is rendered by a chosen file.
+- New `e2e/online-phase-2p-composer.spec.ts`: an authenticated lane against
+  `next start` over hosted Supabase, 8 passed on desktop and mobile. It exists
+  because every CI journey spec is unauthenticated or fixture-rendered and cannot
+  see the RSC boundary — the defect class that has shipped twice. It asserts the
+  field present before asserting the tablist absent, watches for a
+  `multipart/form-data` request rather than any POST (the first draft failed on
+  the re-wired telemetry beacon, which is now its liveness control), and runs an
+  axe scan jsdom cannot perform. It sends nothing, so it leaves no residue and
+  spends no credential.
+
 ## 2026-08-18 - Slice 2P.2: Conversation repaired at the boundary that was broken, and every failure made nameable
 
 - `2P-CHAT-001` … `-007`. **Zero migrations**; 97 local = 97 hosted, parity
