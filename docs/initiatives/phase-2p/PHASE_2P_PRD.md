@@ -3,11 +3,18 @@
 **Authorization:** planning and the product direction below were approved by the
 owner on 2026-08-18 and recorded by ADR-121. **Implementation is not authorized
 by this package.** It starts only after the owner reviews the package and records
-a separate implementation decision.
+a separate implementation decision — which the owner did the same day:
+**ADR-122 authorizes slices 2P.0 … 2P.8.** This document keeps stating what it
+does and does not authorize on its own, because that is what makes the separate
+decision legible.
 
-**Baseline:** `main` `27f9f77`, clean and equal to `origin/main`; 97 local
-migrations and hosted parity `202608160097`, verified read-only on 2026-08-18.
-Signup remains closed and the rollout gate remains 25 pass · 3 fail · 2
+**Baseline:** authored against `main` `27f9f77`; **implementation baseline is
+`main` `6a7bf21`**, which is `27f9f77` plus this package's own merge (PR #253).
+The complete product-code delta between them is three guard test files and
+**zero product surfaces**, so every finding here still describes the tree it was
+written against — see `PHASE_2P_SLICE_00_ACCEPTANCE.md` §1. 97 local migrations
+and hosted parity `202608160097`, verified read-only on 2026-08-18. Signup
+remains closed and the rollout gate remains 25 pass · 3 fail · 2
 owner-signature.
 
 **Governing pair:** this PRD and `PHASE_2P_IMPLEMENTATION_PLAN.md`.

@@ -2,6 +2,34 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Phase 2P implementation authorized (ADR-122); slice 2P.0 measures both broken loops
+
+- ADR-122 authorizes slices 2P.0 … 2P.8 over the package ADR-121 accepted.
+  Migrations stay unfunded except one conditional allocation; anything else is
+  a stop condition. Closeout stays blocked behind real iPhone and VoiceOver
+  evidence.
+- **Slice 2P.0 changes no product behaviour.** `2P-FOUNDATION-001` … `-007`.
+  Zero migrations; 97 local = 97 hosted, parity `202608160097` unchanged.
+- Conversation classified: the grounded-answer path works (hosted record shows
+  every question answered, audited and metered), and the real defect is that no
+  failure of it is recorded anywhere — `guard()` rethrows undeclared faults out
+  of the Server Action, the error boundary logs only to the browser and still
+  claims the sink does not exist, and `recordErrorEvent` has one production
+  caller, not on the chat path.
+- Needs You measured: the entry lifecycle is derived from the interpretation by
+  three functions and never re-derived by the nine that record the owner's
+  resolutions, while the queue keys `review_interpretation` unconditionally on
+  status. A fully resolved entry therefore cannot leave.
+- Migration `202608170098` re-audited and **rejected**; not applied, not copied
+  forward. Its five defects are recorded, and the corrected migration slice
+  2P.1 needs is raised as an owner stop condition.
+- Telemetry established without a migration: the deployed `error_events`,
+  `product_events` and `audit_logs` vocabularies already cover failure class,
+  queue reason, automation decision and undo outcome.
+- New guard `phase-2p-foundation-guard.test.ts` pins the measured contracts;
+  `phase-2p-declarations.test.ts` flips from planning-only absences to the
+  implementation posture. Both proved non-vacuous against a planted violation.
+
 ## 2026-08-18 - Phase 2P planning reviewed and corrected: 87 requirements, `2P-SETTINGS-008` appended
 
 - An independent review of the planning package reproduced all twelve audit
