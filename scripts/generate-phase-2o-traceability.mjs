@@ -507,6 +507,29 @@ export function audit(root = REPOSITORY_ROOT) {
 }
 
 /** The counts every document must re-derive rather than transcribe. */
+/**
+ * The comparison is about **content**, and a line terminator is not content here.
+ *
+ * The repository stores LF and this generator writes LF, but `core.autocrlf`
+ * checks the file out with **CRLF on Windows** — so a byte-for-byte comparison
+ * against the working copy failed on a tree that was completely correct, and
+ * passed in CI, where no conversion happens. It was found by running `--check`
+ * on `main` immediately after a `git checkout`, and not before, because the file
+ * this session wrote had never been through a checkout.
+ *
+ * **A gate that fails on correct code is the one that gets weakened later.** The
+ * temptation on seeing that refusal is to regenerate — which rewrites the file
+ * as LF, makes the working tree look dirty against a checkout git considers
+ * identical, and teaches the next reader that the check is noise.
+ *
+ * Normalising here narrows the comparison to exactly what is committed. Every
+ * other difference — a reordered row, a changed count, a hand edit — still
+ * fails, which the guard proves in both directions.
+ */
+export function normalizeNewlines(text) {
+  return text.replace(/\r\n/g, "\n");
+}
+
 export function counts(resolved) {
   const tally = Object.fromEntries(CLASSES.map((name) => [name, 0]));
   for (const entry of resolved.values()) tally[entry.classification] += 1;
@@ -599,7 +622,7 @@ function main() {
       process.exit(1);
     }
     const current = readFileSync(target, "utf8");
-    if (current !== rendered) {
+    if (normalizeNewlines(current) !== normalizeNewlines(rendered)) {
       console.error(`REFUSED — ${OUTPUT} differs from what the sources generate. Regenerate it.`);
       process.exit(1);
     }
