@@ -8,7 +8,7 @@ import type { Locale } from "@/lib/preferences";
 
 import type { ByokActionState } from "./actions";
 import { getByokCopy } from "./copy";
-import type { CredentialMetadata } from "./credential-view";
+import type { CredentialMetadata, CredentialStatus } from "./credential-view";
 import type { PendingEntryCount } from "./pending-entries";
 
 /**
@@ -104,12 +104,26 @@ export function CredentialPanel({
   // and never, on any path, something that runs by itself. Saving a key renders
   // this; it does not press it.
   const showPendingEntries = credential.status === "active" && pending.count > 0;
-  const statusLabel =
-    credential.status === "active"
-      ? copy.settings.statusConfigured
-      : credential.status === "invalid"
-        ? copy.settings.statusInvalid
-        : copy.settings.statusAbsent;
+  /*
+    Four statuses, four sentences.
+
+    This exhausted three of `CredentialStatus`'s four members and let `removed`
+    fall through to `statusAbsent`, so a key the account had and deleted said
+    "Nenhuma chave configurada" — the same words as a key never entered. The
+    polish pass separated them by `data-status`, which a stylesheet and a test
+    can read and a person cannot.
+
+    Written as a `Record` rather than a third ternary so the compiler is the
+    thing that notices the next member: a fifth `CredentialStatus` fails to
+    typecheck here instead of silently inheriting whichever branch is last.
+  */
+  const statusLabels: Record<CredentialStatus, string> = {
+    active: copy.settings.statusConfigured,
+    invalid: copy.settings.statusInvalid,
+    removed: copy.settings.statusRemoved,
+    absent: copy.settings.statusAbsent,
+  };
+  const statusLabel = statusLabels[credential.status];
 
   return (
     <section className="settings-section byok-panel" aria-labelledby="byok-heading">

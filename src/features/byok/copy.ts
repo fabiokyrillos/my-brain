@@ -51,6 +51,24 @@ export type ByokCopy = {
     readonly statusConfigured: string;
     readonly statusInvalid: string;
     readonly statusAbsent: string;
+    /**
+     * `removed` said `statusAbsent` until slice 2O.7, and the two are not the
+     * same fact.
+     *
+     * `CredentialStatus` has four members and the panel rendered three
+     * sentences, so a key the account **had and deleted** read exactly like a
+     * key that was never entered. The polish pass between 2O.6 and 2O.7 gave
+     * the two different `data-status` values, which distinguishes them for a
+     * stylesheet and for a test — and for nobody using the product. A
+     * distinction carried only by an attribute is not an accessible
+     * distinction, which is `2O-ACCESS-003` stated about text rather than
+     * about colour.
+     *
+     * The owner minted this sentence; the agent did not. Nothing about
+     * storage, encryption, the write path or the state transitions moved with
+     * it.
+     */
+    readonly statusRemoved: string;
     readonly validatedAt: string;
     readonly neverShown: string;
     readonly costsNote: string;
@@ -103,6 +121,7 @@ const ptBR: ByokCopy = {
     statusConfigured: "Configurada",
     statusInvalid: "Recusada pelo provedor",
     statusAbsent: "Nenhuma chave configurada",
+    statusRemoved: "Chave removida",
     validatedAt: "Validada em",
     neverShown: "Por segurança, a chave nunca é exibida depois de salva.",
     costsNote:
@@ -156,6 +175,7 @@ const en: ByokCopy = {
     statusConfigured: "Configured",
     statusInvalid: "Rejected by the provider",
     statusAbsent: "No key configured",
+    statusRemoved: "Key removed",
     validatedAt: "Validated on",
     neverShown: "For safety, the key is never displayed after it is saved.",
     costsNote:

@@ -8,6 +8,7 @@ import {
   APPEARANCE_STORAGE_KEY,
   appearanceChoices,
   applyAppearanceChoice,
+  applyAppearanceThemeColor,
   parseAppearanceChoice,
   type AppearanceChoice,
 } from "./contracts";
@@ -65,6 +66,12 @@ export function AppearanceControl({ locale }: { locale: Locale }) {
   function choose(next: AppearanceChoice) {
     setChoice(next);
     applyAppearanceChoice(document.documentElement, next);
+    // The browser chrome follows the same choice, in the same gesture. Without
+    // this the canvas would change under a status bar still reading the
+    // machine's setting — the divergence slices 2O.3 and 2O.4 both routed to
+    // 2O.7, and it is only closed if *both* entry points close it: the
+    // pre-paint script for a load, this for a change with no reload.
+    applyAppearanceThemeColor(document, next);
     try {
       window.localStorage.setItem(APPEARANCE_STORAGE_KEY, next);
     } catch {

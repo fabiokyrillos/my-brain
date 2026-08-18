@@ -27,6 +27,24 @@ const absent: CredentialMetadata = {
   observedUpdatedAt: null,
 };
 
+/**
+ * A key the account **had and deleted**.
+ *
+ * Distinct from `absent` in the one way that matters to a person: something was
+ * here. The row survives removal — which is why `status` can be `removed` at
+ * all — so the fingerprint of what was removed is still readable while the
+ * credential itself is gone.
+ */
+const removed: CredentialMetadata = {
+  configured: false,
+  status: "removed",
+  provider: "openai",
+  fingerprint: "sk-proj · a3f9c1",
+  validatedAt: null,
+  lastFailureCode: null,
+  observedUpdatedAt: "2026-08-02T12:00:00+00:00",
+};
+
 const active: CredentialMetadata = {
   configured: true,
   status: "active",
@@ -174,6 +192,38 @@ describe("CredentialPanel", () => {
       cleanup();
       renderPanel(absent);
       expect(document.querySelector(".byok-badge")?.getAttribute("data-status")).toBe("absent");
+    });
+
+    /**
+     * `2O-ACCESS-003`, applied to a word rather than to a colour.
+     *
+     * `removed` reused `absent`'s sentence until this slice, so the distinction
+     * between "you never entered a key" and "you deleted the key you had"
+     * existed **only** in `data-status` — legible to a stylesheet, to a test and
+     * to nobody using the product. The owner minted the sentence; this asserts
+     * the two states no longer share one.
+     */
+    it("says a removed key was removed, and not that none was ever configured", () => {
+      renderPanel(removed);
+      const badge = document.querySelector(".byok-badge");
+      expect(badge?.getAttribute("data-status")).toBe("removed");
+      expect(badge?.textContent).toContain("Key removed");
+      expect(badge?.textContent).not.toContain("No key configured");
+    });
+
+    it("gives all four statuses four distinct sentences", () => {
+      // The mechanism, asserted rather than the instance: a fifth
+      // `CredentialStatus` that reused an existing sentence would pass every
+      // test above and fail this one.
+      const seen = new Map<string, string>();
+      for (const metadata of [active, { ...active, status: "invalid" as const }, removed, absent]) {
+        cleanup();
+        renderPanel(metadata);
+        const badge = document.querySelector(".byok-badge");
+        seen.set(metadata.status, badge?.textContent?.trim() ?? "");
+      }
+      expect(seen.size).toBe(4);
+      expect(new Set(seen.values()).size, `two statuses share a sentence: ${[...seen].map(([k, v]) => `${k}=${v}`).join(", ")}`).toBe(4);
     });
   });
 

@@ -130,6 +130,81 @@ export function applyAppearanceChoice(root: Element, choice: AppearanceChoice) {
 }
 
 /**
+ * The marker on the one `theme-color` meta this product owns — slice 2O.7.
+ *
+ * Everything else with that name belongs to Next's metadata system, and this
+ * attribute is how the override finds its own node again instead of guessing by
+ * position. `data-` rather than an id, because an id in `<head>` is a global
+ * name and this is an implementation detail of one script.
+ */
+export const APPEARANCE_THEME_COLOR_MARKER = "data-appearance-theme-color";
+
+/**
+ * The browser chrome, made to follow the **choice** rather than the machine —
+ * the residual slices 2O.3 and 2O.4 both routed to 2O.7.
+ *
+ * ## The divergence, stated exactly
+ *
+ * `viewport.themeColor` is serialised at build time into two tags:
+ *
+ * ```html
+ * <meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)" />
+ * <meta name="theme-color" content="#141311" media="(prefers-color-scheme: dark)" />
+ * ```
+ *
+ * The framework offers no other shape — `generate-viewport.md` documents these
+ * two and nothing request-scoped — and it could not, because the choice lives
+ * in `localStorage` and the server has never seen it. So the **canvas** obeyed
+ * an explicit choice while the **status bar** kept obeying the operating
+ * system: a page deliberately set to light, on a machine set to dark, painted
+ * a dark bar above a light page. On an installed PWA that bar is most of what
+ * the user sees of the app's frame.
+ *
+ * ## Why this adds a tag instead of editing Next's two
+ *
+ * Rewriting their `media` attributes was the shorter fix and it puts this
+ * script in a tug-of-war with the framework's own metadata rendering, which
+ * owns those nodes and may re-assert them. Adding one node the framework does
+ * not know about avoids the contest entirely, and leaves the two originals
+ * byte-identical so `system` is served by simply removing the addition.
+ *
+ * **First in `<head>`, because the specification says first wins.** The browser
+ * uses the earliest `theme-color` meta whose `media` matches, so appending
+ * would lose to the light tag on a light machine and change nothing.
+ *
+ * ## No colour is invented
+ *
+ * The content is **read off** whichever of Next's two tags names the chosen
+ * scheme. There is no literal here, no second copy of the palette to drift, and
+ * a change to `viewport.themeColor` propagates without touching this file. If
+ * neither tag is found the function does nothing, which leaves the framework's
+ * behaviour exactly as it was.
+ *
+ * Idempotent by construction: it reuses its own node, so running it again on an
+ * appearance change — which `AppearanceControl` does — replaces a value rather
+ * than accumulating tags.
+ */
+export function applyAppearanceThemeColor(document: Document, choice: AppearanceChoice) {
+  const owned = document.querySelector(`meta[name="theme-color"][${APPEARANCE_THEME_COLOR_MARKER}]`);
+  const value = appearanceAttributeValue(choice);
+
+  if (value === null) {
+    owned?.remove();
+    return;
+  }
+
+  const source = document.querySelector(`meta[name="theme-color"][media*="${value}"]`);
+  const color = source?.getAttribute("content");
+  if (!color) return;
+
+  const meta = owned ?? document.createElement("meta");
+  meta.setAttribute("name", "theme-color");
+  meta.setAttribute(APPEARANCE_THEME_COLOR_MARKER, "");
+  meta.setAttribute("content", color);
+  if (!owned) document.head.insertBefore(meta, document.head.firstChild);
+}
+
+/**
  * The pre-paint script, as source.
  *
  * ## Why it is a string and not a component
@@ -168,4 +243,6 @@ export const APPEARANCE_SCRIPT = `(function(){try{var c=${JSON.stringify(
   explicitAppearanceChoices,
 )};var k=${JSON.stringify(APPEARANCE_STORAGE_KEY)};var a=${JSON.stringify(
   APPEARANCE_ATTRIBUTE,
-)};var v=window.localStorage.getItem(k);var r=document.documentElement;if(c.indexOf(v)>=0)r.setAttribute(a,v);else r.removeAttribute(a);}catch(e){}})()`;
+)};var m=${JSON.stringify(
+  APPEARANCE_THEME_COLOR_MARKER,
+)};var v=window.localStorage.getItem(k);var r=document.documentElement;var o=c.indexOf(v)>=0;if(o)r.setAttribute(a,v);else r.removeAttribute(a);var s=o&&document.querySelector('meta[name="theme-color"][media*="'+v+'"]');var t=s&&s.getAttribute("content");if(t){var e=document.createElement("meta");e.setAttribute("name","theme-color");e.setAttribute(m,"");e.setAttribute("content",t);document.head.insertBefore(e,document.head.firstChild);}}catch(e){}})()`;
