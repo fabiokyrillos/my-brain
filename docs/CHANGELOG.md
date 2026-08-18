@@ -2,6 +2,23 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-18 - Phase 2P planning reviewed and corrected: 87 requirements, `2P-SETTINGS-008` appended
+
+- An independent review of the planning package reproduced all twelve audit
+  findings against the real code and re-verified counts, IDs, the candidate
+  branch's posture and hosted parity live.
+- Two review corrections: the durable handoff gained §88 (the authorization had
+  no handoff record, against the §37/§49/§74 precedent), and the A13 retarget's
+  missed literal pin in `phase-2o-declarations.test.ts` was updated with a
+  two-sided control.
+- The owner then authorized appending `2P-SETTINGS-008` to the end of its
+  family — Notifications becomes a focused history/inbox surface with its
+  extensive controls in Settings — instantiating `OD-2P-8`'s second half.
+  Count moves 86 → 87; families, slices and every existing ID are unchanged;
+  the change is recorded as an amendment inside ADR-121.
+- Still zero product code, zero migration, zero deploy; implementation remains
+  unauthorized.
+
 ## 2026-08-18 - Phase 2P planning authorized: trustworthy capture and everyday UX
 
 - Added the Phase 2P PRD and nine-slice implementation plan: 86 requirements

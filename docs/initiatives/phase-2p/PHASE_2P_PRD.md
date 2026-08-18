@@ -13,8 +13,11 @@ owner-signature.
 **Governing pair:** this PRD and `PHASE_2P_IMPLEMENTATION_PLAN.md`.
 **Evidence:** `docs/reports/phase-2p/`.
 
-**86 requirements across fourteen families and nine slices. Nothing is
-implemented by this package.**
+**87 requirements across fourteen families and nine slices. Nothing is
+implemented by this package.** (86 at ADR-121; `2P-SETTINGS-008` was appended
+to the end of its family by a later owner authorization on 2026-08-18,
+instantiating `OD-2P-8`'s second half. No ID was renumbered, reused or
+removed.)
 
 ---
 
@@ -110,7 +113,7 @@ provider, retain audio, or silently absorb Phase 2N/2O residuals.
 - **2P-AUTONOMY-009:** Every automatic write produces a content-minimal audit reason and a bounded undo window visible to the owner.
 - **2P-AUTONOMY-010:** The owner can disable automation by category without disabling interpretation or suggestions.
 
-### 3.6 `2P-SETTINGS` — a navigable control centre (7)
+### 3.6 `2P-SETTINGS` — a navigable control centre (8)
 
 - **2P-SETTINGS-001:** Settings has stable sections for General, Assistant, AI, Planning, Notifications, Privacy and data, Appearance, and Account.
 - **2P-SETTINGS-002:** Each section has a stable deep link and preserves back/forward navigation.
@@ -119,6 +122,7 @@ provider, retain audio, or silently absorb Phase 2N/2O residuals.
 - **2P-SETTINGS-005:** Every visible control retains a proved behavioural consumer.
 - **2P-SETTINGS-006:** BYOK retains its security posture while becoming a compact, comprehensible panel.
 - **2P-SETTINGS-007:** Failed saves preserve input and name the affected section.
+- **2P-SETTINGS-008:** Notifications becomes a focused history/inbox surface: its consent, type, frequency, quiet-hours and cap controls move to the Settings notifications section, and the page keeps at most one discreet contextual entry to those preferences. Empty, loading, error and read/unread states and navigation to each item's destination are covered on desktop and mobile; deep links, keyboard focus and screen-reader access are preserved; and no existing setting is lost or changes semantics through the reorganization alone.
 
 ### 3.7 `2P-PERSON` — direct relationship editing (4)
 

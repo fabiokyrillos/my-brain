@@ -8645,3 +8645,24 @@ review. Push HTTP 403/Android, retention scheduling, SMTP, the restore drill,
 the unexecuted screen-reader session and every other inherited residual stay
 exactly where §87 left them. **This section deliberately does not name what
 comes after Phase 2P.**
+
+### Addendum — the owner answered the open question, and the count is 87 (2026-08-18)
+
+The paragraph above routed `OD-2P-8`'s uncovered second half to the owner, and
+the owner decided it the same day rather than at the implementation
+checkpoint: **`2P-SETTINGS-008` is appended to the end of its family**,
+recorded as an amendment inside ADR-121 with the superseded count quoted in
+place. The requirement makes Notifications a focused history/inbox surface,
+moves its extensive controls (consent, types, frequency, quiet hours, caps)
+into the Settings notifications section, allows at most one discreet
+contextual entry back to the preferences, requires empty/loading/error and
+read/unread coverage with navigation to each item's destination on desktop
+and mobile, preserves deep links, keyboard focus and screen-reader access,
+and forbids losing or re-semanticising any existing setting through the
+reorganization alone.
+
+**The package now declares 87 requirements; the fourteen families and nine
+slices are unchanged; no ID was renumbered, reused or removed.** The
+declaration guard's locked counts moved with it (`TOTAL` 87, `SETTINGS` 8).
+Still zero product code, zero migrations, zero deploy — and implementation
+remains a separate, unrecorded authorization.

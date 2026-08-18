@@ -23,14 +23,16 @@ const REQUIRED = [PRD, PLAN, AUDIT, GAPS, THREATS, CONTRACT] as const;
 
 const DECLARATION = /^- \*\*(2P-[A-Z]+-\d{3}):\*\*/gm;
 const ids = [...read(PRD).matchAll(DECLARATION)].map((match) => match[1]);
-const TOTAL = 86;
+// 86 at ADR-121; 87 since the owner's amendment appended 2P-SETTINGS-008 to
+// the end of its family (2026-08-18). No ID was renumbered, reused or removed.
+const TOTAL = 87;
 const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   FOUNDATION: 7,
   ATTENTION: 8,
   CHAT: 7,
   CAPTURE: 10,
   AUTONOMY: 10,
-  SETTINGS: 7,
+  SETTINGS: 8,
   PERSON: 4,
   MEMORY: 4,
   RELATION: 4,
@@ -46,7 +48,7 @@ describe("Phase 2P declarations", () => {
     for (const file of REQUIRED) expect(exists(file), file).toBe(true);
   });
 
-  it("declares 86 unique requirements across fourteen expressible families", () => {
+  it("declares 87 unique requirements across fourteen expressible families", () => {
     expect(ids).toHaveLength(TOTAL);
     expect(new Set(ids).size).toBe(TOTAL);
     const families = [...new Set(ids.map((id) => id.split("-")[1]))];
@@ -75,6 +77,10 @@ describe("Phase 2P declarations", () => {
     expect(decisions).toMatch(/signs all twelve product decisions/i);
     expect(prd).toMatch(/Implementation is not authorized/i);
     expect(decisions).toMatch(/ADR-121 — The owner authorizes Phase 2P planning/);
+    // The 87th requirement exists only because the owner authorized it after
+    // ADR-121; the count and its authorization must never drift apart.
+    expect(decisions).toMatch(/Amendment \(2026-08-18\) — the owner authorizes appending `2P-SETTINGS-008`/);
+    expect(decisions).toMatch(/declares 87 requirements/);
   });
 
   it("keeps implementation-only Phase 2P artifacts absent", () => {

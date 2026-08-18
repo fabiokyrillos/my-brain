@@ -25,7 +25,7 @@
 | 2P.2 | Conversation repair and reachability | CHAT 001–007 | 1–2 weeks | zero expected |
 | 2P.3 | shared multimodal composer | CAPTURE 001–010 | 2–3 weeks | zero expected |
 | 2P.4 | calibrated reversible automation | AUTONOMY 001–010 | 3–5 weeks | conditional; stop if schema authority is required |
-| 2P.5 | settings IA and notification move | SETTINGS 001–007 | 2–3 weeks | zero expected |
+| 2P.5 | settings IA and notification move | SETTINGS 001–008 | 2–3 weeks | zero expected |
 | 2P.6 | people, memories and relations | PERSON, MEMORY, RELATION | 2–3 weeks | zero expected |
 | 2P.7 | calendar and reminders | CALENDAR, REMINDER | 2–3 weeks | zero expected |
 | 2P.8 | mobile, accessibility, security, traceability and closeout | MOBILE, ACCESS, CLOSE | 1–2 weeks | zero |
@@ -94,8 +94,10 @@ not conveniences to route around.
 
 Introduce stable settings sections and deep links, then move notification
 governance without changing its readers or writers. Notifications retains its
-URL, pagination and history. BYOK is compacted without exposing or re-rendering
-the stored key.
+URL, pagination and history, and closes as the focused history/inbox surface
+`2P-SETTINGS-008` requires — at most one discreet contextual entry back to the
+preferences, with no setting lost or changed in semantics by the move. BYOK is
+compacted without exposing or re-rendering the stored key.
 
 ### 2P.6 — contextual creation and relations
 
