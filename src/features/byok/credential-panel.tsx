@@ -123,25 +123,46 @@ export function CredentialPanel({
         </div>
       </div>
 
-      <p className="byok-status" data-status={credential.status}>
-        {credential.status === "active" ? (
-          <ShieldCheck size={16} aria-hidden />
-        ) : (
-          <ShieldAlert size={16} aria-hidden />
-        )}
-        <strong>{statusLabel}</strong>
+      <div className="byok-body">
+      {/*
+        Three separate answers, on three separate lines — the polish pass
+        between slices 2O.6 and 2O.7, and the only reason it is a `<div>` of
+        three children rather than one `<p>` of three inline ones.
+
+        The state, the fingerprint and the validity were siblings inside a
+        single paragraph with **no rule anywhere in the stylesheets**, so the
+        browser laid them out as running text: "Configurada" ran straight into
+        the keyed digest beside it and the validation date trailed off the end
+        with no hierarchy at all. Nothing about what is rendered changed — same
+        three facts, same source, same absence handling.
+      */}
+      <div className="byok-state" data-status={credential.status}>
+        <span className="byok-badge" data-status={credential.status}>
+          {credential.status === "active" ? (
+            <ShieldCheck size={16} aria-hidden />
+          ) : (
+            <ShieldAlert size={16} aria-hidden />
+          )}
+          <strong>{statusLabel}</strong>
+        </span>
         {/* Metadata only: the fingerprint is a keyed digest, never a slice of
-            the key, and it is the most identifying thing shown anywhere. */}
-        {credential.fingerprint ? <code>{credential.fingerprint}</code> : null}
+            the key, and it is the most identifying thing shown anywhere. It is
+            still the ONLY `<code>` in this panel — `byok-settings-journey`
+            matches it by element and a second one would break that. */}
+        {credential.fingerprint ? (
+          <p className="byok-identifier">
+            <code>{credential.fingerprint}</code>
+          </p>
+        ) : null}
         {credential.validatedAt ? (
-          <span>
+          <p className="byok-validated">
             {copy.settings.validatedAt}{" "}
             <time dateTime={credential.validatedAt}>
               {formatInstant(credential.validatedAt, "day", locale, timeZone)}
             </time>
-          </span>
+          </p>
         ) : null}
-      </p>
+      </div>
 
       <p className="byok-honesty">{copy.settings.honesty}</p>
 
@@ -169,17 +190,26 @@ export function CredentialPanel({
           placeholder="sk-…"
           aria-describedby="byok-key-hint"
         />
-        <p id="byok-key-hint" className="field-hint">
+        <p id="byok-key-hint" className="field-hint byok-hint">
           {copy.settings.fieldHint} {copy.settings.neverShown}
         </p>
 
-        <button type="submit" disabled={savePending}>
+        <button className="byok-submit" type="submit" disabled={savePending}>
           {savePending ? <LoaderCircle size={16} className="spin" aria-hidden /> : null}
           {credential.configured ? copy.settings.rotate : copy.settings.save}
         </button>
       </form>
 
+      {/*
+        The destructive action, separated from the primary one by a rule rather
+        than by nothing. It was previously a bare `<button className="danger">`
+        — and `.danger` on its own has no rule in any stylesheet, only
+        `.reminder-button.danger` and `.reminder-panel.danger` do — so it
+        rendered as an unstyled browser button with a loose trash glyph beside
+        the text. Same form, same action, same confirmation.
+      */}
       {credential.status !== "absent" && credential.status !== "removed" ? (
+        <div className="byok-danger">
         <form
           action={remove}
           className="byok-remove"
@@ -198,7 +228,7 @@ export function CredentialPanel({
           }}
         >
           <input type="hidden" name="locale" value={locale} />
-          <button type="submit" className="danger" disabled={removePending}>
+          <button type="submit" className="danger byok-destructive" disabled={removePending}>
             {removePending ? (
               <LoaderCircle size={16} className="spin" aria-hidden />
             ) : (
@@ -207,6 +237,19 @@ export function CredentialPanel({
             {copy.settings.remove}
           </button>
         </form>
+        </div>
+      ) : null}
+
+      {/*
+        The outcome, moved to sit directly under the two actions it reports on
+        rather than below the pending-entries card. Which state it renders and
+        when is unchanged — `lastAction` still decides, for the reason the
+        header gives.
+      */}
+      {state.status !== "idle" ? (
+        <p role="status" data-state={state.status} className="byok-feedback">
+          {state.message}
+        </p>
       ) : null}
 
       {showPendingEntries ? (
@@ -220,7 +263,7 @@ export function CredentialPanel({
           </p>
           <form action={interpretPending}>
             <input type="hidden" name="locale" value={locale} />
-            <button type="submit" disabled={interpretPendingBusy}>
+            <button className="byok-pending-submit" type="submit" disabled={interpretPendingBusy}>
               {interpretPendingBusy ? (
                 <LoaderCircle size={16} className="spin" aria-hidden />
               ) : null}
@@ -235,13 +278,8 @@ export function CredentialPanel({
         </div>
       ) : null}
 
-      {state.status !== "idle" ? (
-        <p role="status" data-state={state.status} className="byok-feedback">
-          {state.message}
-        </p>
-      ) : null}
-
       <p className="byok-costs-note">{copy.settings.costsNote}</p>
+      </div>
     </section>
   );
 }
