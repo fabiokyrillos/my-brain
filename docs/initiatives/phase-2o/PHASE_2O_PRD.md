@@ -326,9 +326,19 @@ path. It does not redesign a surface the Papel e Console redesign just shipped.
 - **2O-NOTIFY-004:** A denied browser permission is a first-class state with its
   own recovery text, distinct from "not yet asked" and from "consented but
   undelivered".
-- **2O-NOTIFY-005:** Quiet hours, the daily cap and the important-reminder
+- **2O-NOTIFY-005:** Quiet hours and the daily cap are stated where consent is
+  given, because they are what makes the consent bounded — and the surface
+  states **explicitly that no override exists**: quiet hours always wins, the
+  daily cap continues to apply, and **no type, priority or urgency passes
+  either**. *(Corrected in place by ADR-120. Slice 2O.6 went looking for the
+  third bound and found no object: `decideDelivery` refuses inside quiet hours
+  with no exemption for type, priority or urgency, and the words `important`,
+  `priority` and `urgent` appear nowhere in the governance module. The owner
+  decided the product's rule is correct and the requirement was the artifact
+  that was wrong. The identifier is unchanged and is not renumbered.)*
+  *Superseded text: "Quiet hours, the daily cap and the important-reminder
   override are stated where consent is given, because they are what makes the
-  consent bounded.
+  consent bounded."*
 - **2O-NOTIFY-006:** No surface claims a notification was delivered. Push is
   implemented and hosted, **fails with HTTP 403 on a real iPhone**, and has
   never been executed on Android; that is stated where it matters and is not
