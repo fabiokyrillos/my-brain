@@ -6,26 +6,27 @@ import { describe, expect, it } from "vitest";
 import { getNotificationSettingsCopy } from "./copy";
 
 /**
- * The notifications route's heading outline, as a guard.
+ * The notifications route's shape, as a guard — retargeted by slice 2P.5 and
+ * **not relaxed**.
  *
- * ## The defect this locks out
+ * ## What it protected before, and why that claim retired
  *
- * The page mounted `NotificationSettings` — whose first child is
- * `<h2>Notificações no aparelho</h2>` — **above** its own
- * `<header class="list-header"><h1>Notificações</h1>`. Two things followed, and
- * both were reported by a reader before any test noticed:
+ * The page mounted `NotificationSettings` — whose first child was
+ * `<h2>Notificações no aparelho</h2>` — **above** its own `<h1>Notificações</h1>`,
+ * so the document opened at level two and the word appeared twice. This file
+ * asserted the `<h1>` came first.
  *
- *  1. the document opened at level two, so the outline a screen reader
- *     announces began in the middle of its own hierarchy;
- *  2. the word "Notificações" appeared twice, the second time as a display-size
- *     serif `<h1>` two-thirds of the way down, which reads as the start of a
- *     different page rather than as the name of a section.
+ * `2P-SETTINGS-008` moved that component to Settings → Notificações entirely,
+ * so the ordering claim no longer has two things to order. Asserting it would
+ * be asserting nothing.
  *
- * A component test cannot see either, because both are facts about the ORDER in
- * which the page composes two components that are each correct on their own.
- * `online-notifications-and-recovery.spec.ts` asserts the `<h1>` is present and
- * would have passed against the broken page, which is precisely why the claim
- * that needs a guard is the ordering one.
+ * ## What it protects now
+ *
+ * The **absence**, plus everything the move could plausibly have taken with it.
+ * An absence assertion is the dangerous kind — it passes on a file that never
+ * loaded, on a renamed component, on a page reduced to nothing — so every one
+ * below is paired with a positive control that fails if the page stopped being
+ * the page.
  *
  * ## Why this reads source rather than rendering
  *
@@ -40,44 +41,168 @@ import { getNotificationSettingsCopy } from "./copy";
 const PAGE = join(__dirname, "..", "..", "app", "[locale]", "app", "notifications", "page.tsx");
 const source = readFileSync(PAGE, "utf8");
 
-describe("the notifications route has one page heading, and it is first", () => {
-  it("puts the `<h1>` above the governance section that opens with an `<h2>`", () => {
-    const heading = source.indexOf("<h1>");
-    const governance = source.indexOf("<NotificationSettings");
-    expect(heading, "the page lost its <h1>").toBeGreaterThan(-1);
-    expect(governance, "the page lost its governance section").toBeGreaterThan(-1);
-    expect(heading).toBeLessThan(governance);
+/**
+ * The rendered code, with comments removed.
+ *
+ * **A guard must forbid the act, not the word**, and the first cut of this file
+ * forbade the word. It failed on the page's own docstring — the sentence
+ * explaining that `NotificationSettings` moved to Settings — which is the third
+ * time this repository has recorded that exact shape. Weakening the pattern or
+ * deleting the sentence would each have traded a real property for a passing
+ * test; stripping comments keeps both.
+ *
+ * `{/* … *\/}` JSX comment blocks go too: this page keeps its reasoning inside
+ * the tree, so a block comment there is prose in exactly the same way.
+ */
+const code = source
+  .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
+describe("the guard has a page to read", () => {
+  /**
+   * The non-vacuity control for every absence assertion below.
+   *
+   * A missing, emptied or renamed file would satisfy "does not contain
+   * `<NotificationSettings`" for free. These are the markers that prove the
+   * file under inspection is still the notifications route.
+   */
+  it("is reading the notifications route and not an empty string", () => {
+    expect(source.length).toBeGreaterThan(2000);
+    expect(code).toContain("export default async function NotificationsPage");
+    expect(code).toContain('supabase.from("notifications")');
   });
 
-  it("keeps the way back above the heading, so the orientation comes first", () => {
+  /**
+   * The comment stripper's own control.
+   *
+   * If it ever removed too much, every absence assertion below would pass
+   * against an empty string. So: prose that exists only in a comment is gone,
+   * and code that exists only outside one survives.
+   */
+  it("strips prose and keeps code", () => {
+    expect(source, "the page lost the docstring this control reads").toContain(
+      "`NotificationSettings` — consent",
+    );
+    expect(code, "the stripper left the docstring behind").not.toContain(
+      "`NotificationSettings` — consent",
+    );
+    expect(code.length).toBeGreaterThan(1500);
+  });
+});
+
+describe("`2P-SETTINGS-008`: the governance controls are gone from this page", () => {
+  it("no longer mounts the settings component, and no longer imports it", () => {
+    expect(code, "the governance section is back on the history page").not.toContain(
+      "<NotificationSettings",
+    );
+    // The import too, so a mount cannot reappear behind a rename or a wrapper.
+    // Matched as an import specifier rather than as a bare word, because
+    // `getNotificationSettingsCopy` legitimately contains the same characters
+    // and the copy module is still used for the history's own strings.
+    expect(code).not.toMatch(/import\s*\{[^}]*\bNotificationSettings\b[^}]*\}/);
+  });
+
+  it("mounts none of the controls it carried, directly either", () => {
+    // Each of these would be a re-implementation rather than a re-mount, which
+    // is the shape the requirement forbids most: two surfaces owning one
+    // preference is how their semantics drift apart.
+    for (const control of ["PushControls", "NotificationBounds", "NotificationFacts"]) {
+      expect(code, `${control} is still rendered on the history page`).not.toContain(`<${control}`);
+      expect(code, `${control} is still imported by the history page`).not.toMatch(
+        new RegExp(`import\\s*\\{[^}]*\\b${control}\\b[^}]*\\}`),
+      );
+    }
+  });
+
+  it("does not read the consent record or the sender key any more", () => {
+    // Nothing on this page needs either, and a read with no consumer is how a
+    // moved control quietly grows a second home.
+    expect(code).not.toContain("readPushConsent");
+    expect(code).not.toContain("readVapidPublicKey");
+  });
+});
+
+describe("exactly one discreet entry back to the preferences", () => {
+  it("links to the settings notifications section, resolved rather than typed", () => {
+    expect(code).toContain("settingsSectionHref(locale, \"notifications\")");
+    expect(code).toContain("copy.preferencesLink");
+  });
+
+  it("offers it once — `at most one` is the requirement's own word", () => {
+    const occurrences = code.split("preferencesLink").length - 1;
+    expect(occurrences, "the preferences are linked more than once").toBe(1);
+  });
+
+  it("has copy for it in both locales, and they differ", () => {
+    expect(getNotificationSettingsCopy("pt-BR").preferencesLink).toBe("Ajustar preferências de notificação");
+    expect(getNotificationSettingsCopy("en").preferencesLink).toBe("Adjust notification preferences");
+  });
+});
+
+describe("the history surface keeps everything that makes it one", () => {
+  it("opens with its one heading, below the way back", () => {
     // `2O-PREF-002`. A reader who arrived from the bell or a deep link needs to
     // know where they are before they read what is here.
-    expect(source.indexOf("<AccountDataStrip")).toBeLessThan(source.indexOf("<h1>"));
+    const strip = code.indexOf("<AccountDataStrip");
+    const heading = code.indexOf("<h1>");
+    expect(strip).toBeGreaterThan(-1);
+    expect(heading).toBeGreaterThan(-1);
+    expect(strip).toBeLessThan(heading);
   });
 
   it("names the feed instead of leaving it as an unlabelled tail", () => {
-    // Moving the `<h1>` to the top left the list below with no name at all. The
-    // name goes through the typed copy record, in both locales.
-    expect(source).toContain('className="notification-history"');
-    expect(source).toContain("notifyCopy.historyHeading");
+    expect(code).toContain('className="notification-history"');
+    expect(code).toContain("copy.historyHeading");
     expect(getNotificationSettingsCopy("pt-BR").historyHeading).toBe("Avisos recebidos");
     expect(getNotificationSettingsCopy("en").historyHeading).toBe("Alerts you received");
     expect(getNotificationSettingsCopy("pt-BR").historyHeading)
       .not.toBe(getNotificationSettingsCopy("en").historyHeading);
   });
 
-  it("keeps the governance section above the list it makes a promise about", () => {
-    // `2M-NOTIFY-008`. The heading moved; this did not, and it is the one
-    // ordering claim the reordering could plausibly have broken.
-    expect(source.indexOf("<NotificationSettings"))
-      .toBeLessThan(source.indexOf('className="notification-history"'));
+  it("keeps the route's own properties, which a consolidation would have taken", () => {
+    expect(code).toContain("PaginationLinks");
+    expect(code).toContain("parsePage");
+    expect(code).not.toContain("redirect(");
   });
 
-  it("keeps the route's own properties, which a consolidation would have taken", () => {
-    // The same three checks `account-centre.test.tsx` makes, restated here
-    // because this file is the one that reorders the page.
-    expect(source).toContain("PaginationLinks");
-    expect(source).toContain("parsePage");
-    expect(source).not.toContain("redirect(");
+  it("keeps the empty state and the destination link", () => {
+    expect(code).toContain("<UniversalStateView");
+    expect(code).toContain("item.action_url");
+  });
+});
+
+describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () => {
+  it("renders the state as a badge with its own copy", () => {
+    expect(code).toContain('className="notification-status-badge"');
+    expect(code).toContain("copy.unreadBadge");
+    expect(code).toContain("copy.readBadge");
+  });
+
+  it("announces the unread count above the list", () => {
+    expect(code).toContain("copy.unreadSummary");
+    expect(code).toContain("copy.allReadSummary");
+    expect(code).toMatch(/notification-unread-summary[^>]*role="status"|role="status"[^>]*notification-unread-summary/);
+  });
+
+  it("offers `mark as read` only where it changes something", () => {
+    // A row that is already read has nothing to mark, and a control that does
+    // nothing is what `R-24` refuses.
+    expect(code).toContain('item.status === "unread" ? <form action={markNotification}>');
+  });
+
+  it("names each row's controls after the row, so twenty are distinguishable", () => {
+    expect(code).toContain("aria-label={`${copy.markRead}: ${item.title}`}");
+    expect(code).toContain("aria-label={`${copy.openDestination}: ${item.title}`}");
+  });
+
+  it("has both locales for every one of the new strings", () => {
+    for (const locale of ["pt-BR", "en"] as const) {
+      const copy = getNotificationSettingsCopy(locale);
+      for (const value of [copy.unreadBadge, copy.readBadge, copy.markRead, copy.openDestination, copy.allReadSummary]) {
+        expect(value.length, `${locale} is missing a string`).toBeGreaterThan(0);
+      }
+      expect(copy.unreadSummary(1)).not.toBe(copy.unreadSummary(2));
+    }
   });
 });

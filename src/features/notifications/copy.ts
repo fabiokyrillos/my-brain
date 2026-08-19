@@ -108,6 +108,30 @@ export type NotificationSettingsCopy = {
   readonly inviteBody: string;
   readonly inviteAction: string;
   readonly inviteDismiss: string;
+
+  /* ---- Slice 2P.5 -------------------------------------------------------- */
+
+  /**
+   * `2P-SETTINGS-008`. The page becomes the history surface, so the states it
+   * had been rendering as a CSS class alone now have words.
+   *
+   * `read`/`unread` was `className={\`list-row notification-row ${item.status}\`}`
+   * and nothing else — a colour, invisible to a screen reader and to anyone who
+   * cannot distinguish the two tints. The rows carry the word now, and the
+   * unread count is announced above the list so the state is perceivable before
+   * a reader has scanned twenty rows for it.
+   */
+  readonly unreadBadge: string;
+  readonly readBadge: string;
+  readonly unreadSummary: (count: number) => string;
+  readonly allReadSummary: string;
+  readonly markRead: string;
+  readonly openDestination: string;
+  /**
+   * The **one** discreet contextual entry back to the preferences that
+   * `2P-SETTINGS-008` allows. Its href is the Settings notifications section.
+   */
+  readonly preferencesLink: string;
 };
 
 const PT_BR: NotificationSettingsCopy = {
@@ -188,6 +212,13 @@ const PT_BR: NotificationSettingsCopy = {
   inviteBody: "Você acabou de agendar algo. Se quiser, o Brain pode avisar no aparelho quando chegar a hora — sem carregar o conteúdo no aviso.",
   inviteAction: "Ver como funciona",
   inviteDismiss: "Agora não",
+  unreadBadge: "Não lida",
+  readBadge: "Lida",
+  unreadSummary: (count) => (count === 1 ? "1 aviso não lido." : `${count} avisos não lidos.`),
+  allReadSummary: "Nenhum aviso não lido.",
+  markRead: "Marcar como lida",
+  openDestination: "Abrir",
+  preferencesLink: "Ajustar preferências de notificação",
 };
 
 const EN: NotificationSettingsCopy = {
@@ -268,6 +299,13 @@ const EN: NotificationSettingsCopy = {
   inviteBody: "You have just scheduled something. If you want it, Brain can tell you on your device when the time comes — without carrying the content in the alert.",
   inviteAction: "See how it works",
   inviteDismiss: "Not now",
+  unreadBadge: "Unread",
+  readBadge: "Read",
+  unreadSummary: (count) => (count === 1 ? "1 unread alert." : `${count} unread alerts.`),
+  allReadSummary: "No unread alerts.",
+  markRead: "Mark as read",
+  openDestination: "Open",
+  preferencesLink: "Adjust notification preferences",
 };
 
 export function getNotificationSettingsCopy(locale: string): NotificationSettingsCopy {

@@ -566,7 +566,23 @@ export async function markNotification(formData: FormData) {
     .eq("id", parsed.data.notificationId)
     .eq("user_id", user.id);
   requireSupabaseSuccess(result, "update notification status");
-  revalidatePath(`/${parsed.data.locale}/app/notifications`);
+  /*
+    THE ROUTE PATTERN for the surface this slice changed, and the resolved path
+    for the one it did not.
+
+    `/app/notifications` lives under a dynamic `[locale]` segment, and the Next
+    documentation is explicit that such a path needs the `type` parameter:
+    without it the invalidation matches nothing, the row stays "unread" after
+    the owner marks it read, and the count above the list does not move. Slice
+    2P.4 measured exactly that failure on `/app/settings`.
+
+    `/app` keeps its resolved form deliberately. Slice 2P.5's surfaces are
+    Settings and Notifications; the cockpit is not one of them, and repairing a
+    call site this slice cannot prove is a change nobody in this slice can
+    defend. It is recorded with the other seventy-odd in the acceptance record's
+    debt list instead.
+  */
+  revalidatePath("/[locale]/app/notifications", "page");
   revalidatePath(`/${parsed.data.locale}/app`);
 }
 

@@ -179,7 +179,7 @@ describe("the schema is not created for nobody", () => {
   });
 
   it("mounts the surface on the settings page", () => {
-    const page = readFileSync(join(REPO, "src/app/[locale]/app/settings/page.tsx"), "utf8");
+    const page = readFileSync(join(REPO, "src/features/settings/settings-section-content.tsx"), "utf8");
     expect(page).toContain("AutomationSection");
     expect(page).toContain("loadAutomationStatus");
     expect(page).toContain("setAutomationCategoryPolicy");

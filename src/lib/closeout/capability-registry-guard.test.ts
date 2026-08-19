@@ -203,7 +203,7 @@ const GOVERNED_CONTROLS: ReadonlySet<string> = new Set<string>(
  * A hand-written array would have needed someone to remember to extend it, and
  * §79 records that nobody did.
  */
-const SETTINGS_PAGE = "src/app/[locale]/app/settings/page.tsx";
+const SETTINGS_PAGE = "src/features/settings/settings-section-content.tsx";
 
 /**
  * Comments removed, because a comment is not a control.
@@ -494,6 +494,22 @@ function discoverControls(source: string): DiscoveredControl[] {
    * Imports count for the same reason: a handler imported from another module
    * is defined, and the failure being caught is a name bound **nowhere**, which
    * is what a typo or a deleted function looks like.
+   *
+   * ## The fifth shape, added by slice 2P.5, and the third time this happened
+   *
+   * A handler **destructured from the component's props** is defined by its
+   * caller and typed by its own signature. `universal-state.tsx` takes
+   * `onAction` that way, and this repository's dominant pattern is precisely
+   * that — *"Injected, so this component stays free of Server Actions"* appears
+   * on a dozen components.
+   *
+   * The collector reached that file for the first time in slice 2P.5, because
+   * `automation-policy-form.tsx` began rendering `UniversalStateLine` for
+   * `2P-SETTINGS-007`, and reported its retry button as having no handler. That
+   * is a defect in correct code and the **third** time in this file that a
+   * too-narrow pattern accused the product — so the pattern widens rather than
+   * the file being exempted, and the planted control below proves a name bound
+   * nowhere still fails.
    */
   const handlers = new Set([
     ...[...markup.matchAll(/function\s+([A-Za-z][A-Za-z0-9]*)\s*\(/g)].map((match) => match[1]),
@@ -503,6 +519,17 @@ function discoverControls(source: string): DiscoveredControl[] {
     ),
     ...[...markup.matchAll(/import\s*\{([^}]+)\}\s*from/g)].flatMap((match) =>
       match[1].split(",").map((binding) => binding.replace(/^type\s+/, "").trim()),
+    ),
+    /*
+      A destructured parameter object: `function X({ a, b = 1, c }: Props)` and
+      `({ a, b }) =>`. Each entry is the identifier before a default or a rename,
+      which is the name the body can actually call.
+    */
+    ...[...markup.matchAll(/\(\s*\{([^{}]*)\}\s*(?::|\)|,)/g)].flatMap((match) =>
+      match[1]
+        .split(",")
+        .map((binding) => binding.trim().split(/[=:]/, 1)[0].trim())
+        .filter((binding) => /^[A-Za-z][A-Za-z0-9]*$/.test(binding)),
     ),
   ]);
 
@@ -654,6 +681,31 @@ describe("2O-ACTIVATION-005 direction B: every control in the centre is seen, an
       expect(planted[0]?.discharged).toBe(false);
     });
 
+    /**
+     * The fifth handler shape, with its control on both sides.
+     *
+     * Slice 2P.5 widened the collector to recognise a handler destructured from
+     * the component's props, because `universal-state.tsx` takes `onAction`
+     * that way and the guard reached it for the first time. A widening is only
+     * safe if it still refuses a name bound nowhere — so these two cases differ
+     * in exactly one thing: whether the handler appears in the signature.
+     */
+    it("passes a client action whose handler is a destructured prop", () => {
+      const injected = discoverControls(
+        'export function Panel({ locale, onAction }: Props) { return <button type="button" onClick={onAction}>Tentar</button>; }',
+      );
+      expect(injected[0]?.kind).toBe("client-action");
+      expect(injected[0]?.discharged).toBe(true);
+    });
+
+    it("still fails when the handler is not among the destructured props", () => {
+      const typo = discoverControls(
+        'export function Panel({ locale, onAction }: Props) { return <button type="button" onClick={onActoin}>Tentar</button>; }',
+      );
+      expect(typo[0]?.kind).toBe("client-action");
+      expect(typo[0]?.discharged, "the widened collector accepts a name bound nowhere").toBe(false);
+    });
+
     it("fails a button that classifies as nothing at all", () => {
       // The closure property. A control shaped in a way nobody anticipated is a
       // failure rather than a silent pass, which is the difference between a
@@ -751,7 +803,7 @@ describe("2O-ACTIVATION-004: the registry is load-bearing", () => {
   it("reaches a page, so a stale row changes what a user sees", () => {
     // A component nothing mounts is not a consumer either. This is the second
     // half of "load-bearing" and the reason the first half alone is not enough.
-    const page = readFileSync(join(REPO, "src/app/[locale]/app/settings/page.tsx"), "utf8");
+    const page = readFileSync(join(REPO, "src/features/settings/settings-section-content.tsx"), "utf8");
     expect(page).toContain("CapabilitySummary");
     expect(page).toMatch(/from "@\/features\/shell\/capability-summary"/);
   });
@@ -931,7 +983,7 @@ describe("2O-ACTIVATION-007: the nine consumer-less columns are recorded and unc
      * page *does*. The same shape `planning_day` and `planning_time` are held to
      * one test above.
      */
-    for (const path of [PREFERENCES_FORM, "src/app/[locale]/app/settings/page.tsx"]) {
+    for (const path of [PREFERENCES_FORM, "src/features/settings/settings-section-content.tsx"]) {
       const source = readFileSync(join(REPO, path), "utf8");
       expect(source, `${path} renders an embedding control`).not.toMatch(/name="embeddingModel"/);
       expect(source, `${path} names the column`).not.toContain("embedding_model");

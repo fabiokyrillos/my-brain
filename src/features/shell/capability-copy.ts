@@ -96,6 +96,10 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
         name: "Automação por categoria",
         effect: "Define, por tipo de registro, se o agente só sugere ou pode agir sozinho. Hoje nenhuma categoria age sozinha.",
       },
+      notification_delivery: {
+        name: "Entrega de notificações",
+        effect: "Decide quais tipos de aviso saem, com que frequência, dentro de qual janela de silêncio e até quantos por dia.",
+      },
     },
   },
   en: {
@@ -135,6 +139,10 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
       automation_categories: {
         name: "Automation by category",
         effect: "Sets, per kind of record, whether the agent only suggests or may act on its own. No category acts on its own today.",
+      },
+      notification_delivery: {
+        name: "Notification delivery",
+        effect: "Decides which kinds of alert go out, how often, inside which quiet window, and how many in a day.",
       },
     },
   },

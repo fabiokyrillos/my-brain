@@ -180,6 +180,23 @@ describe("navigation capabilities", () => {
        */
       { key: "autonomy", state: "future", visible: false },
       { key: "automation_categories", state: "operational", visible: true },
+      /*
+       * Slice 2P.5, and the row exists because a guard found the gap rather
+       * than because the slice added a control.
+       *
+       * `2P-SETTINGS-008` moved the notification preferences into Settings, and
+       * `capability-registry-guard` — which walks the preferences centre
+       * transitively — immediately reported five rendered controls the registry
+       * had never heard of. They shipped ungoverned in slice 2M.4b and were out
+       * of the guard's scope until the move brought them in.
+       *
+       * `operational` rather than `uncontrolled`: `public.begin_push_delivery`
+       * reads the enabled types, the frequency, the local quiet window and the
+       * daily cap before every send, which is a behavioural consumer inside the
+       * database. `visible: true` because the controls are offered, and
+       * `2O-ACTIVATION-004`'s summary must therefore say what they do.
+       */
+      { key: "notification_delivery", state: "operational", visible: true },
       { key: "follow_up_intensity", state: "future", visible: false },
       { key: "privacy_default", state: "future", visible: false },
       { key: "reasoning_route", state: "future", visible: false },

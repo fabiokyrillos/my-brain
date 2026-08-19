@@ -17,6 +17,7 @@ import {
   type AutomationCategory,
   type AutomationCategoryDecision,
 } from "./automation-policy";
+import { idleAutomationState } from "./automation-state";
 
 function decision(
   category: AutomationCategory,
@@ -49,8 +50,8 @@ function renderSection(
   decisions: readonly AutomationCategoryDecision[],
   history: readonly AutomationPolicyChange[] = [],
 ) {
-  const saveAction = vi.fn(async () => {});
-  const undoAction = vi.fn(async () => {});
+  const saveAction = vi.fn(async () => idleAutomationState);
+  const undoAction = vi.fn(async () => idleAutomationState);
   return {
     saveAction,
     undoAction,
@@ -227,8 +228,8 @@ describe("both locales", () => {
         locale="en"
         decisions={allSix}
         history={[]}
-        saveAction={vi.fn(async () => {})}
-        undoAction={vi.fn(async () => {})}
+        saveAction={vi.fn(async () => idleAutomationState)}
+        undoAction={vi.fn(async () => idleAutomationState)}
       />,
     );
     expect(screen.getByRole("heading", { name: "Automation by category" })).toBeInTheDocument();

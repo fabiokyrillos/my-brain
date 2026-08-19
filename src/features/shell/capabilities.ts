@@ -176,6 +176,35 @@ export const capabilityRegistry = [
    * evidence the decision measures.
    */
   { key: "automation_categories", state: "operational", surface: "settings", consumerEvidence: ["agent/automation-data", "agent/automation-actions", "loadAutomationStatus", "automation_category_status"], visible: true, columns: [], controls: ["automationCategoryState"] },
+  /*
+   * Slice 2P.5 — the notification preferences, governed for the first time.
+   *
+   * ## Why this row did not exist before, and why it has to now
+   *
+   * `2P-SETTINGS-008` moved consent, the types, the frequency, the quiet window
+   * and the daily cap from `/app/notifications` into Settings → Notificações.
+   * The controls are unchanged; what changed is that they are now inside the
+   * preferences centre, and `capability-registry-guard` walks that centre
+   * transitively. It found five rendered controls the registry had never heard
+   * of — which is `2O-ACTIVATION-005` direction B doing exactly its job.
+   *
+   * **The gap was revealed rather than created.** These controls shipped in
+   * slice 2M.4b and were never governed, because the guard's scope was the
+   * settings surface and they were not on it. Adding the row is the honest
+   * response; exempting the file would have been the other one.
+   *
+   * ## `columns: []` and why the consumers are still real
+   *
+   * None of the five is an `agent_preferences` column. They live in the push
+   * consent record, and `public.begin_push_delivery` reads **every one of them**
+   * before sending — the type against the enabled set, the frequency, the local
+   * quiet window and the daily cap. That is a behavioural consumer inside the
+   * database, which is stronger evidence than a reader in application code.
+   *
+   * `visible: true`: the controls are offered on the surface, so
+   * `2O-ACTIVATION-004`'s summary must say what they do.
+   */
+  { key: "notification_delivery", state: "operational", surface: "settings", consumerEvidence: ["begin_push_delivery", "notifications/consent-contract", "notifications/consent-reader", "notifications/actions"], visible: true, columns: [], controls: ["notificationType", "notificationFrequency", "quietStart", "quietEnd", "dailyCap"] },
   { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"], controls: [] },
   { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"], controls: [] },
   { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"], controls: [] },
@@ -445,7 +474,15 @@ export const navigationCapabilities = [
   { key: "reminders", route: "reminders", group: "organization", visibility: "more", nested: false, aliases: [] },
   { key: "history", route: "history", group: "transparency", visibility: "more", nested: false, aliases: [] },
   { key: "costs", route: "costs", group: "transparency", visibility: "more", nested: false, aliases: [] },
-  { key: "settings", route: "settings", group: "preferences", visibility: "more", nested: false, aliases: [] },
+  /*
+   * `nested: true` since slice 2P.5, and it is load-bearing rather than
+   * tidying. `2P-SETTINGS-001` gives Settings eight sections under
+   * `/app/settings/[section]`; without this, `classifyNavigationPath` returns
+   * `null` for `/app/settings/appearance` and the rail stops marking Ajustes as
+   * the current destination while the reader is standing in it — the same
+   * defect `mobileDemotedKeys` exists to prevent on the other surface.
+   */
+  { key: "settings", route: "settings", group: "preferences", visibility: "more", nested: true, aliases: [] },
   { key: "capture", route: "capture", group: "global", visibility: "global", nested: false, aliases: [] },
   { key: "notifications", route: "notifications", group: "global", visibility: "global", nested: false, aliases: [] },
   { key: "jobs", route: "jobs", group: "advanced", visibility: "context-only", nested: false, aliases: [] },

@@ -43,6 +43,15 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 const code = (relative: string) =>
   read(relative).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
+/**
+ * Where Ajustes' sections mount their content, since slice 2P.5.
+ *
+ * `2P-SETTINGS-001` split the single page into eight routes over one dynamic
+ * segment, so the page file no longer mounts anything but a panel. The census
+ * rows below are about what Ajustes *reaches*, and that is now decided here.
+ */
+const SETTINGS_SECTIONS_MODULE = "src/features/settings/settings-section-content.tsx";
+
 /** The four the bar carries beside capture. */
 const BAR_DESTINATIONS = ["home", "inbox", "work"] as const;
 
@@ -193,7 +202,7 @@ describe("the rest of the census, path by path", () => {
     const section = code("src/features/transparency/data-ai-section.tsx");
     expect(section).toContain("TRANSPARENCY_LENSES.map");
     expect(section).toContain("getNavigationHref(locale, lens)");
-    expect(code("src/app/[locale]/app/settings/page.tsx")).toContain("<DataAiSection");
+    expect(code(SETTINGS_SECTIONS_MODULE)).toContain("<DataAiSection");
     expect(TRANSPARENCY_LENSES).toEqual(["history", "costs", "jobs"]);
   });
 
@@ -219,7 +228,7 @@ describe("the rest of the census, path by path", () => {
     const section = code("src/features/account-centre/account-data-section.tsx");
     expect(section).toContain("ACCOUNT_CENTRE_DESTINATIONS.flatMap");
     expect(section).toContain("accountCentreLinks(locale, destination)");
-    expect(code("src/app/[locale]/app/settings/page.tsx")).toContain("<AccountDataSection");
+    expect(code(SETTINGS_SECTIONS_MODULE)).toContain("<AccountDataSection");
 
     // Resolved rather than asserted as strings, so a route that moves cannot
     // leave this passing against a path that no longer exists.

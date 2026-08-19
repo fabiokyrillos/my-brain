@@ -4,10 +4,13 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+import { SETTINGS_REVALIDATION_PATHS } from "@/features/settings/sections";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale, type Locale } from "@/lib/preferences";
 
-import { AUTOMATION_CATEGORIES, AUTOMATION_POLICY_STATES } from "./automation-policy";
+import { getAutomationCopy } from "./automation-copy";
+import { AUTOMATION_CATEGORIES, AUTOMATION_POLICY_STATES, isAutomationCategory } from "./automation-policy";
+import type { AutomationActionState } from "./automation-state";
 
 /**
  * The owner's two automation controls — set a category's policy, and take that
@@ -33,6 +36,16 @@ import { AUTOMATION_CATEGORIES, AUTOMATION_POLICY_STATES } from "./automation-po
  * It is the shape `updateProfile`, the BYOK actions and the onboarding pair
  * already use, and it is narrowed rather than trusted: a revalidation path
  * built from an unchecked string is a request-supplied path.
+ *
+ * ## Slice 2P.5: these return instead of throwing
+ *
+ * See `automation-state.ts` for the whole reasoning. In short, slice 2P.4 made
+ * them throw because a *swallowed* error is worse than a loud one, and named
+ * `2P-SETTINGS-007` as the successor that would make a *rendered* error
+ * possible. This is that successor: a thrown error replaces the page with the
+ * boundary and destroys the section, the history and any other section's
+ * unsaved input, while a returned state keeps all of it and says something
+ * specific.
  */
 
 const categorySchema = z.enum(AUTOMATION_CATEGORIES);
@@ -44,61 +57,61 @@ function resolveLocale(raw: FormDataEntryValue | null): Locale {
 }
 
 /**
- * Invalidate the route, and let the client ask for it again.
+ * Invalidate both settings routes, and let the client ask for them again.
  *
  * ## What was measured, in a real browser against the deployed database
  *
- * `revalidatePath` alone committed the write and **did not refresh the page**:
- * the category's reason still read `suggest_only_by_owner`, the history list
- * stayed empty, and the undo control never appeared until the owner reloaded by
- * hand. A `redirect` back to the same URL did not fix it either — Next treats a
- * navigation to the current route as a no-op, so the router cache kept serving
- * the entry it already had.
+ * `revalidatePath` with the **resolved** path committed the write and **did not
+ * refresh the page**: the category's reason still read `suggest_only_by_owner`,
+ * the history list stayed empty, and the undo control never appeared until the
+ * owner reloaded by hand. A `redirect` back to the same URL did not fix it
+ * either — Next treats a navigation to the current route as a no-op, so the
+ * router cache kept serving the entry it already had.
  *
- * That is the same practical failure this repository already recorded from the
- * opposite direction — *"revalidatePath destroys the undo control"* — arriving
- * here as *the undo control never appears*. For `2P-AUTONOMY-009` the undo has
- * to be reachable at the moment the owner changes the policy, which is exactly
- * when they might want it back.
+ * The route **pattern** plus `'page'` is the form a dynamic segment needs, and
+ * the Next documentation says so outright: *"If `path` contains a dynamic
+ * segment … this parameter is required."*
  *
- * ## The two halves, and why neither replaces the other
+ * ## Two patterns since slice 2P.5
  *
- * This one invalidates the server's cache, so the next render is fresh. The
- * client half — `router.refresh()` in `automation-policy-form.tsx` and
- * `automation-undo-button.tsx` — makes the next render *happen*. It is the
- * pattern `features/operations/undo-affordance.tsx` already uses after a task
- * command.
+ * The section this control lives in moved from `/app/settings` to
+ * `/app/settings/assistant`, which is a **second** dynamic segment. Both come
+ * from the routing contract rather than being written here, so a section added
+ * to the route tree cannot leave this action invalidating a path that no longer
+ * matches it.
  */
 function invalidateSettings(): void {
-  /*
-    THE ROUTE PATTERN, NOT THE RESOLVED PATH, AND THE DIFFERENCE WAS MEASURED.
-
-    With `revalidatePath(`/${locale}/app/settings`)` — the shape every other
-    action in this repository uses — the client's refresh request really was
-    sent (the network shows `POST` then a fresh `GET` with `_rsc`) and the
-    server answered it with the OLD render. `/app/settings` lives under a
-    dynamic `[locale]` segment, and Next matches those by ROUTE PATTERN plus a
-    type rather than by resolved URL.
-
-    It takes no locale for the same reason: the pattern covers every locale, so
-    there is nothing here for a request-supplied value to influence.
-  */
-  revalidatePath("/[locale]/app/settings", "page");
+  for (const path of SETTINGS_REVALIDATION_PATHS) revalidatePath(path, "page");
 }
 
-export async function setAutomationCategoryPolicy(formData: FormData): Promise<void> {
+export async function setAutomationCategoryPolicy(
+  _state: AutomationActionState,
+  formData: FormData,
+): Promise<AutomationActionState> {
   const locale = resolveLocale(formData.get("locale"));
+  const copy = getAutomationCopy(locale);
   const category = categorySchema.safeParse(formData.get("category"));
   const state = stateSchema.safeParse(formData.get("automationCategoryState"));
 
   /*
-    A malformed submission changes nothing and says nothing, deliberately.
+    A malformed submission changes nothing and says so.
+
     Neither field is user-typed prose — both are closed vocabularies rendered by
     this product — so an unparseable value is a tampered or stale payload rather
-    than a mistake to explain. There is nothing here for the "a failed save must
-    preserve what was typed" rule to preserve.
+    than a mistake to explain, and there is nothing here for the "a failed save
+    must preserve what was typed" rule to preserve. It still reports rather than
+    returning silently: slice 2P.4 measured that a silent no-op and a successful
+    save look identical on this surface, because the `<select>` is uncontrolled
+    and holds the owner's own click either way.
   */
-  if (!category.success || !state.success) return;
+  if (!category.success || !state.success) {
+    const raw = formData.get("category");
+    return {
+      status: "error",
+      message: copy.saveFailed,
+      ...(isAutomationCategory(raw) ? { category: raw } : {}),
+    };
+  }
 
   const { supabase } = await requireUser(locale);
   const { error } = await supabase.rpc("set_automation_category_policy", {
@@ -106,44 +119,66 @@ export async function setAutomationCategoryPolicy(formData: FormData): Promise<v
     p_state: state.data,
     p_operation_key: randomUUID(),
   });
-  /*
-    A failed save RAISES rather than returning quietly, and for this control
-    specifically.
-
-    A `<form action>` re-renders the server tree when the action resolves, so a
-    swallowed error would put the stored value back in the select with no
-    explanation — the owner would believe they changed who may write without
-    asking them, and nothing would have changed. That is the worst failure mode
-    an authority control has, and it is worse than an error the user can see.
-
-    `2P-SETTINGS-007` — a failed save preserves input and names its section —
-    belongs to slice 2P.5, which introduces the settings sections this will live
-    in. Until then the honest behaviour is to refuse loudly rather than to
-    report a success that did not happen.
-  */
   if (error) {
-    throw new Error(`set_automation_category_policy failed: ${error.code ?? "unknown"}`);
+    /*
+      No revalidation on a failure. A revalidation would refresh the page out
+      from under the failed save and discard the message with it — the shape
+      slice 2N.3 found in the undo control and `updateProfile` already avoids.
+    */
+    console.error("Automation policy save failed", error.code);
+    return { status: "error", category: category.data, message: copy.saveFailed };
   }
 
   invalidateSettings();
+  return { status: "success", category: category.data, message: copy.saveSucceeded };
 }
 
-export async function undoAutomationCategoryPolicy(formData: FormData): Promise<void> {
+export async function undoAutomationCategoryPolicy(
+  _state: AutomationActionState,
+  formData: FormData,
+): Promise<AutomationActionState> {
   const locale = resolveLocale(formData.get("locale"));
+  const copy = getAutomationCopy(locale);
   const undoId = undoIdSchema.safeParse(formData.get("undoId"));
-  if (!undoId.success) return;
+  /*
+    The category rides along purely so the failure can be rendered on the right
+    row. It is NOT trusted for anything else: `public.undo_operation` re-reads
+    the recorded operation and decides for itself which category it touches, so
+    a tampered value here can misplace a message and nothing more.
+  */
+  const raw = formData.get("category");
+  const category = isAutomationCategory(raw) ? raw : undefined;
+
+  if (!undoId.success) {
+    return { status: "error", message: copy.undoFailed, ...(category ? { category } : {}) };
+  }
 
   const { supabase } = await requireUser(locale);
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
-  /*
-    Same rule, and the same reason. `55P03` here means the category moved since
-    the operation was recorded — the handler refuses rather than overwriting a
-    newer decision with an older one — and reporting that as a successful undo
-    would tell the owner their policy had been restored when it had not.
-  */
   if (error) {
-    throw new Error(`undo_operation failed: ${error.code ?? "unknown"}`);
+    /*
+      `55P03` is not a generic failure and must not read as one: it means the
+      category moved since the operation was recorded, and the handler refused
+      rather than overwriting a newer decision with an older one. Reporting that
+      as "could not undo, try again" would invite exactly the retry that will
+      keep being refused.
+    */
+    console.error("Automation policy undo failed", error.code);
+    return {
+      status: "error",
+      message: error.code === "55P03" ? copy.undoStale : copy.undoFailed,
+      ...(category ? { category } : {}),
+    };
   }
 
   invalidateSettings();
+  return { status: "success", message: copy.undoSucceeded, ...(category ? { category } : {}) };
 }
+
+/*
+  `idleAutomationState` is deliberately NOT re-exported from here.
+
+  A `"use server"` module may export only async functions — a plain const is a
+  build error `tsc --noEmit` cannot see, which this repository has already paid
+  for once. Consumers import it from `automation-state.ts`, where it lives.
+*/

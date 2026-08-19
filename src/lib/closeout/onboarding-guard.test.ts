@@ -49,7 +49,7 @@ const code = (relative: string) =>
 const ONBOARDING_DIR = "src/features/onboarding";
 const HOME_VIEW = "src/features/shell/home-view.tsx";
 const HOME_DASHBOARD = "src/features/shell/home-dashboard.tsx";
-const SETTINGS_PAGE = "src/app/[locale]/app/settings/page.tsx";
+const SETTINGS_PAGE = "src/features/settings/settings-section-content.tsx";
 const APP_LAYOUT = "src/app/[locale]/app/layout.tsx";
 const IDENTITY_MIGRATION = "supabase/migrations/202607160001_phase1_identity.sql";
 

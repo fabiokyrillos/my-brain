@@ -973,3 +973,205 @@
     justify-self: stretch;
   }
 }
+
+/* ==========================================================================
+   Slice 2P.5 — the Settings sections, the automation additions, and the
+   notification history's new states.
+
+   Placed at the END of this file, after the `@media (max-width: 600px)` block
+   above, and every narrow-viewport rule this slice adds is placed after its own
+   base rules for the same reason: a media query that precedes the base rules it
+   overrides adds no specificity, so the later base rule wins and the narrow
+   layout is silently dead. This repository has already shipped that defect once.
+   ========================================================================== */
+
+/* `2P-SETTINGS-003`. One DOM, two layouts.
+
+   Mobile is the DEFAULT here rather than the override: the sections are a
+   vertical list above the panel, which is exactly what the requirement asks
+   for — "a list or compact selector rather than an overflowing tab row" — and
+   it needs no rule at all. The rail is what the wide viewport adds. */
+.settings-layout {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+  align-items: start;
+}
+
+.settings-nav-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  /* `2O-MOBILE`'s signed floor. A settings section is a primary destination on
+     this surface and must not be smaller than one. */
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  text-decoration: none;
+  transition: background var(--motion-standard) var(--ease-enter);
+}
+
+.settings-nav-link:hover {
+  background: var(--background-subtle);
+  color: var(--text-primary);
+}
+
+/* The active section, marked by more than colour.
+
+   `aria-current="page"` is what a screen reader reads; the border and the
+   weight are what a sighted reader sees, and neither is a hue alone — a reader
+   who cannot separate the two tints still has the edge and the weight. */
+.settings-nav-link.active {
+  border-color: var(--border-strong);
+  background: var(--background-subtle-strong);
+  color: var(--text-primary);
+  font: var(--type-label);
+  font-weight: 600;
+}
+
+.settings-panel {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+/* The panel receives focus on a section change, and the ring is how a keyboard
+   reader knows it arrived. `:focus-visible` rather than `:focus` so a pointer
+   user who clicked a section does not get a ring they did not ask for. */
+.settings-panel:focus {
+  outline: none;
+}
+
+/* `2px solid var(--focus-ring)`, not `var(--focus-ring)` alone.
+
+   `--focus-ring` is a COLOUR (`tokens.css:62`), so `outline: var(--focus-ring)`
+   is an invalid declaration the browser drops in silence — the ring simply does
+   not exist, with no warning anywhere. `onboarding.css:232` records this exact
+   defect from an earlier slice; this is the same mistake, caught by reading
+   what the token actually holds instead of what its name suggests. */
+.settings-panel:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+.settings-panel-summary {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+/* Slice 2P.4's section, with slice 2P.5's three additions. */
+.automation-thresholds {
+  margin: var(--space-3) 0 0;
+  padding: var(--space-3);
+  border: 1px solid var(--tone-information-line);
+  border-radius: var(--radius-md);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+  font: var(--type-caption);
+}
+
+/* Freshness and the undo block, as a definition list because they are two
+   named rules with two answers rather than a paragraph of prose. */
+.automation-blocking {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+}
+
+.automation-blocking > div {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.automation-blocking dt {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.automation-blocking dd {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-caption);
+}
+
+/* An active undo block is a refusal, so it reads as one rather than as a
+   neutral fact sitting beside a clear one. */
+.automation-blocking dd[data-undo-block="active"] {
+  color: var(--tone-attention-fg);
+}
+
+.automation-outcome {
+  margin: var(--space-2) 0 0;
+  grid-column: 1 / -1;
+}
+
+.automation-outcome-success {
+  color: var(--tone-success-fg);
+  font: var(--type-caption);
+}
+
+/* `2P-SETTINGS-008` — the notification history's states, as words with a shape.
+
+   The row's `unread`/`read` class used to be the whole signal. The badge is the
+   visible half of the repair; the announced summary above the list is the other
+   half, and neither is a hue on its own. */
+.notification-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.notification-status-badge[data-status="unread"] {
+  border-color: var(--tone-information-line);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+  font-weight: 600;
+}
+
+.notification-unread-summary {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+/* The one discreet contextual entry the requirement allows. Discreet, and still
+   a real target: it is the only way back to the preferences from here. */
+.notification-preferences-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+}
+
+@media (min-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: var(--space-10);
+  }
+
+  .settings-nav {
+    position: sticky;
+    /* Clear of the top bar, so a sticky rail does not sit under it. */
+    top: var(--space-8);
+  }
+}
