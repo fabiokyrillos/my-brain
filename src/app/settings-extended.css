@@ -715,3 +715,261 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* ---------------------------------------------------------------------------
+   Phase 2P slice 2P.4 — automation by category.
+
+   BASE RULES FIRST, the media query last. A media query placed above the rules
+   it overrides adds no specificity, so a later base rule wins and the narrow
+   layout silently stops applying — a failure this repository has already paid
+   for and which only a real browser can see.
+
+   Every custom property below is declared in `tokens.css`. An undefined
+   `var()` does not fall back: it voids the whole declaration, and the one time
+   that happened here it removed a focus ring completely with no warning
+   anywhere.
+   ------------------------------------------------------------------------- */
+
+.automation-section {
+  margin-top: var(--space-10);
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
+}
+
+.automation-section > h2 {
+  margin: 0 0 var(--space-2);
+  font: var(--type-title-2);
+  color: var(--text-primary);
+}
+
+.automation-section > p {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+/* The posture line is the honest headline of this surface: nothing is
+   automatic. It is toned as information rather than as a warning, because the
+   safe state is not a fault. */
+.automation-posture {
+  padding: var(--space-3);
+  border: 1px solid var(--tone-information-line);
+  border-radius: var(--radius-md);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+}
+
+.automation-list {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.automation-row {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+
+.automation-row-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.automation-row-heading h3 {
+  margin: 0;
+  font: var(--type-label);
+  color: var(--text-primary);
+}
+
+/* The reason, always shown and never abbreviated to a generic "unavailable":
+   which of the five it is decides what the owner should do next. */
+.automation-state {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.automation-state-active {
+  border-color: var(--tone-success-line);
+  background: var(--tone-success-bg);
+  color: var(--tone-success-fg);
+}
+
+.automation-risk {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.automation-evidence {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-sm);
+  background: var(--background-surface);
+}
+
+.automation-evidence-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+}
+
+.automation-evidence-empty,
+.automation-required,
+.automation-shortfall,
+.automation-state-help {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.automation-shortfall {
+  color: var(--text-primary);
+}
+
+.automation-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.automation-counts > div {
+  display: grid;
+  gap: 2px;
+}
+
+.automation-counts dt {
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.automation-counts dd {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+
+.automation-form {
+  display: grid;
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.automation-form > label {
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.automation-form select {
+  width: 100%;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+  /* 16px prevents iOS zooming the page on focus, and the `font` shorthand
+     above would otherwise carry the token's own size. Declared after it, on
+     purpose: the shorthand resets what it does not name. */
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.automation-form select:focus-visible,
+.automation-save:focus-visible,
+.automation-undo:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.automation-save {
+  justify-self: start;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-label);
+}
+
+.automation-save:hover {
+  background: var(--action-primary-hover);
+}
+
+.automation-history {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-default);
+}
+
+.automation-history-label {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.automation-history-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.automation-history-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  color: var(--text-primary);
+  font: var(--type-caption);
+}
+
+.automation-undo {
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+
+@media (max-width: 600px) {
+  .automation-section {
+    padding: var(--space-4);
+  }
+
+  .automation-counts {
+    gap: var(--space-3);
+  }
+
+  .automation-save,
+  .automation-undo {
+    width: 100%;
+    justify-self: stretch;
+  }
+}

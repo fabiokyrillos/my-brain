@@ -1,4 +1,10 @@
 import { AccountDataSection } from "@/features/account-centre/account-data-section";
+import {
+  setAutomationCategoryPolicy,
+  undoAutomationCategoryPolicy,
+} from "@/features/agent/automation-actions";
+import { loadAutomationPolicyHistory, loadAutomationStatus } from "@/features/agent/automation-data";
+import { AutomationSection } from "@/features/agent/automation-section";
 import { AiConfigSection } from "@/features/ai-config/ai-config-section";
 import { AppearanceControl } from "@/features/appearance/appearance-control";
 import { interpretPendingEntries, removeAiCredential, saveAiCredential } from "@/features/byok/actions";
@@ -29,8 +35,17 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const pt = locale === "pt-BR";
   const { supabase, user } = await requireUser(locale);
-  const [values, credential, pending, onboardingDismissed, census, consent, pushConsent] =
-    await Promise.all([
+  const [
+    values,
+    credential,
+    pending,
+    onboardingDismissed,
+    census,
+    consent,
+    pushConsent,
+    automation,
+    automationHistory,
+  ] = await Promise.all([
       loadSettingsFormValues(supabase, user.id),
       loadCredentialMetadata(supabase, user.id),
       loadPendingEntryCount(supabase, user.id),
@@ -47,6 +62,14 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
       loadPrivacyCensus(supabase, user.id),
       loadConsentRecord(supabase, user.id),
       readPushConsent(supabase, user.id),
+      /*
+        Slice 2P.4's two reads, in the same batch and for the same reason the
+        three above are: both run on the request-scoped `authenticated` client
+        under forced RLS, the status projection is one RPC over six categories,
+        and the history is five rows keyed by `action_type`.
+      */
+      loadAutomationStatus(supabase),
+      loadAutomationPolicyHistory(supabase, new Date().toISOString()),
     ]);
   const signedInEmail = await readSignedInEmail(supabase);
 
@@ -70,6 +93,28 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
         timeZone={await getOwnerTimeZone()}
       />
       <SettingsForm action={updateProfile} locale={locale} values={values} />
+      {/*
+        `2P-AUTONOMY-001`, `-003`, `-009`, `-010` — slice 2P.4.
+
+        It sits directly after the saved preferences because it IS one, and
+        because it is the preference with the largest consequence on the page:
+        it decides whether the agent may write without asking. Nothing is
+        automatic today and the section says so in its own first paragraph
+        rather than leaving the reader to infer it from six identical selects.
+
+        `2P-SETTINGS-001` gives Settings stable sections in slice 2P.5 and this
+        is written to be moved into one without changing its semantics: the
+        authority is the database function, the projection is
+        `loadAutomationStatus`, and the copy is a typed module. Mounting is the
+        only thing this page decides.
+      */}
+      <AutomationSection
+        locale={locale}
+        decisions={automation}
+        history={automationHistory}
+        saveAction={setAutomationCategoryPolicy}
+        undoAction={undoAutomationCategoryPolicy}
+      />
       {/*
         `2O-ONBOARD-010`'s reversal. It renders only when the guide is actually
         dismissed, so it is never a control that changes nothing (`R-2O-12`),

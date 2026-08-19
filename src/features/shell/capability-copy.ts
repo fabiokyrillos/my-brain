@@ -86,6 +86,16 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
         name: "Aparência",
         effect: "Escolhe entre seguir o aparelho, claro ou escuro. Vale só neste navegador.",
       },
+      /*
+       * `2P-AUTONOMY-001`. The effect is written for a reader deciding whether
+       * to change it, so it names the SAFE state as the current one rather than
+       * describing a capability the product does not have yet: nothing is
+       * automatic today, and this list must not imply otherwise.
+       */
+      automation_categories: {
+        name: "Automação por categoria",
+        effect: "Define, por tipo de registro, se o agente só sugere ou pode agir sozinho. Hoje nenhuma categoria age sozinha.",
+      },
     },
   },
   en: {
@@ -121,6 +131,10 @@ const copy: Record<Locale, CapabilitySummaryCopy> = {
       appearance: {
         name: "Appearance",
         effect: "Chooses between following the device, light or dark. It applies in this browser only.",
+      },
+      automation_categories: {
+        name: "Automation by category",
+        effect: "Sets, per kind of record, whether the agent only suggests or may act on its own. No category acts on its own today.",
       },
     },
   },

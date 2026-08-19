@@ -145,7 +145,37 @@ export const capabilityRegistry = [
    * themselves, and `2O-PREF-006` keeps it asserted in both locales.
    */
   { key: "scheduled_reviews", state: "operational", surface: "settings", consumerEvidence: ["day-review/review-schedule", "day-review-projection"], visible: true, columns: ["daily_review_time", "weekly_review_time", "weekly_review_day"], controls: [] },
+  /*
+   * Phase 2P slice 2P.4 added `automation_categories` below, and this row
+   * stays exactly as it is. The two are not the same capability and must not
+   * be merged.
+   *
+   * `autonomy_level` is one global `text` on `agent_preferences`, NOT NULL,
+   * defaulting to `'autonomous'`, and **nothing reads it** — `trust-builders`
+   * passes `autonomyAllowed: true` as a literal rather than consulting it. It
+   * therefore stays `future` with empty evidence and no control, which is
+   * `OD-2O-7` **A**, and `2O-ACTIVATION-007`'s nine keep it invisible.
+   *
+   * The per-category policy is a different store, a different vocabulary and a
+   * different authority. Giving this row a control would mean a schema default
+   * nobody chose could be read as consent for six categories of automatic
+   * write.
+   */
   { key: "autonomy", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["autonomy_level"], controls: [] },
+  /*
+   * `2P-AUTONOMY-001`, `-003`, `-009`, `-010`.
+   *
+   * `columns` is empty because this row governs no `agent_preferences` column —
+   * the policy lives in `automation_category_policies`, one row per category —
+   * and `controls` carries the one rendered control name, which is the shape
+   * `2O-PREF-008` added for exactly this case.
+   *
+   * The consumers are real and behavioural: the decision function is the single
+   * authority any automatic write must clear, `loadAutomationStatus` is what the
+   * interface renders, and the producer turns the owner's own reviews into the
+   * evidence the decision measures.
+   */
+  { key: "automation_categories", state: "operational", surface: "settings", consumerEvidence: ["agent/automation-data", "agent/automation-actions", "loadAutomationStatus", "automation_category_status"], visible: true, columns: [], controls: ["automationCategoryState"] },
   { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"], controls: [] },
   { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"], controls: [] },
   { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"], controls: [] },
