@@ -9422,3 +9422,204 @@ remainders stay open and unabsorbed: `2P-CHAT-004-MOBILE` (slice 2P.5) and
 `2P-CHAT-007-JOURNEY` (slice 2P.8). Push HTTP 403, signup, rollout and every
 inherited residual stay where §87, §88 and §91 left them. **This section
 deliberately does not name what comes after Phase 2P.**
+
+## §94 — Slice 2P.1 ships and deploys: a resolved entry can finally leave Needs You, and two of the three things that stopped it were comments (2026-08-19)
+
+**Merge SHA `4d04f5930ec9fbfc2519dd3f5dc9049328ea6285`.** `main` synchronized
+and clean, zero open PRs, **98 local = 98 hosted, parity `202608180098`** — read
+live. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+**The phase's single authorized migration is now SPENT.** Any further migration
+is a stop condition requiring a new owner authorization.
+
+### The defect, measured closed on the deployed database
+
+An entry's status was derived once, at interpretation time, from the
+interpretation's own JSON — and no resolution path ever re-derived it. So
+nothing could leave the queue. Hosted, after deployment:
+
+| Step | `list_needs_attention` |
+|---|---|
+| a settled entry, before | `review_interpretation` — **in** the queue |
+| after `confirm_entry_interpretation` | status `completed`, reason **`null`** — it has **left** |
+| re-reading | still absent — the answer is stable across reads |
+| after `undo_operation` | `review_interpretation` — back, truthfully |
+
+### One contract, bound to tables rather than to bodies
+
+`private.entry_pending_decisions` → `entry_lifecycle_state` →
+`rederive_entry_lifecycle`, reached by four `after` triggers on the **union of
+everything the twelve resolution functions write**: `tasks`,
+`entry_task_candidate_resolutions`, `pending_questions`,
+`entry_person_candidate_resolutions`. Binding to the tables rather than to the
+function bodies is what makes §93's twelve tractable: the six routes the
+application never calls, every superseded version still granted to
+`authenticated`, and direct DML all re-derive, and a thirteenth route added
+later inherits the rule without being told about it.
+
+`public.confirm_entry_interpretation` is the positive act for the one class no
+resolution can clear. All six defects of the rejected `202608170098` are
+answered — both statuses accepted, terminal state re-derived rather than forced,
+handler-backed undo, `entity_id` present, `reason` carrying prose only, and
+deduplication on the real unique index `(user_id, operation_key)` rather than on
+the current status. It was never applied, copied or counted.
+
+### The owner decided the two things CI opened, and both decisions changed the design
+
+**(i) A re-derivation preserves `entries.updated_at`.** `list_needs_attention`
+orders by that column and `set_updated_at` writes `now()`, which is *transaction*
+time — so without this, resolving one decision would both jump that entry to the
+top of Needs You and collapse every entry re-derived in one transaction onto a
+single timestamp, which is exactly how three ordering assertions failed.
+
+The mechanism is a dedicated `before update` trigger on `entries` whose name
+sorts **after** `entries_updated_at`, so it runs last and sees what
+`set_updated_at` wrote. It restores the instant only when **both** hold: a
+**transaction-local** setting names *that entry id*, and `status` is the **only**
+column that moved — compared over the whole row as jsonb, so a column added later
+is covered without anyone remembering. `set_updated_at` is unmodified, no trigger
+is ever disabled, the marker cannot outlive its transaction, cannot be seen by
+another session, and cannot reach another entry; the previous value is restored
+right after the one statement.
+
+It was proved **against the deployed schema before CI**, in a transaction that
+was rolled back — and the rollback semantics were themselves proved first, with a
+probe schema that did not survive. Marked status-only change: preserved.
+Unmarked status-only change: **stamped**. Marked but content also moved:
+**stamped**. Then the migration's own backfill repaired a real stranded hosted
+entry — `partially_processed` → `awaiting_review`, one audit row, `audit_logs`
+341 → 342 — **and left its instant at `2026-08-17T00:04:49`**.
+
+**(ii) An unresolved person candidate is a real pending decision**, and reports
+`confirm_existing_candidates` rather than the generic reason. That reason's
+deployed copy already reads *"Decida sobre as sugestões / Escolha o destino de
+cada sugestão pendente"* — *suggestions*, not tasks. A sixth reason was
+**rejected**: `needs_attention_item_opened` validates exactly five names inside
+the database (`202607170024:205-212`), and widening a deployed vocabulary to
+express a distinction the existing name already expresses correctly is the shape
+this phase's own plan calls a stop condition.
+
+### §89 was half right about the projection, and the half that was wrong inverted the fix
+
+§89 concluded *"2P.1 needs no projection change once the status can move"*. The
+finer predicates **are** correct — but they were gated on `status = 'completed'`
+and sequenced **after** the generic status branch. So making the status truthful
+made them **less** reachable: an entry with one unconfirmed candidate becomes
+`awaiting_review` and the generic branch swallowed
+`confirm_existing_candidates`. The entry never wrongly left the queue; it stayed
+under a less specific reason, which is a live regression against
+`2P-ATTENTION-004`.
+
+The finer reasons now decide **first**, gated on the three statuses the contract
+governs, and `review_interpretation` means exactly one thing: the interpretation
+itself is unconfirmed. Proved on the owner's real entries — the one carrying
+`task_candidate` + `person_candidate` now reports the specific reason where all
+three previously reported the generic one.
+
+**The guard was replaced, not relaxed.** `phase-2p-foundation-guard` used to
+assert the migration must *not* redefine the projection. That is gone; a stricter
+pin stands in its place — the exact eight-step decision order, the three-status
+gate appearing exactly three times, the two-status gate on
+`review_interpretation`, all three predicates present, and the reason set still
+being exactly the deployed five. **Its two-sided control is the real
+predecessor** from `202607230048`, read from disk: the bytes that shipped the
+defect, proved to fail the new pin. Nothing is mutated to produce it, so a run
+that dies mid-test cannot leave the tree dirty.
+
+### Three things stopped this slice, and two of them were comments
+
+1. **CI, on a real error.** `entry_interpretations` is immutable by trigger, and
+   this slice's own fixture correction tried to write `element_policy` directly.
+   pgTAP cannot run locally — there is no Docker on this machine — so the suite
+   is CI-only, and CI is what found it.
+2. **The full diff review, on a comment that the slice's own change made false.**
+   `page.tsx` justified a workaround by stating that `list_needs_attention`
+   resolves the status branch *before* `answer_existing_question`. True when
+   written; false the moment 3(a) landed. No test can fail on that.
+3. **The same review, on a pgTAP helper doing DDL inside a plpgsql function**
+   where the repository already had a proven inline form.
+
+**And the acceptance record's own count was wrong twice.** It said *eight*
+assertions failed; **ten** did. The two it did not list were the contract
+working: those fixtures forced `status = 'completed'` while claiming the open
+question was the only reason, and `model_only_element_trust` scores
+`confidence * 0.20 + 0.05` — never above 0.25 — so it returns
+`block_until_confirmation` at **every** confidence and the element policy was a
+real pending decision all along. The fixture's premise was made **true** rather
+than the assertion re-baselined. Separately, the slice covers
+`2P-ATTENTION-001` … **`-008`** — eight, not seven; the family was miscounted in
+prose and the count was re-taken from the plan's slice table, which is the same
+correction §93 had to make about "nine functions".
+
+### What is deliberately NOT claimed
+
+- **`2P-ATTENTION-008` is partial.** Removal, replay and another-owner isolation
+  are proved hosted (`P0002` on the cross-owner attempt, the other owner's entry
+  untouched). **Refresh and back navigation are proved only at the data layer** —
+  the projection returns the same answer on repeated reads — because no
+  authenticated **browser** journey was run.
+- **No live two-session race on this contract.** `for update` is present and
+  structurally asserted; the hosted probe holds one connection.
+- **The confirmation panel has never been rendered in a real authenticated
+  browser.** CI's journey lane is unauthenticated or fixture-rendered and cannot
+  see the RSC boundary — the defect class that has shipped twice here.
+- **`RG-DEP-3` stays INCOMPLETE.** The backup gate was executed for this
+  deployment and reports **the same three blockers as 2026-08-07**, textually:
+  no `pg_dump`, no `SUPABASE_DB_URL`, no `BACKUP_ENCRYPTION_KEY`. It is recorded,
+  not treated as passed.
+
+### Zero residue, with a control
+
+Every hosted probe ran in a transaction that was rolled back, and absence was
+then **measured**: probe users, entries, interpretations, questions,
+`undo_operations` and audit rows all **0**; probe schemas **0**. Because a zero
+count is not a control, the same predicates were aimed at what really exists —
+**2** users, **3** entries, **15** `undo_operations`. The owner's three entries
+carry their original instants, `confirm_entry_interpretation` audit rows total
+**0**, and `audit_logs` is 342: the census's 341 plus the backfill's one row,
+nothing unaccounted for.
+
+### Slice 2P.4 re-audited against `4d04f593`, and it hits a stop condition immediately
+
+| Requirement | State |
+|---|---|
+| `-001` per-category automation policy | **not built.** `agent_preferences.autonomy_level` is a single global `text`, **no check constraint**, default `'autonomous'`, and `capabilities.ts:148` registers `autonomy` as `state: "future"` with `consumerEvidence: []`, `visible: false`, `controls: []`. Per-category policy needs a store. |
+| `-002` raw confidence cannot authorize a write | **already true by construction**, and worth pinning rather than building: `model_only_element_trust` returns `block_until_confirmation` at every confidence, so no automatic write exists today. |
+| `-003` calibration against an owner-reviewed reference set | **not built, and there is no reference set to measure against.** |
+| `-004` ambiguity / conflict / missing evidence → Needs You | **largely shipped by this very slice.** `entry_pending_decisions` routes four classes to the queue, each with a specific reason. Identity collision remains `2N-IDENTITY-EXTRACTION`. |
+| `-005` high-trust task creation validates title, temporal, duplicates | **not built** — no high-trust creation exists. |
+| `-006` high-trust person creation resolves candidates first | **partly guarded**: the owner's 2P.1 decision already forbids this contract creating an identity automatically, and an unresolved candidate blocks completion. |
+| `-007` memories need durable-language evidence | **not built** — memory creation is manual. |
+| `-008` relations never from co-mention | **hard boundary**, `2N-RELATION-TRIGGER`. |
+| `-009` content-minimal audit reason + bounded undo window | **primitives all shipped and just exercised end to end** by 2P.1: `audit_logs` (`action_type` carries no check constraint), `undo_operations` (24h default), the handler registry. **No migration needed.** |
+| `-010` disable automation by category | **not built** — same store problem as `-001`. |
+
+**The plan's own slice row says *"conditional; stop if schema authority is
+required"*, and the answer is that it is.** `-001`, `-003` and `-010` all need a
+persisted per-category policy and a calibration reference set. Reusing
+`privacy_preferences` jsonb for automation policy would be one vocabulary serving
+two authorities — the defect this repository has already paid for. And §89
+already warned that a product-analytics funnel for automation would be a new
+deployed vocabulary value and therefore a stop condition too.
+
+**So 2P.4 is NOT started.** The migration budget is spent, and starting it would
+either need a second migration or a store bent out of a column meant for
+something else.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** 2P.1 is merged, green on its exact
+merge SHA with the step list read at both points, deployed, parity proved live,
+zero residue measured. `main` is synchronized and clean; nothing is half-written.
+
+**Next action: an owner decision on slice 2P.4's schema authority**, using the
+re-audit above. Without it, the sequence should move to a slice that needs no
+schema — 2P.5 (settings and notifications) carries `2P-CHAT-004-MOBILE` and is
+where the mobile bar slot frees up.
+
+**Cumulative: 32 of 87 requirements, one migration spent of one authorized.**
+Three remainders open and unabsorbed: `2P-ATTENTION-008`'s browser half,
+`2P-CHAT-004-MOBILE` (slice 2P.5) and `2P-CHAT-007-JOURNEY` (slice 2P.8, with the
+owner's one-turn BYOK authorization). Push HTTP 403, signup, rollout and every
+inherited residual stay where §87, §88, §91 and §93 left them. **This section
+deliberately does not name what comes after Phase 2P.**

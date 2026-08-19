@@ -2,6 +2,63 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Slice 2P.1: one central lifecycle contract, and a resolved entry can leave Needs You
+
+- `2P-ATTENTION-001` … `-008` (eight; `-008` **partial**). **One migration** —
+  `202608180098`, the phase's first and only — applied after the seven gates in
+  order. 98 local = 98 hosted, parity `202608180098`. No provider call and no
+  BYOK spend.
+- **The P0 defect is closed, measured on the deployed database.** An entry's
+  status was derived once at interpretation time and no resolution path ever
+  re-derived it, so nothing could leave the queue. Hosted now: a settled entry
+  reads `review_interpretation`, confirmation makes it `completed`,
+  `list_needs_attention` returns nothing for it, re-reading agrees, and undo puts
+  it back.
+- **One contract, bound to tables rather than to function bodies.**
+  `private.entry_pending_decisions` / `entry_lifecycle_state` /
+  `rederive_entry_lifecycle`, reached by four `after` triggers on `tasks`,
+  `entry_task_candidate_resolutions`, `pending_questions` and
+  `entry_person_candidate_resolutions` — the union of everything the **twelve**
+  resolution functions write. So the six routes the application never calls, and
+  direct DML, re-derive too, and a thirteenth route added later inherits the rule
+  without being told.
+- **`public.confirm_entry_interpretation`** is the positive act for the one class
+  no resolution can clear. It accepts `awaiting_review` **and**
+  `partially_processed`, refuses while any other decision remains (`55P03`,
+  never the `40001` that hangs the gateway), deduplicates on the real unique
+  index `(user_id, operation_key)` rather than on the current status, and
+  registers a handler-backed undo that restores the **re-derived** prior state
+  rather than a remembered one. All six defects of the rejected candidate
+  `202608170098` are answered; it was never applied, copied or counted.
+- **`entries.updated_at` is preserved across a re-derivation** (owner decision).
+  A dedicated `before update` trigger sorting after `entries_updated_at` restores
+  the instant only when a transaction-local marker names that entry **and**
+  `status` is the only column that moved. `public.set_updated_at` is unmodified,
+  no trigger is disabled anywhere, the marker cannot outlive its transaction or
+  reach another entry, and a real content change is still stamped — proved with
+  one negative and two positive controls, hosted and in pgTAP. Without it,
+  resolving one decision would have re-ranked the entry to the top of Needs You
+  and collapsed every entry re-derived in one transaction onto a single
+  timestamp.
+- **`list_needs_attention` decides the finer reasons first.** They were gated on
+  `status = 'completed'` and sequenced after the generic status branch, so making
+  the status truthful made them *less* reachable. They are now gated on the three
+  statuses the contract governs, and `review_interpretation` means exactly one
+  thing: the interpretation itself is unconfirmed. An unresolved **person
+  candidate** reports `confirm_existing_candidates`, whose deployed copy already
+  reads "decide about the suggestions" in both locales — a sixth reason was
+  rejected because `needs_attention_item_opened` validates five names inside the
+  database.
+- The guard that forbade redefining the projection is **replaced by a stricter
+  one** pinning the exact eight-step decision order and semantics, with the real
+  predecessor from `202607230048` as its two-sided control.
+- The migration's backfill moved **one** stranded entry, wrote **one** audit row
+  (`audit_logs` 341 → 342) and preserved its instant.
+- **Not claimed:** a live two-session race on this contract, the confirmation
+  panel rendered in an authenticated browser, refresh and back navigation as
+  browser journeys, and `RG-DEP-3` — the backup gate was executed and reports the
+  same three blockers as 2026-08-07.
+
 ## 2026-08-18 - Slice 2P.3: one composer on both surfaces, over two forms
 
 - `2P-CAPTURE-001` … `-010`. **Zero migrations**; 97 local = 97 hosted, parity

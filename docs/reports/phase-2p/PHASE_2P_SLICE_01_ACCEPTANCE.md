@@ -310,15 +310,85 @@ the snooze deadline passes, both still stand unchanged.
 
 ## 6. Verification
 
-*(completed after deployment)*
+**Merged at `4d04f593`, deployed, parity `202608180098`.** The full evidence is
+in `PHASE_2P_SLICE_01_DEPLOYMENT.md`; this is the summary.
+
+| Gate | Result |
+|---|---|
+| CI on the exact head `6dd5625` | four check-runs, all `success` — **21 steps `success`, 2 `skipped`, zero `cancelled`**, with `Install the browser` and `Run the deterministic foundation journey` both read individually |
+| Full diff review | 22 files. **It found two defects and both were fixed by it** — see below |
+| Merge | `4d04f5930ec9fbfc2519dd3f5dc9049328ea6285` |
+| CI on the exact merge SHA | three check-runs, all `success`, steps read again, same 21/2/0 |
+| Byte identity | `sha256 38b41d1cb5625cb4c6652918ca1edd53d2ac9e644561e92f266f69c6fb6f8fc5`, `main` = disk |
+| Backup and posture gate | executed; **3 blockers, the same three recorded 2026-08-07**; `RG-DEP-3` stays INCOMPLETE and is not treated as passed |
+| Dry run | exactly one pending migration |
+| Parity | 98 local = 98 hosted, `202608180098`, read live |
+| Zero residue | measured, with a non-vacuity control on the same predicates |
+
+**What the review found, that no gate would have.** The projection change made
+two comments in the tree false, and both asserted the very thing this slice
+changed: `page.tsx` explained a workaround by saying `list_needs_attention`
+resolves the status branch *before* `answer_existing_question` — true when it
+was written, false the moment 3(a) landed. And a pgTAP helper did DDL inside a
+plpgsql function where the repository already had a proven inline form. Neither
+is a test failure; both were corrected.
+
+**What CI found, that nothing local could.** Local runs cannot execute pgTAP —
+there is no Docker on this machine — so the suite is CI-only. It caught a real
+error in this slice's own fixture correction: `entry_interpretations` is
+immutable by trigger, and clearing an element policy has to suspend that trigger
+for exactly one statement.
+
+**The defect this slice exists for, measured closed on the deployed database:** a
+settled entry reads `review_interpretation`; after `confirm_entry_interpretation`
+its status is `completed` and `list_needs_attention` returns **nothing** for it;
+re-reading agrees; `undo_operation` puts it back. Before this migration **no
+entry could ever leave Needs You.**
+
+**The queue behaviours, hosted:** every finer reason correct on the owner's real
+entries; confirmation refused while a question is open (`55P03`); both
+`awaiting_review` and `partially_processed` confirmable; the same key a true
+replay and a different key creating no second confirmation; undo restoring the
+**re-derived** prior state rather than a remembered one; another owner's entry
+refused (`P0002`) and untouched; and `updated_at` preserved on every
+re-derivation, including the backfill's repair of a real stranded entry.
 
 ## 7. Threats dispositioned
 
-*(completed after deployment)*
+| Threat | Disposition |
+|---|---|
+| `T-10` — an automatic write forcing a terminal state the evidence does not support | **Closed by construction.** Nothing forces a status. `rederive_entry_lifecycle` writes only what `entry_pending_decisions` implies, and `confirm_entry_interpretation` refuses while any other decision remains — proved hosted by the `55P03` refusal. |
+| A second authority over `entries.status` | **Refused.** The contract lives in `private`, is granted to nobody, and is reached only through four `after` triggers and the one `public` entry point. No client-side status write exists; the Server Action delegates and never invents a status. |
+| A silent change of grants, RLS, retention or authority | **None.** The only new privilege is `EXECUTE` on the new `public.confirm_entry_interpretation` to `authenticated`. Stated in `SECURITY.md`, asserted in pgTAP, and re-counted hosted after deployment. |
+| An irreversible automatic action | **Closed.** Confirmation registers an `undo_operations` row against the deployed handler registry; undo re-derives rather than restoring a remembered status. |
+| A derived-state write masquerading as a real change | **Closed by owner decision (i)**, with a negative control and two positive controls, hosted and in pgTAP. |
+| Cross-owner leakage | **Refused** (`P0002`), and the other owner's entry proved untouched. |
 
 ## 8. Where this stops
 
-*(completed after deployment)*
+**Slice 2P.1 is delivered and deployed.** `main` `4d04f593`, clean, zero open
+PRs, 98 local = 98 hosted at `202608180098`, zero residue.
+
+**The slice covers `2P-ATTENTION-001` … `-008` — eight requirements, not seven.**
+The family was miscounted while writing this record and the count was then taken
+from the plan's own slice table rather than from prose, which is the same
+correction §93 had to make about "nine functions". Cumulative: **32 of 87**.
+
+Four things are deliberately **not** claimed, and are carried forward rather
+than quietly absorbed:
+
+1. **`2P-ATTENTION-008` is partial.** Removal, replay and another-owner
+   isolation are proved hosted. Refresh and back navigation are proved only at
+   the **data** layer — the projection returns the same answer on repeated
+   reads — because no authenticated browser journey was run.
+2. **No live two-session race was run against this contract.** The `for update`
+   lock is present and structurally asserted; a real hosted race needs two
+   connections the probe does not have.
+3. **The confirmation panel has not been rendered in an authenticated
+   browser.** CI's journey lane is unauthenticated or fixture-rendered and
+   cannot see the RSC boundary — the defect class that has shipped twice here.
+4. **`RG-DEP-3` stays INCOMPLETE.** The backup gate was executed and reports the
+   same three blockers it reported on 2026-08-07.
 
 ---
 
