@@ -52,6 +52,38 @@ import {
 const subjectIdSchema = z.string().uuid();
 
 /**
+ * Invalidate the person surfaces (slice 2P.6).
+ *
+ * ## The route patterns, whole
+ *
+ * Under a `[locale]` dynamic segment a literal path invalidates nothing, which
+ * slice 2P.4 measured against the deployed app. A *hybrid* —
+ * `/[locale]/app/people/<uuid>` — is worse than either, because it looks
+ * targeted and matches no route file at all: Next tags cache entries by route
+ * structure, and that string is neither the structure nor a resolved path. The
+ * first draft of `linkPersonOrganization` shipped one.
+ *
+ * ## Synchronous, and that was established by execution
+ *
+ * The call was briefly moved into `after()` to keep it off the response path,
+ * on the reasoning that both routes are dynamic (`ƒ` in the build output) and
+ * therefore have no full-route cache to rebuild. The authenticated journey
+ * refuted it immediately: the company saved, the dialog closed, and the page
+ * went on rendering *Sem empresa*. **A Server Action's response carries a fresh
+ * render only when the action revalidated something synchronously**, so moving
+ * it after the response is indistinguishable from not calling it at all — the
+ * write lands and the owner is looking at the old value.
+ *
+ * It stays where it is for that reason, and the cost is real: invalidating the
+ * pattern makes the response re-render a page that issues eighteen queries in
+ * three rounds. That is a property of the person workspace, not of this write.
+ */
+function revalidatePeople(): void {
+  revalidatePath("/[locale]/app/people/[personId]", "page");
+  revalidatePath("/[locale]/app/people", "page");
+}
+
+/**
  * A unique-index violation, told apart from every other write failure.
  *
  * `projects_user_name_idx` and `people_user_name_idx` are unique on
@@ -221,8 +253,15 @@ export async function updatePerson(
   });
   if (audit.error) console.error("Person edit audit failed", audit.error.message);
 
-  revalidatePath(`/${parsed.data.locale}/app/people/${personId}`);
-  revalidatePath(`/${parsed.data.locale}/app/people`);
+  /*
+   * Repaired in slice 2P.6 because this slice's own surface needs it: the
+   * disclosure that submits here now carries the company as a hidden field, so a
+   * save from it must leave the page showing the stored values rather than the
+   * ones it was rendered with. ADR-123's amendment scopes the repair
+   * deliberately — the remaining `revalidatePath` call sites across the
+   * repository stay recorded debt rather than being rewritten silently.
+   */
+  revalidatePeople();
   return { status: "success", message: getEntityCopy(locale).saved };
 }
 
@@ -521,11 +560,7 @@ export async function linkPersonOrganization(
   });
   if (audit.error) console.error("Person company audit failed", audit.error.message);
 
-  // The route PATTERN, never the resolved path: under a `[locale]` dynamic
-  // segment a literal path invalidates nothing, which slice 2P.4 measured
-  // against the deployed app.
-  revalidatePath(`/[locale]/app/people/${personId}`, "page");
-  revalidatePath("/[locale]/app/people", "page");
+  revalidatePeople();
   return { status: "success", message: getEntityCopy(locale).companySaved };
 }
 
@@ -626,7 +661,13 @@ export async function createOrganizationForSubject(
   });
   if (linkAudit.error) console.error("Organization link audit failed", linkAudit.error.message);
 
-  revalidatePath(`/${parsed.data.locale}/app/organizations`);
-  revalidatePath(`/${parsed.data.locale}/app/${subject === "person" ? "people" : "projects"}/${subjectId}`);
+  // The company dialog's create pane submits here, so this is one of the call
+  // sites slice 2P.6's own surface needs. Off the response path for the reason
+  // `revalidatePeople` records.
+  revalidatePath("/[locale]/app/organizations", "page");
+  revalidatePath(
+    subject === "person" ? "/[locale]/app/people/[personId]" : "/[locale]/app/projects/[projectId]",
+    "page",
+  );
   return { status: "success", message: getEntityCopy(locale).createdAndLinked };
 }

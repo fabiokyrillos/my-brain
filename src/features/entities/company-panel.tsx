@@ -41,7 +41,7 @@
  */
 
 import { Building2, LoaderCircle, Pencil } from "lucide-react";
-import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { useActionState, useId, useState } from "react";
 
 import { ConfirmDialog } from "@/features/task-commands/confirm-dialog";
 import type { Locale } from "@/lib/preferences";
@@ -72,54 +72,85 @@ export function CompanyPanel({
 }) {
   const copy = getEntityCopy(locale);
   const fieldId = useId();
-  const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
 
   const [linkState, link, linking] = useActionState(linkAction, idleEntityEditState);
   const [createState, create, createPending] = useActionState(createAction, idleEntityEditState);
+  const pending = linking || createPending;
 
   /**
-   * The last round that actually completed, whichever form ran it.
+   * The two action states as they stood when the dialog was opened, and whether
+   * the owner has since dismissed it.
    *
-   * Held rather than derived, and that is a correction rather than a
-   * preference: `createState.status !== "idle" ? createState : linkState` looks
-   * equivalent and is not. After a `createdButNotLinked` refusal the create
-   * state stays non-idle forever, so a subsequent *successful* link would have
-   * gone on rendering the create failure — the owner would fix the problem and
-   * be told it was still broken.
+   * ## Why openness is DERIVED and not stored
    *
-   * The effect fires once per completed round because it compares the state
-   * object by identity against the one it last saw. `useActionState` returns a
-   * fresh object per round, so a re-render cannot re-close a dialog the owner
-   * has since reopened.
+   * The first version closed the dialog from an effect, and against the deployed
+   * app it hung **permanently**: the owner saw *Salvando…*, the row was written,
+   * and nothing ever moved again. It reproduced only with a dialog *and* a
+   * `revalidatePath` — the inline role editor on the same page, revalidating the
+   * same route, was unaffected, and removing the revalidation let the dialog
+   * close. Three builds and four authenticated runs to isolate.
+   *
+   * The mechanism the evidence points at: the successful state arrives together
+   * with the re-rendered page, and the transition that owns `pending` is still
+   * applying that payload. Closing unmounts the `<form>` that dispatched it —
+   * `ConfirmDialog` renders `null` when shut — which takes the in-flight
+   * dispatcher out from under React mid-commit, and `pending` never comes back
+   * down.
+   *
+   * So the close waits for `pending` to fall, and it is expressed as a
+   * derivation rather than a second effect. That is not only lint: a stored
+   * "close me" flag is a fact about the past that can disagree with React's own
+   * transition, and the whole failure above was two sources of truth about
+   * whether a round had finished.
+   *
+   * Reopening works because the snapshot is retaken: the success that closed the
+   * dialog is no longer *newer than the snapshot*, so it cannot close it again.
    */
-  const [outcome, setOutcome] = useState<EntityEditState>(idleEntityEditState);
-  const lastLink = useRef<EntityEditState>(linkState);
-  const lastCreate = useRef<EntityEditState>(createState);
-  useEffect(() => {
-    const rounds: Array<[EntityEditState, React.RefObject<EntityEditState>]> = [
-      [linkState, lastLink],
-      [createState, lastCreate],
-    ];
-    for (const [state, previous] of rounds) {
-      if (state === previous.current) continue;
-      previous.current = state;
-      if (state.status === "idle") continue;
-      setOutcome(state);
-      if (state.status === "success") {
-        setOpen(false);
-        setCreating(false);
-        continue;
-      }
-      // `2P-PERSON-003`. The company exists; the next act is to select it, not
-      // to create it again. Returning to the selector is the refusal of the
-      // duplicate — the sentence alone would leave the create field in front of
-      // the owner with a name that has already worked.
-      if (state.code === "createdButNotLinked") setCreating(false);
-    }
-  }, [createState, linkState]);
+  const [round, setRound] = useState<{ link: EntityEditState; create: EntityEditState } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [createRequested, setCreateRequested] = useState(false);
+  /** Which pane ran the last submission. Set from `onSubmit`, never from state. */
+  const [submittedPane, setSubmittedPane] = useState<"link" | "create" | null>(null);
 
-  const pending = linking || createPending;
+  /**
+   * The round that has completed since the dialog opened, or `null`.
+   *
+   * **Keyed on the pane the owner last submitted from**, which is an event and
+   * therefore needs no effect. A fixed preference between the two states cannot
+   * work, because both orders are reachable: create → `createdButNotLinked` →
+   * select, and select → refusal → create. Whichever is checked first would go
+   * on reporting a failure the owner had already fixed — which is the defect the
+   * first draft shipped and its own test caught.
+   */
+  const changed =
+    round === null || submittedPane === null
+      ? null
+      : submittedPane === "create"
+        ? (createState !== round.create ? createState : null)
+        : (linkState !== round.link ? linkState : null);
+
+  const outcome = changed ?? idleEntityEditState;
+  const open = round !== null && !dismissed && !(changed?.status === "success" && !pending);
+  /*
+   * `2P-PERSON-003`. The company exists; the next act is to select it, not to
+   * create it again — so the pane goes back to the selector on that outcome.
+   * Derived for the same reason openness is: a stored flag would have to be
+   * cleared by whoever set it, and the sentence alone would leave the create
+   * field in front of the owner with a name that has already worked.
+   */
+  const creating = createRequested && changed?.code !== "createdButNotLinked";
+
+  function openDialog() {
+    setRound({ link: linkState, create: createState });
+    setDismissed(false);
+    setCreateRequested(false);
+    setSubmittedPane(null);
+  }
+
+  function closeDialog() {
+    setDismissed(true);
+    setCreateRequested(false);
+  }
 
   return (
     <div className="entity-company">
@@ -134,7 +165,7 @@ export function CompanyPanel({
         <small>{copy.companyExplainer}</small>
       </p>
 
-      <button className="entity-edit-open" onClick={() => setOpen(true)} type="button">
+      <button className="entity-edit-open" onClick={openDialog} type="button">
         <Pencil aria-hidden="true" size={15} />
         {copy.companyEdit}
       </button>
@@ -157,7 +188,7 @@ export function CompanyPanel({
         className="task-command-dialog-form"
         description={copy.companyDialogDescription}
         idPrefix="entity-company-dialog"
-        onClose={() => { setOpen(false); setCreating(false); }}
+        onClose={closeDialog}
         open={open}
         title={copy.companyDialogTitle}
       >
@@ -179,7 +210,7 @@ export function CompanyPanel({
             required-but-nullable, so an absent key would be an invalid-input
             refusal for a form with no description control to fix.
           */
-          <form action={create}>
+          <form action={create} onSubmit={() => setSubmittedPane("create")}>
             <input name="locale" type="hidden" value={locale} />
             <input name="subject" type="hidden" value="person" />
             <input name="subjectId" type="hidden" value={personId} />
@@ -207,7 +238,7 @@ export function CompanyPanel({
               <button
                 className="task-command-secondary"
                 disabled={pending}
-                onClick={() => setCreating(false)}
+                onClick={() => setCreateRequested(false)}
                 type="button"
               >
                 {copy.companyCreateBack}
@@ -215,7 +246,7 @@ export function CompanyPanel({
             </div>
           </form>
         ) : (
-          <form action={link}>
+          <form action={link} onSubmit={() => setSubmittedPane("link")}>
             <input name="locale" type="hidden" value={locale} />
             <input name="personId" type="hidden" value={personId} />
 
@@ -254,7 +285,7 @@ export function CompanyPanel({
               <button
                 className="task-command-secondary"
                 disabled={pending}
-                onClick={() => setCreating(true)}
+                onClick={() => setCreateRequested(true)}
                 type="button"
               >
                 {copy.companyCreateToggle}

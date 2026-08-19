@@ -51,7 +51,7 @@
  */
 
 import { LoaderCircle, Plus, Undo2 } from "lucide-react";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 
 import { ConfirmDialog } from "@/features/task-commands/confirm-dialog";
 import type { Locale } from "@/lib/preferences";
@@ -76,7 +76,6 @@ export function MemoryComposer({
   undoAction: MemoryProposalAction;
 }) {
   const copy = getMemoryCopy(locale);
-  const [open, setOpen] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   /**
    * Controlled, and that is the point rather than a detail.
@@ -94,38 +93,63 @@ export function MemoryComposer({
   const [undoState, undo, undoing] = useActionState(undoAction, idleMemoryProposalState);
 
   /**
-   * The last round that completed, whichever form ran it.
+   * The round that has completed since the dialog opened, and whether the owner
+   * has dismissed it — the same **derivation** `company-panel.tsx` records at
+   * length, rather than an effect that closes on a state change.
    *
-   * Held rather than derived from whichever state is non-idle: once the create
-   * state leaves `idle` it never returns, so a derivation would go on rendering
-   * the creation message after an undo had replaced it. Compared by object
-   * identity, because `useActionState` returns a fresh object per round and a
-   * re-render must not re-close a dialog the owner has since reopened.
+   * The hazard it prevents is not hypothetical there: closing unmounts the
+   * `<form>` that dispatched the action, and taking an in-flight dispatcher out
+   * from under React while the re-rendered page is still being applied leaves
+   * `pending` stuck true — a dialog frozen on *Salvando…* over a write that
+   * already landed. Deriving openness from `pending` cannot get that wrong,
+   * because there is only one source of truth about whether the round is over.
+   *
+   * It has not bitten this surface yet, and the reason is an accident worth
+   * naming: `revalidateMemory` still uses resolved paths, which invalidate
+   * nothing under a `[locale]` segment, so the response carries no re-render to
+   * apply. The day those paths are repaired — they are part of the recorded
+   * `revalidatePath` debt — this composer would inherit the freeze.
+   *
+   * `submittedPane` keys the outcome on what the owner last did, which is an
+   * event rather than a guess about which of two states is newer.
    */
-  const [outcome, setOutcome] = useState<MemoryProposalState>(idleMemoryProposalState);
-  const lastCreate = useRef<MemoryProposalState>(createState);
-  const lastUndo = useRef<MemoryProposalState>(undoState);
-  useEffect(() => {
-    for (const [state, previous] of [
-      [createState, lastCreate],
-      [undoState, lastUndo],
-    ] as Array<[MemoryProposalState, React.RefObject<MemoryProposalState>]>) {
-      if (state === previous.current) continue;
-      previous.current = state;
-      if (state.status === "idle") continue;
-      setOutcome(state);
-      // A stored memory — new or the duplicate that already held the sentence —
-      // closes the dialog. There is nothing left to review, and the result and
-      // its undo are on the page behind it.
-      if (state.status === "success" || state.status === "duplicate") {
-        setOpen(false);
-        setReviewing(false);
-        setDraft("");
-      }
-    }
-  }, [createState, undoState]);
+  const [round, setRound] = useState<{ create: MemoryProposalState; undo: MemoryProposalState } | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [submittedPane, setSubmittedPane] = useState<"create" | "undo" | null>(null);
 
   const pending = creating || undoing;
+
+  const changed =
+    round === null || submittedPane === null
+      ? null
+      : submittedPane === "create"
+        ? (createState !== round.create ? createState : null)
+        : (undoState !== round.undo ? undoState : null);
+
+  const outcome = changed ?? idleMemoryProposalState;
+  /*
+   * A stored memory — new, or the duplicate that already held the sentence —
+   * closes the dialog once its transition has settled. There is nothing left to
+   * review, and the result and its undo are on the page behind it.
+   */
+  const stored = changed?.status === "success" || changed?.status === "duplicate";
+  const open = round !== null && !dismissed && !(stored && !pending);
+
+  function openDialog() {
+    setRound({ create: createState, undo: undoState });
+    setDismissed(false);
+    setSubmittedPane(null);
+    setReviewing(false);
+    setEmptyDraft(false);
+    setDraft("");
+  }
+
+  function closeDialog() {
+    setDismissed(true);
+    setReviewing(false);
+    setEmptyDraft(false);
+  }
+
   /**
    * `2K-ACT-008`. The undo is offered while the id is live and withdrawn once it
    * has been used — an undo control that stays after archiving would invite a
@@ -137,7 +161,7 @@ export function MemoryComposer({
     <div className="memory-compose">
       <button
         className="memory-compose-open"
-        onClick={() => { setOpen(true); setEmptyDraft(false); }}
+        onClick={openDialog}
         type="button"
       >
         <Plus aria-hidden="true" size={16} />
@@ -157,7 +181,7 @@ export function MemoryComposer({
         <div className="memory-compose-outcome" data-memory-outcome={outcome.status}>
           <p>{outcome.message}</p>
           {undoable ? (
-            <form action={undo}>
+            <form action={undo} onSubmit={() => setSubmittedPane("undo")}>
               <input name="locale" type="hidden" value={locale} />
               <input name="memoryId" type="hidden" value={outcome.memoryId ?? ""} />
               <button className="task-command-secondary" disabled={pending} type="submit">
@@ -174,7 +198,7 @@ export function MemoryComposer({
         className="task-command-dialog-form"
         description={copy.composeDescription}
         idPrefix="memory-compose-dialog"
-        onClose={() => { setOpen(false); setReviewing(false); setEmptyDraft(false); }}
+        onClose={closeDialog}
         open={open}
         title={copy.composeTitle}
       >
@@ -183,7 +207,7 @@ export function MemoryComposer({
         </div>
 
         {reviewing ? (
-          <form action={create}>
+          <form action={create} onSubmit={() => setSubmittedPane("create")}>
             <input name="locale" type="hidden" value={locale} />
             {/* `fact` for the reason the module header records: it is what this
                 page has always stored, and `2P-MEMORY-004` asks the flow to
@@ -254,7 +278,7 @@ export function MemoryComposer({
               </button>
               <button
                 className="task-command-secondary"
-                onClick={() => { setOpen(false); setReviewing(false); setEmptyDraft(false); }}
+                onClick={closeDialog}
                 type="button"
               >
                 {copy.composeCancel}

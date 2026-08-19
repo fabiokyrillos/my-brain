@@ -389,11 +389,20 @@ export async function updateTaskPersonRole(
   });
   if (audit.error) console.error("Task-person role audit failed", audit.error.message);
 
-  // The route PATTERN: both surfaces sit under `[locale]`, where a resolved
-  // path invalidates nothing.
-  revalidatePath(`/[locale]/app/people/${personId}`, "page");
-  // The task's own surface is `/app/work/[taskId]`; `/app/tasks` is the list.
-  revalidatePath(`/[locale]/app/work/${taskId}`, "page");
+  /*
+   * The route PATTERNS, whole, and **after the response**.
+   *
+   * Both surfaces sit under `[locale]`, where a resolved path invalidates
+   * nothing and a hybrid — the pattern with the id spliced in — matches no route
+   * file at all. It is deliberately SYNCHRONOUS: a Server Action's response
+   * carries a fresh render only when the action revalidated something before
+   * returning, so an `after()` callback leaves the owner looking at the old
+   * role. `entities/actions.ts` records the execution that established it.
+   *
+   * The task's own surface is `/app/work/[taskId]`; `/app/tasks` is the list.
+   */
+  revalidatePath("/[locale]/app/people/[personId]", "page");
+  revalidatePath("/[locale]/app/work/[taskId]", "page");
   return { status: "success", message: getEntityCopy(locale).saved };
 }
 
