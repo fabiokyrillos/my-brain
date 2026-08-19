@@ -2,6 +2,22 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Owner decisions: 2P-CALENDAR-001 means a real month, and 2P-REMINDER-002 drops recurrence
+
+Documentation and one guard. Slice 2P.6's re-audit found two of slice 2P.7's requirements naming things the product does not have, and put both to the owner instead of resolving them. Both are now answered, in opposite directions. **The count stays 87 and no ID is renumbered.**
+
+### Confirmed
+
+- **`2P-CALENDAR-001` means a real month view.** `CALENDAR_ORIENTATIONS` is `["day","week","agenda"]`, and Agenda may not be interpreted or renamed as Mês. 2P.7 delivers Dia, Semana and Mês; Agenda may stay as an additional view. The month shows the real grid, marks today without relying on colour alone, distinguishes days outside the month, bounds each cell with reachable overflow, opens a day or item preserving context, stays legible on a phone, carries a text alternative, preserves timezone and local-date semantics, and **creates no new write path**. **The requirement's own text is unchanged** — this was a confirmation, not a correction, and the guard asserts that distinction, because "confirmed" and "corrected" leave different traces.
+
+### Changed
+
+- **`2P-REMINDER-002` is corrected by amendment**, with its prior wording preserved in ADR-121 and the PRD. `reminders` has no recurrence column of any kind, so offering recurrence needed a third Phase 2P migration - refused. The modal groups content, date and time, importance, an optional link, and save/cancel. Recurrence becomes the traceable remainder **`2P-REMINDER-RECURRENCE`**, never classified built, baseline or partial, and never faked by a dead control, free text, duplicated rows or a reused column.
+
+### Notes
+
+- The new guard's first draft **scanned** for recurrence artifacts and was reported three times by `phase-2m-recurrence-guard.test.ts` within a minute, because the fixtures a scanner needs are the shapes that scanner forbids. `2M-RECUR-001` already enforces the refusal repository-wide with a deliberately single-file self-exemption, and broadening that exemption is how a guard stops guarding. **One enforcer, one recorder:** the 2P guard records the decision, asserts `reminders`'s exact closed column list - which fails on a column added under *any* name - and calls the 2M scanner rather than re-implementing it.
+
 ## 2026-08-19 - Slice 2P.6: the company is edited where it is shown, a memory is written deliberately, and Relations opens on the drawing
 
 **`2P-PERSON-001` … `-004`, `2P-MEMORY-001` … `-004`, `2P-RELATION-001` … `-004` — twelve built. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged. Cumulative 63 of 87.**
