@@ -10062,3 +10062,116 @@ migration remains a stop condition.
 403, signup, rollout and every inherited residual stay where §87, §88, §91, §93,
 §94 and §95 left them. **This section deliberately does not name what comes
 after Phase 2P.**
+
+## §97 — Slice 2P.5 merges, and slice 2P.6 is re-audited against the `main` it produced (2026-08-19)
+
+**Merge SHA `e0d7b2e1580d148a3a6d96139e0d71d3c42b3c7a`.** `main` synchronized
+and clean, zero open PRs, **99 local = 99 hosted, parity `202608190099`** — read
+live from `supabase_migrations.schema_migrations`, not quoted, and **unchanged
+by this slice**. Both Phase 2P allocations remain spent; a third remains a stop
+condition. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+**Cumulative: 51 of 87.** `2P-SETTINGS-001` … `-008` all built and
+`2P-CHAT-004-MOBILE` closed. The full record is
+`docs/reports/phase-2p/PHASE_2P_SLICE_05_ACCEPTANCE.md`; §96 has the narrative.
+
+### CI: green at both points, and it took three attempts to get there
+
+**On the exact head `681002e`: all four checks green**, with the
+`database and journey` step list read — **21 `success`, 2 `skipped`, zero
+`cancelled`**, `Install the browser` and `Run the deterministic foundation
+journey` both `success`, the whole migration chain applied to an empty database,
+pgTAP green. That is what the merge was made on.
+
+**On the merge SHA `e0d7b2e`: all three jobs green, same step list read — 21
+`success`, 2 `skipped`, zero `cancelled`.** It took **three attempts**, and the
+two that failed are worth recording because neither was the repository.
+
+`database and journey` was **CANCELLED twice** at step 15, `npx playwright
+install --with-deps chromium`. The log says exactly what happened: `apt-get
+update` got repeated `Ign:` from `azure.archive.ubuntu.com`, fell back to
+`archive.ubuntu.com`, fetched three `InRelease` files at `16:35:33` — and then
+produced **nothing for 31 minutes** until `##[error]The operation was canceled`
+at `17:06:46`, with `Terminate orphan process: npm exec playwright install` in
+the cleanup. The runner's Ubuntu mirror stalled. The identical step, on
+identical tree content, took 7.5 minutes and succeeded on the head at 15:40 —
+and succeeded again on the third attempt.
+
+**Neither cancellation was treated as green while it stood.** A cancelled job is
+not a passing one: the decisive step — the deterministic foundation journey —
+was `skipped` both times, so those runs proved nothing about the browser lane
+however many earlier steps were green. The rule applies to a merge SHA exactly
+as it applies to a head, and the answer was to re-run until the infrastructure
+cooperated rather than to reason around it.
+
+**Worth knowing the next time this happens.** Everything before step 15 — the
+whole migration chain from an empty database, pgTAP, `supabase db lint`, and all
+three concurrency proofs — had already passed on **both** cancelled attempts. A
+cancellation inside `--with-deps` is an `apt` mirror problem and nothing else,
+and re-running the failed job is the whole remedy. **Do not edit the workflow to
+route around a transient mirror**: that change would sit on the critical path of
+every future run.
+
+### Slice 2P.6 re-audited against `e0d7b2e`, before any edit
+
+Twelve requirements, and the re-audit changes what the slice is: **three are
+substantially or wholly shipped already**, **one names a column that does not
+exist**, and the shared modal the plan asks for **is already written and has
+three consumers**.
+
+| Requirement | State measured on `e0d7b2e` |
+|---|---|
+| `2P-PERSON-001` company and role editable from their displayed section | **gap, and half of it names a field that does not exist.** The company line is read-only prose (`entity-relation-line`); editing means opening a `<details className="entity-edit-disclosure">` further down holding a nine-field form. **`people` has no `role` column** — measured against the deployed schema, its columns are `id, user_id, organization_id, name, notes, created_at, updated_at`. `role` exists only on `person_projects` and `task_people`, both relationship tables, so "the role" is per-project rather than per-person. Either the requirement means the project role — which is not in the section it names — or it wants a column, and **a column is a third Phase 2P migration and therefore a stop condition.** Resolve that with the owner before designing anything. |
+| `2P-PERSON-002` select-or-create a company in one flow | **largely shipped.** `createOrganizationForSubject` is a second action on the same form, and `EntityEditForm` already receives it. |
+| `2P-PERSON-003` created-but-not-linked reported distinctly | **shipped, both halves.** `entities/actions.ts` returns a dedicated `createdButNotLinked` state when the organization is created and the link write fails, with its own audit row — and the copy closes the second half explicitly: *"A empresa foi criada, mas não foi vinculada. **Selecione-a na lista.**"* directs the owner to pick the company that now exists rather than to create it again. What is missing is a **test**, not behaviour. |
+| `2P-PERSON-004` mobile and keyboard, no nested dialogs | **not proved.** No authenticated mobile journey covers this flow. |
+| `2P-MEMORY-001` modal/sheet with a multiline field | **gap, exactly as written.** `/app/memories` mounts `InlineCreateForm`, which is a single-line `<input maxLength={4000}>` with an `sr-only` label and a placeholder. |
+| `2P-MEMORY-002` explains durability, asks for validity/source only when relevant | **gap.** The inline form has one field and no explainer. |
+| `2P-MEMORY-003` review before saving, undo after | **half shipped.** `createRecord` already returns `{ undoId, expiresAt }` from the RPC, so the undo exists; the review step does not. |
+| `2P-MEMORY-004` preserves owner scope, lifecycle, retrieval | **baseline** — `memories/lifecycle.ts`, `undo.ts` and `read.ts` all predate this slice and must not move. |
+| `2P-RELATION-001` opens on Drawing, All links second | **gap, and it inverts the current order.** `relations/page.tsx` renders `<RelationList>` **then** `<RelationDiagram>` as siblings, with no tabs at all. |
+| `2P-RELATION-002` the text tab is complete and independently usable | **largely shipped** as the list, which is already the complete projection — but it becomes a *claim about a tab* once tabs exist. |
+| `2P-RELATION-003` focus a person, open an explainable link, add no inferred facts | **partly guarded.** `2N-RELATION-TRIGGER` is a hard boundary and `relation-list.tsx` already gates `graph`-sourced facts behind an explicit local act. Focus-on-a-person is not built. |
+| `2P-RELATION-004` bounded readable representation on mobile | **partly there, and the honest reading matters.** `data.ts` bounds every hop by `RELATION_LIMIT` (50), so the QUERY is bounded, and `relations.css:229` gives the figure `max-width:100%; overflow-x:auto` so the drawing scrolls inside its own box rather than the page. What does not exist is a **different, bounded representation** when the graph cannot fit — today a phone gets the same SVG behind a horizontal scroll. Decide whether the requirement means "scrolls without breaking the page" (shipped) or "a reduced view" (not built) before building either. |
+
+**The shared modal/sheet the plan asks for already exists, has three consumers,
+and carries a decision measured rather than preferred.**
+`task-commands/confirm-dialog.tsx` is imported by `delete-entity-control.tsx`,
+`command-console.tsx` and `task-detail-controls.tsx`. It hand-rolls
+`role="dialog" aria-modal="true"` instead of `<dialog>` + `showModal()` for a
+reason its own docstring states and verified by execution: **jsdom 29.1.1 — the
+version this repository runs — implements `HTMLDialogElement` with no
+`showModal`**, so a native dialog would make `2E-A11Y-004` unassertable in the
+only place CI checks it. It already supplies, each with a test, the three
+behaviours `showModal()` would have: initial focus into the dialog, Tab cycling
+that cannot reach the page behind, and Escape closing it with focus returning to
+the control that opened it — which is most of what `2P-PERSON-004` asks for.
+**2P.6 should reuse or extract that contract, never write a fourth dialog**, and
+must not reverse the recorded decision without saying so.
+
+**Zero migrations are expected.** Nothing in the twelve needs deployed SQL:
+the person/organization link, the memory lifecycle and the relation projection
+all exist. A third Phase 2P migration remains a stop condition.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** 2P.5 is merged, green on its exact
+head and again on its exact merge SHA with the step list read at both points,
+`main` is synchronized and clean, nothing is half-written, and no deployment was
+needed because the slice carries no migration.
+
+**Next action: slice 2P.6 — contextual creation and relations**, using the
+re-audit above and re-verifying it against `main` before any edit
+(`2P-FOUNDATION-007`). Begin with the shared modal/sheet contract, because all
+three surfaces depend on it and writing a fourth dialog is the outcome to avoid.
+
+**Six remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half;
+`2P-CHAT-007-JOURNEY` (2P.8, with the owner's one-turn BYOK authorization);
+`RG-DEP-3`; the four missing review flows (`2P-AUTONOMY-FLOW-PROJECT`,
+`-ORGANIZATION`, `-MEMORY`, `-RELATION`); **`2P-APPEARANCE-HYDRATION`**, new in
+§96 and pre-existing on `main`; and the **70 `revalidatePath` call sites** across
+17 modules outside the surfaces 2P.5 opened.
+
+Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
+§91, §93, §94, §95 and §96 left them. **This section deliberately does not name
+what comes after Phase 2P.**
