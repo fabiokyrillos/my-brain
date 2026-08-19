@@ -69,22 +69,47 @@ const migrationFiles = readdirSync(MIGRATIONS).filter((name) => name.endsWith(".
  * in the **last** migration that contains one, up to the closing `$function$`
  * / `$$` of that body. Null when the name is never defined.
  */
-function latestDefinition(name: string): string | null {
-  const opener = new RegExp(String.raw`create\s+or\s+replace\s+function\s+public\.${name}\s*\(`, "gi");
+function definitionIn(source: string, name: string, schema: "public" | "private" = "public"): string | null {
+  const opener = new RegExp(String.raw`create\s+or\s+replace\s+function\s+${schema}\.${name}\s*\(`, "gi");
+  const starts = [...source.matchAll(opener)].map((match) => match.index ?? -1).filter((at) => at >= 0);
+  if (starts.length === 0) return null;
+  const from = starts[starts.length - 1]!;
+  // The next function definition in the same file bounds this one; otherwise
+  // the file's end does. Bounding matters: several migrations redefine four
+  // functions in a row and an unbounded read would attribute all four bodies
+  // to the first name. Slice 2P.1's migration defines in both schemas, so the
+  // bound has to see either — otherwise a private body would swallow the
+  // public one that follows it.
+  const rest = source.slice(from + 1);
+  const nextAt = rest.search(/create\s+or\s+replace\s+function\s+(public|private)\./i);
+  return nextAt === -1 ? source.slice(from) : source.slice(from, from + 1 + nextAt);
+}
+
+function latestDefinition(name: string, schema: "public" | "private" = "public"): string | null {
   for (let index = migrationFiles.length - 1; index >= 0; index -= 1) {
     const source = sqlCode(readFileSync(join(MIGRATIONS, migrationFiles[index]!), "utf8"));
-    const starts = [...source.matchAll(opener)].map((match) => match.index ?? -1).filter((at) => at >= 0);
-    if (starts.length === 0) continue;
-    const from = starts[starts.length - 1]!;
-    // The next function definition in the same file bounds this one; otherwise
-    // the file's end does. Bounding matters: several migrations redefine four
-    // functions in a row and an unbounded read would attribute all four bodies
-    // to the first name.
-    const rest = source.slice(from + 1);
-    const nextAt = rest.search(/create\s+or\s+replace\s+function\s+public\./i);
-    return nextAt === -1 ? source.slice(from) : source.slice(from, from + 1 + nextAt);
+    const found = definitionIn(source, name, schema);
+    if (found !== null) return found;
   }
   return null;
+}
+
+/** The definition a NAMED migration shipped, for comparing an era against its successor. */
+function definitionInMigration(file: string, name: string): string | null {
+  return definitionIn(sqlCode(readFileSync(join(MIGRATIONS, file), "utf8")), name);
+}
+
+/**
+ * The reason literals a projection body decides, in CASE order.
+ *
+ * Comments are already stripped by `sqlCode`, and these five strings appear
+ * nowhere in the function except as `then` values, so the sequence this returns
+ * is the decision order the database will actually apply.
+ */
+function reasonOrder(body: string): string[] {
+  const literals =
+    /then\s+'(resolve_consistency|retry_processing|answer_existing_question|confirm_existing_candidates|review_interpretation)'/gi;
+  return [...body.matchAll(literals)].map((match) => match[1]!.toLowerCase());
 }
 
 describe("2P-FOUNDATION-002: which functions re-derive an entry's lifecycle", () => {
@@ -127,14 +152,60 @@ describe("2P-FOUNDATION-002: which functions re-derive an entry's lifecycle", ()
     }
   });
 
-  it("records that no resolution function re-derives the lifecycle", () => {
-    // When slice 2P.1 lands, one or more of these moves to REDERIVERS. The
-    // failure this then produces is the point: it says "the contract 2P.0
-    // measured has changed", which is exactly what a reviewer must see.
+  /*
+    SLICE 2P.1 PASSED THROUGH THIS PIN CONSCIOUSLY, AND THE ANSWER WAS NEITHER
+    "move a resolver to REDERIVERS" NOR "leave it alone".
+
+    2P.0 wrote the pin expecting 2P.1 to add `interpretation_lifecycle_status`
+    to one or more resolver bodies. Re-measuring against the hosted database
+    found twelve resolution functions, not nine, ten of them still granted to
+    `authenticated` — so patching bodies would have had to be done twelve times
+    and would still have been twelve places for the next divergence to start.
+
+    What 202608180098 does instead: the union of everything the twelve write is
+    four tables, and each of those four now carries an `after` trigger running
+    ONE function, which calls ONE central contract. The resolvers are therefore
+    still correct not to contain the derivation — but the reason changed
+    completely, from "nothing re-derives" to "re-derivation is not their job".
+
+    So the old assertion is kept (it is still true and still catches a stray
+    twelfth copy of the rule) and it is no longer sufficient on its own. The
+    two assertions below are what actually hold the contract now.
+  */
+  it("keeps the rule out of the resolution functions themselves", () => {
     for (const name of RESOLVERS) {
-      expect(latestDefinition(name), `${name} now re-derives — move it to REDERIVERS and say so in the slice record`)
+      expect(latestDefinition(name), `${name} grew its own copy of the lifecycle rule — the contract is central`)
         .not.toContain("interpretation_lifecycle_status");
     }
+  });
+
+  it("routes every resolution table through one central re-derivation contract", () => {
+    const contract = latestDefinition("entry_pending_decisions", "private");
+    expect(contract, "the central pending-decision contract must exist").not.toBeNull();
+    // It is the single consumer of the deployed derivation for resolved state.
+    expect(contract).toContain("interpretation_lifecycle_status");
+    // And it reads the entry and the owner, which the derivation alone cannot.
+    expect(contract).toContain("p_entry_id");
+    expect(contract).toContain("p_user_id");
+
+    // Every table the twelve resolution functions write reaches it. Missing one
+    // means a resolution route that still cannot move the entry's status.
+    const migration = sqlCode(read(
+      "supabase/migrations/202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
+    ));
+    for (const table of [
+      "public.tasks",
+      "public.entry_task_candidate_resolutions",
+      "public.pending_questions",
+      "public.entry_person_candidate_resolutions",
+    ]) {
+      expect(migration, `${table} must re-derive`).toMatch(
+        new RegExp(String.raw`after insert or update or delete on ${table}\s+for each row execute function private\.rederive_entry_lifecycle_from_row`, "i"),
+      );
+    }
+    // One trigger function, not four. Four would be four places to drift.
+    expect([...migration.matchAll(/create or replace function private\.rederive_entry_lifecycle_from_row/gi)])
+      .toHaveLength(1);
   });
 
   it("derives the lifecycle from the interpretation alone", () => {
@@ -150,14 +221,105 @@ describe("2P-FOUNDATION-002: which functions re-derive an entry's lifecycle", ()
     expect(body).not.toMatch(/p_entry_id|p_user_id/);
   });
 
-  it("shows the queue reason keyed on status before any finer predicate", () => {
+  /**
+   * The order the queue decides its reason in, pinned.
+   *
+   * 2P.0 predicted the projection would need no change once the status could
+   * move. That was half right, and the half that was wrong is why this pin
+   * exists rather than the one it replaces. The finer predicates *are* correct
+   * — but they were gated on `status = 'completed'` and sequenced *after* the
+   * generic status branch, so making the status truthful made them **less**
+   * reachable: an entry with one unconfirmed candidate becomes
+   * `awaiting_review` and the generic branch swallowed
+   * `confirm_existing_candidates`. The entry never wrongly left the queue; it
+   * stayed under a less specific reason, which is a regression against
+   * `2P-ATTENTION-004`.
+   *
+   * The predecessor pin said "the migration must not redefine this function".
+   * That was the right instinct for a slice that changed only the status, and
+   * the wrong rule once the reordering became the correction. It is **replaced,
+   * not relaxed**: what follows pins the exact decision order and the exact
+   * semantics, which is strictly more than "unchanged" ever asserted.
+   */
+  const QUEUE_DECISION_ORDER = [
+    "resolve_consistency",
+    "retry_processing",
+    "retry_processing",
+    "answer_existing_question",
+    "confirm_existing_candidates",
+    "confirm_existing_candidates",
+    "review_interpretation",
+    "resolve_consistency",
+  ] as const;
+
+  it("decides every finer reason before the generic one", () => {
     const body = latestDefinition("list_needs_attention")!;
-    expect(body).toMatch(/entry_status in \('awaiting_review', 'partially_processed'\)/);
-    expect(body).toContain("review_interpretation");
-    // The finer predicates exist and are correct; they are unreachable while
-    // the status cannot move, which is why 2P.1 needs no projection change.
+    expect(reasonOrder(body)).toEqual([...QUEUE_DECISION_ORDER]);
+
+    // The three finer branches are gated on the statuses the central contract
+    // governs — not on 'completed' alone, which is the dependency that made
+    // them unreachable.
+    expect(body.match(/entry_status in \('awaiting_review', 'partially_processed', 'completed'\)/g))
+      .toHaveLength(3);
+    // ...and the generic branch keeps the two-status gate, so it can only be
+    // reached by an entry whose finer decisions are all resolved. That is the
+    // whole of its new meaning: the interpretation itself is still unconfirmed.
+    expect(body).toMatch(
+      /entry_status in \('awaiting_review', 'partially_processed'\)\s*then 'review_interpretation'/,
+    );
+
+    // Every predicate the queue decides on, still present and still the same
+    // ones private.entry_pending_decisions uses.
     expect(body).toContain("has_open_question");
     expect(body).toContain("has_unconfirmed_candidate");
+    expect(body).toContain("has_unresolved_person_candidate");
+
+    // An unresolved person candidate is a real pending decision and reports a
+    // FINER reason. It must not add a sixth vocabulary value: the five names
+    // needs_attention_item_opened validates inside the database are unchanged,
+    // and this migration does not touch that validator.
+    expect(new Set(reasonOrder(body))).toEqual(
+      new Set([
+        "resolve_consistency",
+        "retry_processing",
+        "answer_existing_question",
+        "confirm_existing_candidates",
+        "review_interpretation",
+      ]),
+    );
+    expect(sqlCode(read("supabase/migrations/202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql")))
+      .not.toMatch(/require_product_event_enum|needs_attention_item_opened/i);
+  });
+
+  it("is not vacuous: the definition this replaced fails the same pin", () => {
+    // The control is the real predecessor, read from its own migration on disk
+    // — not a synthetic body, and nothing is mutated to produce it. Restoring
+    // the old order by editing a file would leave the tree dirty if the run
+    // died between planting and restoring; reading the era that actually
+    // shipped proves the same thing and cannot.
+    const previous = definitionInMigration("202607230048_phase_2d_question_dispositions.sql", "list_needs_attention")!;
+    const order = reasonOrder(previous);
+
+    // This is the defect, in the bytes that shipped it: the generic reason was
+    // decided BEFORE both finer ones.
+    expect(order).toEqual([
+      "resolve_consistency",
+      "retry_processing",
+      "retry_processing",
+      "review_interpretation",
+      "answer_existing_question",
+      "confirm_existing_candidates",
+      "resolve_consistency",
+    ]);
+    expect(order.indexOf("review_interpretation")).toBeLessThan(order.indexOf("answer_existing_question"));
+    expect(order.indexOf("review_interpretation")).toBeLessThan(order.indexOf("confirm_existing_candidates"));
+
+    // And the pin above rejects it — so the pin can fail, and says why.
+    expect(order).not.toEqual([...QUEUE_DECISION_ORDER]);
+    // Its finer branches were gated on 'completed' alone, and it knew nothing
+    // about person candidates.
+    expect(previous).toMatch(/entry_status = 'completed' and f\.has_open_question/);
+    expect(previous).not.toContain("has_unresolved_person_candidate");
   });
 
   it("is not vacuous: latestDefinition bounds a body and ignores commentary", () => {
@@ -390,6 +552,10 @@ describe("the census walks a real tree", () => {
   });
 
   it("sees the whole migration chain", () => {
-    expect(migrationFiles).toHaveLength(97);
+    // 97 through slice 2P.3; 98 once slice 2P.1 spent the one migration the
+    // owner's replacement authorization funded. This number is a corpus-length
+    // check for `latestDefinition`, not a budget — the budget is pinned in
+    // phase-2p-declarations.test.ts, which asserts exactly one 2P migration.
+    expect(migrationFiles).toHaveLength(98);
   });
 });

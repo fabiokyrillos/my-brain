@@ -113,6 +113,8 @@ export const HISTORY_ACTION_TYPES = [
   "confirm_entry_task_candidates_v6",
   "create_memory",
   "entry_awaiting_ai_configuration",
+  "entry_lifecycle_rederived",
+  "interpretation_confirmed",
   "entry_interpretation_corrected",
   "entry_interpretation_correction_undone",
   "entry_person_candidates_resolved",
@@ -204,6 +206,15 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   end_person_context: "lifecycle",
   end_person_project: "lifecycle",
   end_person_relationship: "lifecycle",
+  // The record's situation was re-derived from the decisions that genuinely
+  // remain. `lifecycle`, not `changed`: no content moved, and not
+  // `interpreted`, because no interpretation was produced.
+  entry_lifecycle_rederived: "lifecycle",
+  // The owner read the interpretation and accepted it. `answered` is the
+  // closest true category -- it is a decision the owner gave, like
+  // resolving a question -- and `changed` would claim the interpretation
+  // moved, which is exactly what confirmation does NOT do.
+  interpretation_confirmed: "answered",
   entry_interpretation_corrected: "changed",
   // `lifecycle`, and deliberately neither of its two neighbours. Not
   // `interpreted`, because nothing was: the record was saved and no

@@ -551,7 +551,13 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
   it("has created no migration, and the tree agrees", () => {
     const migrations = readdirSync(join(REPO, "supabase", "migrations"))
       .filter((name) => name.endsWith(".sql"));
-    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 3);
+    // Phase 2P slice 2P.1 spent one authorized migration after this phase
+    // closed. It is counted explicitly and pinned at exactly one, so an
+    // unattributed migration still fails the total below.
+    const laterPhase2p = migrations.filter((name) => /phase[_-]?2p/i.test(name));
+    expect(laterPhase2p, `Phase 2P must have exactly one migration: ${laterPhase2p.join(", ")}`)
+      .toHaveLength(1);
+    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length);
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);
     // Non-vacuous: the filter really filters.

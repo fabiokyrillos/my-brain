@@ -94,7 +94,8 @@ describe("2N-RELATION-003: this slice persists nothing and infers nothing", () =
      */
     expect(migrations.filter((file) => /phase_2n_slice_6/i.test(file))).toEqual([]);
     // The phase's ceiling, restated where a slice could break it.
-    expect(migrations).toHaveLength(97);
+    // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
+    expect(migrations).toHaveLength(98);
   });
 
   it("mutation control: the narrowed migration scan still refuses this slice's own", () => {

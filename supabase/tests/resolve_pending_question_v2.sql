@@ -352,6 +352,40 @@ where user_id = '2d200001-0000-4000-8000-000000000001'
     '2d210005-0000-4000-8000-000000000005'
   );
 
+-- Slice 2P.1 makes the premise on the line above TRUE rather than assumed.
+--
+-- public.model_only_element_trust scores a model-only interpretation at
+-- confidence * 0.20 + 0.05, i.e. never above 0.25, so it returns
+-- 'block_until_confirmation' at EVERY confidence. Under the central lifecycle
+-- contract that is a real pending decision -- the one
+-- public.confirm_entry_interpretation exists to clear -- so these entries would
+-- stay in Needs Attention under 'review_interpretation' after their question is
+-- deferred or dismissed, and the two assertions below ("a deferred question
+-- leaves the queue", "a dismissed question leaves the queue terminally") would
+-- be asserting about an entry that still has something else pending.
+--
+-- Forcing the status alone made that premise a fiction that only held while the
+-- status could never move. Clearing the element policy on exactly the two
+-- entries those assertions read makes it a fact: the open question really is
+-- the only reason either entry is in the queue. Nothing is weakened -- the
+-- positive control at line ~620 still requires the entry to be LISTED for its
+-- open question first, and the reactivation check still requires it to come
+-- back when the snooze deadline passes.
+--
+-- entry_interpretations is immutable by trigger (a real product contract, and
+-- one worth having), so the trigger is suspended for exactly this statement and
+-- restored immediately -- the same fixture device needs_attention_projection.sql
+-- uses to plant timestamps. It is never how the product writes.
+alter table public.entry_interpretations disable trigger entry_interpretations_protect_immutable;
+update public.entry_interpretations
+set element_policy = '{}'::jsonb
+where user_id = '2d200001-0000-4000-8000-000000000001'
+  and entry_id in (
+    '2d210001-0000-4000-8000-000000000001',
+    '2d210002-0000-4000-8000-000000000002'
+  );
+alter table public.entry_interpretations enable trigger entry_interpretations_protect_immutable;
+
 create temporary table phase2d2_refs on commit drop as
 select
   (select q.id from public.pending_questions q where q.entry_id = '2d210001-0000-4000-8000-000000000001') as defer_question_id,
