@@ -75,7 +75,7 @@ const PRIMARY = ["Hoje", "Registros", "Trabalho", "Brain"] as const;
  * redesign; Brain is the destination that sits in `Mais` instead, which
  * `mobileDemotedKeys` derives rather than lists.
  */
-const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Mais"] as const;
+const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Brain"] as const;
 /*
  * The overflow disclosure's five groups.
  *
@@ -127,25 +127,18 @@ function sideNav() {
 }
 
 /**
- * Mirrors the mobile branch of `navigation-links.tsx:145-176`: the first two
- * primary keys, the capture link, the remaining primary keys, then `Mais`.
+ * Mirrors the mobile branch of `navigation-links.tsx`: the five declared slots,
+ * in order, and nothing else.
+ *
+ * Slice 2P.5 retired the `Mais` disclosure from this bar, so the fixture has no
+ * overflow panel to build either. The mirror is now a straight map over
+ * `MOBILE_BAR`, which is what the component itself became.
  */
 function bottomNav() {
-  const groups = GROUPS.map(
-    ([label, items]) =>
-      `<div class="mobile-nav-group" role="group" aria-label="${label}"><span class="mobile-nav-group-label" aria-hidden="true">${label}</span><div class="nav-group-items">${items
-        .map((item) => navLink(item))
-        .join("")}</div></div>`,
-  ).join("");
-  // Brain leads the panel's destinations: demoted off the bar, not buried.
-  const demoted = `<div class="mobile-nav-group mobile-nav-demoted" role="group" aria-label="Principal"><div class="nav-group-items">${navLink("Brain")}</div></div>`;
-  const more = `<details class="mobile-more"><summary aria-label="Mais">${ICON}<span>Mais</span></summary><div class="mobile-more-menu">${demoted}${groups}</div></details>`;
   // Built from the declared slot order, so the fixture cannot drift from the
   // component's own sequence without this list changing too.
   return MOBILE_BAR.map((label) =>
-    label === "Mais"
-      ? more
-      : navLink(label, label === "Captura rápida" ? "capture-fab" : "mobile-primary-link"),
+    navLink(label, label === "Captura rápida" ? "capture-fab" : "mobile-primary-link"),
   ).join("");
 }
 

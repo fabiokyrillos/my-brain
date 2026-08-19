@@ -2,6 +2,89 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Slice 2P.5: Settings becomes eight sections, Notificacoes becomes history, and the mobile bar gets its fifth slot
+
+- `2P-SETTINGS-001` ... `-008`, and the remainder `2P-CHAT-004-MOBILE` closed.
+  **Zero migrations** - 99 local = 99 hosted, parity `202608190099` unchanged.
+  Both Phase 2P migrations remain spent; a third remains a stop condition.
+- **The owner signed the calibration thresholds, and no number moved.** Three
+  amendments to **ADR-123** record the signature before any code read the values
+  as definitive: 50/0.90 tasks, 60/0.95 projects and companies, 80/0.97 people
+  and memories, 100/0.98 relations, plus 10 reviewed inside 90 days, the newest
+  within 30, and any undo among the 20 most recent blocking eligibility. Those
+  were already the constants; what changed is that the module stopped calling
+  them a **proposal** and the surface stopped hedging - while saying in the same
+  sentence that signing a minimum enabled nothing.
+- **The four categories with no producer are four named remainders**, not
+  calibration that time will complete: `2P-AUTONOMY-FLOW-PROJECT`,
+  `-ORGANIZATION`, `-MEMORY`, `-RELATION`. The surface says *esperar nao muda
+  isso* rather than showing a zero that reads as "not enough yet".
+- **Eight sections, eight canonical URLs, zero redirects.** `/app/settings`
+  renders Geral and the other seven sit behind one `[section]` dynamic segment.
+  A redirect from the parent would trap the back button, and one segment rather
+  than seven folders lets **two** route patterns invalidate every section in both
+  locales. `settings` became `nested: true`, or the rail would stop marking
+  Ajustes current while the reader stands in it.
+- **The split needed a section-scoped writer, and that is the slice.**
+  `SettingsForm` was one `<form>` over a `.strict()` schema spanning four
+  sections' columns, so splitting it without changing the action would have made
+  every section's save blank the other three - the exact defect
+  `2P-SETTINGS-004` forbids. A section now declares the columns it owns and
+  `updateProfile` builds a complete payload from the form for those and from the
+  **stored row** for everything else, parsed by the unchanged strict schema.
+  Hidden inputs were rejected: echoing the other sections' values through the
+  page would let a stale tab overwrite a newer save with what it rendered.
+  `resolveSettingsFormValues` is extracted so the renderer and the writer answer
+  "what is stored" identically, including for an account with no preferences row.
+  The four groups are asserted to **partition** `profileSchema.shape`, with
+  two-sided non-vacuity controls.
+- **Both automation actions stop throwing** (`2P-SETTINGS-007`). Slice 2P.4 made
+  them throw because a swallowed error is worse than a loud one, and named this
+  slice as the successor that would make a *rendered* one possible - a throw
+  replaces the page with the error boundary and destroys the section, the
+  history and the message. They return a typed state on the category's own row,
+  and `55P03` gets its own sentence because it means the category moved rather
+  than "try again". Neither revalidates on failure, so the input survives.
+- **Notificacoes is the history surface** (`2P-SETTINGS-008`). Consent, types,
+  frequency, quiet hours, the cap and `PushControls` moved to Settings unchanged
+  - same component, same props, same reader, and `begin_push_delivery` still
+  reads every one before sending. The page keeps its URL, its `?page` deep link,
+  its pagination and its owner-scoped read, and gains read/unread as an
+  announced **word** rather than a tint, per-row accessible names, and exactly
+  one discreet link back.
+- **`2P-CHAT-004-MOBILE` closed.** The bar is
+  `Hoje - Registros - [Capturar] - Trabalho - Brain`. The census in
+  `capabilities.ts` named two blockers and neither was waived: `AccountMenu`
+  gained a third `variant` in the top bar (still one component, still two
+  mounts), and Perguntas got an unconditional link in Registros' header - the
+  fix that census named and declined to build there, because a permanent control
+  on the cockpit to satisfy a census would be arranging the product around its
+  own bookkeeping. Hoje is untouched.
+- **The capability registry had never governed the notification controls.** Five
+  of them shipped in 2M.4b outside the guard's scope; moving them into the
+  preferences centre made the guard see them, and `notification_delivery` now
+  governs them as `operational`.
+- **`revalidatePath`: five sites repaired, 70 recorded as debt.** The census is
+  generated - **75** call sites, one of which used the route-pattern form. Only
+  the Settings and Notificacoes sites moved; a silent sweep of seventy across
+  surfaces this slice cannot prove is the wide, quiet change the owner forbade.
+- **The authenticated browser ran**, against a rebuilt `next start`: 10/10
+  desktop and 10/10 mobile on the new lane. Slice 2P.4's lane was retargeted onto
+  `/app/settings/assistant` with **not one assertion changed** - 12/12 - which is
+  the proof ADR-123 Decision 7 asked for. Both automation controls dropped
+  `window.location.reload()` for `useActionState` plus `router.refresh()` on
+  success only.
+- **One lane stays red and it is not this slice's.** `2O-PREF-013/-014/-015`
+  fails on the appearance radio after a reload, reproduced identically on a
+  worktree at `0296e2a` with its own build. Recorded as
+  `2P-APPEARANCE-HYDRATION`, not absorbed and not fixed.
+  `online-mobile-navigation.spec.ts` was also already red on `main`; it is
+  repaired here because the lane is otherwise unrunnable.
+- **Zero residue, measured with a control.** Probe users 0, against 2 real users,
+  3 entries, 344 audit rows and 16 undo operations - every audit row resolving to
+  a live owner. No automation enabled, no policy row for anybody, no BYOK
+  credential saved, no provider call.
+
 ## 2026-08-19 - Slice 2P.4: per-category automation policy, calibration from real reviews, and a checkpoint instead of a switch
 
 - `2P-AUTONOMY-001` … `-010`. **One migration** - `202608190099`, the phase's

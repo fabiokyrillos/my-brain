@@ -339,6 +339,13 @@ const INVENTORY: readonly RouteEntry[] = [
    */
   { route: "search", sections: [] },
   { route: "settings", sections: [] },
+  /*
+   * Slice 2P.5 — the seven non-default settings sections, behind one dynamic
+   * segment. `sections: []` for the same reason `settings` carries it: the
+   * route renders preferences and navigation, not an owned collection, so
+   * EGC-INVARIANT-004 has nothing here to demand a writer for.
+   */
+  { route: "settings/[section]", sections: [] },
   { route: "tasks", sections: [] },
   { route: "today", sections: [] },
   { route: "waiting", sections: [] },

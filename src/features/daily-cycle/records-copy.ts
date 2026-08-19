@@ -32,6 +32,22 @@ export type RecordsCopy = {
     readonly label: string;
   };
   readonly states: { readonly recordOnly: string };
+  /**
+   * Slice 2P.5. Perguntas, as a view OF Registros rather than as a destination
+   * Hoje advertises.
+   *
+   * `capabilities.ts`'s census records Perguntas as one of the two things `Mais`
+   * was the only mobile route to, and it names this exact fix: *"the handoff
+   * makes Perguntas a view of Registros rather than a destination Hoje
+   * advertises, and adding a permanent control to the cockpit to make this
+   * census true would be arranging the product around its own bookkeeping."*
+   *
+   * Registros is a bar slot, so this puts Perguntas one tap from the bar — which
+   * is what retiring `Mais` needed. Unconditional, because a link that appears
+   * only once there is something to see is not a path: you cannot answer a
+   * question from a page you cannot open.
+   */
+  readonly questionsLink: string;
   /** One line saying what is at stake, per row. Never blank. */
   readonly proposals: {
     readonly question: string;
@@ -92,6 +108,7 @@ export const recordsCopy = {
       label: "Visões de Registros",
     },
     states: { recordOnly: "Só registro" },
+    questionsLink: "Ver perguntas pendentes",
     proposals: {
       question: "1 pergunta pendente",
       candidates: "sugestões aguardando sua decisão",
@@ -137,6 +154,7 @@ export const recordsCopy = {
       label: "Record views",
     },
     states: { recordOnly: "Record only" },
+    questionsLink: "See pending questions",
     proposals: {
       question: "1 pending question",
       candidates: "suggestions waiting on your decision",

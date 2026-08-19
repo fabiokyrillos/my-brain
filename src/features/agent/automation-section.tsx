@@ -6,10 +6,12 @@ import { AutomationPolicyForm } from "./automation-policy-form";
 import { AutomationUndoButton } from "./automation-undo-button";
 import {
   AUTOMATION_POLICY_STATES,
+  CALIBRATION_FRESHNESS,
   calibrationShortfall,
   permitsAutomaticWrite,
   type AutomationCategoryDecision,
 } from "./automation-policy";
+import type { AutomationActionState } from "./automation-state";
 
 /**
  * `2P-AUTONOMY-001`, `-003`, `-009` and `-010`'s surface.
@@ -54,7 +56,7 @@ function CategoryRow({
 }: {
   decision: AutomationCategoryDecision;
   locale: Locale;
-  saveAction: (formData: FormData) => Promise<void>;
+  saveAction: (previous: AutomationActionState, formData: FormData) => Promise<AutomationActionState>;
 }) {
   const copy = getAutomationCopy(locale);
   const category = copy.categories[decision.category];
@@ -119,6 +121,45 @@ function CategoryRow({
         {shortfall !== null && shortfall.reviewed > 0 ? (
           <p className="automation-shortfall">{copy.shortfall(shortfall.reviewed)}</p>
         ) : null}
+        {/*
+          Freshness and the undo block, stated separately from the counts —
+          because they are separate rules and either can refuse a category whose
+          totals are fine.
+
+          A reader who has 60 reviewed tasks and still sees a refusal needs to
+          know whether the problem is that none of them is recent or that they
+          undid something last week. Folding both into one "not eligible" line
+          would leave them with nothing to act on.
+
+          The whole block is skipped where there is no producer: printing
+          "0 in the last 90 days" for a category that can never gather one would
+          be the zero-that-reads-as-a-shortfall the copy above exists to avoid.
+        */}
+        {decision.calibration.hasProducer ? (
+          <dl className="automation-blocking">
+            <div>
+              <dt>{copy.freshnessLabel}</dt>
+              <dd>
+                {copy.freshnessRequirement(
+                  CALIBRATION_FRESHNESS.minimumRecentReviewed,
+                  CALIBRATION_FRESHNESS.recentWindowDays,
+                  CALIBRATION_FRESHNESS.newestWithinDays,
+                )}{" "}
+                {decision.calibration.newestObservedAt === null
+                  ? copy.freshnessNone
+                  : `${copy.freshnessRecent(decision.calibration.recentReviewed)} · ${copy.freshnessNewest(decision.calibration.newestObservedAt.slice(0, 10))}`}
+              </dd>
+            </div>
+            <div>
+              <dt>{copy.undoBlockLabel}</dt>
+              <dd data-undo-block={decision.calibration.recentUndo ? "active" : "clear"}>
+                {decision.calibration.recentUndo
+                  ? copy.undoBlockActive(CALIBRATION_FRESHNESS.undoBlockWindow)
+                  : copy.undoBlockClear}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
       </div>
 
       {/*
@@ -167,8 +208,8 @@ export function AutomationSection({
   decisions: readonly AutomationCategoryDecision[];
   history: readonly AutomationPolicyChange[];
   /** Injected, so this component stays free of Server Actions. */
-  saveAction: (formData: FormData) => Promise<void>;
-  undoAction: (formData: FormData) => Promise<void>;
+  saveAction: (previous: AutomationActionState, formData: FormData) => Promise<AutomationActionState>;
+  undoAction: (previous: AutomationActionState, formData: FormData) => Promise<AutomationActionState>;
 }) {
   const copy = getAutomationCopy(locale);
   const anyAutomatic = decisions.some(permitsAutomaticWrite);
@@ -178,6 +219,16 @@ export function AutomationSection({
       <h2 id="automation-title">{copy.title}</h2>
       <p>{copy.intro}</p>
       {!anyAutomatic ? <p className="automation-posture">{copy.posture}</p> : null}
+      {/*
+        The signed contract, said once.
+
+        Slice 2P.4 shipped these thresholds calling them a proposal, because
+        they were one. The owner signed them on 2026-08-19 (ADR-123's first
+        amendment of that date), so the surface stops hedging — and says in the
+        same breath that signing a minimum enabled nothing, because the sentence
+        that only said "these are signed" would read as an activation.
+      */}
+      <p className="automation-thresholds">{copy.thresholdsSigned}</p>
 
       <ul className="automation-list" aria-label={copy.listLabel}>
         {decisions.map((decision) => (
@@ -204,6 +255,7 @@ export function AutomationSection({
                   <AutomationUndoButton
                     locale={locale}
                     undoId={change.undoId}
+                    category={change.category}
                     label={copy.undo}
                     undoAction={undoAction}
                   />

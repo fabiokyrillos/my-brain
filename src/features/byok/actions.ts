@@ -11,6 +11,8 @@ import type { Secret } from "@/lib/byok/secret";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 
+import { SETTINGS_REVALIDATION_PATHS } from "@/features/settings/sections";
+
 import { getByokCopy } from "./copy";
 import { PENDING_ENTRY_BATCH_LIMIT } from "./pending-entries";
 import { validateAgainstProvider } from "./probe";
@@ -107,6 +109,27 @@ async function sealCredential(key: Secret, userId: string) {
 }
 
 /**
+ * Invalidate the settings surface — by ROUTE PATTERN, not by resolved path.
+ *
+ * Slice 2P.5 moved the credential panel from `/app/settings` to
+ * `/app/settings/ai`, and both of those live under a dynamic `[locale]`
+ * segment. The Next documentation states the rule outright — *"If `path`
+ * contains a dynamic segment … this parameter is required"* — and slice 2P.4
+ * measured what happens without it against the deployed app: the write lands,
+ * the client's refresh request is answered with the previous render, and the
+ * panel keeps showing the credential state it had before the save.
+ *
+ * The two patterns come from the routing contract rather than being written
+ * here, so a section added to the route tree cannot leave this action
+ * invalidating a path that no longer matches it. Neither takes a locale: the
+ * pattern covers both, so there is nothing here for a request-supplied value to
+ * influence.
+ */
+function invalidateSettings(): void {
+  for (const path of SETTINGS_REVALIDATION_PATHS) revalidatePath(path, "page");
+}
+
+/**
  * Save or rotate — one action, because they are one operation.
  *
  * `BYOK-ROTATE-001`: **validate first**. On failure the existing credential is
@@ -182,7 +205,7 @@ export async function saveAiCredential(
     if (!data || data.length === 0) {
       return { status: "error", message: copy.rotationConflict };
     }
-    revalidatePath(`/${resolveLocale(formData.get("locale"))}/app/settings`);
+    invalidateSettings();
     return {
       status: "success",
       message: replacingActiveKey ? copy.rotated : copy.saved,
@@ -194,7 +217,7 @@ export async function saveAiCredential(
     .upsert({ user_id: user.id, ...sealed }, { onConflict: "user_id" });
   if (error) return { status: "error", message: copy.validation.unknown };
 
-  revalidatePath(`/${resolveLocale(formData.get("locale"))}/app/settings`);
+  invalidateSettings();
   return { status: "success", message: copy.saved };
 }
 
@@ -231,7 +254,7 @@ export async function removeAiCredential(
     .eq("user_id", user.id);
   if (error) return { status: "error", message: copy.validation.unknown };
 
-  revalidatePath(`/${resolveLocale(formData.get("locale"))}/app/settings`);
+  invalidateSettings();
   return { status: "success", message: copy.removed };
 }
 
@@ -327,7 +350,7 @@ export async function interpretPendingEntries(
     if (error.code === "55P03") alreadyQueued += 1;
   }
 
-  revalidatePath(`/${locale}/app/settings`);
+  invalidateSettings();
   revalidatePath(`/${locale}/app/inbox`);
   revalidatePath(`/${locale}/app`);
 

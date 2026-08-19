@@ -26,9 +26,9 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const t = getMessages(locale);
-  // One element, mounted twice. See `account-menu.tsx` for why the two surfaces
-  // may not have separate session models.
-  const account = (variant: "rail" | "overflow") => (
+  // One element, mounted three times since slice 2P.5. See `account-menu.tsx`
+  // for why the surfaces may not have separate session models.
+  const account = (variant: "rail" | "overflow" | "header") => (
     <AccountMenu identity={identity} locale={locale} signOut={signOut} variant={variant} />
   );
 
@@ -94,6 +94,28 @@ export function AppShell({
             {/* A client component, because marking the current destination
                 needs the pathname and this shell reads nothing (UX-34). */}
             <NotificationsLink locale={locale} />
+            {/*
+              `2P-CHAT-004-MOBILE`'s release condition, met here.
+
+              `capabilities.ts`'s census stated it exactly: *"when `AccountMenu`
+              is mounted somewhere a phone can reach without the disclosure, the
+              fifth slot becomes `library`"*. This is that mount. Until now the
+              account lived only in the desktop rail's foot and inside the mobile
+              overflow panel, so retiring `Mais` would have taken Ajustes, the
+              whole of Dados e IA and **sign-out** with it — the way out of the
+              product disappearing rather than a destination moving one tap away.
+
+              It is the SAME component with a third `variant`, not a second
+              implementation, for the reason `account-menu.tsx` records at
+              length: two implementations are two chances for one surface to end
+              a session the other does not.
+
+              The stylesheet hides it above the mobile breakpoint, where the rail
+              foot already carries the account. Both mounts render on every
+              viewport in the DOM, so the census below counts three and the guard
+              can see all three.
+            */}
+            <span className="top-account">{account("header")}</span>
           </div>
         </header>
         <main id="main-content" tabIndex={-1}>
@@ -102,12 +124,15 @@ export function AppShell({
       </div>
       <nav aria-label={t.shell.mobileNavigation} className="bottom-nav">
         {/*
-          Injected into the overflow panel rather than added as a sixth bar item:
-          the bar holds four destinations and capture, and it is placed *first*
-          inside the panel so it is reachable without scrolling past the secondary
-          product destinations.
+          Five destinations and nothing else, since slice 2P.5.
+
+          The bar used to inject the account into a `Mais` panel, because that
+          panel was the only place a phone could reach it from. The account is in
+          the top bar now, so the panel had no reason left to exist and the slot
+          it occupied went to Brain — which is the bar `02-arquitetura-e-rotas.md`
+          specifies and the release condition `capabilities.ts` recorded.
         */}
-        <NavigationLinks account={account("overflow")} locale={locale} mobile />
+        <NavigationLinks locale={locale} mobile />
       </nav>
     </div>
   );

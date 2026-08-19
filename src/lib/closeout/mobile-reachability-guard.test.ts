@@ -34,7 +34,7 @@ import {
   accountCentreLinks,
 } from "../../features/account-centre/contracts";
 import { BRAIN_DOMAIN_LENSES } from "../../features/library/lenses";
-import { mobileBarSlots } from "../../features/shell/capabilities";
+import { mobileBarSlots, mobileDemotedKeys } from "../../features/shell/capabilities";
 import { TRANSPARENCY_LENSES } from "../../features/transparency/contracts";
 
 const REPO = process.cwd();
@@ -43,23 +43,49 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 const code = (relative: string) =>
   read(relative).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
+/**
+ * Where Ajustes' sections mount their content, since slice 2P.5.
+ *
+ * `2P-SETTINGS-001` split the single page into eight routes over one dynamic
+ * segment, so the page file no longer mounts anything but a panel. The census
+ * rows below are about what Ajustes *reaches*, and that is now decided here.
+ */
+const SETTINGS_SECTIONS_MODULE = "src/features/settings/settings-section-content.tsx";
+
 /** The four the bar carries beside capture. */
 const BAR_DESTINATIONS = ["home", "inbox", "work"] as const;
 
 describe("the bar is what it says it is", () => {
   it("holds five slots with capture at the midpoint", () => {
-    expect(mobileBarSlots).toEqual(["home", "inbox", "capture", "work", "more"]);
+    expect(mobileBarSlots).toEqual(["home", "inbox", "capture", "work", "library"]);
     expect(mobileBarSlots.length % 2).toBe(1);
     expect(mobileBarSlots[(mobileBarSlots.length - 1) / 2]).toBe("capture");
   });
 
-  it("still carries every primary destination but Brain", () => {
-    for (const key of BAR_DESTINATIONS) {
+  /**
+   * The release condition fired, and this assertion turned over with it.
+   *
+   * It used to read *"still carries every primary destination but Brain"* and
+   * failed if Brain reached the bar, because reaching it early would have
+   * stranded the account. Slice 2P.5 met the condition, so the same claim is now
+   * stated in its post-release form: **every** primary destination is a slot,
+   * and `more` is not one.
+   *
+   * It still fails in both directions — a destination leaving the bar, and the
+   * disclosure coming back — which is what stops this from being a rubber stamp
+   * on whatever `capabilities.ts` currently says.
+   */
+  it("carries every primary destination, Brain included, and no disclosure", () => {
+    for (const key of [...BAR_DESTINATIONS, "library"] as const) {
       expect(mobileBarSlots, `${key} left the bar`).toContain(key);
     }
-    expect(mobileBarSlots, "Brain reached the bar — the census below must be revisited").not.toContain(
-      "library",
-    );
+    expect(
+      mobileBarSlots,
+      "`more` is back on the bar — the account and Perguntas must have lost their paths",
+    ).not.toContain("more");
+    // Every primary destination, derived rather than listed, so a fifth primary
+    // added later cannot quietly go missing from the bar.
+    expect(mobileDemotedKeys, "a primary destination is demoted again").toEqual([]);
   });
 });
 
@@ -150,21 +176,67 @@ describe("the rest of the census, path by path", () => {
    * tells them the census row can move: the same two-directional shape the
    * account check has, and the reason that check exists.
    */
-  it("records that Hoje's link to Perguntas is gated, which is why the census says so", () => {
+  it("records that Hoje's link to Perguntas is still gated, and that Hoje was not changed to fix it", () => {
     const home = code("src/features/shell/home-view.tsx");
     expect(
       preceding(home, "/app/questions"),
-      "Hoje now reaches Perguntas unconditionally — move it out of the `more`-only set in capabilities.ts",
+      "Hoje now reaches Perguntas unconditionally — the census row can move, and this assertion with it",
     ).toMatch(/view\.openQuestion\s*\?/);
   });
 
-  it("names the same dependency in the census, so the two cannot drift", () => {
-    const census = read("src/features/shell/capabilities.ts");
-    expect(census, "the census no longer records the Perguntas dependency").toMatch(
-      /The second is `questions`/,
+  /**
+   * Perguntas' real path, and the reason it is here rather than on Hoje.
+   *
+   * Retiring `Mais` needed a path to Perguntas that does not depend on there
+   * being one to answer. The previous census named the fix and declined to build
+   * it in that part: Perguntas is *"a view of Registros rather than a
+   * destination Hoje advertises"*, and putting a permanent control on the
+   * cockpit to satisfy a census would be arranging the product around its own
+   * bookkeeping.
+   *
+   * Registros is a bar slot, so this is one tap from the bar. Unconditional is
+   * the whole point — the same standard the reminders link is held to two
+   * assertions above, and for the same reason: a link that appears only once
+   * there is something to see is not a path.
+   */
+  it("Registros reaches Perguntas whether or not any are open", () => {
+    const records = code("src/app/[locale]/app/inbox/page.tsx");
+    expect(records, "Registros lost its link to Perguntas").toContain("/app/questions");
+    expect(records).toContain("records-questions-link");
+
+    const at = records.indexOf("records-questions-link");
+    const before = records.slice(Math.max(0, at - 400), at);
+    // Non-vacuity: an empty window matches nothing and would pass for free.
+    expect(before.length, "no code preceded the link to inspect").toBeGreaterThan(100);
+    expect(before, "the Perguntas link became conditional").not.toMatch(
+      /openQuestion|questions\.length|hasQuestions|\?\s*\(/,
     );
-    // …and it must NOT still claim Hoje reaches it.
-    expect(census).not.toMatch(/\| reviews, questions \| Hoje \|/);
+  });
+
+  it("names the release in the census, so the two cannot drift", () => {
+    /*
+      Comment markers and line wrapping removed before matching.
+
+      A sentence in a block comment is broken by ` * ` at whatever column the
+      wrap lands on, so a phrase that reads as one line in the file is three
+      fragments in the source. Matching the raw text would make this assertion
+      pass or fail on where a re-wrap put the newline, which is a guard nobody
+      could trust.
+    */
+    const prose = read("src/features/shell/capabilities.ts")
+      .replace(/^\s*\*\s?/gm, " ")
+      .replace(/\s+/g, " ");
+
+    // The census must record BOTH halves of what freed the slot, or a later
+    // reader cannot tell why `more` retired.
+    expect(prose, "the census no longer records the account's move").toContain(
+      "the mobile overflow panel is replaced by the **top bar**",
+    );
+    expect(prose, "the census no longer records the Perguntas path").toContain(
+      "Registros' header, unconditionally",
+    );
+    // …and it must not still be waiting for a condition that has already fired.
+    expect(prose).not.toContain("The release condition, stated so nobody has to rediscover it");
   });
 
   /**
@@ -193,7 +265,7 @@ describe("the rest of the census, path by path", () => {
     const section = code("src/features/transparency/data-ai-section.tsx");
     expect(section).toContain("TRANSPARENCY_LENSES.map");
     expect(section).toContain("getNavigationHref(locale, lens)");
-    expect(code("src/app/[locale]/app/settings/page.tsx")).toContain("<DataAiSection");
+    expect(code(SETTINGS_SECTIONS_MODULE)).toContain("<DataAiSection");
     expect(TRANSPARENCY_LENSES).toEqual(["history", "costs", "jobs"]);
   });
 
@@ -219,7 +291,7 @@ describe("the rest of the census, path by path", () => {
     const section = code("src/features/account-centre/account-data-section.tsx");
     expect(section).toContain("ACCOUNT_CENTRE_DESTINATIONS.flatMap");
     expect(section).toContain("accountCentreLinks(locale, destination)");
-    expect(code("src/app/[locale]/app/settings/page.tsx")).toContain("<AccountDataSection");
+    expect(code(SETTINGS_SECTIONS_MODULE)).toContain("<AccountDataSection");
 
     // Resolved rather than asserted as strings, so a route that moves cannot
     // leave this passing against a path that no longer exists.
@@ -250,37 +322,45 @@ describe("the rest of the census, path by path", () => {
   });
 });
 
-describe("the account is the one thing left, and that is the release condition", () => {
+describe("the account moved to the header, and that is what freed the fifth slot", () => {
   /**
-   * The decisive assertion, and it is written to fail **in both directions**.
+   * The decisive assertion, still written to fail **in both directions** — the
+   * directions have simply swapped.
    *
-   * If `AccountMenu` ever mounts somewhere a phone can reach without opening the
-   * disclosure — a header avatar, a profile chip, anything — this fails, and
-   * whoever did it is told that the fifth slot is now free for Brain. If the
-   * mount inside the overflow disappears without a replacement, it fails too,
-   * because sign-out would have left the phone entirely.
+   * Before slice 2P.5 it failed if the account reached the header (telling
+   * whoever did it that the slot was now free) and if the overflow mount
+   * vanished without a replacement (because sign-out would have left the phone
+   * entirely). Now it fails if the account **leaves** the header while the bar
+   * still carries Brain, which is the same danger from the other side: the fifth
+   * slot would be spent and the way out gone.
+   *
+   * Still exactly two mounts of one component, because two implementations are
+   * two chances for one surface to end a session the other does not.
    */
-  it("mounts AccountMenu exactly twice: the desktop rail and the mobile overflow", () => {
+  it("mounts AccountMenu exactly twice: the desktop rail and the top bar", () => {
     const shell = code("src/features/shell/app-shell.tsx");
-    const mounts = shell.match(/account\("(rail|overflow)"\)/g) ?? [];
-    expect([...mounts].sort()).toEqual(['account("overflow")', 'account("rail")']);
+    const mounts = shell.match(/account\("(rail|overflow|header)"\)/g) ?? [];
+    expect([...mounts].sort()).toEqual(['account("header")', 'account("rail")']);
 
-    // The overflow mount is inside the bar's navigation, which is the
-    // disclosure. The rail mount is desktop-only chrome.
-    expect(shell).toMatch(/<NavigationLinks account=\{account\("overflow"\)\}/);
     expect(shell).toMatch(/className="rail-footer">\{account\("rail"\)\}/);
 
-    // Nothing in the top bar is the account. Three controls, none of them it.
+    // The header mount is inside the top bar's own action row, so a phone
+    // reaches it without opening anything.
     const topBar = shell.slice(shell.indexOf('className="top-actions"'), shell.indexOf("</header>"));
     expect(topBar).toContain("<CommandPalette");
     expect(topBar).toContain("<LocaleSwitchLink");
     expect(topBar).toContain("<NotificationsLink");
-    expect(topBar, "the account reached the mobile header — retire `more` and put Brain in slot five").not.toContain(
-      "account(",
-    );
+    expect(
+      topBar,
+      "the account left the mobile header — the fifth slot must go back to `more`",
+    ).toContain('account("header")');
+
+    // And the bar no longer receives an account to inject, because it no longer
+    // has a panel to put one in.
+    expect(shell).not.toMatch(/<NavigationLinks account=/);
   });
 
-  it("Ajustes is reached from the account menu and nowhere a phone can get to first", () => {
+  it("Ajustes is reached from the account menu, which a phone now reaches first", () => {
     // If this ever gains a second in-product entry the census changes, which is
     // exactly the event this file exists to notice.
     expect(code("src/features/shell/account-menu.tsx")).toContain("/app/settings");

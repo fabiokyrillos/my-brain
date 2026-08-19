@@ -16,9 +16,27 @@ import { getAiConfigCopy } from "@/features/ai-config/copy";
 import type { Locale } from "@/lib/preferences";
 import { getReviewPreferencesCopy } from "./review-preferences-copy";
 import type { SettingsFormValues } from "./settings-contracts";
+import type { ProfileFormSection } from "./settings-sections";
 import { getTimeZoneOptions } from "./timezones";
 
-export type ProfileFormState = { status: "idle" | "success" | "error"; message: string };
+/**
+ * `2P-SETTINGS-007`: *a failed save preserves input and names the affected
+ * section.*
+ *
+ * The input half was already true and is documented at length below — this
+ * returns a state rather than redirecting or revalidating, so React keeps what
+ * was typed. The **section** half is new: with one form per section, a message
+ * that only said *"could not save"* would leave a reader who had switched
+ * sections since submitting with no idea which one failed.
+ *
+ * It is optional because `idleState` has no section and neither does a success
+ * that arrived before this field existed.
+ */
+export type ProfileFormState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  section?: ProfileFormSection;
+};
 export type ProfileFormAction = (state: ProfileFormState, formData: FormData) => Promise<ProfileFormState>;
 
 const idleState: ProfileFormState = { status: "idle", message: "" };
@@ -152,15 +170,43 @@ function restoreForm(form: HTMLFormElement, draft: FormDraft) {
   }
 }
 
+/**
+ * One Settings section's persisted preferences, as one form.
+ *
+ * ## Why the same component renders four different forms
+ *
+ * `2P-SETTINGS-001` splits these seventeen columns across Geral, Assistente,
+ * Planejamento and IA. Four components would be four copies of the draft
+ * snapshot, the restore-on-failure layout effect, the save bar and the
+ * `useActionState` wiring — and four chances for one section to lose input that
+ * the other three keep. One component with a `section` prop keeps every one of
+ * those behaviours defined exactly once.
+ *
+ * ## What the `section` field in the payload does
+ *
+ * It tells `updateProfile` **which columns this submission owns**. Everything
+ * else is read from the stored row rather than from the page, which is what
+ * makes `2P-SETTINGS-004` structural instead of tested-for: a section cannot
+ * blank another's values because it never names them, and a stale tab cannot
+ * overwrite a newer save with what it happened to render.
+ *
+ * The numbers on the section headings are unchanged and deliberately still
+ * global — 01 timezone, 02 assistant, 03 quiet hours, 04 reviews, 05 advanced
+ * AI. They numbered the whole surface before the split and they still do; a
+ * reader who knew them keeps their bearings, and nothing renumbers.
+ */
 export function SettingsForm({
   action,
   initialState = idleState,
   locale,
+  section,
   values,
 }: {
   action: ProfileFormAction;
   initialState?: ProfileFormState;
   locale: Locale;
+  /** Which columns this form owns. Submitted, and enforced by the action. */
+  section: ProfileFormSection;
   values: SettingsFormValues;
 }) {
   const [state, formAction, pending] = useActionState(action, initialState);
@@ -234,9 +280,17 @@ export function SettingsForm({
     },
   ];
 
-  return <form action={submit} className="settings-form" ref={formRef}>
+  return <form action={submit} className="settings-form" data-settings-form={section} ref={formRef}>
     <input type="hidden" name="locale" value={locale} />
+    {/*
+      The section this submission owns. The action reads it, takes only this
+      section's fields from the form, and reads every other column from the
+      stored row — see `settings-sections.ts` for why that is a database read
+      rather than a set of hidden inputs.
+    */}
+    <input type="hidden" name="section" value={section} />
 
+    {section === "general" ? <>
     <Section number="01" title={pt ? "Fuso horário" : "Time zone"} description={pt ? "Datas, prazos, revisões manuais e períodos silenciosos usam esta escolha." : "Dates, deadlines, manual reviews, and quiet periods use this setting."} />
     {/*
       Hints sit **outside** the label and are linked by `aria-describedby`, the
@@ -247,7 +301,9 @@ export function SettingsForm({
       label and the hint is the description, which is what each is for.
     */}
     <div className="settings-fields"><div className="settings-field"><label htmlFor="timezone">{pt ? "Fuso horário" : "Time zone"}<select id="timezone" name="timezone" aria-describedby="timezone-hint" defaultValue={values.timezone}>{zones.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><small id="timezone-hint">{pt ? "Também interpreta expressões como “amanhã”." : "It also resolves phrases such as tomorrow."}</small></div></div>
+    </> : null}
 
+    {section === "assistant" ? <>
     <Section number="02" title={pt ? `Como ${values.agentName} responde` : `How ${values.agentName} responds`} description={pt ? "Estas escolhas afetam chat e revisões geradas sob demanda." : "These settings affect chat and reviews generated on demand."} />
     {/*
       The field UX-06 found missing. The column has existed since
@@ -258,7 +314,9 @@ export function SettingsForm({
     */}
     <div className="settings-fields"><div className="settings-field"><label htmlFor="agent-name">{pt ? "Nome do assistente" : "Assistant name"}<input id="agent-name" name="agentName" type="text" required minLength={1} maxLength={60} autoComplete="off" aria-describedby="agent-name-hint" defaultValue={values.agentName} /></label><small id="agent-name-hint">{pt ? "Como o assistente se chama nas telas e nas respostas. O produto continua sendo My Brain." : "What the assistant is called on screen and in its answers. The product is still My Brain."}</small></div></div>
     <div className="settings-fields"><label htmlFor="personality">{pt ? "Personalidade" : "Personality"}<select id="personality" name="personality" defaultValue={values.personality}><option value="proactive">{pt ? "Proativa" : "Proactive"}</option><option value="direct">{pt ? "Direta" : "Direct"}</option><option value="warm">{pt ? "Acolhedora" : "Warm"}</option><option value="analytical">{pt ? "Analítica" : "Analytical"}</option></select></label><label htmlFor="tone">{pt ? "Tom" : "Tone"}<select id="tone" name="tone" defaultValue={values.tone}><option value="direct">{pt ? "Direto" : "Direct"}</option><option value="informal">Informal</option><option value="natural">Natural</option><option value="professional">{pt ? "Profissional" : "Professional"}</option></select></label><label htmlFor="response-detail">{pt ? "Detalhe das respostas" : "Response detail"}<select id="response-detail" name="responseDetail" defaultValue={values.responseDetail}><option value="short">{pt ? "Curto" : "Short"}</option><option value="balanced">{pt ? "Equilibrado" : "Balanced"}</option><option value="detailed">{pt ? "Detalhado" : "Detailed"}</option></select></label></div>
+    </> : null}
 
+    {section === "planning" ? <>
     <Section number="03" title={pt ? "Silêncio e frequência" : "Quiet hours and frequency"} description={pt ? "Limites aplicados pelo processamento de lembretes e acompanhamentos." : "Limits enforced by reminder and follow-up processing."} />
     <div className="settings-fields"><label htmlFor="quiet-start">{pt ? "Período silencioso começa" : "Quiet period starts"}<input id="quiet-start" name="quietStart" type="time" defaultValue={values.quietStart} /></label><label htmlFor="quiet-end">{pt ? "Período silencioso termina" : "Quiet period ends"}<input id="quiet-end" name="quietEnd" type="time" defaultValue={values.quietEnd} /></label><label htmlFor="max-followups">{pt ? "Máximo de acompanhamentos por dia" : "Maximum follow-ups per day"}<input id="max-followups" name="maxFollowupsPerDay" type="number" min="0" max="20" defaultValue={values.maxFollowupsPerDay} /></label><label className="settings-checkbox"><input name="importantReminderOverride" type="checkbox" defaultChecked={values.importantReminderOverride} /><span>{pt ? "Permitir lembretes importantes durante o silêncio" : "Allow important reminders during quiet hours"}</span></label></div>
 
@@ -289,7 +347,9 @@ export function SettingsForm({
         <small id="weekly-review-hint">{reviews.weeklyHint}</small>
       </div>
     </div>
+    </> : null}
 
+    {section === "ai" ? <>
     <details className="settings-advanced">
       <summary><span>05</span><div><strong>{pt ? "IA avançada" : "Advanced AI"}</strong><small>{pt ? "Roteamento e custos das funções com consumer ativo." : "Routing and costs for functions with active consumers."}</small></div></summary>
       <div className="settings-advanced-content">
@@ -328,7 +388,17 @@ export function SettingsForm({
         </div>
       </div>
     </details>
+    </> : null}
 
-    <div className="settings-save-bar"><div aria-live="polite">{state.status !== "idle" && <p className={`settings-feedback ${state.status}`} role={state.status === "success" ? "status" : "alert"}>{state.status === "success" && <CheckCircle2 size={18} />} {state.message}</p>}</div><button type="submit" disabled={pending} className="settings-submit">{pending ? <LoaderCircle className="spin" size={18} /> : <Save size={18} />} {pending ? (pt ? "Salvando…" : "Saving…") : (pt ? "Salvar preferências" : "Save preferences")}</button></div>
+    {/*
+      The outcome, and `2P-SETTINGS-007`'s second half.
+
+      `state.section` is only rendered when it is *this* form's section. A
+      reader who submitted Planejamento, switched to Aparência and came back
+      would otherwise find a stale failure attached to a section that never
+      failed — and with one `useActionState` per mounted form, that is a real
+      sequence rather than a hypothetical one.
+    */}
+    <div className="settings-save-bar"><div aria-live="polite">{state.status !== "idle" && (state.section === undefined || state.section === section) && <p className={`settings-feedback ${state.status}`} role={state.status === "success" ? "status" : "alert"}>{state.status === "success" && <CheckCircle2 size={18} />} {state.message}</p>}</div><button type="submit" disabled={pending} className="settings-submit">{pending ? <LoaderCircle className="spin" size={18} /> : <Save size={18} />} {pending ? (pt ? "Salvando…" : "Saving…") : (pt ? "Salvar preferências" : "Save preferences")}</button></div>
   </form>;
 }

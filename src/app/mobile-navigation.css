@@ -368,3 +368,70 @@
     font: var(--type-caption);
   }
 }
+
+/* ==========================================================================
+   Slice 2P.5 — the account in the top bar, which is what freed the mobile
+   bar's fifth slot for Brain (`2P-CHAT-004-MOBILE`).
+
+   Placed AFTER the `@media (max-width: 899px)` block above, and its own
+   narrow-viewport rules are placed after these base rules, for the reason this
+   repository has already paid for once: a media query that precedes the base
+   rules it overrides adds no specificity, so the later base rule wins and the
+   narrow layout is silently dead.
+   ========================================================================== */
+
+/*
+  Hidden on desktop, where the rail foot already carries the account.
+
+  `display: none` rather than not rendering it: `AccountMenu` is one component
+  with two mounts, and deciding which one exists from a viewport would need
+  JavaScript on a server-rendered shell. The rail's mount is the desktop one and
+  this is the mobile one; both are in the DOM, exactly one is visible, and the
+  guard can see both.
+*/
+.top-account {
+  display: none;
+}
+
+.account-menu-header {
+  position: relative;
+}
+
+.account-menu-header > summary {
+  /* The bell and the locale switch beside it are 44px targets; the account must
+     not be the one control in the row that is smaller than the rest. */
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* The name is announced but not drawn: the header has room for an avatar and
+   not for "Assinado como / Marina Duarte". `aria-label` on the summary already
+   carries the account's name, so nothing is lost to a screen reader. */
+.account-menu-header .account-summary-text {
+  display: none;
+}
+
+.account-menu-header .account-menu-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  width: min(280px, calc(100vw - 24px));
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
+  padding: var(--space-2);
+}
+
+@media (max-width: 899px) {
+  .top-account {
+    display: inline-flex;
+    align-items: center;
+  }
+}

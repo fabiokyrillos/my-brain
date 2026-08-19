@@ -176,6 +176,35 @@ export const capabilityRegistry = [
    * evidence the decision measures.
    */
   { key: "automation_categories", state: "operational", surface: "settings", consumerEvidence: ["agent/automation-data", "agent/automation-actions", "loadAutomationStatus", "automation_category_status"], visible: true, columns: [], controls: ["automationCategoryState"] },
+  /*
+   * Slice 2P.5 — the notification preferences, governed for the first time.
+   *
+   * ## Why this row did not exist before, and why it has to now
+   *
+   * `2P-SETTINGS-008` moved consent, the types, the frequency, the quiet window
+   * and the daily cap from `/app/notifications` into Settings → Notificações.
+   * The controls are unchanged; what changed is that they are now inside the
+   * preferences centre, and `capability-registry-guard` walks that centre
+   * transitively. It found five rendered controls the registry had never heard
+   * of — which is `2O-ACTIVATION-005` direction B doing exactly its job.
+   *
+   * **The gap was revealed rather than created.** These controls shipped in
+   * slice 2M.4b and were never governed, because the guard's scope was the
+   * settings surface and they were not on it. Adding the row is the honest
+   * response; exempting the file would have been the other one.
+   *
+   * ## `columns: []` and why the consumers are still real
+   *
+   * None of the five is an `agent_preferences` column. They live in the push
+   * consent record, and `public.begin_push_delivery` reads **every one of them**
+   * before sending — the type against the enabled set, the frequency, the local
+   * quiet window and the daily cap. That is a behavioural consumer inside the
+   * database, which is stronger evidence than a reader in application code.
+   *
+   * `visible: true`: the controls are offered on the surface, so
+   * `2O-ACTIVATION-004`'s summary must say what they do.
+   */
+  { key: "notification_delivery", state: "operational", surface: "settings", consumerEvidence: ["begin_push_delivery", "notifications/consent-contract", "notifications/consent-reader", "notifications/actions"], visible: true, columns: [], controls: ["notificationType", "notificationFrequency", "quietStart", "quietEnd", "dailyCap"] },
   { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"], controls: [] },
   { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"], controls: [] },
   { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"], controls: [] },
@@ -445,7 +474,15 @@ export const navigationCapabilities = [
   { key: "reminders", route: "reminders", group: "organization", visibility: "more", nested: false, aliases: [] },
   { key: "history", route: "history", group: "transparency", visibility: "more", nested: false, aliases: [] },
   { key: "costs", route: "costs", group: "transparency", visibility: "more", nested: false, aliases: [] },
-  { key: "settings", route: "settings", group: "preferences", visibility: "more", nested: false, aliases: [] },
+  /*
+   * `nested: true` since slice 2P.5, and it is load-bearing rather than
+   * tidying. `2P-SETTINGS-001` gives Settings eight sections under
+   * `/app/settings/[section]`; without this, `classifyNavigationPath` returns
+   * `null` for `/app/settings/appearance` and the rail stops marking Ajustes as
+   * the current destination while the reader is standing in it — the same
+   * defect `mobileDemotedKeys` exists to prevent on the other surface.
+   */
+  { key: "settings", route: "settings", group: "preferences", visibility: "more", nested: true, aliases: [] },
   { key: "capture", route: "capture", group: "global", visibility: "global", nested: false, aliases: [] },
   { key: "notifications", route: "notifications", group: "global", visibility: "global", nested: false, aliases: [] },
   { key: "jobs", route: "jobs", group: "advanced", visibility: "context-only", nested: false, aliases: [] },
@@ -496,67 +533,58 @@ export const primaryNavigationKeys = navigationCapabilities
  * overflow.* Its default view is now the decision queue, so the premise of the
  * old decision is gone with it.
  *
- * ## The one place this bar departs from the handoff, and the exact size of it
+ * ## The bar is now the handoff's bar, and the release condition was met rather
+ * than waived
  *
- * The handoff's bar is `Hoje · Registros · [Capturar] · Trabalho · Brain`, and
- * it adds that *"Mais" deixa de existir*. The first four slots are exactly that.
- * The fifth is still `more`, and the reason has changed shape twice — so it is
- * written here as a **census with a release condition** rather than as a
- * paragraph that has to be re-argued each time.
+ * `02-arquitetura-e-rotas.md` specifies `Hoje · Registros · [Capturar] ·
+ * Trabalho · Brain`, and adds that *"Mais" deixa de existir*. Slice 2P.5
+ * delivers exactly that, closing the remainder `2P-CHAT-004-MOBILE`.
  *
- * The 2026-08-14 version of this comment said `more` was the only route to
- * **fourteen** destinations. That was true then. Brain's lenses, Trabalho's
- * modes, Hoje's closing section and Ajustes → Dados e IA have since absorbed
- * twelve of them, and each has a named in-product path that
- * `mobile-reachability-guard.test.ts` re-derives from the components on every
- * run:
+ * The previous version of this comment held a **census with a release
+ * condition** — the fifth slot stayed `more` because two destinations had no
+ * other mobile route. It ended: *"when `AccountMenu` is mounted somewhere a
+ * phone can reach without the disclosure, the fifth slot becomes `library` and
+ * this comment shrinks to nothing."* Both blockers are now closed, and each is
+ * closed by a real path rather than by re-reading the census:
  *
  * | destination | reached from |
  * | --- | --- |
- * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview |
+ * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview — **now a bar slot**, so one tap |
  * | calendar (and the planner) | Trabalho's mode tabs |
  * | reviews | Hoje, unconditionally |
  * | reminders | the calendar's control band, unconditionally |
  * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
  * | notifications | the top bar's bell, **and** Ajustes → Conta e dados (`2O-PREF-002`) |
+ * | **settings, and sign-out** | the account disclosure, **now in the top bar on every viewport** |
+ * | **questions** | Registros' header, unconditionally |
  *
- * Slice 2O.3 added the last row and freed no slot. Conta e dados reaches
- * notifications, the policy documents and account deletion — which is
- * `2O-PREF-001`'s *one destination* — but the account surface itself did not
- * move, so the release condition below is exactly where it was.
- *
- * **Two things are left, and the first of them is the account.** `AccountMenu`
- * is mounted in exactly two places: the desktop rail's foot, and the mobile
- * overflow panel. On a phone the top bar carries the palette, the locale switch
- * and notifications — no avatar, no profile chip. So retiring `more` today would
- * take Ajustes with it, and with Ajustes the whole of Dados e IA, and
- * **sign-out**. That is not a destination being one tap further away; it is the
+ * **The account.** `AccountMenu` mounts twice, as it always has, and one of the
+ * two moved: the desktop rail's foot is unchanged, and the mobile overflow panel
+ * is replaced by the **top bar**, which every viewport carries. Retiring `more`
+ * before that move would have taken Ajustes with it, and with Ajustes the whole
+ * of Dados e IA and **sign-out**: not a destination moving one tap away but the
  * way out of the product disappearing.
  *
- * **The second is `questions`, and this row is a correction.** An earlier
- * version of this table claimed Hoje reached it. Hoje's only link to
- * `/app/questions` sits inside `{view.openQuestion ? … : null}`, and the other
- * in-product path — `conversational-questions.tsx` — returns `null` on an empty
- * list. So an owner with no open question has no path to Perguntas but the
- * disclosure, which is the same shape Lembretes had before this part fixed it.
- * It is left as a **stated dependency rather than patched with a new link**: the
- * handoff makes Perguntas a *view of Registros* rather than a destination Hoje
- * advertises, and adding a permanent control to the cockpit to make this census
- * true would be arranging the product around its own bookkeeping.
+ * **Perguntas.** Hoje's only link sits inside `{view.openQuestion ? … : null}`
+ * and `conversational-questions.tsx` returns `null` on an empty list, so an
+ * owner with no open question had no path but the disclosure. The fix is the one
+ * the previous comment named and declined to build here: Perguntas is *a view of
+ * Registros*, so Registros' header links to it unconditionally. Hoje is
+ * untouched — adding a permanent control to the cockpit to satisfy a census
+ * would be arranging the product around its own bookkeeping, which is what that
+ * paragraph refused and still refuses.
  *
- * `02-arquitetura-e-rotas.md` already specifies the fix — *Conta e ajustes ·
- * Avatar no cabeçalho* on mobile. It is not built here because moving the
- * account surface changes the shell on both viewports, and this initiative's
- * last delimited part is not where the way out of the product gets rebuilt
- * unvalidated.
+ * **`more` did not disappear; it stopped being a bar slot.** The desktop rail
+ * keeps its `side-more` disclosure with all five groups, and the command palette
+ * — an explicit control in the top bar, which on mobile is the only entry point
+ * there has ever been for it — reaches every destination by name on both
+ * viewports. What retired is a mobile bar slot spent on a menu.
  *
- * **The release condition, stated so nobody has to rediscover it:** when
- * `AccountMenu` is mounted somewhere a phone can reach without the disclosure,
- * the fifth slot becomes `library` and this comment shrinks to nothing. The
- * guard fails the moment that census changes, in either direction — a
- * destination losing its path, or the account gaining one.
+ * `mobile-reachability-guard.test.ts` re-derives every row above from the
+ * components on every run, and still fails in **both** directions: a destination
+ * losing its path, and the account leaving the header while the slot stays.
  */
-export const mobileBarSlots = ["home", "inbox", "capture", "work", "more"] as const;
+export const mobileBarSlots = ["home", "inbox", "capture", "work", "library"] as const;
 
 export type MobileBarSlot = (typeof mobileBarSlots)[number];
 

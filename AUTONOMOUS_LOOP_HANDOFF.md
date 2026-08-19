@@ -9867,3 +9867,198 @@ Four remainders open and unabsorbed: `2P-ATTENTION-008`'s browser half,
 HTTP 403, signup, rollout and every inherited residual stay where §87, §88, §91,
 §93 and §94 left them. **This section deliberately does not name what comes
 after Phase 2P.**
+
+## §96 — Slice 2P.5 ships: Settings becomes eight sections, and splitting one form turned out to need a new writer (2026-08-19)
+
+**Branch `codex/phase-2p-slice-5-settings-notifications`, from `main`
+`0296e2a`.** **ZERO migrations** — 99 local = 99 hosted, parity `202608190099`,
+read live and unchanged. Both Phase 2P allocations remain spent; a third remains
+a stop condition. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+**`2P-SETTINGS-001` … `-008` all built, and `2P-CHAT-004-MOBILE` closed.
+Cumulative 51 of 87.**
+
+### The owner signed the thresholds, and no number moved
+
+ADR-123 Decision 5 sent slice 2P.4 to a checkpoint. The owner signed the
+proposal, and three amendments to ADR-123 record that **before** any code read
+the values as definitive. The numbers were already in
+`automation-policy.ts` and were already correct — 50/0.90 · 80/0.97 · 60/0.95 ·
+60/0.95 · 80/0.97 · 100/0.98, plus 10 reviewed inside 90 days, the newest within
+30, and any undo among the 20 most recent blocking eligibility. **What changed
+is the word `PROPOSAL`.** The surface says the minimums are signed and, in the
+same sentence, that signing one enabled nothing.
+
+The four categories with no producer are four **named remainders** —
+`2P-AUTONOMY-FLOW-PROJECT`, `-ORGANIZATION`, `-MEMORY`, `-RELATION` — and the
+copy says *esperar não muda isso*, because a zero beside the other five reads as
+*not enough yet*, which is a promise nothing in the product can keep for them.
+
+### The layout change that was not a layout change
+
+`SettingsForm` was **one `<form>` over a `.strict()` schema spanning seventeen
+columns owned by four different sections.** Splitting it and leaving
+`updateProfile` alone would have made every section's save blank the other three
+— manufacturing the exact defect `2P-SETTINGS-004` forbids. The section split is
+therefore not the work; the **section-scoped writer** is.
+
+A section declares the columns it owns, and the action assembles a *complete*
+payload from two sources — the form for the owned fields, the **stored row** for
+every other — then parses the whole thing with the schema unchanged. Hidden
+inputs were rejected outright: echoing the other sections' values through the
+page would let a tab left open overwrite a newer save with what it rendered, a
+lost update introduced to avoid a database read the action already performs.
+
+`resolveSettingsFormValues` is extracted so `loadSettingsFormValues` and
+`updateProfile` answer *"what is stored"* identically, including for an account
+with no `agent_preferences` row. The four groups are asserted to **partition**
+`profileSchema.shape`, with two-sided non-vacuity controls. And the action
+`delete`s an owned key rather than defaulting it — an unticked checkbox submits
+nothing, so absence IS the value, and leaving the stored `"on"` in place would
+have made `importantReminderOverride` impossible to turn off.
+
+### Eight canonical URLs, and the redirect that would have trapped the back button
+
+`/app/settings` renders Geral; the other seven sit behind one `[section]`
+dynamic segment. A redirect from the parent to `/settings/general` would make
+`history.back()` land on the parent and be sent forward again — the reader could
+never leave. One segment rather than seven folders is also what lets **two**
+route patterns invalidate every section in both locales, instead of sixteen
+literal paths kept in step with a list living elsewhere.
+
+`settings` became `nested: true`, or `classifyNavigationPath` returns `null` for
+`/app/settings/appearance` and the rail stops marking Ajustes current while the
+reader is standing in it.
+
+**The heading demotion was deliberately not done.** The layout owns the one
+`<h1>` and every component keeps its `<h2>`: outline h1 → h2 → h3, the rule
+`page-outline.test.ts` already enforces. A per-section `<h2>` would have forced
+thirteen components to `<h3>` and every level-selecting spec with them, to
+express what `aria-current="page"` and the panel's accessible name already say.
+
+### Both automation actions stopped throwing, and 2P.4's comment predicted it
+
+Slice 2P.4 made them throw and was right about why — a *swallowed* error would
+put the stored value back in an uncontrolled select with no explanation. That
+comment named its own successor. A throw replaces the page with the error
+boundary and destroys the section, the history, the undo control and the
+message; `2P-SETTINGS-007` wants the message. They return a typed state on the
+category's own row now, `55P03` gets its own sentence because it means *the
+category moved*, and neither revalidates on failure so the input survives.
+
+**Both controls also dropped `window.location.reload()`** for `useActionState`
+plus `router.refresh()` **on success only**, and the automation lane's
+save-and-undo test passes on desktop and on mobile — so the reload 2P.4 needed is
+no longer needed, and a failure message now survives because nothing navigates.
+
+### `2P-CHAT-004-MOBILE`: the census named two blockers and neither was waived
+
+The bar is `Hoje · Registros · [Capturar] · Trabalho · Brain`. `AccountMenu`
+gained a third `variant` in the top bar — still one component, still exactly two
+mounts, the overflow one having **moved** rather than multiplied. And Perguntas
+got an unconditional link in **Registros' header**, which is the fix the census
+itself named and declined to build there: Perguntas is *a view of Registros*, and
+a permanent control on the cockpit to satisfy a census would be arranging the
+product around its own bookkeeping. **Hoje is untouched**, and the guard still
+asserts its link is gated.
+
+### Two gaps the move revealed, and a guard that fell into its own trap
+
+**The capability registry had never governed the five notification controls.**
+They shipped in 2M.4b and were outside the guard's scope until the move brought
+them into the preferences centre. `notification_delivery` governs them now,
+`operational` because `begin_push_delivery` reads every one before sending.
+
+**The control taxonomy could not see a handler destructured from props** — this
+repository's dominant injection pattern — and accused `universal-state.tsx` of a
+defect in correct code. That file's own docstring already records two earlier
+occasions of a too-narrow pattern accusing the product; this is the third. The
+collector gained a fifth shape with a two-sided control.
+
+**And `page-outline.test.ts`'s first cut forbade the WORD `NotificationSettings`,
+failing on the page's own docstring explaining that the component had moved.**
+Third time this repository has written that down. It strips comments and forbids
+the *act* now — the mount and the import — with a control proving the stripper
+removes prose and keeps code.
+
+**A non-vacuity control also caught my own fixture.** `actions.test.ts`'s check
+that every field submits a value different from the stored one failed on
+`reviewModel`, where I had picked the same model on both sides — that field's
+isolation check could never have discriminated.
+
+### The authenticated browser, and one red lane that is not this slice's
+
+Against a **rebuilt and restarted** `next start`: **10/10 desktop and 10/10
+mobile** on the new lane. Sections entered directly by URL; two steps back reach
+Geral and stop; focus lands on the panel on a change and not on arrival; a save
+in Assistente survives while Planejamento's leaves it alone; a failed save keeps
+80 typed characters and names *Assistente*; no `sk-`, no reveal control, an empty
+password field; Notificações holds history, none of the moved controls, and one
+link back.
+
+**Slice 2P.4's lane is the strongest single piece of evidence here.** Its URL
+moved and **not one assertion changed** — 12/12 across both projects. ADR-123
+Decision 7 required this reorganization to happen *"without changing its
+semantics"*, and a retarget that had also needed its expectations rewritten
+would have been the evidence it did not.
+
+**`2O-PREF-013/-014/-015` stays red, and it is pre-existing.** The appearance
+radio after a reload carries the `checked` attribute while its DOM property
+reads `unchecked` — a hydration mismatch. **Reproduced on a git worktree at
+`0296e2a`, with its own build and its own server**: identical assertion,
+identical symptom. Recorded as `2P-APPEARANCE-HYDRATION`, not absorbed and not
+fixed — changing when that control resolves its choice is a behaviour change to
+a control this slice only relocated. `online-mobile-navigation.spec.ts` was also
+already red on `main` (it named "Início" and "Conversar" where the product
+renders "Hoje" and "Brain") and is repaired here only because the lane is
+otherwise unrunnable.
+
+### `revalidatePath`: five repaired, seventy recorded
+
+The census is **generated**: **75 call sites**, of which **one** used the
+route-pattern form. §95 inherited *"about twelve"*, which is what a transcribed
+list becomes. Five are repaired — all on Settings and Notificações — and **70
+across 17 modules are recorded with file and line as separate debt**. The `/app`
+and `/app/inbox` calls sitting beside the repaired ones are left alone
+deliberately: a silent sweep of seventy across surfaces this slice cannot prove
+is the wide, quiet change the owner forbade.
+
+### Zero residue, with a control
+
+Probe users **0**, against **2** real users, **3** entries, **344** audit rows,
+**16** undo operations, **0** policy rows and **0** calibration observations —
+every audit row resolving to a live owner, no orphans. `audit_logs` is 344 where
+§95 left 342; the two extra are `interpretation_confirmed` +
+`entry_lifecycle_rederived` at `12:49:37Z` on an owner account that still exists.
+**The owner using the product, not this slice.**
+
+### What is deliberately NOT claimed
+
+- **Nothing on real hardware.** Pixel 7 emulation; `2P-MOBILE-005`'s NOT
+  EXECUTED rule and ADR-122 Decision 6 are untouched.
+- **No screen-reader run.** Roles, names, `aria-current` and focus are asserted
+  in a real browser; nobody listened to VoiceOver.
+- **No live two-session race** on the section-scoped writer.
+- **Unsaved typing does not survive a deliberate section change.** Sections are
+  separate documents; what `-004` forbids is a *save* resetting another
+  section's values, and that is proved.
+- **`RG-DEP-3` not re-run** — this slice deploys nothing.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices**, and the work is on a branch rather
+than merged: the PR is open and awaiting CI on its exact head. Nothing is
+half-written; `main` is untouched.
+
+**Next action: merge on green at the exact head, confirm green again on the
+merge SHA with the step list read at both points, then slice 2P.6** —
+contextual creation and relations — re-audited against the `main` this slice
+produces before any edit. **2P.6 needs no migration**, and a third Phase 2P
+migration remains a stop condition.
+
+**Six remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half,
+`2P-CHAT-007-JOURNEY` (2P.8), `RG-DEP-3`, the four missing review flows,
+`2P-APPEARANCE-HYDRATION`, and the 70 `revalidatePath` call sites. Push HTTP
+403, signup, rollout and every inherited residual stay where §87, §88, §91, §93,
+§94 and §95 left them. **This section deliberately does not name what comes
+after Phase 2P.**

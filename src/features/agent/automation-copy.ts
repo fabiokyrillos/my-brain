@@ -36,6 +36,41 @@ export type AutomationCopy = Readonly<{
   undo: string;
   /** How a change reads in the history: from one state to another. */
   changedFrom: string;
+
+  /* ---- Slice 2P.5 -------------------------------------------------------- */
+
+  /**
+   * `2P-SETTINGS-007`. Both actions used to `throw`, which replaced the whole
+   * page with the error boundary; they now return a state and the row renders
+   * it. The sentences are specific because the two failures call for different
+   * responses from the owner.
+   */
+  saveFailed: string;
+  saveSucceeded: string;
+  undoFailed: string;
+  /** `55P03` — the category moved since the change was recorded. */
+  undoStale: string;
+  undoSucceeded: string;
+
+  /**
+   * The signed contract, said once above the list.
+   *
+   * Slice 2P.4 shipped these numbers calling them a proposal. The owner signed
+   * them, so the surface stops hedging — and says in the same breath that
+   * signing a threshold enabled nothing.
+   */
+  thresholdsSigned: string;
+
+  /** Freshness, per category, in the owner's terms rather than the schema's. */
+  freshnessLabel: string;
+  freshnessRequirement: (recent: number, windowDays: number, newestDays: number) => string;
+  freshnessRecent: (recent: number) => string;
+  freshnessNewest: (isoDate: string) => string;
+  freshnessNone: string;
+  /** The undo block, stated as the separate blocking rule it is. */
+  undoBlockLabel: string;
+  undoBlockActive: (window: number) => string;
+  undoBlockClear: string;
 }>;
 
 const copy: Record<Locale, AutomationCopy> = {
@@ -82,12 +117,38 @@ const copy: Record<Locale, AutomationCopy> = {
     undone: "desfeitos",
     precision: "acerto",
     required: "necessário",
-    noProducer: "Ainda não existe um fluxo de revisão para esta categoria, então não há como reunir evidência.",
+    /*
+      The sentence has to say that WAITING CHANGES NOTHING here, not just that
+      the count is zero. A zero beside the other five reads as "not enough yet",
+      which is a promise that time will fix it — and for these four it will not,
+      because nothing produces evidence at all. ADR-123's second 2026-08-19
+      amendment records the four as named remainders for exactly this reason.
+    */
+    noProducer:
+      "Ainda não existe um fluxo de revisão para esta categoria, então nada é acumulado — esperar não muda isso. Fica registrado como pendência do produto.",
     noEvidence: "Nenhum exemplo revisado ainda.",
     shortfall: (missing) => `Faltam ${missing} exemplos revisados.`,
     historyLabel: "Cada mudança de política fica registrada e pode ser desfeita.",
     undo: "Desfazer",
     changedFrom: "de",
+    saveFailed: "Não foi possível salvar esta política. Nada mudou — tente novamente.",
+    saveSucceeded: "Política salva. Você pode desfazer abaixo.",
+    undoFailed: "Não foi possível desfazer. Nada mudou.",
+    undoStale:
+      "A política desta categoria mudou depois desta alteração, então desfazer foi recusado para não sobrescrever a decisão mais recente.",
+    undoSucceeded: "Política restaurada.",
+    thresholdsSigned:
+      "Os mínimos abaixo estão assinados por você. Assinar um mínimo não ativa nada: a categoria só age sozinha quando você a arma e a medição realmente o alcança.",
+    freshnessLabel: "Atualidade",
+    freshnessRequirement: (recent, windowDays, newestDays) =>
+      `Exige ${recent} exemplos revisados nos últimos ${windowDays} dias, com o mais recente há no máximo ${newestDays} dias.`,
+    freshnessRecent: (recent) => `${recent} nos últimos 90 dias`,
+    freshnessNewest: (isoDate) => `Mais recente: ${isoDate}`,
+    freshnessNone: "Sem exemplos recentes.",
+    undoBlockLabel: "Bloqueio por desfazer",
+    undoBlockActive: (window) =>
+      `Você desfez algo nas ${window} observações mais recentes, então esta categoria está suspensa até que saiam da janela.`,
+    undoBlockClear: "Nenhum desfazer recente.",
   },
   en: {
     title: "Automation by category",
@@ -132,12 +193,31 @@ const copy: Record<Locale, AutomationCopy> = {
     undone: "undone",
     precision: "accuracy",
     required: "required",
-    noProducer: "No review flow exists for this category yet, so there is no way to gather evidence.",
+    noProducer:
+      "No review flow exists for this category yet, so nothing accumulates — waiting will not change that. It is recorded as an open gap in the product.",
     noEvidence: "No reviewed examples yet.",
     shortfall: (missing) => `${missing} more reviewed examples needed.`,
     historyLabel: "Every policy change is recorded and can be undone.",
     undo: "Undo",
     changedFrom: "from",
+    saveFailed: "Could not save this policy. Nothing changed — try again.",
+    saveSucceeded: "Policy saved. You can undo it below.",
+    undoFailed: "Could not undo. Nothing changed.",
+    undoStale:
+      "This category's policy moved after that change, so the undo was refused rather than overwriting the newer decision.",
+    undoSucceeded: "Policy restored.",
+    thresholdsSigned:
+      "The minimums below are signed by you. Signing a minimum enables nothing: a category acts on its own only once you arm it and the measurement genuinely reaches it.",
+    freshnessLabel: "Freshness",
+    freshnessRequirement: (recent, windowDays, newestDays) =>
+      `Requires ${recent} reviewed examples in the last ${windowDays} days, the newest no more than ${newestDays} days old.`,
+    freshnessRecent: (recent) => `${recent} in the last 90 days`,
+    freshnessNewest: (isoDate) => `Newest: ${isoDate}`,
+    freshnessNone: "No recent examples.",
+    undoBlockLabel: "Undo block",
+    undoBlockActive: (window) =>
+      `You undid something within the ${window} most recent observations, so this category is suspended until they leave the window.`,
+    undoBlockClear: "No recent undo.",
   },
 };
 

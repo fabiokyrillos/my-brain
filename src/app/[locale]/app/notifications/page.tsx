@@ -3,9 +3,8 @@ import { notFound } from "next/navigation";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { markNotification } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
-import { readPushConsent, readVapidPublicKey } from "@/features/notifications/consent-reader";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
-import { NotificationSettings } from "@/features/notifications/notification-settings";
+import { settingsSectionHref } from "@/features/settings/sections";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
@@ -16,19 +15,48 @@ import { instantFormatter } from "@/lib/time/instant-format";
 import { getAgentName } from "@/features/profile/agent-identity";
 
 /**
- * `2M-TIME-005` and `2M-TIME-006`, and the defect they found here.
+ * `2P-SETTINGS-008` — the page is the history, and only the history.
  *
- * This page used to format `created_at` with
- * `new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short" })`
- * and **no `timeZone`**, so it rendered in the host's zone — UTC on the server —
- * while the calendar, the planner, the reminders page and the task detail had
- * all been passing the owner's zone since slice 2M.1. A user who changed their
- * timezone in settings saw four surfaces move and this one stay put, and the same
- * instant read differently depending on which page it was on.
+ * ## What left, and what deliberately did not
  *
- * It now reads `profiles.timezone` like its neighbours and formats through the
- * one contract, so a change to the preference reaches every dated surface and
- * two surfaces cannot disagree about an instant.
+ * `NotificationSettings` — consent, the five states, the three facts, the
+ * bounds, the type/frequency/quiet-hours/cap controls and the whole of
+ * `PushControls` — now lives in Settings → Notificações. Nothing about those
+ * preferences changed: the same component takes the same props from the same
+ * reader, and `begin_push_delivery` still reads every one of them before
+ * sending. **A control that moves must not change meaning**, which is the half
+ * of this requirement that is easy to break and hard to notice.
+ *
+ * What stayed is everything that makes this a route rather than a tab: the URL,
+ * the `?page` deep link, the pagination, the owner-scoped read and
+ * `AccountDataStrip`'s way back. No redirect was added and no route ended.
+ *
+ * ## What the page gained
+ *
+ * Read and unread were a CSS class and nothing else — a tint, invisible to a
+ * screen reader and to anyone who cannot tell the two apart. Each row now
+ * carries the word, the list is preceded by a live count, and each row's
+ * controls are named after the row they belong to rather than repeating "Lida"
+ * twenty times with nothing to distinguish them.
+ *
+ * Loading and error states are **inherited** rather than added:
+ * `src/app/[locale]/app/loading.tsx` and `error.tsx` already wrap every
+ * authenticated route, this one included. A second pair here would be a second
+ * vocabulary for the same two states.
+ *
+ * ## The one link back
+ *
+ * `2P-SETTINGS-008` allows *at most one discreet contextual entry* to the
+ * preferences. There is exactly one, in the header, and it resolves through
+ * `settingsSectionHref` so it cannot drift from where the section actually
+ * lives.
+ *
+ * ## `2M-TIME-005` and `2M-TIME-006`, and the defect they found here
+ *
+ * This page used to format `created_at` with no `timeZone`, so it rendered in
+ * the host's zone — UTC on the server — while four other surfaces had been
+ * passing the owner's zone since slice 2M.1. It now reads `profiles.timezone`
+ * like its neighbours and formats through the one contract.
  */
 export default async function NotificationsPage({ params, searchParams }: { params: Promise<{ locale: string }>; searchParams: Promise<{ page?: string | string[] }> }) {
   const { locale: candidate } = await params;
@@ -44,9 +72,8 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const agentName = await getAgentName();
   const result = await supabase.from("notifications").select("id,type,title,body,action_url,priority,status,created_at").neq("status", "dismissed").order("created_at", { ascending: false }).range(from, to);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load notifications") ?? []);
-
-  const consent = await readPushConsent(supabase, user.id);
-  const notifyCopy = getNotificationSettingsCopy(locale);
+  const copy = getNotificationSettingsCopy(locale);
+  const unread = items.filter((item) => item.status === "unread").length;
 
   return <div className="content-page">{/*
     `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
@@ -64,31 +91,40 @@ export default async function NotificationsPage({ params, searchParams }: { para
     It used to sit below `NotificationSettings`, whose own `<h2>Notificações no
     aparelho</h2>` therefore opened the document at level two — and then the
     `<h1>Notificações</h1>` arrived in the middle of the page, so the word
-    appeared twice and the second one read as the start of a different page. The
-    heading order is now h1 → h2, which is both what a screen reader announces
-    as an outline and what a sighted reader takes as "one page, two sections".
-  */}<header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div></header>{/*
-    `2M-NOTIFY-003`/`-008`. The governance section sits above the list it makes
-    a promise about, so the promise and the thing it is a promise about are read
-    together.
-
-    Slice 2M.4b replaces slice 2M.4a's hardcoded `NO_CONSENT.state` with the
-    real owner-scoped read. The resolution is still fail-closed: a missing or
-    unreadable record resolves to `unsupported`, never to a default-on.
-  */}<NotificationSettings
-    locale={locale}
-    state={consent.state}
-    pushPublicKey={readVapidPublicKey()}
-    enabledTypes={consent.enabledTypes}
-    frequency={consent.frequency}
-    quietStart={consent.quietStart ?? "22:30"}
-    quietEnd={consent.quietEnd ?? "07:00"}
-    dailyCap={consent.dailyCap}
-  />{/*
+    appeared twice and the second one read as the start of a different page.
+    Slice 2P.5 moved that component to Settings entirely, so the page now opens
+    at level one with nothing above it to compete.
+  */}<header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div>{/*
+    The one discreet contextual entry `2P-SETTINGS-008` allows, and it is
+    deliberately a link rather than a panel: the controls it points at are no
+    longer on this page, and a second copy of any of them here would be the
+    duplication the requirement exists to remove.
+  */}<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link></header>{/*
     The feed, as a named section of this page rather than as an unlabelled tail
     of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
     where notification CONTENT lives, behind the login — and the section keeps
     its pagination, its `?page` deep link and its empty state exactly as they
-    were. Only the name above it is new.
-  */}<section aria-labelledby="notification-history-heading" className="notification-history"><h2 id="notification-history-heading">{notifyCopy.historyHeading}</h2>{items.length ? <div className="list-stack">{items.map((item) => <article className={`list-row notification-row ${item.status}`} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta"><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link className="row-action" href={item.action_url}>{pt ? "Abrir" : "Open"}</Link>}<form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form></div></article>)}</div> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+    were.
+  */}<section aria-labelledby="notification-history-heading" className="notification-history"><h2 id="notification-history-heading">{copy.historyHeading}</h2>{/*
+    The unread count, announced.
+
+    Before this the only signal was a tint on the row, so a screen-reader user
+    had no way to know an alert was unread and a reader who cannot distinguish
+    the two tints had none either. `role="status"` rather than a bare paragraph
+    because the number changes when a row is marked read, and that change is the
+    confirmation the action gives.
+  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p>{items.length ? <ul className="list-stack">{items.map((item) => <li className={`list-row notification-row ${item.status}`} data-status={item.status} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta">{/*
+    The state as a word, not only as a colour (`2P-SETTINGS-008`). It precedes
+    the timestamp because "unread, two hours ago" is the order a reader wants
+    the two facts in.
+  */}<span className="notification-status-badge" data-status={item.status}>{item.status === "unread" ? copy.unreadBadge : copy.readBadge}</span><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link aria-label={`${copy.openDestination}: ${item.title}`} className="row-action" href={item.action_url}>{copy.openDestination}</Link>}{/*
+    Offered only where it changes something. A row that is already read has
+    nothing to mark, and a control that does nothing is what `R-24` refuses.
+
+    The accessible name carries the alert's own title, because twenty buttons
+    all reading "Marcar como lida" are twenty buttons a screen-reader user
+    cannot tell apart — and voice control needs the visible label to stay the
+    short one, which is why this is `aria-label` on the button rather than a
+    longer word inside it.
+  */}{item.status === "unread" ? <form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button aria-label={`${copy.markRead}: ${item.title}`} className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form> : null}</div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

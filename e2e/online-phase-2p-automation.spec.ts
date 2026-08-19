@@ -6,6 +6,16 @@ import { signInOnline } from "./support/online-session";
  * Slice 2P.4's authenticated acceptance — `2P-AUTONOMY-001`, `-003`, `-009`,
  * `-010`.
  *
+ * ## Retargeted by slice 2P.5, and the retarget is itself the proof
+ *
+ * The section moved from `/app/settings` to `/app/settings/assistant` when
+ * `2P-SETTINGS-001` gave Settings eight sections. **Every assertion below is
+ * unchanged** — same headings, same six categories, same reasons, same history
+ * and undo, same reflow, same English surface — because ADR-123 Decision 7
+ * required 2P.5 to reorganize this surface *"without changing its semantics"*.
+ * A retarget that had also needed the assertions rewritten would have been the
+ * evidence that the semantics moved.
+ *
  * ## What only a real authenticated browser can answer
  *
  *  1. **The RSC boundary.** `/app/settings` mounts a new Server Component that
@@ -79,7 +89,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
 
   test("2P-AUTONOMY-001/-010: the section renders, and all six categories refuse", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/assistant");
 
     // The RSC assertion: it rendered at all.
     await expect(page.getByRole("heading", { name: "Automação por categoria" })).toBeVisible();
@@ -105,7 +115,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
 
   test("2P-AUTONOMY-003: `no evidence yet` and `no way to gather it` are different answers", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/assistant");
 
     // Four categories have no review flow at all; two have one and no rows.
     await expect(page.getByText(/não existe um fluxo de revisão/i)).toHaveCount(4);
@@ -117,7 +127,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
 
   test("2P-AUTONOMY-009: a policy change persists, is listed, and can be undone", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/assistant");
 
     const memories = page.getByRole("form", { name: "Memórias" });
     await expect(memories.getByLabel("Política")).toHaveValue("suggest_only");
@@ -155,7 +165,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
 
   test("2P-AUTONOMY-001: the surface survives a reload and a back navigation", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/assistant");
     await expect(page.getByRole("heading", { name: "Automação por categoria" })).toBeVisible();
 
     await page.reload();
@@ -170,7 +180,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
   test("2P-MOBILE-005 shape: the section reflows without horizontal page scroll", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.setViewportSize({ width: 375, height: 812 });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/assistant");
 
     await expect(page.getByRole("heading", { name: "Automação por categoria" })).toBeVisible();
 
@@ -189,7 +199,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
 
   test("the English surface renders with no Portuguese leaking through", async ({ page }) => {
     await signInOnline(page, { email, locale: "en" });
-    await page.goto("/en/app/settings");
+    await page.goto("/en/app/settings/assistant");
 
     await expect(page.getByRole("heading", { name: "Automation by category" })).toBeVisible();
     await expect(page.locator(".automation-section").getByText(/No category acts on its own today/)).toBeVisible();

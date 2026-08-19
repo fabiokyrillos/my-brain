@@ -73,10 +73,10 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
 
   test("2O-PREF-001/-002: Ajustes reaches every preference, and no route ended", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/account");
 
     // The page renders at all, which is the RSC assertion.
-    await expect(page.getByRole("heading", { name: "Configurações com efeito real" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeVisible();
 
     const accountSection = page.locator(".data-ai-section", { hasText: "Conta e dados" });
     await expect(accountSection).toBeVisible();
@@ -84,9 +84,15 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
       await expect(accountSection.getByRole("link", { name: door })).toBeVisible();
     }
 
-    // Dados e IA is still there beside it — this slice added a section rather
-    // than replacing one.
+    /*
+      Dados e IA is still there — in Privacidade e dados since slice 2P.5, which
+      is a section away rather than a scroll away. The claim is unchanged: this
+      slice added a reaching section rather than replacing one, and BOTH still
+      exist. A single-page assertion would now be asserting the old layout.
+    */
+    await page.goto("/pt-BR/app/settings/privacy");
     await expect(page.locator(".data-ai-section", { hasText: "Dados e IA" })).toBeVisible();
+    await page.goto("/pt-BR/app/settings/account");
 
     /*
      * `2O-PREF-002`'s hardest half: the reached route **keeps its own URL and
@@ -103,6 +109,7 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings$/);
 
     // The deletion route, still outside `app/`, still asking properly.
+    await page.goto("/pt-BR/app/settings/account");
     await page.locator(".data-ai-section", { hasText: "Conta e dados" })
       .getByRole("link", { name: "Apagar a conta" }).click();
     await expect(page).toHaveURL(/\/pt-BR\/account\/delete$/);
@@ -111,11 +118,17 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
 
   test("2O-PREF-004/-005/-009/-010: the review controls save, and say what changed", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    /*
+      Two sections since slice 2P.5: the advanced routing disclosure is IA and
+      the review controls are Planejamento. Both assertions are unchanged.
+    */
+    await page.goto("/pt-BR/app/settings/ai");
 
     // `2O-PREF-009`: advanced is disclosed, and it is not the default view.
     const advanced = page.locator("details.settings-advanced");
     await expect(advanced).not.toHaveAttribute("open", "");
+
+    await page.goto("/pt-BR/app/settings/planning");
 
     // `2O-PREF-005`: the promise `/app/reviews` makes, repeated where a reader
     // could otherwise conclude the opposite.
@@ -164,7 +177,7 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
      */
     await page.emulateMedia({ colorScheme: "dark" });
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/appearance");
 
     // Follow-the-machine is where a reader who has chosen nothing starts.
     await expect(page.getByRole("radio", { name: "Seguir o aparelho" })).toBeChecked();
@@ -213,14 +226,14 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     const first = await browser.newContext();
     const firstPage = await first.newPage();
     await signInOnline(firstPage, { email, locale: "pt-BR" });
-    await firstPage.goto("/pt-BR/app/settings");
+    await firstPage.goto("/pt-BR/app/settings/appearance");
     await firstPage.getByRole("radio", { name: "Escuro" }).check();
     await expect(firstPage.locator("html")).toHaveAttribute("data-theme", "dark");
 
     const second = await browser.newContext();
     const secondPage = await second.newPage();
     await signInOnline(secondPage, { email, locale: "pt-BR" });
-    await secondPage.goto("/pt-BR/app/settings");
+    await secondPage.goto("/pt-BR/app/settings/appearance");
     await expect(secondPage.locator("html")).not.toHaveAttribute("data-theme", /.*/);
     await expect(secondPage.getByRole("radio", { name: "Seguir o aparelho" })).toBeChecked();
     // And the surface says so, rather than leaving it to be discovered.
@@ -234,14 +247,23 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
 
   test("2O-PREF-013: the whole centre works in English too", async ({ page }) => {
     await signInOnline(page, { email, locale: "en" });
-    await page.goto("/en/app/settings");
+    /*
+      "The whole centre" is three sections now rather than one page, and walking
+      all three is a stronger version of the same claim: each renders in English
+      on its own route, so a locale that only worked on the surface a reader
+      happened to land on would fail here.
+    */
+    await page.goto("/en/app/settings/appearance");
 
     await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Follow the device" })).toBeChecked();
     await expect(page.getByText(/does not follow your account to other devices/)).toBeVisible();
+
+    await page.goto("/en/app/settings/planning");
     await expect(page.getByLabel("Offer to close the day from")).toBeVisible();
     await expect(page.getByText(/Nothing runs from a configured schedule/)).toBeVisible();
 
+    await page.goto("/en/app/settings/account");
     const accountSection = page.locator(".data-ai-section", { hasText: "Account and data" });
     await expect(accountSection.getByRole("link", { name: "Terms of use" })).toBeVisible();
     await expect(accountSection.getByRole("link", { name: "Delete the account" })).toBeVisible();

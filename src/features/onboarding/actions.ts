@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
+import { SETTINGS_REVALIDATION_PATHS } from "@/features/settings/sections";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale, type Locale } from "@/lib/preferences";
 import {
@@ -37,10 +38,20 @@ function resolveLocale(raw: FormDataEntryValue | null): Locale {
   return typeof raw === "string" && isLocale(raw) ? raw : "pt-BR";
 }
 
-/** Both surfaces the pair affects: the panel's home, and its reversal control. */
+/**
+ * Both surfaces the pair affects: the panel's home, and its reversal control.
+ *
+ * The settings half is the ROUTE PATTERN since slice 2P.5 — the reversal
+ * control moved to `/app/settings` under two dynamic segments, and Next matches
+ * those by pattern plus a type rather than by resolved URL, so the resolved
+ * form invalidated nothing and the restore button did not disappear after being
+ * pressed. `/app` keeps its resolved form: the cockpit is not a surface this
+ * slice opened, and its call site is recorded as debt rather than changed
+ * without proof.
+ */
 function revalidateBoth(locale: Locale): void {
   revalidatePath(`/${locale}/app`);
-  revalidatePath(`/${locale}/app/settings`);
+  for (const path of SETTINGS_REVALIDATION_PATHS) revalidatePath(path, "page");
 }
 
 export async function dismissOnboarding(formData: FormData): Promise<void> {
