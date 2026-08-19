@@ -1,6 +1,14 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+/*
+  The policy form and the undo button call `router.refresh()` after their
+  action — the fix for the defect the authenticated journey found, where the
+  page never re-rendered and the undo control never appeared. The same shape
+  `calendar-outcome.test.tsx` uses.
+*/
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
 import { AutomationSection } from "./automation-section";
 import type { AutomationPolicyChange } from "./automation-data";
 import {
