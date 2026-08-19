@@ -35,6 +35,32 @@ type MemoryCopy = {
   readonly backToList: string;
   readonly detailLink: string;
 
+  /**
+   * `2P-MEMORY-001` … `-004` — the deliberate composer that replaced the
+   * one-line field.
+   *
+   * `composeProvenanceNone` is the sentence that must never become "informed by
+   * you". A memory written here carries `source_entry_id = null`, and the column
+   * is `on delete set null`, so the list renders it `unsourced`. A composer
+   * claiming owner-authorship would contradict the surface the memory lands on
+   * — and would be inventing an origin the row cannot express.
+   */
+  readonly composeOpen: string;
+  readonly composeTitle: string;
+  readonly composeDescription: string;
+  readonly composeFieldLabel: string;
+  readonly composePlaceholder: string;
+  readonly composeReviewStep: string;
+  readonly composeReviewHeading: string;
+  readonly composeBack: string;
+  readonly composeSubmit: string;
+  readonly composeCancel: string;
+  readonly composeClose: string;
+  readonly composeEmpty: string;
+  readonly composeProvenanceNone: string;
+  readonly composeUndo: string;
+  readonly composeUndoing: string;
+
   /** Lifecycle. */
   readonly states: Readonly<Record<MemoryLifecycleState, string>>;
   readonly archive: string;
@@ -167,6 +193,23 @@ const copy = {
     backToList: "Memórias",
     detailLink: "Abrir memória",
 
+    composeOpen: "Nova memória",
+    composeTitle: "Nova memória",
+    composeDescription:
+      "Uma memória é um fato ou preferência sua que continua valendo com o tempo — por isso ela é consultada em toda conversa. Se for algo que aconteceu num momento só, registre como um registro, não como memória.",
+    composeFieldLabel: "O que deve continuar valendo",
+    composePlaceholder: "Ex.: prefiro reuniões pela manhã e no máximo de 30 minutos.",
+    composeReviewStep: "Revisar",
+    composeReviewHeading: "É isto que vou guardar:",
+    composeBack: "Voltar e editar",
+    composeSubmit: "Guardar memória",
+    composeCancel: "Cancelar",
+    composeClose: "Fechar",
+    composeEmpty: "Escreva a memória antes de revisar.",
+    composeProvenanceNone: "Sem registro de origem: esta memória não veio de uma captura.",
+    composeUndo: "Desfazer",
+    composeUndoing: "Desfazendo…",
+
     states: { scheduled: "Programada", active: "Em vigor", archived: "Arquivada" },
     archive: "Arquivar",
     archiving: "Arquivando…",
@@ -258,6 +301,23 @@ const copy = {
 
     backToList: "Memories",
     detailLink: "Open memory",
+
+    composeOpen: "New memory",
+    composeTitle: "New memory",
+    composeDescription:
+      "A memory is a fact or preference of yours that stays true over time — which is why it is consulted in every conversation. If it happened once and is over, record it as a record, not as a memory.",
+    composeFieldLabel: "What should stay true",
+    composePlaceholder: "e.g. I prefer meetings in the morning and no longer than 30 minutes.",
+    composeReviewStep: "Review",
+    composeReviewHeading: "This is what I will keep:",
+    composeBack: "Back and edit",
+    composeSubmit: "Keep this memory",
+    composeCancel: "Cancel",
+    composeClose: "Close",
+    composeEmpty: "Write the memory before reviewing.",
+    composeProvenanceNone: "No source record: this memory did not come from a capture.",
+    composeUndo: "Undo",
+    composeUndoing: "Undoing…",
 
     states: { scheduled: "Scheduled", active: "In force", archived: "Archived" },
     archive: "Archive",

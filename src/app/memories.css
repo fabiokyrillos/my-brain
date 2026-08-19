@@ -26,6 +26,74 @@
   color: var(--text-secondary);
 }
 
+/*
+  The deliberate composer (2P-MEMORY-001 … -004).
+
+  It replaced a one-line field that sat in the header's action slot, so the
+  wrapper keeps that position and the outcome stacks under the control rather
+  than pushing the header's own text around.
+*/
+.memory-compose {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.memory-compose-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* The repository's touch-target minimum: this is the primary way to create a
+     memory and it is reached with a thumb as often as with a pointer. */
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.memory-compose-open:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/*
+  The result, and the undo attached to it.
+
+  It survives the dialog closing on purpose: the undo is the only way back, and
+  a confirmation that vanishes with the surface that produced it takes the undo
+  with it.
+*/
+.memory-compose-outcome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.memory-compose-outcome > p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+.memory-compose-outcome button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 /* The rows are links now (UX-20): they were `<article>` elements styled as
    interactive with nothing to activate. `color: inherit` keeps them reading as
    rows rather than as a stack of blue links. */

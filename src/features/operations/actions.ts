@@ -9,7 +9,6 @@ import { buildTaskCommandAppliedProperties } from "@/features/task-commands/anal
 import { TaskCommandApplyError } from "@/features/task-commands/apply";
 import { TaskCandidateQueryError } from "@/features/task-commands/candidates";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
-import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import {
   createTaskCommand,
   issueTaskCommandCreationConfirmation,
@@ -21,7 +20,6 @@ import { WorkCommandInputError, applyWorkCommand } from "@/features/task-command
 import { requireUser } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
 import { locales, resolveLocale, type Locale } from "@/lib/preferences";
-import { requireSupabaseData } from "@/lib/supabase/result";
 import { applyDetailCommand } from "@/features/task-commands/detail-command";
 import { buildDetailPatch, detailControlFor } from "@/features/task-commands/detail-controls";
 import { isBulkEligibleAction } from "./bulk-eligibility";
@@ -35,7 +33,14 @@ import { getWorkActionsCopy } from "./work-actions-copy";
 import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const createSchema = z.object({
-  kind: z.enum(["task", "project", "person", "memory"]),
+  /*
+   * Three kinds, not four. `memory` left this action in slice 2P.6 along with
+   * its branch: the memories page now writes through `createProposedMemory`,
+   * which is idempotent, audited and returns the created id its undo needs.
+   * Narrowing the enum is what makes a forged `kind=memory` a refusal instead of
+   * a second, unaudited route into `public.memories`.
+   */
+  kind: z.enum(["task", "project", "person"]),
   locale: z.enum(locales),
   name: z.string().trim().min(1).max(AI_INPUT_BOUNDS.entityName),
 });
@@ -139,7 +144,10 @@ export async function createRecord(
 
   const parsed = createSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { status: "error", message: copy.invalidName };
-  if (parsed.data.kind !== "task" && parsed.data.kind !== "memory" && parsed.data.name.length > 160) {
+  // A task title may run to 240; a project or person name is bounded at 160 by
+  // its own column. `memory` used to be the third exemption and is no longer a
+  // kind this action accepts at all.
+  if (parsed.data.kind !== "task" && parsed.data.name.length > 160) {
     return { status: "error", message: copy.nameTooLong };
   }
 
@@ -163,68 +171,34 @@ export async function createRecord(
     }
   } else if (parsed.data.kind === "project") {
     ({ error } = await supabase.from("projects").insert({ user_id: user.id, name: parsed.data.name }));
-  } else if (parsed.data.kind === "person") {
-    ({ error } = await supabase.from("people").insert({ user_id: user.id, name: parsed.data.name }));
   } else {
-    const { getAIProvider } = await import("@/lib/ai");
-    const { recordAIUsage } = await import("@/lib/ai/usage");
-    const { openAiGate } = await import("@/lib/byok/gate");
-    let embedding: number[] | null = null;
-    let embeddingModel: string | null = null;
-
-    // BYOK gate, **outside** the try. This embedding is already best-effort —
-    // the record is created either way — so a missing credential degrades like a
-    // provider outage: no embedding, no error, and no provider call.
-    //
-    // Hoisted rather than thrown from inside the block, because "the user has
-    // not configured a key" is not an embedding failure and must not be logged
-    // as one. A gated user is a normal user; only a real failure reaches the
-    // catch below.
-    const gate = await openAiGate(supabase, user.id);
-
-    // 2H-RATE-001, and the degradation is the point. This embedding is
-    // best-effort: the memory is created either way. So a rate refusal must
-    // behave exactly like the gate above and like a provider outage — skip the
-    // provider call, keep the record — rather than destroying a non-AI operation
-    // because its optional AI half was over pace. Refusing the whole `createRecord`
-    // here would let an hourly ceiling stop someone writing anything down.
-    const embeddingAdmission = gate.ok
-      ? await admitRateLimitedOperation({
-        client: supabase,
-        bucket: "ai",
-        locale: parsed.data.locale,
-        operation: "embed_text",
-      })
-      : null;
-
-    if (gate.ok && embeddingAdmission?.ok) {
-      try {
-        const preferencesResult = await supabase.from("agent_preferences").select("embedding_model").eq("user_id", user.id).maybeSingle();
-        const preferences = requireSupabaseData(preferencesResult, "load embedding preference");
-        const result = await getAIProvider({ credential: gate.credential.secret, embeddingModel: preferences?.embedding_model ?? "text-embedding-3-small" }).embedText(parsed.data.name);
-        embedding = result.embedding;
-        embeddingModel = result.model;
-        await recordAIUsage(supabase, { operation: "semantic_search", model: result.model, userId: user.id, usage: result, sourceType: "memory" });
-      } catch (embeddingError) {
-        console.error("Memory embedding failed", embeddingError instanceof Error ? embeddingError.message : "unknown error");
-      }
-    }
-    ({ error } = await supabase.from("memories").insert({
-      user_id: user.id,
-      content: parsed.data.name,
-      kind: "fact",
-      confidence: 1,
-      embedding,
-      embedding_model: embeddingModel,
-    }));
+    ({ error } = await supabase.from("people").insert({ user_id: user.id, name: parsed.data.name }));
   }
+  /*
+   * `2P-MEMORY-001` … `-004`. The memory branch that stood here is **deleted**,
+   * not disabled.
+   *
+   * It was a plain INSERT with a best-effort embedding, reached only from the
+   * one-line field in the memories header — the field slice 2P.6 replaced with a
+   * composer. That composer submits to `createProposedMemory`, which performs
+   * the identical write with the identical BYOK gate, rate-limit degradation and
+   * embedding contract (`embedMemory`), and adds three things this branch could
+   * not: idempotency against a double submit, an audit row, and the created id
+   * an undo control needs.
+   *
+   * Leaving this branch behind would have left two ways to write a memory, one
+   * of them unreachable — the consumer-less contract this repository removes on
+   * sight, and two places for the same rules to drift. `createSchema` no longer
+   * admits `memory`, so a forged `kind` is a validation refusal rather than a
+   * silent second path.
+   */
 
   if (error) {
     const duplicate = error.message.includes("duplicate") || error.message.includes("unique");
     return { status: "error", message: duplicate ? copy.duplicateName : copy.createFailed };
   }
 
-  const route = parsed.data.kind === "task" ? "tasks" : parsed.data.kind === "project" ? "projects" : parsed.data.kind === "person" ? "people" : "memories";
+  const route = parsed.data.kind === "task" ? "tasks" : parsed.data.kind === "project" ? "projects" : "people";
   revalidatePath(`/${parsed.data.locale}/app/${route}`);
   revalidatePath(`/${parsed.data.locale}/app`);
   if (parsed.data.kind === "task") {

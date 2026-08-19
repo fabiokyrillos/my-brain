@@ -7,8 +7,8 @@ import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { asMemoryKind } from "@/features/memories/read";
-import { createRecord } from "@/features/operations/actions";
-import { InlineCreateForm } from "@/features/operations/inline-create-form";
+import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
+import { MemoryComposer } from "@/features/memories/memory-composer";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import {
   deriveClaimProvenance,
@@ -109,7 +109,22 @@ export default async function MemoriesPage({
           <h1>{copy.title}</h1>
           <p>{copy.intro}</p>
         </div>
-        <InlineCreateForm action={createRecord} kind="memory" locale={locale} />
+        {/*
+          `2P-MEMORY-001` … `-004`. The one-line field this header carried is
+          gone. It was an `<input maxLength={4000}>` showing about sixty
+          characters, with an `sr-only` label, no explanation of what a memory is
+          for, and no step between typing and storing.
+
+          The composer submits to `createProposedMemory` — the action the
+          assistant composer already uses, which is idempotent, audits, and
+          returns the created id the undo needs. `createRecord`'s memory branch
+          is deleted in the same change rather than left dormant.
+        */}
+        <MemoryComposer
+          createAction={createProposedMemory}
+          locale={locale}
+          undoAction={undoProposedMemory}
+        />
       </header>
 
       <BrainLensTabs active="memories" locale={locale} />

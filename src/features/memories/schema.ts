@@ -94,10 +94,32 @@ export const memoryLifecycleSchema = z.object({
  * originating entry, and `memories.source_entry_id` references `entries`. Naming
  * a provenance that does not exist would be worse than admitting there is none.
  */
+/**
+ * Where a confirmed memory was written, for the **audit reason and nothing
+ * else** (`2P-MEMORY-003`).
+ *
+ * Slice 2P.6 gave `createProposedMemory` a second caller: the memories page's
+ * own composer, where the owner types the sentence themselves rather than
+ * confirming one the assistant proposed. The write is identical and must stay
+ * identical — a second creation path would be a second place for the
+ * idempotency rule, the embedding contract and the ownership predicate to
+ * disagree. What is *not* identical is the audit row's sentence, and leaving it
+ * saying the assistant proposed the memory would have made the trail untrue for
+ * every memory written from that page.
+ *
+ * So this reaches exactly one expression, the same way `origin` does in
+ * `associations.ts`: **it selects no table, no predicate, no payload and no
+ * revalidation.** Optional because the composer that predates it sends no such
+ * field and must keep working unchanged.
+ */
+export const MEMORY_ORIGINS = ["composer", "memories"] as const;
+export type MemoryOrigin = (typeof MEMORY_ORIGINS)[number];
+
 export const memoryProposalSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),
   content: memoryContent,
   kind: z.enum(MEMORY_KINDS),
+  origin: z.enum(MEMORY_ORIGINS).optional(),
 }).strict();
 
 export type MemoryUpdateInput = z.infer<typeof memoryUpdateSchema>;
