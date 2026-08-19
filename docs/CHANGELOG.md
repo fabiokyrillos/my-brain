@@ -2,6 +2,37 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Slice 2P.6: the company is edited where it is shown, a memory is written deliberately, and Relations opens on the drawing
+
+**`2P-PERSON-001` … `-004`, `2P-MEMORY-001` … `-004`, `2P-RELATION-001` … `-004` — twelve built. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged. Cumulative 63 of 87.**
+
+### The owner corrected a requirement rather than funding a column
+
+`2P-PERSON-001` named a `people.role` column that does not exist. Adding one is a third Phase 2P migration and therefore a stop condition, so the owner refused it and corrected the wording by amendment: the prior text is preserved in ADR-121 and in the PRD, the count stays 87, and nothing was renumbered. A role belongs to the relation that carries it - `person_projects` for a project, `task_people` for a task - each edited in its own context, never duplicated onto `people`, and no global title is synthesized from them. `phase-2p-person-role-guard.test.ts` makes that executable and forbids the act rather than the word, so the prose explaining the refusal does not fail it.
+
+### Changed
+
+- **The company moved out of the disclosure.** Editing it used to mean opening a `<details>`, finding a selector inside a nine-field form, and opening a second disclosure to create one. It is now one `ConfirmDialog` in the section that displays the value, with select and create as two panes of the same dialog. `linkPersonOrganization` writes only `organization_id` and `updated_at`, because a payload carrying the stored name and notes would revert a note edited in between.
+- **`task_people.role` gained its first application writer.** Its primary key is `(task_id, person_id, role)` and its check constraint admits four values, so the request names which row it changes, a collision reports that the person already holds the role, an unchanged role writes nothing, and the task's governed title stays out of the audit trail. The role editor was extracted rather than written twice.
+- **Memory creation is a dialog with a review step and an undo.** It submits to `createProposedMemory`, the action the assistant composer already uses, which is idempotent, audits, and returns the created id an undo needs. The undo archives - never deletes.
+- **Relations opens on the drawing** with a text tab beside it. Both are links carrying `?view=`, so each has its own address and the text resolves with JavaScript off. Focus is a GET form over the same projection; a foreign id, a non-person and nonsense all take the same arm.
+- **A phone gets a bounded readable representation** of the drawn links, capped at 12, with the drawing kept rather than replaced. Its `display: block` sits after the base rule, because a media query above the rule it overrides adds no specificity.
+
+### Removed
+
+- **`createRecord`'s memory branch**, and `memory` from its schema. Two ways to write a memory is a duplicated write path; after this there is one, and a forged kind is a refusal rather than a second unaudited route into `public.memories`.
+
+### Fixed
+
+- **A dialog that closes while its own transition is still applying froze on `Salvando…` permanently.** The row was written, the server logged nothing, and `pending` never came down. It reproduced only with a dialog *and* a `revalidatePath`; the inline role editor revalidating the same route on the same page was unaffected. Both dialogs now derive openness from `pending` rather than closing from an effect - a stored "close me" flag is a second source of truth about whether a round has finished, and two sources of truth about exactly that was the failure.
+- **Three `revalidatePath` call sites** - the ones this slice's own surfaces need. The first draft shipped a hybrid path, the locale pattern with an id spliced in, which matches no route file at all. Moving the call into `after()` was tried and reverted: it removes the refresh as well as the latency, so the surface saved and went on rendering the old value.
+- Two declared censuses that caught real changes: the memories page's writer, and `embedding_model`'s call sites. The ai-config non-vacuity floor became per-route as well as lower, so an ordinary correct deletion stops tripping it.
+
+### Notes
+
+- 2N's DOM-ordering guard was **retargeted, not relaxed**: it asserted the list preceded the drawing in the page source, which `OD-2P-10` makes impossible. The property it stood for is now asserted directly, with two mutation controls.
+- Authenticated journeys: desktop 9 passed + 1 flaky, mobile 9 passed + 1 flaky, all green on retry, against `next start` on a rebuilt artifact. The retry compensates for one measured thing - the first Server Action against a freshly started server - and it is recorded rather than hidden.
+
 ## 2026-08-19 - Slice 2P.5: Settings becomes eight sections, Notificacoes becomes history, and the mobile bar gets its fifth slot
 
 - `2P-SETTINGS-001` ... `-008`, and the remainder `2P-CHAT-004-MOBILE` closed.
