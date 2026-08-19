@@ -254,6 +254,21 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
       { table: "agent_preferences" },
       { table: "account_lifecycle" },
       { table: "policy_acceptances" },
+      /*
+        Phase 2P slice 2P.4. Both belong to `account` because both are the
+        owner's own settings-surface state: the policy is a preference, and the
+        evidence is the record of the owner's own reviews that the same surface
+        renders.
+
+        Neither carries a `withheldColumns` entry, and that is a property rather
+        than an omission. The evidence table has NO free-text content column at
+        all — only three closed vocabularies, two keys built from identifiers,
+        and owner-scoped foreign keys — so there is nothing in it an export
+        would have to hold back. `2P-AUTONOMY-009`'s content-minimal rule is
+        discharged in the schema, which is why it needs no exception here.
+      */
+      { table: "automation_category_policies" },
+      { table: "automation_calibration_observations" },
     ],
   },
   {

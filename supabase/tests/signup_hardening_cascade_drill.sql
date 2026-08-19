@@ -526,6 +526,24 @@ begin
     values (p_user, 'push', 'reminder', repeat('7', 64), 'delivered');
   exception when others then failures := failures || ('notification_deliveries: ' || sqlerrm); end;
 
+  begin
+    -- Phase 2P slice 2P.4. The population is explicit even though the person
+    -- candidate insert above already fires the calibration producer, because
+    -- detector 2 must see a row for a reason this file states rather than for
+    -- a side effect a later edit could remove.
+    insert into public.automation_category_policies (user_id, category, state)
+    values (p_user, 'task', 'suggest_only')
+    on conflict (user_id, category) do nothing;
+  exception when others then failures := failures || ('automation_category_policies: ' || sqlerrm); end;
+
+  begin
+    insert into public.automation_calibration_observations
+      (user_id, category, outcome, source_kind, subject_key, observation_key)
+    values (p_user, 'task', 'approved', 'task_candidate',
+            'cascade-drill:' || p_tag, 'cascade-drill:' || p_tag)
+    on conflict (user_id, observation_key) do nothing;
+  exception when others then failures := failures || ('automation_calibration_observations: ' || sqlerrm); end;
+
   return array_to_string(failures, ' | ');
 end;
 $populate$;

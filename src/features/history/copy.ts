@@ -202,6 +202,7 @@ const ptBR: HistoryCopy = {
     person_relationship: "relação",
     person_context: "vínculo com contexto",
     person_project: "vínculo com projeto",
+    automation_category_policy: "automação de uma categoria",
   },
   actions: {
     // No `{subject}` placeholder: the subject is the account itself, and the
@@ -236,6 +237,9 @@ const ptBR: HistoryCopy = {
     entry_interpretation_corrected: "corrigiu a interpretação de um registro",
     entry_awaiting_ai_configuration: "salvou o registro[ “{subject}”] sem interpretar, por falta de chave de IA",
     entry_interpretation_correction_undone: "desfez a correção de uma interpretação",
+    // No `{subject}`: `entity_id` is the undo operation's own id, and the
+    // before/after states already carry the category and both policy values.
+    automation_policy_changed: "mudou a política de automação de uma categoria",
     entry_person_candidates_resolved: "confirmou pessoas mencionadas em um registro",
     entry_person_candidates_undone: "desfez decisões sobre pessoas mencionadas",
     entry_interpretation_failed: "não conseguiu interpretar o registro[ “{subject}”]",
@@ -383,6 +387,7 @@ const en: HistoryCopy = {
     person_relationship: "relationship",
     person_context: "context link",
     person_project: "project link",
+    automation_category_policy: "automation for one category",
   },
   actions: {
     // No `{subject}` placeholder: the subject is the account itself, and the
@@ -408,6 +413,7 @@ const en: HistoryCopy = {
     entry_interpretation_corrected: "corrected a record's interpretation",
     entry_awaiting_ai_configuration: "saved the record[ “{subject}”] without interpreting it, for want of an AI key",
     entry_interpretation_correction_undone: "undid an interpretation correction",
+    automation_policy_changed: "changed the automation policy for one category",
     entry_person_candidates_resolved: "confirmed people mentioned in a record",
     entry_person_candidates_undone: "undid decisions about mentioned people",
     entry_interpretation_failed: "could not interpret the record[ “{subject}”]",

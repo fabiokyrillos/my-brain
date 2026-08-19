@@ -590,6 +590,90 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_calibration_observations: {
+        Row: {
+          category: string
+          created_at: string
+          entry_id: string | null
+          id: string
+          interpretation_id: string | null
+          observation_key: string
+          observed_at: string
+          outcome: string
+          source_kind: string
+          subject_id: string | null
+          subject_key: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          interpretation_id?: string | null
+          observation_key: string
+          observed_at?: string
+          outcome: string
+          source_kind: string
+          subject_id?: string | null
+          subject_key: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          entry_id?: string | null
+          id?: string
+          interpretation_id?: string | null
+          observation_key?: string
+          observed_at?: string
+          outcome?: string
+          source_kind?: string
+          subject_id?: string | null
+          subject_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automation_calibration_observations_entry_owner_fk"
+            columns: ["user_id", "entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "automation_calibration_observations_interpretation_owner_fk"
+            columns: ["user_id", "entry_id", "interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "entry_id", "id"]
+          },
+        ]
+      }
+      automation_category_policies: {
+        Row: {
+          category: string
+          created_at: string
+          state: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          state: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          state?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contexts: {
         Row: {
           created_at: string
@@ -2987,6 +3071,27 @@ export type Database = {
         }
         Returns: Json
       }
+      automation_category_status: {
+        Args: never
+        Returns: {
+          approved: number
+          category: string
+          corrected: number
+          eligible: boolean
+          has_producer: boolean
+          newest_observed_at: string
+          precision_ratio: number
+          reason: string
+          recent_reviewed: number
+          recent_undo: boolean
+          rejected: number
+          required_precision: number
+          required_reviewed: number
+          reviewed: number
+          state: string
+          undone: number
+        }[]
+      }
       begin_account_deletion_admin: {
         Args: { p_reason_code: string; p_user_id: string }
         Returns: Json
@@ -3762,6 +3867,10 @@ export type Database = {
           seconds_since_success: number
           staleness_threshold: string
         }[]
+      }
+      set_automation_category_policy: {
+        Args: { p_category: string; p_operation_key: string; p_state: string }
+        Returns: Json
       }
       suspend_account: {
         Args: { p_reason_code: string; p_user_id: string }

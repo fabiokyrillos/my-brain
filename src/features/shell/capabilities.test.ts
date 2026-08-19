@@ -163,7 +163,23 @@ describe("navigation capabilities", () => {
        * one.
        */
       { key: "scheduled_reviews", state: "operational", visible: true },
+      /*
+       * Phase 2P slice 2P.4 added `automation_categories` and left `autonomy`
+       * exactly where it was. The two rows sitting adjacent is the point.
+       *
+       * `autonomy` governs `agent_preferences.autonomy_level` — one global
+       * `text`, `NOT NULL DEFAULT 'autonomous'`, which nothing reads. It stays
+       * `future` and invisible, because a control for it would let a schema
+       * default nobody chose be read as consent for six categories of automatic
+       * write.
+       *
+       * `automation_categories` governs the per-category policy: a different
+       * store, a different vocabulary, a different authority, and real
+       * behavioural consumers. Merging them would recreate exactly the
+       * ambiguity `2O-ACTIVATION-006` added `uncontrolled` to remove.
+       */
       { key: "autonomy", state: "future", visible: false },
+      { key: "automation_categories", state: "operational", visible: true },
       { key: "follow_up_intensity", state: "future", visible: false },
       { key: "privacy_default", state: "future", visible: false },
       { key: "reasoning_route", state: "future", visible: false },

@@ -139,7 +139,8 @@ const REPO = resolve(__dirname, "../../..");
 // commit that adds the migration, which is the only way this pin is allowed to
 // change.
 // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
-const AUTHORIZED_MIGRATION_HEAD = "202608180098";
+// Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning: this pin moves in the commit that adds the migration, and this guard's claim about THIS initiative is untouched.
+const AUTHORIZED_MIGRATION_HEAD = "202608190099";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

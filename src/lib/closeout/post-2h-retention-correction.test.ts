@@ -184,6 +184,16 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // sweep `202607250052` already ships -- a reused signed value, not a
       // minted one.
       "202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
+      // Phase 2P slice 2P.4. Relevant to THIS guard for the same reason, and
+      // it makes the point explicitly rather than by omission: it schedules NO
+      // sweep and mints NO retention value. Its calibration evidence is kept
+      // for the account's lifetime and removed by the `auth.users` cascade,
+      // because a 90-day window would make the calibration contract
+      // unsatisfiable at the owner's real review volume — the sample could
+      // never accumulate. Its `undo_operations` row expires through that
+      // table's existing 24-hour default and is reaped by the sweep
+      // `202607250052` already ships: a reused signed value, not a minted one.
+      "202608190099_phase_2p_slice_4_automation_policy_and_calibration.sql",
     ]);
   });
 });

@@ -553,9 +553,11 @@ describe("the census walks a real tree", () => {
 
   it("sees the whole migration chain", () => {
     // 97 through slice 2P.3; 98 once slice 2P.1 spent the one migration the
-    // owner's replacement authorization funded. This number is a corpus-length
-    // check for `latestDefinition`, not a budget — the budget is pinned in
-    // phase-2p-declarations.test.ts, which asserts exactly one 2P migration.
-    expect(migrationFiles).toHaveLength(98);
+    // owner's replacement authorization funded; 99 once slice 2P.4 spent the
+    // second one ADR-123 authorized. This number is a corpus-length check for
+    // `latestDefinition`, not a budget — the budget is pinned in
+    // phase-2p-declarations.test.ts, which asserts exactly two 2P migrations
+    // and names the authorization for each.
+    expect(migrationFiles).toHaveLength(99);
   });
 });

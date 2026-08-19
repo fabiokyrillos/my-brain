@@ -9623,3 +9623,180 @@ Three remainders open and unabsorbed: `2P-ATTENTION-008`'s browser half,
 owner's one-turn BYOK authorization). Push HTTP 403, signup, rollout and every
 inherited residual stay where §87, §88, §91 and §93 left them. **This section
 deliberately does not name what comes after Phase 2P.**
+
+## §95 — Slice 2P.4 builds the whole automation contract and enables nothing, because the evidence to enable it does not exist (2026-08-19)
+
+**Branch `codex/phase-2p-slice-4-automation-policy`.** Baseline `main`
+`02c41d13`, clean and synchronized, zero open PRs, **98 local = 98 hosted,
+parity `202608180098`** — read live from `supabase_migrations.schema_migrations`,
+not quoted. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+**The owner authorized a second Phase 2P migration, recorded as ADR-123.** A
+third is a stop condition.
+
+### The slice's deliverable is a refusal, and the refusal is measured
+
+Six categories — tasks, people, projects, companies, memories, relations — all
+read `suggest_only` / `suggest_only_by_owner` / `eligible=false`. **The
+migration writes no policy row for anybody**: absence *computes* the default.
+That is the difference between this and `agent_preferences.autonomy_level`,
+which is `NOT NULL DEFAULT 'autonomous'` with no consumer anywhere —
+`trust-builders.ts:55,88` passes `autonomyAllowed: true` as a **literal**. A
+stored default is a value nobody chose that a later reader mistakes for consent;
+a computed one cannot be.
+
+The two capability rows sit adjacent on purpose. `autonomy` stays `future`,
+invisible, empty evidence. `automation_categories` is new, `operational`,
+visible, with four resolving consumers. One vocabulary, one authority — merging
+them would recreate the ambiguity `2O-ACTIVATION-006` added `uncontrolled` to
+remove.
+
+### `2P-AUTONOMY-002` is discharged structurally, not by a threshold
+
+`private.automation_category_decision` reads no confidence, no score, no
+`element_trust` and no `autonomy_level`. There is nothing in it for a model
+score to be compared against, so the requirement cannot regress by somebody
+editing a number. Eligibility requires **both** the owner's arming and the
+measurement, and `automatic_when_eligible` is named that way because arming is
+not authorizing.
+
+### The producer binds to tables, inheriting §94's reasoning
+
+Three `after` triggers on `entry_task_candidate_resolutions`,
+`entry_person_candidate_resolutions` and `undo_operations` — so superseded
+resolver versions, the six routes the application never calls, and direct DML
+all produce evidence. `undo_operations` is `after update`, not `after insert`:
+the signal is the owner taking an acceptance back, which is a status transition.
+
+Correction, rejection and undo are **distinct** signals. `retained` produces
+**nothing** — a deferral is not a verdict, and counting it would be treating
+absence of review as approval. The evidence table has **no free-text content
+column at all**; `corrected` is computed by comparing titles and only the
+outcome is stored.
+
+### Proved against the deployed schema before CI
+
+Rollback semantics proved **first** (probe schema: inside `1`, outside `0`).
+Then the migration's exact bytes, read from disk and never retyped
+(`sha256 36d65188…`, 35 536 bytes), executed in a rolled-back transaction: 13
+behavioural probes green, including **the non-vacuity control where the gate
+really does say yes** at 63 reviewed and 0.9683 precision. Zero residue
+measured, with the real data still visible as the control.
+
+pgTAP is **not installed hosted**, so the 48-assertion suite is CI-only — but it
+was dry-run verbatim against the deployed schema with minimal shims for `is`,
+`has_table`, `lives_ok`, `ok` and `throws_ok`. **48 run, 0 failed.** CI remains the
+authority — and the section below is what that sentence is for.
+
+### CI caught what thirteen green probes could not, and it was severe
+
+**The append-only trigger blocked account deletion.** Its first cut covered
+`update or delete`, and the comment beside it claimed *"the account cascade
+deletes rows through the foreign key, which does not fire this trigger"*. That
+is **false**: an `on delete cascade` performs a real DELETE, row triggers fire,
+and it refused them — so **no account could be deleted at all**. The cascade
+drill named it: `42501: automation_calibration_observations is append-only`.
+
+**The tree had already written this down.**
+`202608070081_phase_2h_rate_limiting.sql:182-188` records the identical defect
+from 2H.2, in as many words. The comment I wrote asserted the opposite of a fact
+the repository already knew, which is the exact shape §90 and §94 keep recording
+from the other direction.
+
+The trigger now covers **UPDATE only**. Deletion is governed by grants, as on
+every other append-only table here: `authenticated` holds `SELECT` and nothing
+else, so no client can mutate a row, and the cascade stays the whole cleanup
+story.
+
+**Why thirteen green probes missed it.** None of them deleted a user, so none
+could reach the cascade. The suite now proves it directly — create an account,
+give it a policy row and an observation, delete it, measure both tables empty —
+and that is why the suite grew. *A probe that never performs
+the operation cannot see the operation fail.*
+
+**Second defect, same run.** The SELECT policies carried no role list, so they
+applied to `PUBLIC`, and `phase_2o_privacy_enumeration.sql` requires every
+counted table to carry a SELECT policy **naming `authenticated`** — a PUBLIC
+policy is not evidence that the *owner* can read their own rows. Both now say
+`to authenticated`.
+
+### A guard must forbid the act, not the word — again
+
+The first cut of both the pgTAP assertion and the closeout guard scanned for the
+identifier `autonomy_level`, and **failed on the migration's own comment
+explaining why reading it is forbidden**. Both now strip comments before
+scanning and each carries a non-vacuity control proving the scan still sees real
+code. Weakening the pattern, or deleting the sentence, would each have traded a
+real property for a passing test. This is the third time this repository has
+recorded that shape.
+
+Separately, one assertion of mine was simply wrong — it asserted
+`after insert on public.undo_operations`, which is neither what the migration
+does nor what it should do. Corrected to a timing-plus-table pair list with a
+negative control on the wrong timing.
+
+### Sixteen guards failed, and every one of them was right
+
+Ten migration-count pins that move deliberately in the commit that adds the
+migration; three Phase 2P budget pins retargeted from one to two **by name**,
+each naming its authorization; and three real product gaps the guards caught
+that nothing else would have:
+
+1. **`history/vocabulary.test.ts`** — `automation_policy_changed` and
+   `automation_category_policy` would have rendered as the neutral fallback on
+   the History page. Both locales now have copy, and `subject-route.ts` records
+   the entity as deliberately non-linkable.
+2. **`capabilities.test.ts`** — the visible-rows list is pinned, so the new row
+   had to be added with its reasoning beside `autonomy`.
+3. **`phase-2l-work-authority-guard`** — the undo router allowlist is a named
+   list, and `automation-actions.ts` is its sixth entry.
+
+And two that would have failed only in CI, found by reading rather than by
+running: the **cascade drill** fails by name for any user-owned table with no
+fixture row, and the **grant census** pins the exact deviation list. Both new
+census lines were placed **where the database actually sorts them** — measured,
+because collation decides where an underscore sorts. Its prose said *"thirty-four
+of the fifty-three"* while the literal already listed thirty-six; the count was
+re-taken from the database and is now thirty-eight of fifty-seven.
+
+### CHECKPOINT DO DONO — CALIBRAÇÃO REAL NECESSÁRIA
+
+| Category | Reviewed | Approved | Corrected | Rejected | Undone | Needed | Missing | Producer? |
+|---|---|---|---|---|---|---|---|---|
+| tasks | **2** | 1 | 0 | 1 | 0 | 50 | **48** | yes |
+| people | **3** | 2 | 1 | 0 | 0 | 80 | **77** | yes |
+| projects | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
+| companies | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
+| memories | **0** | 0 | 0 | 0 | 0 | 80 | **80** | **no** |
+| relations | **0** | 0 | 0 | 0 | 0 | 100 | **100** | **no** |
+
+**Four of the six have no producer at all**, because the product has no review
+flow for projects, companies, memories or relations. That is a measured fact
+about the product, and the surface says so in those words rather than showing a
+zero that would read as *"not enough yet"*.
+
+Historical resolutions are **not** backfilled: manufacturing evidence for
+reviews that predate the contract is the fabrication ADR-123 Decision 4 forbids.
+
+**What would be automated today: nothing. What stays in "Precisa de você":
+everything.**
+
+### What is deliberately NOT claimed
+
+- **No category was enabled**, and none may be until the owner signs the
+  thresholds and the reference set exists.
+- **No automatic write has ever executed**, so `-005` … `-008` are encoded rules
+  rather than proved behaviours — classified `not-built-by-rule`, never `built`.
+- **The surface has not been rendered in a real authenticated browser.** CI's
+  journey lane is unauthenticated or fixture-rendered and cannot see the RSC
+  boundary — the defect class that has shipped twice here.
+- **No live two-session race** on the policy control.
+
+### Where this stops, and how to resume
+
+**Cumulative: 42 of 87 requirements, two migrations spent of two authorized.**
+Four remainders open and unabsorbed: `2P-ATTENTION-008`'s browser half,
+`2P-CHAT-004-MOBILE` (2P.5), `2P-CHAT-007-JOURNEY` (2P.8) and `RG-DEP-3`. Push
+HTTP 403, signup, rollout and every inherited residual stay where §87, §88, §91,
+§93 and §94 left them. **This section deliberately does not name what comes
+after Phase 2P.**

@@ -77,6 +77,12 @@ export const HISTORY_SUBJECT_ROUTES = {
   person_relationship: null,
   person_context: null,
   person_project: null,
+  // Phase 2P slice 2P.4 — the same shape again. `entity_id` is the undo
+  // operation's own id, not the policy row's; the policy is keyed by
+  // `(user_id, category)` and has no id at all. The place to see it is the
+  // automation section on Settings, and a link built from a category name this
+  // row does not carry would be a guess.
+  automation_category_policy: null,
 } satisfies Record<HistoryEntityType, SubjectRouteBuilder | null>;
 
 /** The entity types whose subject has a page — derived, never re-listed. */

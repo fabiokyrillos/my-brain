@@ -90,9 +90,17 @@ const AUTHORITY_ALLOWLIST: readonly CallSite[] = [
  * named list rather than a property of the call. A fifth domain arriving
  * without this line is what the guard is for — and this line is the deliberate,
  * visible answer rather than a widened pattern.
+ *
+ * `src/features/agent/automation-actions.ts` is the **sixth**, joining in Phase
+ * 2P slice 2P.4 (`202608190099`), which registers
+ * `set_automation_category_policy` in the same handler registry. It is a
+ * separate file from `agent/actions.ts` rather than an addition to it, and the
+ * list says so by name for the same reason: the router is generic, so who may
+ * reach it is enumerated, never inferred from a directory.
  */
 const UNDO_ROUTER_ALLOWLIST: readonly string[] = [
   "src/features/agent/actions.ts",
+  "src/features/agent/automation-actions.ts",
   "src/features/deletion/actions.ts",
   "src/features/interpretations/actions.ts",
   "src/features/task-commands/actions.ts",

@@ -125,25 +125,49 @@ describe("Phase 2P declarations", () => {
     expect(read("docs/DECISIONS.md")).toMatch(/remain \*\*forbidden until slice 2P\.8\*\*/);
   });
 
-  it("spends exactly the one migration slice 2P.1 was authorized", () => {
+  it("spends exactly the two migrations the owner authorized, by name", () => {
     /*
-      Retargeted, not relaxed, and this is the passage 2P.0 built the pin for.
+      Retargeted twice, relaxed neither time, and this is the passage 2P.0 built
+      the pin for.
 
       ADR-122 Decision 3 funded one conditional allocation and Decision 4
-      recorded that its condition failed, so before this slice the correct
+      recorded that its condition failed, so before slice 2P.1 the correct
       assertion was "zero". The owner then issued a replacement authorization:
       ONE migration for slice 2P.1, covering the twelve resolution functions
       through a central re-derivation contract, written from nothing.
 
-      "Exactly one" is the whole point. A second Phase 2P migration is a stop
-      condition, and this is what makes it fail loudly rather than accumulate.
+      ADR-123 then authorized a SECOND, for slice 2P.4 and no other purpose:
+      per-category automation policy and calibration, because
+      `2P-AUTONOMY-001`, `-003` and `-010` need persisted authority that
+      `agent_preferences.autonomy_level` — one global column with no consumer
+      and a default nobody chose — cannot carry.
+
+      The list is pinned BY NAME rather than by count, so a second migration
+      arriving for the wrong slice fails just as loudly as a third arriving for
+      any. **A third is a stop condition**, and this is where it fails.
     */
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    const phaseMigrations = migrations.filter((name) => /phase[_-]?2p/i.test(name));
-    expect(phaseMigrations).toEqual(["202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql"]);
+    const phaseMigrations = migrations.filter((name) => /phase[_-]?2p/i.test(name)).sort();
+    expect(phaseMigrations).toEqual([
+      "202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
+      "202608190099_phase_2p_slice_4_automation_policy_and_calibration.sql",
+    ]);
     // The rejected candidate is not copied forward under any name. Unchanged.
     expect(migrations.filter((name) => name.startsWith("202608170098"))).toEqual([]);
-    expect(migrations).toHaveLength(98);
+    expect(migrations).toHaveLength(99);
+  });
+
+  it("records the second authorization, and what it still refuses", () => {
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/ADR-123 — The owner authorizes a second Phase 2P migration/);
+    // It must stay readable as ONE further migration rather than as an open
+    // door — the same property ADR-122's own pin asserts one test above.
+    expect(decisions).toMatch(/\*\*A third Phase 2P migration is a stop condition\.\*\*/);
+    // And it must not have quietly acquired the things every 2P authorization
+    // has refused so far.
+    expect(decisions).toMatch(
+      /ADR-123[\s\S]*?authorizes no signup change, no rollout change, no BYOK spend, no push work and no successor phase/,
+    );
   });
 
   it("records the candidate as evaluated and rejected, not as pending", () => {

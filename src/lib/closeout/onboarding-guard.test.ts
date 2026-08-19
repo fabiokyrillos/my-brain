@@ -250,7 +250,8 @@ describe("2O-ACTIVATION-002 is absolute: the path stores no progress", () => {
       name.endsWith(".sql"),
     );
     // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
-    expect(migrations).toHaveLength(98);
+    // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning.
+    expect(migrations).toHaveLength(99);
     expect(migrations.some((name) => /onboard/i.test(name))).toBe(false);
   });
 

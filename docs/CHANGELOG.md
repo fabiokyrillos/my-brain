@@ -2,6 +2,74 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Slice 2P.4: per-category automation policy, calibration from real reviews, and a checkpoint instead of a switch
+
+- `2P-AUTONOMY-001` … `-010`. **One migration** - `202608190099`, the phase's
+  **second and final**, authorized by **ADR-123**. A third is a stop condition.
+  No provider call and no BYOK spend.
+- **Nothing was enabled, and that is the deliverable.** All six categories -
+  tasks, people, projects, companies, memories, relations - read
+  `suggest_only` / `suggest_only_by_owner` / `eligible=false`. The migration
+  writes **no policy row for anybody**: absence *computes* the default, so it
+  cannot be read later as consent the way `agent_preferences.autonomy_level`'s
+  `NOT NULL DEFAULT 'autonomous'` could.
+- **Two new tables.** `automation_category_policies` (policy per
+  `(user_id, category)`) and `automation_calibration_observations` (append-only
+  evidence). `authenticated` holds **SELECT and nothing else** on both: every
+  write goes through an audited, undoable RPC or through the SECURITY DEFINER
+  producer. The evidence table has **no free-text content column at all** - only
+  three closed vocabularies and two keys built from identifiers - and a pgTAP
+  assertion pins that exact column list.
+- **One authority.** `private.automation_category_decision` returns one of five
+  closed reasons and exactly one of them permits a write. It reads **no
+  confidence, no score, no `element_trust` and no `autonomy_level`**, so
+  `2P-AUTONOMY-002` is discharged structurally rather than by comparing a model
+  score to a number.
+- **The producer binds to tables, not to function bodies** - inheriting slice
+  2P.1's reasoning. Three `after` triggers on
+  `entry_task_candidate_resolutions`, `entry_person_candidate_resolutions` and
+  `undo_operations`, so superseded resolver versions, routes the application
+  never calls and direct DML all produce evidence. Correction, rejection and
+  undo are **distinct** signals; `retained` and `dismissed` produce nothing,
+  because the product's own copy tells the owner that neither says the
+  suggestion was wrong.
+- **Per-category thresholds, never one number.** 50/0.90 for tasks (fully
+  reversible) up to 100/0.98 for relations (`2N-RELATION-TRIGGER` is a hard
+  boundary), plus a freshness window and a recent-undo block. Eligibility needs
+  **both** the owner's arming and the measurement; arming alone refuses.
+- **Proved against the deployed schema before CI**, in transactions that were
+  rolled back, with rollback semantics proved first and the migration's exact
+  bytes read from disk: 13 behavioural probes green, including a **non-vacuity
+  control where the gate really does say yes**, and zero residue measured
+  against real data that stayed visible. The 48-assertion pgTAP suite was
+  dry-run the same way: 48 run, 0 failed.
+- **CI then caught two defects those thirteen green probes could not**, and one
+  was severe. The append-only trigger covered `delete` as well as `update`, and
+  an `on delete cascade` **is** a delete - so it **blocked account deletion
+  entirely**. `202608070081_phase_2h_rate_limiting.sql:182-188` already records
+  the identical defect from 2H.2; the comment beside this one asserted the
+  opposite of a fact the tree already knew. It now covers UPDATE only, and
+  deletion is governed by grants as on every other append-only table here. None
+  of the probes had deleted a user, so none could reach the cascade - the suite
+  now creates an account, gives it rows, deletes it and measures both tables
+  empty. The SELECT policies
+  also carried no role list, so they applied to `PUBLIC` rather than naming
+  `authenticated`, which `phase_2o_privacy_enumeration.sql` requires.
+- **Three existing files moved, each of which would have failed CI.** The
+  cascade drill's populator (it fails by name for any user-owned table with no
+  fixture row), the grant census's pinned deviation list (both lines placed
+  where the database actually sorts them - measured, not assumed; and its prose
+  count was re-taken from the database), and the privacy enumeration.
+- **No existing grant, RLS policy, retention rule or `EXECUTE` privilege
+  changed**, and no `product_events` vocabulary value was added - the audit
+  trail uses `audit_logs`, whose `action_type` carries no constraint.
+- **Stops at `CHECKPOINT DO DONO - CALIBRAÇÃO REAL NECESSÁRIA`.** The hosted
+  reference set is 2 reviewed task candidates and 3 reviewed person candidates;
+  the other four categories have **no producer at all**, because the product has
+  no review flow for them. Nothing would be automated today and everything stays
+  in "Precisa de você". **5 built, 1 baseline, 1 partial, 4
+  not-built-by-rule; cumulative 42 of 87.**
+
 ## 2026-08-19 - Slice 2P.1: one central lifecycle contract, and a resolved entry can leave Needs You
 
 - `2P-ATTENTION-001` … `-008` (eight; `-008` **partial**). **One migration** —
