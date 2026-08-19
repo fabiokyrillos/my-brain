@@ -612,17 +612,6 @@ select is(
 -- disabled, the same technique needs_attention_projection.sql already uses, and
 -- re-enabled immediately: it is a fixture device and never the product contract.
 
-create function pg_temp.plant(p_entry uuid, p_status text, p_at timestamptz)
-returns void language plpgsql as $$
-begin
-  alter table public.entries disable trigger entries_updated_at;
-  update public.entries
-  set status = coalesce(p_status, status), updated_at = p_at
-  where id = p_entry;
-  alter table public.entries enable trigger entries_updated_at;
-end;
-$$;
-
 create function pg_temp.stamp(p_entry uuid)
 returns timestamptz language sql as $$
   select updated_at from public.entries where id = p_entry;
@@ -632,7 +621,10 @@ $$;
 -- write. A direct status-only update, by anyone, is still stamped -- so the
 -- contract has not been globally weakened and set_updated_at still governs
 -- every write that is not this one re-derivation.
-select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set status = 'awaiting_review', updated_at = now() - interval '9 days'
+where id = '2ba10001-0000-4000-8000-000000000001';
+alter table public.entries enable trigger entries_updated_at;
 update public.entries set status = 'partially_processed'
 where id = '2ba10001-0000-4000-8000-000000000001';
 select is(
@@ -642,7 +634,10 @@ select is(
 );
 
 -- The exception itself, on a status that genuinely moves.
-select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set status = 'awaiting_review', updated_at = now() - interval '9 days'
+where id = '2ba10001-0000-4000-8000-000000000001';
+alter table public.entries enable trigger entries_updated_at;
 select is(
   private.rederive_entry_lifecycle(
     '2ba00001-0000-4000-8000-000000000001', '2ba10001-0000-4000-8000-000000000001'
@@ -659,7 +654,10 @@ select is(
 -- POSITIVE CONTROLS: a real change of the owner's content still advances the
 -- instant, and does so even while the marker names this very entry -- because
 -- the trigger independently requires that status is the ONLY column that moved.
-select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', null, now() - interval '9 days');
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set updated_at = now() - interval '9 days'
+where id = '2ba10001-0000-4000-8000-000000000001';
+alter table public.entries enable trigger entries_updated_at;
 select set_config('my_brain.lifecycle_rederivation_entry', '2ba10001-0000-4000-8000-000000000001', true);
 update public.entries set locale = 'pt-BR' where id = '2ba10001-0000-4000-8000-000000000001';
 select is(
@@ -668,7 +666,10 @@ select is(
   'POSITIVE CONTROL: a real content change advances updated_at even with the marker set'
 );
 
-select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set status = 'awaiting_review', updated_at = now() - interval '9 days'
+where id = '2ba10001-0000-4000-8000-000000000001';
+alter table public.entries enable trigger entries_updated_at;
 update public.entries set status = 'partially_processed', locale = 'en'
 where id = '2ba10001-0000-4000-8000-000000000001';
 select is(
@@ -680,8 +681,14 @@ select set_config('my_brain.lifecycle_rederivation_entry', '', true);
 
 -- And the consequence the owner asked to be proved: recalculating only the
 -- lifecycle leaves the queue in the order it was already in.
-select pg_temp.plant('2ba10005-0000-4000-8000-000000000005', 'partially_processed', now() - interval '2 days');
-select pg_temp.plant('2ba10003-0000-4000-8000-000000000003', 'partially_processed', now() - interval '3 days');
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set status = 'partially_processed', updated_at = now() - interval '2 days'
+where id = '2ba10005-0000-4000-8000-000000000005';
+alter table public.entries enable trigger entries_updated_at;
+alter table public.entries disable trigger entries_updated_at;
+update public.entries set status = 'partially_processed', updated_at = now() - interval '3 days'
+where id = '2ba10003-0000-4000-8000-000000000003';
+alter table public.entries enable trigger entries_updated_at;
 
 select is(
   (

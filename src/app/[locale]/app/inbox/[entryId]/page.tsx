@@ -91,12 +91,16 @@ export default async function EntryDetailPage({
   const canConfirmCandidates = view.availableActions.some((action) => action.id === "confirm_existing_candidates");
   /*
    * `2P-ATTENTION-004`. The panel below must never say "nothing left to
-   * decide" while something is. `list_needs_attention` resolves the status
-   * branch BEFORE `answer_existing_question`, so `attentionReason` alone
-   * cannot tell an unanswered question from a settled one -- and the
-   * interpretation JSON keeps a question after it is answered. The open
-   * count is therefore read from the table that actually holds the answer.
-   * RLS scopes it to the owner; the database contract refuses regardless.
+   * decide" while something is.
+   *
+   * Since slice 2P.1 `list_needs_attention` decides the finer reasons FIRST,
+   * so `review_interpretation` already means "every other decision is
+   * resolved" and this count is no longer what makes the panel correct. It is
+   * kept as a second, independent check: the projection is one read of one
+   * moment, the interpretation JSON keeps a question after it is answered, and
+   * this reads the table that actually holds the answer. RLS scopes it to the
+   * owner, and the database contract refuses regardless — so the panel can be
+   * wrong only by appearing, never by writing.
    */
   const { count: openQuestionCount } = await supabase
     .from("pending_questions")

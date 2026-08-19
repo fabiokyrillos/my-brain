@@ -371,6 +371,12 @@ where user_id = '2d200001-0000-4000-8000-000000000001'
 -- positive control at line ~620 still requires the entry to be LISTED for its
 -- open question first, and the reactivation check still requires it to come
 -- back when the snooze deadline passes.
+--
+-- entry_interpretations is immutable by trigger (a real product contract, and
+-- one worth having), so the trigger is suspended for exactly this statement and
+-- restored immediately -- the same fixture device needs_attention_projection.sql
+-- uses to plant timestamps. It is never how the product writes.
+alter table public.entry_interpretations disable trigger entry_interpretations_protect_immutable;
 update public.entry_interpretations
 set element_policy = '{}'::jsonb
 where user_id = '2d200001-0000-4000-8000-000000000001'
@@ -378,6 +384,7 @@ where user_id = '2d200001-0000-4000-8000-000000000001'
     '2d210001-0000-4000-8000-000000000001',
     '2d210002-0000-4000-8000-000000000002'
   );
+alter table public.entry_interpretations enable trigger entry_interpretations_protect_immutable;
 
 create temporary table phase2d2_refs on commit drop as
 select
