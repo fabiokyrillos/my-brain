@@ -160,16 +160,9 @@ export function LocaleSwitchLink({ locale }: { locale: Locale }) {
 export function NavigationLinks({
   locale,
   mobile = false,
-  account,
 }: {
   locale: Locale;
   mobile?: boolean;
-  /**
-   * The account disclosure, injected by the shell so this module holds no Server
-   * Action. Rendered only on the mobile surface, where the overflow panel is the
-   * account area; the desktop rail mounts it in its own foot.
-   */
-  account?: ReactNode;
 }) {
   const pathname = usePathname() ?? `/${locale}/app`;
   const t = getMessages(locale);
@@ -257,44 +250,25 @@ export function NavigationLinks({
    * each entry one column in that sequence. The previous `slice(0,2)` / `slice(2)`
    * split produced six children with the capture control third — which cannot be
    * centred in six columns, and is why exact centring was gated (UX-14).
+   *
+   * ## Slice 2P.5: five destinations, and no disclosure among them
+   *
+   * The fifth slot was `Mais`, and it held the account block, the destinations
+   * the bar demoted, and the five secondary groups. It is `library` now — the
+   * bar `02-arquitetura-e-rotas.md` specifies — because the two things that
+   * needed it no longer do: the account moved to the top bar, and Perguntas
+   * became a link in Registros' header. `capabilities.ts` carries the census and
+   * `mobile-reachability-guard` re-derives it on every run.
+   *
+   * `mobileDemotedKeys` is empty by construction now: every primary destination
+   * is a slot. The map has no `more` arm because `MobileBarSlot` no longer has
+   * that member, so a future edit that reintroduces the disclosure has to say so
+   * in the type first.
    */
   return (
     <>
       {mobileBarSlots.map((slot) =>
-        slot === "more" ? (
-          <NavigationOverflow
-            active={overflowActive}
-            key="more"
-            label={t.nav.more}
-            variant="mobile-more"
-          >
-            {/*
-              The account block is first and spans both columns: the way out of
-              the product must not sit below the things you do inside it.
-            */}
-            {account ? <div className="mobile-nav-account">{account}</div> : null}
-            {/*
-              Then the destinations the bar demoted, before the secondary groups.
-              Registros is a primary destination everywhere else, so inside `Mais`
-              it is the first product destination rather than one more item in
-              `Contexto` — and it needs no scrolling to reach.
-            */}
-            {mobileDemotedKeys.length ? (
-              <div
-                aria-label={t.navGroups.primary}
-                className="mobile-nav-group mobile-nav-demoted"
-                role="group"
-              >
-                <div className="nav-group-items">
-                  {mobileDemotedKeys.map((key) => renderLink(key, { closeMore: true }))}
-                </div>
-              </div>
-            ) : null}
-            {overflowGroups}
-          </NavigationOverflow>
-        ) : (
-          renderLink(slot, { compact: slot !== "capture", capture: slot === "capture" })
-        ),
+        renderLink(slot, { compact: slot !== "capture", capture: slot === "capture" }),
       )}
     </>
   );

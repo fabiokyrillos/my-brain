@@ -51,7 +51,17 @@ export function AccountMenu({
    */
   identity: AccountIdentity | null;
   signOut: SignOutHandler;
-  variant?: "rail" | "overflow";
+  /**
+   * `header` since slice 2P.5 — the mobile top bar.
+   *
+   * A third mount rather than a third component, because the sentence at the
+   * top of this file is the whole reason it is one component: two
+   * implementations are two chances for one surface to end a session the other
+   * does not. The variant changes the class and nothing else; the sign-out
+   * action, the pending handling, the failure state and the focus behaviour are
+   * defined once.
+   */
+  variant?: "rail" | "overflow" | "header";
 }) {
   const copy = getAccountCopy(locale);
   const { ref, onKeyDown } = useDismissableDisclosure();
@@ -60,7 +70,7 @@ export function AccountMenu({
 
   return (
     <details
-      className={variant === "rail" ? "account-menu account-menu-rail" : "account-menu account-menu-overflow"}
+      className={`account-menu account-menu-${variant}`}
       onKeyDown={onKeyDown}
       ref={ref}
     >

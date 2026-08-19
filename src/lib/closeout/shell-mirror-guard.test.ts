@@ -91,12 +91,30 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
     expect(mobileBarSlots[(mobileBarSlots.length - 1) / 2]).toBe("capture");
   });
 
-  it("renders every demoted destination in the overflow panel", () => {
-    const demoted = /mobile-nav-demoted[^`]*?<\/div><\/div>/.exec(FIXTURE)?.[0] ?? "";
-    expect(mobileDemotedKeys.length).toBeGreaterThan(0);
-    // The fixture builds its links through `navLink(label)`, so the label is an
-    // argument rather than text between tags.
-    for (const key of mobileDemotedKeys) expect(demoted).toContain(`navLink("${label(key)}")`);
+  /**
+   * The overflow panel, and the assertion that replaces its mirror.
+   *
+   * Slice 2P.5 retired `Mais` from the mobile bar, so `mobileDemotedKeys` is
+   * empty and the fixture has no panel to mirror. Deleting the check would have
+   * left the fixture free to grow a panel the product does not render — which is
+   * the exact failure this whole file exists to catch, and the one it caught
+   * once already when `GROUPS` was stale by six destinations.
+   *
+   * So the claim inverts rather than disappearing: the product demotes nothing,
+   * therefore the fixture must build nothing. Both halves are asserted, so
+   * either one changing alone fails.
+   */
+  it("mirrors the absence of an overflow panel, because the bar has none", () => {
+    expect(mobileDemotedKeys, "a primary destination is demoted again").toEqual([]);
+    expect(FIXTURE, "the fixture builds an overflow panel the bar no longer renders").not.toContain(
+      "mobile-nav-demoted",
+    );
+    expect(FIXTURE, "the fixture builds a `Mais` disclosure the bar no longer renders").not.toContain(
+      "mobile-more-menu",
+    );
+    // Non-vacuity: the fixture still builds the bar it is supposed to mirror.
+    expect(FIXTURE).toContain("const MOBILE_BAR = [");
+    expect(FIXTURE).toContain("mobile-primary-link");
   });
 
   /*
@@ -130,12 +148,21 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
     expect(fixtureList(mutated, "MOBILE_BAR")).not.toEqual(mobileBarSlots.map(label));
   });
 
-  it("fails when the overflow panel drops a demoted destination", () => {
-    const [key] = mobileDemotedKeys;
-    const mutated = FIXTURE.replace(`navLink("${label(key)}")`, 'navLink("Alguma outra coisa")');
+  /**
+   * The control for the inverted assertion above.
+   *
+   * An absence assertion is the dangerous kind: `not.toContain` passes against a
+   * fixture that was renamed, emptied or moved. This plants the panel back into
+   * a copy of the fixture and requires the check to see it, so "there is no
+   * overflow panel" is a measurement rather than a coincidence.
+   */
+  it("fails when the fixture grows an overflow panel back", () => {
+    const mutated = FIXTURE.replace(
+      "const MOBILE_BAR = [",
+      'const REGROWN = `<div class="mobile-nav-group mobile-nav-demoted"></div>`;\nconst MOBILE_BAR = [',
+    );
     expect(mutated).not.toEqual(FIXTURE);
-    const demoted = /mobile-nav-demoted[^`]*?<\/div><\/div>/.exec(mutated)?.[0] ?? "";
-    expect(demoted).not.toContain(`navLink("${label(key)}")`);
+    expect(mutated).toContain("mobile-nav-demoted");
   });
 });
 

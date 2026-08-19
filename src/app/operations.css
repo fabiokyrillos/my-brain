@@ -753,3 +753,20 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
    sentence's 11px. Inline-flex with the minimum keeps it a real target without
    breaking the line it lives in. */
 .work-filter-relation a{display:inline-flex;align-items:center;min-height:24px}
+
+/*
+ * Slice 2P.5 — Registros' link to Perguntas.
+ *
+ * It exists because retiring the mobile bar's `Mais` needed a path to Perguntas
+ * that does not depend on there being one to answer; `capabilities.ts` carries
+ * the census. Sized as a real target rather than as a caption: on a phone it is
+ * now the only route to that destination.
+ */
+.records-questions-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin-top: var(--space-2);
+  color: var(--link);
+  font: var(--type-label);
+}

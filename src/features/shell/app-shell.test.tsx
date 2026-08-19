@@ -119,9 +119,18 @@ describe("AppShell", () => {
   it("closes an open More disclosure when the pointer goes down outside it", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
 
-    for (const navigationName of ["Navegação principal", "Navegação móvel"]) {
-      const navigation = screen.getByRole("navigation", { name: navigationName });
-      const details = navigation.querySelector(":scope > details") as HTMLDetailsElement;
+    /*
+      The desktop rail, and the header account — the two disclosures that exist
+      after slice 2P.5. The mobile bar's `Mais` retired with the slot it
+      occupied, so this is asserted where the disclosures actually live rather
+      than dropped for having lost one of its two subjects.
+    */
+    const rail = screen
+      .getByRole("navigation", { name: "Navegação principal" })
+      .querySelector(":scope > details") as HTMLDetailsElement;
+    const account = document.querySelector(".account-menu-header") as HTMLDetailsElement;
+
+    for (const [name, details] of [["rail", rail], ["header account", account]] as const) {
       details.open = true;
 
       // A tap on the page behind the overlay. Without this the only ways out were
@@ -129,13 +138,13 @@ describe("AppShell", () => {
       // dismissed by tapping away from it (UX-23).
       fireEvent.pointerDown(document.body);
 
-      expect(details.open, `${navigationName} stayed open`).toBe(false);
+      expect(details.open, `the ${name} disclosure stayed open`).toBe(false);
     }
   });
 
   it("keeps a More disclosure open while the pointer goes down inside it", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
-    const navigation = screen.getByRole("navigation", { name: "Navegação móvel" });
+    const navigation = screen.getByRole("navigation", { name: "Navegação principal" });
     const details = navigation.querySelector(":scope > details") as HTMLDetailsElement;
     details.open = true;
 
@@ -144,14 +153,41 @@ describe("AppShell", () => {
     expect(details.open).toBe(true);
   });
 
-  it("keeps secondary destinations grouped and reachable from mobile More", () => {
+  /**
+   * `2P-CHAT-004-MOBILE`, closed — and this is the assertion that says the bar
+   * is the handoff's bar rather than the one with a menu in it.
+   *
+   * Written as an absence with a positive control beside it: a mobile nav that
+   * rendered nothing at all would satisfy "contains no `<details>`" for free.
+   */
+  it("carries five destinations and no disclosure on the mobile bar", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
-    const mobileNavigation = screen.getByRole("navigation", { name: "Navegação móvel" });
-    const hrefs = within(mobileNavigation)
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+
+    expect(mobile.querySelectorAll(":scope > details"), "`Mais` is back on the bar").toHaveLength(0);
+    expect(within(mobile).queryByText("Mais")).not.toBeInTheDocument();
+    // The control: five real links, so the absence above is not vacuous.
+    expect(mobile.querySelectorAll(":scope > a")).toHaveLength(5);
+  });
+
+  /**
+   * The secondary destinations kept their grouped index — on the rail, which is
+   * where the disclosure still is.
+   *
+   * The mobile half of this claim moved to `mobile-reachability-guard`, which
+   * re-derives every path from the components that emit it rather than reading
+   * one nav's links. That is the honest place for it now: on a phone these are
+   * reached from Brain, Trabalho, Registros, the calendar, the account and the
+   * palette, and no single component can answer for all six.
+   */
+  it("keeps secondary destinations grouped and reachable from the rail's More", () => {
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+    const railNavigation = screen.getByRole("navigation", { name: "Navegação principal" });
+    const hrefs = within(railNavigation)
       .getAllByRole("link")
       .map((link) => link.getAttribute("href"));
 
-    expect(within(mobileNavigation).getByText("Mais")).toBeInTheDocument();
+    expect(within(railNavigation).getByText("Mais")).toBeInTheDocument();
     expect(hrefs).toEqual(expect.arrayContaining([
       "/pt-BR/app",
       "/pt-BR/app/inbox",
@@ -180,22 +216,28 @@ describe("AppShell", () => {
     expect(hrefs).not.toContain("/pt-BR/app/jobs");
     expect(hrefs).not.toContain("/pt-BR/app/notifications");
     for (const group of ["Contexto", "Reflexão", "Organização", "Transparência", "Preferências"]) {
-      expect(within(mobileNavigation).getByRole("group", { name: group })).toBeInTheDocument();
+      expect(within(railNavigation).getByRole("group", { name: group })).toBeInTheDocument();
     }
   });
 
-  it("closes mobile More with Escape and restores focus to its summary", () => {
-    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
-    const mobileNavigation = screen.getByRole("navigation", { name: "Navegação móvel" });
-    const summary = within(mobileNavigation).getByText("Mais").closest("summary");
-    const details = summary?.closest("details");
+  /**
+   * The account is now the disclosure a phone opens, so it inherits the
+   * behaviour `Mais` used to be held to.
+   *
+   * `2P-CHAT-004-MOBILE` freed the slot by moving this control into the header;
+   * dropping the Escape-and-restore-focus assertion along with the panel would
+   * have traded a proved keyboard behaviour for a slot.
+   */
+  it("closes the header account with Escape and restores focus to its summary", () => {
+    render(<AppShell identity={{ displayName: "Marina Duarte" }} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+    const account = document.querySelector(".account-menu-header") as HTMLDetailsElement;
+    const summary = account.querySelector("summary");
 
     expect(summary).not.toBeNull();
-    expect(details).not.toBeNull();
-    details?.setAttribute("open", "");
-    fireEvent.keyDown(details!, { key: "Escape" });
+    account.setAttribute("open", "");
+    fireEvent.keyDown(account, { key: "Escape" });
 
-    expect(details).not.toHaveAttribute("open");
+    expect(account).not.toHaveAttribute("open");
     expect(summary).toHaveFocus();
   });
 
@@ -216,8 +258,11 @@ describe("AppShell", () => {
      *
      * Registros is back on the bar, because its default view is now the decision
      * queue and `02-arquitetura-e-rotas.md` says a queue cannot live in overflow.
-     * Brain took the slot it left, and `Mais` stays — it is the only route to
-     * fourteen destinations on a phone.
+     *
+     * **Brain took the fifth slot in slice 2P.5**, when the two destinations
+     * `capabilities.ts` recorded as the release condition got paths that do not
+     * go through a menu: the account reached the top bar, and Perguntas got an
+     * unconditional link in Registros' header.
      *
      * DOM order is asserted here and *is* the visual order, because the grid
      * assigns columns in source order and nothing sets `order`.
@@ -227,7 +272,7 @@ describe("AppShell", () => {
       "Registros",
       "Captura rápida",
       "Trabalho",
-      "Mais",
+      "Brain",
     ]);
   });
 
@@ -257,19 +302,18 @@ describe("AppShell", () => {
    * lead the panel's destinations rather than joining a secondary group, so it
    * needs no scrolling to reach.
    */
-  it("keeps the demoted primary destination first inside Mais", () => {
+  it("demotes nothing, because every primary destination is a slot", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
-    const panel = mobile.querySelector(":scope > details > .mobile-more-menu")!;
 
-    // The account block still leads the panel (Slice D3: the way out must not sit
-    // below what you do inside).
-    expect(panel.firstElementChild).toHaveClass("mobile-nav-account");
-
-    const destinations = Array.from(panel.querySelectorAll(":scope > :not(.mobile-nav-account) a"));
-    expect(destinations[0]).toHaveAttribute("href", "/pt-BR/app/library");
-    expect(destinations[0]).toHaveTextContent("Brain");
-    expect(mobileDemotedKeys).toEqual(["library"]);
+    /*
+      Derived, not listed: `mobileDemotedKeys` is `primaryNavigationKeys` minus
+      the bar. It was `["library"]` and is empty now, which is the arithmetic
+      statement of *the handoff's bar shipped* — and it is why the overflow panel
+      that used to hold the demoted destination has nothing left to hold.
+    */
+    expect(mobileDemotedKeys).toEqual([]);
+    expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveTextContent("Brain");
   });
 
   it("carries Registros on the bar itself, not behind the disclosure", () => {
@@ -283,16 +327,15 @@ describe("AppShell", () => {
     expect(onTheBar).toContain("/pt-BR/app/inbox");
   });
 
-  it("marks Mais active while the user is inside the destination it now contains", () => {
-    // The failure this prevents: a phone user standing in a demoted destination
-    // sees no active state anywhere. The destination changed with the redesign —
-    // Brain now, Registros before — and the failure is the same one.
+  it("marks Brain as the current page from the bar itself", () => {
+    // The failure this prevents is unchanged: a phone user standing in a
+    // destination sees no active state anywhere. It used to be answered by
+    // marking `Mais` active while Brain hid inside it; Brain is a slot now, so
+    // the slot says it directly.
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app/library");
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
 
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
-    expect(mobile.querySelector(":scope > details")).toHaveClass("active");
-    // And the link inside it is the current page.
     expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveAttribute("aria-current", "page");
 
     // Desktop is unchanged: Brain is a primary rail destination, so the rail's own
@@ -324,16 +367,17 @@ describe("AppShell", () => {
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
   });
 
-  it("closes the disclosure when a demoted destination is followed", () => {
+  it("closes the disclosure when a destination inside it is followed", () => {
+    // Asserted on the rail, which is where the disclosure lives after slice
+    // 2P.5. The behaviour is unchanged and so is its reason — otherwise the
+    // panel stays open over the page the user just navigated to.
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
-    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
-    const details = mobile.querySelector(":scope > details") as HTMLDetailsElement;
+    const rail = screen.getByRole("navigation", { name: "Navegação principal" });
+    const details = rail.querySelector(":scope > details") as HTMLDetailsElement;
     details.open = true;
 
-    const demoted = mobile.querySelector('details a[href="/pt-BR/app/library"]') as HTMLAnchorElement;
-    fireEvent.click(demoted);
+    fireEvent.click(details.querySelector('a[href="/pt-BR/app/projects"]') as HTMLAnchorElement);
 
-    // Otherwise the panel stays open over the page the user just navigated to.
     expect(details.open).toBe(false);
   });
 
@@ -354,7 +398,17 @@ describe("AppShell", () => {
       const controls = screen.getAllByRole("button", { name: "Sair da conta" });
       expect(controls).toHaveLength(2);
       expect(document.querySelectorAll(".account-menu-rail")).toHaveLength(1);
-      expect(document.querySelectorAll(".account-menu-overflow")).toHaveLength(1);
+      /*
+        `header` since slice 2P.5, where it was `overflow`.
+
+        The mount moved rather than multiplied: the overflow panel retired with
+        the bar slot it occupied, and the top bar carries the account on every
+        viewport instead. Still two mounts of one component, so a phone user and
+        a desktop user have the same way out and neither surface can end a
+        session the other does not.
+      */
+      expect(document.querySelectorAll(".account-menu-header")).toHaveLength(1);
+      expect(document.querySelectorAll(".account-menu-overflow")).toHaveLength(0);
     });
 
     it("sits in the rail foot on desktop, not among the navigation destinations", () => {
@@ -368,14 +422,28 @@ describe("AppShell", () => {
       expect(within(navigation).queryByRole("button", { name: "Sair da conta" })).toBeNull();
     });
 
-    it("is the first thing in the mobile overflow panel, before the secondary destinations", () => {
+    /**
+     * `2P-CHAT-004-MOBILE`'s release condition, asserted as the thing that
+     * actually freed the slot.
+     *
+     * Placement was always the requirement — *reachable without scrolling past
+     * product destinations* — and the top bar satisfies it more strongly than
+     * the panel did: nothing has to be opened first, and it is in the same place
+     * on every viewport. `mobile-reachability-guard` holds the other direction,
+     * failing if the account leaves the header while the slot stays Brain.
+     */
+    it("sits in the top bar, reachable without opening anything else", () => {
       render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
-      const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
-      const panel = mobile.querySelector(":scope > details > .mobile-more-menu")!;
 
-      // Placement is the requirement: reachable without scrolling past product
-      // destinations, on a panel that scrolls at 65vh.
-      expect(panel.firstElementChild).toHaveClass("mobile-nav-account");
+      const account = document.querySelector(".top-bar .top-actions .account-menu-header");
+      expect(account, "the account left the top bar — the fifth slot must go back to `Mais`").toBeTruthy();
+      // Not nested in a second disclosure: its own summary is the first and only
+      // control to press.
+      expect((account as HTMLElement).closest("details")).toBe(account);
+      // And it is not inside either navigation, so it adds no destination.
+      for (const name of ["Navegação principal", "Navegação móvel"]) {
+        expect(screen.getByRole("navigation", { name }).contains(account)).toBe(false);
+      }
     });
 
     it("adds no navigation destination, and reaches Settings as the route it already is", () => {
@@ -399,27 +467,40 @@ describe("AppShell", () => {
       expect(screen.getAllByText("Sua conta")).toHaveLength(2);
     });
 
-    it("closes one nested layer per Escape, keeping focus on a control that is still there", () => {
-      // The mobile account block lives inside the overflow panel. Before
-      // `stopPropagation`, one Escape closed both — so the summary the inner
-      // handler had just focused was hidden by the time the press finished, and
-      // focus was lost. Caught by the live Pixel 7 run, pinned here.
+    /**
+     * The nesting this was written for is gone, and the property it proves is
+     * not.
+     *
+     * The mobile account block used to live *inside* the overflow panel, and
+     * before `stopPropagation` one Escape closed both — so the summary the inner
+     * handler had just focused was hidden by the time the press finished, and
+     * focus was lost. Caught by the live Pixel 7 run.
+     *
+     * Slice 2P.5 removed that nesting by moving the account to the top bar, so
+     * the mobile pair no longer exists. The desktop rail still nests nothing
+     * inside its disclosure either — but the `stopPropagation` that fixed the
+     * defect is still in `useDismissableDisclosure` and still has to work, so
+     * this now proves it on the two disclosures that DO coexist: closing one
+     * must not close the other.
+     */
+    it("closes one disclosure per Escape, leaving the other alone", () => {
       render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
-      const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
-      const overflow = mobile.querySelector(":scope > details") as HTMLDetailsElement;
-      const account = mobile.querySelector(".account-menu") as HTMLDetailsElement;
+      const rail = screen
+        .getByRole("navigation", { name: "Navegação principal" })
+        .querySelector(":scope > details") as HTMLDetailsElement;
+      const account = document.querySelector(".account-menu-header") as HTMLDetailsElement;
 
-      overflow.open = true;
+      rail.open = true;
       account.open = true;
       fireEvent.keyDown(account, { key: "Escape" });
 
       expect(account.open).toBe(false);
-      expect(overflow.open, "one Escape must not collapse the layer above it").toBe(true);
+      expect(rail.open, "one Escape collapsed a disclosure it was not aimed at").toBe(true);
       expect(document.activeElement).toBe(account.querySelector("summary"));
 
-      // A second Escape then closes the layer above.
-      fireEvent.keyDown(overflow, { key: "Escape" });
-      expect(overflow.open).toBe(false);
+      // And the other one still answers its own Escape.
+      fireEvent.keyDown(rail, { key: "Escape" });
+      expect(rail.open).toBe(false);
     });
 
     it("localizes both mounts in English", () => {

@@ -92,7 +92,10 @@ const STORED_PREFERENCES = {
   privacy_default: "private",
 };
 
-function activeClient(rpc = vi.fn(async () => ({ error: null })), storedProfile: unknown = { display_name: "Owner", locale: "en", timezone: "America/Sao_Paulo" }) {
+/** Typed so `rpc.mock.calls[0][1]` is the payload rather than a tuple of nothing. */
+type SaveRpc = (name: string, payload: { p_profile: Record<string, unknown>; p_preferences: Record<string, unknown> }) => Promise<{ error: { code: string; message: string } | null }>;
+
+function activeClient(rpc = vi.fn<SaveRpc>(async () => ({ error: null })), storedProfile: unknown = { display_name: "Owner", locale: "en", timezone: "America/Sao_Paulo" }) {
   const profile = queryStub(storedProfile);
   const preferences = queryStub(STORED_PREFERENCES);
   const lifecycle = queryStub({ status: "active" });
@@ -144,7 +147,7 @@ describe("updateProfile", () => {
   // SH-LIFECYCLE-009: a non-active account is refused server-side before any write.
   it("redirects a suspended account to the account-state surface before saving anything", async () => {
     const lifecycle = queryStub({ status: "suspended" });
-    const rpc = vi.fn(async () => ({ error: null }));
+    const rpc = vi.fn<SaveRpc>(async () => ({ error: null }));
     vi.mocked(createClient).mockResolvedValue({
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1", user_metadata: { display_name: "Fallback" } } }, error: null })) },
       from: vi.fn(() => lifecycle),
@@ -215,8 +218,8 @@ describe("a section writes its own columns and passes every other one through", 
       const result = await updateProfile({ status: "idle", message: "" }, sectionFormData(section));
       expect(result.status).toBe("success");
 
-      const call = rpc.mock.calls[0][1] as { p_profile: Record<string, unknown>; p_preferences: Record<string, unknown> };
-      const written = { ...call.p_preferences, timezone: call.p_profile.timezone };
+      const call = rpc.mock.calls[0][1];
+      const written: Record<string, unknown> = { ...call.p_preferences, timezone: call.p_profile.timezone };
       const owned = PROFILE_SECTION_FIELDS[section] as readonly string[];
 
       for (const field of Object.keys(STORED_AS_PAYLOAD)) {
@@ -259,14 +262,14 @@ describe("a section writes its own columns and passes every other one through", 
       sectionFormData("planning", { importantReminderOverride: null }),
     );
     expect(result.status).toBe("success");
-    const call = rpc.mock.calls[0][1] as { p_preferences: Record<string, unknown> };
+    const call = rpc.mock.calls[0][1];
     expect(call.p_preferences.importantReminderOverride).toBe(false);
   });
 
   it("but another section's save leaves it exactly as stored", async () => {
     const { rpc } = activeClient();
     await updateProfile({ status: "idle", message: "" }, sectionFormData("general"));
-    const call = rpc.mock.calls[0][1] as { p_preferences: Record<string, unknown> };
+    const call = rpc.mock.calls[0][1];
     expect(call.p_preferences.importantReminderOverride).toBe(true);
   });
 
@@ -280,7 +283,7 @@ describe("a section writes its own columns and passes every other one through", 
     const profile = queryStub(null);
     const preferences = queryStub(null);
     const lifecycle = queryStub({ status: "active" });
-    const rpc = vi.fn(async () => ({ error: null }));
+    const rpc = vi.fn<SaveRpc>(async () => ({ error: null }));
     vi.mocked(createClient).mockResolvedValue({
       auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1", user_metadata: { display_name: "Fallback" } } }, error: null })) },
       from: vi.fn((table: string) => table === "account_lifecycle" ? lifecycle : table === "profiles" ? profile : preferences),
@@ -289,7 +292,7 @@ describe("a section writes its own columns and passes every other one through", 
 
     const result = await updateProfile({ status: "idle", message: "" }, sectionFormData("general"));
     expect(result.status).toBe("success");
-    const call = rpc.mock.calls[0][1] as { p_preferences: Record<string, unknown> };
+    const call = rpc.mock.calls[0][1];
     // `resolveSettingsFormValues`' own fallbacks, which is what the form would
     // have rendered against the same empty row.
     expect(call.p_preferences.quietStart).toBe("22:30");
@@ -337,8 +340,8 @@ describe("a failure names its section and writes nothing", () => {
   });
 
   it("names the section when the database refuses the write", async () => {
-    const rpc = vi.fn(async () => ({ error: { code: "23514", message: "check" } }));
-    activeClient(rpc as never);
+    const rpc = vi.fn<SaveRpc>(async () => ({ error: { code: "23514", message: "check" } }));
+    activeClient(rpc);
     const result = await updateProfile({ status: "idle", message: "" }, sectionFormData("planning"));
     expect(result.status).toBe("error");
     expect(result.section).toBe("planning");

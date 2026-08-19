@@ -181,6 +181,29 @@ function RecordsHeader({ locale, lead }: { locale: Locale; lead: string }) {
       <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
       <h1>{pt ? "Registros" : "Records"}</h1>
       <p className="records-lead">{lead}</p>
+      {/*
+        Slice 2P.5, and it is what let the mobile bar's fifth slot free up.
+
+        `capabilities.ts`'s census names Perguntas as one of exactly two
+        destinations `Mais` was the only mobile route to: Hoje's link sits inside
+        `{view.openQuestion ? … : null}`, and `conversational-questions.tsx`
+        returns `null` on an empty list, so an owner with no open question had no
+        path at all.
+
+        The census also names the fix and rejects the obvious alternative:
+        Perguntas is *"a view of Registros rather than a destination Hoje
+        advertises"*, and putting a permanent control on the cockpit to make the
+        census true would be arranging the product around its own bookkeeping.
+        Registros is a bar slot, so this is one tap from the bar.
+
+        **Unconditional, deliberately.** A link that appears only once there is
+        something to see is not a path — it is the same shape the calendar's
+        reminders link had before an earlier part fixed it, and you cannot answer
+        a question from a page you cannot open.
+      */}
+      <Link className="records-questions-link" href={`/${locale}/app/questions`}>
+        {getRecordsCopy(locale).questionsLink}
+      </Link>
     </header>
   );
 }
