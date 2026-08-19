@@ -287,3 +287,26 @@ rather than hidden** — see §8.
   VoiceOver evidence remains ADR-122 Decision 6's closeout gate.
 
 **Cumulative: 63 of 87.**
+
+---
+
+## 9. The merge
+
+**Merged at `f45ea4bcb54e6716c0ebbf745734a5ac54bbc150`** (PR #265), first
+attempt, no re-runs.
+
+**Green at both points, with the step list read at both.** On the exact head
+`d4fe9ce` and again on the exact merge SHA `f45ea4b`, the `database and journey`
+job reports **21 `success`, 2 `skipped`, zero `cancelled`**, and each decisive
+step is confirmed by name: the whole migration chain applied to an empty
+database, pgTAP, `supabase db lint`, all three concurrency proofs, `Install the
+browser`, and `Run the deterministic foundation journey`. The two skipped are the
+on-failure artifact collectors. `application` reports 11 `success`; `edge worker`
+9. The PR carried zero reviews and one automated comment.
+
+An earlier run on `4523f38` shows `cancelled`. That head was superseded by the
+handoff push seconds later, and a cancelled run was not read as a passing one.
+
+**After the merge:** `main` synchronized and clean, zero open PRs, **99 local =
+99 hosted, parity `202608190099`** unchanged, read live. No deployment was
+needed, because the slice carries no migration.

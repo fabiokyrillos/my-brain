@@ -10327,3 +10327,96 @@ the **first-action warm-up**, new here.
 Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
 §91, §93, §94, §95, §96 and §97 left them. **This section deliberately does not
 name what comes after Phase 2P.**
+
+## §99 — Slice 2P.6 merges, and slice 2P.7 is confirmed blocked on two owner decisions (2026-08-19)
+
+**Merge SHA `f45ea4bcb54e6716c0ebbf745734a5ac54bbc150`** (PR #265). `main`
+synchronized and clean, **zero open PRs**, **99 local = 99 hosted, parity
+`202608190099`** — read live from `supabase_migrations.schema_migrations` and
+**unchanged by this slice**. Both Phase 2P allocations remain spent; a third
+remains a stop condition. Signup closed; rollout 25 pass · 3 fail · 2
+owner-signature. No automation enabled.
+
+**Cumulative: 63 of 87.** `2P-PERSON-001` … `-004`, `2P-MEMORY-001` … `-004` and
+`2P-RELATION-001` … `-004` all built. The record is
+`docs/reports/phase-2p/PHASE_2P_SLICE_06_ACCEPTANCE.md`; §98 has the narrative.
+
+### CI: green at both points, and the step lists were read at both
+
+**On the exact head `d4fe9ce`: all three jobs green**, with the `database and
+journey` step list read — **21 `success`, 2 `skipped`, zero `cancelled`**, and
+every decisive step confirmed by name: the whole migration chain applied to an
+empty database, pgTAP, `supabase db lint`, all three concurrency proofs,
+`Install the browser` and `Run the deterministic foundation journey`. The two
+skipped are the on-failure artifact collectors. That is what the merge was made
+on. Vercel also reported success; the PR carried **zero reviews** and one
+automated comment.
+
+**On the merge SHA `f45ea4b`: all three jobs green, same step list read — 21
+`success`, 2 `skipped`, zero `cancelled`**, with the same eight decisive steps
+confirmed by name, and `application` at 11 `success`. **First attempt, no
+re-runs.**
+
+An earlier run on `4523f38` shows `cancelled` and is **not** a failure: that head
+was superseded by the handoff push seconds later. A cancelled run is not a
+passing one and was not read as one — the green above is on the two SHAs that
+matter.
+
+### One tooling failure worth carrying, because it looked like patience
+
+The first CI monitor reported **nothing for a full hour** and was assumed to mean
+*still running*. It was not: `gh api /repos/...` inside Git Bash is rewritten to
+`C:/Program Files/Git/repos/...` and fails, and the error goes to stderr, which
+is not the event stream. **Omit the leading slash** — `gh api repos/...` — and
+test the exact command in the foreground before arming a monitor on it. A
+monitor that never speaks has not told you the job is healthy.
+
+### Slice 2P.7 re-audited against `f45ea4b`, and it is blocked
+
+§98's re-audit was taken against the branch; both decisive facts were re-measured
+against the merged `main` and are unchanged:
+
+- **`CALENDAR_ORIENTATIONS` is `["day","week","agenda"]`**, with
+  `DEFAULT_ORIENTATION` and `MOBILE_DEFAULT_ORIENTATION` both `day`.
+  `2P-CALENDAR-001` asks for **month** navigation, which does not exist.
+- **`reminders` has no recurrence column of any kind** — `id, user_id, title,
+  remind_at, important, status, sent_at, snoozed_until, task_id, entry_id,
+  created_at, updated_at`. `2P-REMINDER-002` asks the modal to group recurrence,
+  which would be **a third Phase 2P migration and therefore a stop condition**.
+
+**Both are owner decisions of exactly the shape `2P-PERSON-001` just received,
+and 2P.7 must not open by writing code.** The honest first act is to put both to
+the owner with the measurement, the stop condition named, and — where the answer
+is a wording correction rather than new work — a proposed amendment that
+preserves the prior text and changes no count.
+
+The rest of 2P.7's ten: `2P-REMINDER-001` is a real gap (`/app/reminders` mounts
+`ReminderForm` inline in the page body); `2P-REMINDER-004`'s contract now exists
+and is proved, so reuse `ConfirmDialog` and do not write a fifth dialog;
+`2P-CALENDAR-003` is partly shipped through `calendar-reschedule.tsx`, which
+routes to the task-detail command path rather than a second writer; and
+`2P-CALENDAR-002`, `-004`, `-005`, `2P-REMINDER-003` and `-005` are unmeasured in
+this pass and must be re-measured rather than inherited.
+
+### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** 2P.6 is merged, green on its exact
+head and again on its exact merge SHA with the step list read at both points,
+`main` is synchronized and clean, nothing is half-written, and no deployment was
+needed because the slice carries no migration.
+
+**The next action is not slice 2P.7's implementation. It is the owner's answer to
+the two questions above.**
+
+**Seven remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half;
+`2P-CHAT-007-JOURNEY` (2P.8, with the owner's one-turn BYOK authorization);
+`RG-DEP-3`; the four missing review flows (`2P-AUTONOMY-FLOW-PROJECT`,
+`-ORGANIZATION`, `-MEMORY`, `-RELATION`); `2P-APPEARANCE-HYDRATION`; the
+remaining `revalidatePath` call sites outside the three 2P.6 needed; and the
+**first-action warm-up** — the first Server Action after a server start can
+exceed sixty seconds, compensated by one documented retry and **not** diagnosed
+to root cause.
+
+Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
+§91, §93, §94, §95, §96, §97 and §98 left them. **This section deliberately does
+not name what comes after Phase 2P.**
