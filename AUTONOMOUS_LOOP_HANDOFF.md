@@ -10420,3 +10420,98 @@ to root cause.
 Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
 §91, §93, §94, §95, §96, §97 and §98 left them. **This section deliberately does
 not name what comes after Phase 2P.**
+
+## §100 — The owner answers both of slice 2P.7's blocking questions: a real month, and no recurrence (2026-08-19)
+
+**Baseline `main` `97cee34`** — slice 2P.6's merge (`f45ea4b`) plus its record
+(§99). Clean, zero open PRs, **99 local = 99 hosted, parity `202608190099`**,
+read live. **63 of 87.** Both Phase 2P allocations spent; a third remains a stop
+condition. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+§98 and §99 recorded two questions and refused to answer them. **Both are now
+answered, and they went in opposite directions** — which is the point of asking
+rather than inferring.
+
+### `2P-CALENDAR-001` — the text is unchanged, and the scope is confirmed
+
+**A real month view.** Agenda **may not** be interpreted or renamed as Mês, and
+a plain list may not be declared a month. Slice 2P.7 delivers **Dia, Semana and
+Mês**; Agenda may remain as an additional view while it stays useful.
+
+The month view must: show the real grid of the month; mark today perceptibly
+**without relying on colour alone**; distinguish days outside the current month;
+show tasks, reminders and reviews **boundedly**; keep cells from growing without
+limit; offer access to the overflow; open a day or an item **preserving
+context**; work on mobile without an illegible grid; carry an accessible text
+alternative; preserve timezone and local-date semantics; and **create no new
+write path**. Where a legible grid needs a different presentation on a phone, a
+compact or contextual agenda is allowed **while the real month remains the
+selected period**.
+
+The requirement's own wording is **untouched** — this was a confirmation, not a
+correction, and the PRD must not read as though it moved. The guard asserts that
+directly, because "confirmed" and "corrected" leave different traces and
+conflating them would lose the fact that nothing was renegotiated here.
+
+### `2P-REMINDER-002` — corrected, with recurrence out of the phase
+
+`reminders` has no recurrence column of any kind, so the requirement as written
+needed a third Phase 2P migration. **The owner refuses it.** The corrected
+declaration groups **content; date and time; importance; an optional link; and
+the save and cancel actions**, and the prior text is preserved in ADR-121 and in
+the PRD. **The count stays 87** and no ID is renumbered.
+
+**Recurrence becomes the traceable remainder `2P-REMINDER-RECURRENCE`**, never
+classified `built`, `baseline` or `partial` for this implementation. Binding
+while it stands: no control that does not work; no rule encoded in free text; no
+duplicated reminders simulating a repeat; no reuse of an existing column; **no
+column, table, RPC or migration**; and no change to what the current scheduling
+means.
+
+### The guard duplicated an existing one, and the duplication announced itself
+
+The first draft of `phase-2p-reminder-recurrence-guard.test.ts` scanned the
+repository for recurrence artifacts. It was reported **three times by
+`phase-2m-recurrence-guard.test.ts`** within a minute of being written, because
+the fixtures a scanner needs are exactly the shapes that scanner forbids.
+
+The lesson is not that the 2M guard is too strict. `2M-RECUR-001` already
+forbids every implementation shape across `src`, `supabase/migrations`,
+`supabase/functions` and `public`, with its own controls and a deliberately
+**single-file** self-exemption — and broadening that exemption to a second file
+is precisely how a guard stops guarding. **One enforcer, one recorder:** the 2P
+guard now records the decision, pins what 2M cannot see (the amendment, the
+preserved wording, the named remainder, the calendar confirmation), asserts
+`reminders`'s **exact closed column list** — which fails on a column added under
+*any* name, not only a repeat-shaped one — and calls the 2M scanner rather than
+re-implementing it, so the delegation cannot rot into a comment pointing at a
+guard somebody deleted.
+
+### Slice 2P.7, now unblocked and re-scoped
+
+Ten requirements. The two questions are answered; the rest stand as §98 measured
+them, and each must be **re-measured** rather than inherited:
+
+| Requirement | State |
+|---|---|
+| `2P-CALENDAR-001` | **build the month.** `CALENDAR_ORIENTATIONS` is still `["day","week","agenda"]`; when the month ships, the guard's fact assertion flips and the flip is the delivery. |
+| `2P-CALENDAR-002` `-004` `-005` | unmeasured in this pass; `calendar-item.tsx` and `calendar-outcome.tsx` exist with tests. Re-measure. |
+| `2P-CALENDAR-003` | partly shipped — `calendar-reschedule.tsx` routes to the task-detail command path rather than a second writer. Period-preservation is a browser claim and is unproved. |
+| `2P-REMINDER-001` | **gap** — `/app/reminders` mounts `ReminderForm` inline in the page body. |
+| `2P-REMINDER-002` | corrected; build the four groups, **no recurrence**. |
+| `2P-REMINDER-003` | unmeasured — check whether reminders share the reschedule vocabulary before designing. |
+| `2P-REMINDER-004` | **the contract exists and is proved** — `ConfirmDialog` plus slice 2P.6's derived-openness fix and its keyboard journey. Reuse it; do not write a fifth dialog, and do not close a dialog while its own transition is still applying. |
+| `2P-REMINDER-005` | unmeasured. |
+
+**Zero migrations**, per ADR-123's amendment of this date. No automation
+enabled, no inference persisted, no grant, RLS policy, retention rule or
+authority moved.
+
+**Eight remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half;
+`2P-CHAT-007-JOURNEY` (2P.8); `RG-DEP-3`; the four missing review flows;
+`2P-APPEARANCE-HYDRATION`; the remaining `revalidatePath` call sites; the
+**first-action warm-up**; and now **`2P-REMINDER-RECURRENCE`**.
+
+Push HTTP 403, signup, rollout and every inherited residual stay where §87 …
+§99 left them. **This section deliberately does not name what comes after Phase
+2P.**

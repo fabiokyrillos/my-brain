@@ -122,7 +122,30 @@ of the same date records the posture, and a third remains a stop condition.
 
 Recompose calendar hierarchy and move reminder creation/rescheduling into the
 shared modal/sheet. Preserve selected period, timezone, quiet-hour semantics,
-dedupe, recurrence and existing command paths.
+dedupe and existing command paths.
+
+Two of the ten requirements named things the product does not have, and slice
+2P.6's re-audit put both to the owner instead of resolving them. Both answers
+are recorded in ADR-121's amendment of 2026-08-19.
+
+**`2P-CALENDAR-001` means a real month view.** `CALENDAR_ORIENTATIONS` is
+`["day","week","agenda"]`, and Agenda **may not** be interpreted or renamed as
+Mês. The slice delivers Dia, Semana and Mês; Agenda may stay as an additional
+view. The month shows the real grid, marks today without relying on colour
+alone, distinguishes days outside the month, bounds what each cell shows, offers
+the overflow, opens a day or item preserving context, stays legible on a phone,
+carries a text alternative, preserves timezone and local-date semantics, and
+**creates no new write path**. A compact or contextual agenda is allowed on a
+phone **while the real month remains the selected period**; a plain list is not
+a month view.
+
+**`2P-REMINDER-002` was corrected: recurrence is out of this phase.**
+`reminders` has no recurrence column of any kind, so offering it would be a
+third Phase 2P migration and therefore a stop condition. The modal groups
+content, date and time, importance, an optional link, and save/cancel.
+Recurrence becomes the traceable remainder **`2P-REMINDER-RECURRENCE`** and is
+never classified `built`, `baseline` or `partial` here. **Zero migrations** —
+ADR-123's amendment of the same date records the posture.
 
 ### 2P.8 — close honestly
 

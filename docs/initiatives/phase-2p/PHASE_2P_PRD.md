@@ -157,6 +157,8 @@ provider, retain audio, or silently absorb Phase 2N/2O residuals.
 ### 3.10 `2P-CALENDAR` — calm planning context (5)
 
 - **2P-CALENDAR-001:** Calendar has clear day, week and month navigation with an unmistakable current day.
+
+  *Scope confirmed by the owner on 2026-08-19; the text is unchanged.* Slice 2P.7's re-audit found `CALENDAR_ORIENTATIONS` is `["day","week","agenda"]` and asked whether "month" could mean the agenda. **It cannot.** `2P-CALENDAR-001` means a **real month view**, and Agenda must not be interpreted or renamed as Mês. 2P.7 delivers **Dia, Semana and Mês**; Agenda may remain as an additional view while it stays useful. The month view shows the real grid of the month; marks today perceptibly **without relying on colour alone**; distinguishes days outside the current month; shows tasks, reminders and reviews in a **bounded** way; keeps cells from growing without limit; offers access to the overflow; opens a day or an item **preserving context**; works on mobile without an illegible grid; carries an accessible text alternative; preserves timezone and local-date semantics; and **creates no new write path**. If a legible month grid needs a different presentation on a phone, use a compact or contextual agenda **while the real month stays the selected period** — a plain list must not be declared a month view.
 - **2P-CALENDAR-002:** Task, reminder and review use a small consistent visual vocabulary that also works without color.
 - **2P-CALENDAR-003:** Opening or rescheduling an item preserves the selected period and scroll context.
 - **2P-CALENDAR-004:** Empty, partial, loading and failed lanes remain distinguishable.
@@ -165,7 +167,9 @@ provider, retain audio, or silently absorb Phase 2N/2O residuals.
 ### 3.11 `2P-REMINDER` — creation in a focused modal/sheet (5)
 
 - **2P-REMINDER-001:** The page header contains a single “New reminder” action, not an inline creation form.
-- **2P-REMINDER-002:** The modal/sheet groups content, schedule, recurrence/importance and optional links in that order.
+- **2P-REMINDER-002:** The modal/sheet groups content, date and time, importance, an optional link, and the save and cancel actions, in that order.
+
+  *Corrected by the owner on 2026-08-19; see ADR-121's amendment of that date.* Superseded wording, preserved: *"The modal/sheet groups content, schedule, recurrence/importance and optional links in that order."* It named recurrence, and `reminders` has **no recurrence column of any kind** — `id, user_id, title, remind_at, important, status, sent_at, snoozed_until, task_id, entry_id, created_at, updated_at` — so offering it would need a third Phase 2P migration, which is a stop condition. **Recurrence is not offered in this phase, because the product has no persistent model for it.** It becomes the explicit traceable remainder **`2P-REMINDER-RECURRENCE`**, and it is never classified `built`, `baseline` or `partial` for this implementation. Forbidden while it stands: a recurrence control that does not work; recurrence encoded in free text; duplicated reminders simulating a repeat; reuse of an existing column for it; any column, table, RPC or migration; and any change to what the current scheduling means. The count stays 87 and no ID is renumbered.
 - **2P-REMINDER-003:** Create and reschedule share vocabulary and validation without creating a second write path.
 - **2P-REMINDER-004:** Cancel closes without writing and restores focus and page context.
 - **2P-REMINDER-005:** Reminder cards prioritize content and next occurrence; destructive actions are visually secondary but reachable.
