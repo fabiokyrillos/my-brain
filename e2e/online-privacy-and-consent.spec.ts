@@ -75,7 +75,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
 
   test("2O-PRIVACY-001/-003: every category is counted, and nothing is previewed", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/privacy");
 
     // The RSC assertion: the new Server Component rendered at all.
     await expect(page.getByRole("heading", { name: "Privacidade e dados" })).toBeVisible();
@@ -131,7 +131,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
 
   test("2O-PRIVACY-002: the three withheld tables are named with their reason", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/privacy");
 
     const withheld = page.locator(".privacy-withheld");
     await expect(withheld).toBeVisible();
@@ -143,7 +143,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
 
   test("2O-PRIVACY-004/-006: the export completes or refuses, and never offers both", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/privacy");
 
     const control = page.locator(".privacy-export");
     await control.getByRole("button", { name: "Gerar exportação" }).click();
@@ -162,7 +162,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
 
   test("2O-PRIVACY-007/-008/-009: retention, sessions and deletion are reachable", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/privacy");
 
     // `2O-PRIVACY-007`, generated from `RETENTION_SCHEDULE` and honesty-gated.
     await expect(page.getByRole("heading", { name: "Por quanto tempo guardamos" })).toBeVisible();
@@ -184,7 +184,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
     page,
   }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/privacy");
 
     await expect(page.getByRole("heading", { name: "O que você aceitou" })).toBeVisible();
 
@@ -209,7 +209,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
 
   test("2O-CONSENT-003: the whole surface reads in English too", async ({ page }) => {
     await signInOnline(page, { email, locale: "en" });
-    await page.goto("/en/app/settings");
+    await page.goto("/en/app/settings/privacy");
 
     await expect(page.getByRole("heading", { name: "Privacy and data" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "What you have accepted" })).toBeVisible();

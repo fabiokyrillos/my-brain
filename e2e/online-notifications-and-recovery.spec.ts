@@ -78,7 +78,14 @@ test.describe("notifications say three things, and every surface recovers in one
 
   test("2O-NOTIFY-007: consent, permission and delivery render as three separate facts", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/notifications");
+    /*
+      The three facts moved to Settings with the rest of the governance section
+      in slice 2P.5 (2P-SETTINGS-008). Every assertion below is unchanged: the
+      reorganization was required to move this surface without changing its
+      semantics, and a retarget that also needed the expectations rewritten
+      would have been the evidence that it did not.
+    */
+    await page.goto("/pt-BR/app/settings/notifications");
 
     // The RSC assertion: the new Server Component rendered at all.
     const facts = page.locator(".notification-facts");
@@ -110,7 +117,7 @@ test.describe("notifications say three things, and every surface recovers in one
 
   test("2O-NOTIFY-005: the bounds are stated above the control, and the missing one is declared missing", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/notifications");
+    await page.goto("/pt-BR/app/settings/notifications");
 
     const bounds = page.locator("[data-notification-bounds]");
     await expect(bounds).toBeVisible();
@@ -156,7 +163,7 @@ test.describe("notifications say three things, and every surface recovers in one
 
   test("2O-NOTIFY-001: Ajustes reaches notifications, and the route keeps its list", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/notifications");
 
     const link = page.getByRole("link", { name: /Notifica/ }).first();
     await expect(link).toBeVisible();

@@ -70,7 +70,7 @@ test.describe("the product says what it does with a model, and what it costs", (
 
   test("2O-AICONFIG-001/-003/-004/-005: Ajustes states every route and controls only four", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/ai");
 
     const section = page.locator(".ai-config-section");
     // The RSC assertion: it rendered at all.
@@ -111,7 +111,7 @@ test.describe("the product says what it does with a model, and what it costs", (
 
   test("2O-AICONFIG-008: an account with no credential is told, with exactly one way out", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/ai");
 
     // The fixture account has configured no key, which is the state under test.
     const absent = page.locator(".ai-config-credential.absent");
@@ -175,7 +175,7 @@ test.describe("the product says what it does with a model, and what it costs", (
      * `ai_model_pricing` carrying neither version nor source. It is gone, and
      * the catalogue that remains is on Custos, read from the table.
      */
-    await page.goto("/pt-BR/app/settings");
+    await page.goto("/pt-BR/app/settings/ai");
     await page.locator("details.settings-advanced").click();
     const options = await page.locator("#chat-model option").allTextContents();
     expect(options.length).toBeGreaterThan(0);
