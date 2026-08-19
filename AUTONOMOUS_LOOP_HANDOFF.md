@@ -10175,3 +10175,155 @@ three surfaces depend on it and writing a fourth dialog is the outcome to avoid.
 Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
 §91, §93, §94, §95 and §96 left them. **This section deliberately does not name
 what comes after Phase 2P.**
+
+## §98 — Slice 2P.6 ships: a requirement named a column that does not exist, and a dialog that closed too early froze forever (2026-08-19)
+
+**Branch `codex/phase-2p-slice-6-contextual-creation`, PR #265, head `4523f38`,
+over baseline `main` `1cf5959`.** **Zero migrations** — 99 local = 99 hosted,
+parity `202608190099`, read live from `supabase_migrations.schema_migrations` and
+unchanged. Both Phase 2P allocations remain spent; a third remains a stop
+condition. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature. No
+automation enabled; all six categories still `suggest_only`.
+
+**Twelve built — `2P-PERSON-001` … `-004`, `2P-MEMORY-001` … `-004`,
+`2P-RELATION-001` … `-004`. Cumulative 63 of 87.** The full record is
+`docs/reports/phase-2p/PHASE_2P_SLICE_06_ACCEPTANCE.md`.
+
+### The owner corrected a requirement rather than funding a column
+
+`2P-PERSON-001` said *"Company and role are editable from their displayed
+section"*. `people` has columns `id, user_id, organization_id, name, notes,
+created_at, updated_at` and **no `role`** — measured live. Half the sentence
+named a field the product does not have, and building it as written meant adding
+one: a third Phase 2P migration, and therefore a stop condition.
+
+The owner **refused the column** and corrected the wording by amendment, with the
+prior text preserved in ADR-121 and in the PRD. **The count stays 87** and no ID
+was renumbered. A role belongs to the relation that carries it —
+`person_projects` for a project, `task_people` for a task — each edited in its
+own context, never copied onto `people`, and no global title synthesized from
+them.
+
+`src/lib/closeout/phase-2p-person-role-guard.test.ts` makes that **executable**,
+because the risk is not that somebody disagrees: it is that a later reader finds
+a person page with no global role, concludes the requirement is unmet, and adds
+the obvious column. It **forbids the act, not the word** — it asserts the
+generated schema, a migration shape and a data-access shape, so the amendment
+explaining the refusal does not fail it.
+
+### Two of §97's own findings did not survive re-measurement
+
+| §97 recorded | Measured on `1cf5959` |
+|---|---|
+| *"`createRecord` already returns `{ undoId, expiresAt }` from the RPC"* | **False.** `CreateRecordState` is `{status, message}` and the memory branch was a plain `INSERT`. The `undoId` lines in `operations/actions.ts` belong to other actions. |
+| `role` lives on two relation tables | True, and the **shape** was never looked at: `task_people`'s primary key is `(task_id, person_id, role)` over a four-value check, so it is a closed vocabulary and one person may hold **two roles on one task**. |
+
+Both changed the design. The memory composer went to `createProposedMemory` —
+idempotent, audited, returns the id an undo needs — and the task-role request
+carries `previousRole`, because without it the write would guess which row it is
+changing.
+
+**`createRecord`'s memory branch is deleted** and `memory` left `createSchema`.
+There is now one memory writer rather than two, and a forged `kind` is a refusal
+rather than a second unaudited route into `public.memories`.
+
+### The defect only a browser could find, and the four wrong explanations
+
+**A dialog that closes while its own transition is still applying freezes on
+`Salvando…` permanently.** The row was written — proved by polling PostgREST
+before touching the screen — the server logged nothing, and `pending` never came
+down.
+
+| Hypothesis | Refuted by |
+|---|---|
+| hosted latency | the write landed in seconds; the wait was 60s and never resolved |
+| the `revalidatePath` pattern is expensive | the inline role editor revalidates the **same route on the same page** and passes in 8.7s |
+| move it into `after()` | the surface then saved and went on rendering *Sem empresa* — **the call must be synchronous**, or the response carries no re-render at all |
+| drop the revalidation | the dialog closed correctly, which is what named the interaction |
+
+Closing unmounts the `<form>` that dispatched the action, since `ConfirmDialog`
+renders `null` when shut, and that takes the in-flight dispatcher out from under
+React mid-commit. **Both dialogs now derive openness from `pending`** instead of
+closing from an effect — a stored "close me" flag is a second source of truth
+about whether a round has finished, and two sources of truth about exactly that
+*was* the failure. Which state is the current outcome is keyed on the pane the
+owner last submitted from: an event, not a guess about which of two objects is
+newer, because both orders are reachable and a fixed preference reported a
+failure the owner had already fixed.
+
+**Three `revalidatePath` call sites** were repaired — the ones this slice's own
+surfaces need, as ADR-123's amendment scopes. The first draft shipped a
+**hybrid** path, `/[locale]/app/people/<uuid>`, which is worse than either form
+it mixes: it looks targeted and matches no route file at all.
+
+### 2N's ordering guard was retargeted, not relaxed
+
+It asserted `<RelationList` preceded `<RelationDiagram` in the page source.
+`OD-2P-10` makes that impossible, and the ordering was only ever a proxy for
+`2N-RELATION-007`. The property is now asserted directly — one `projection`
+feeds both presentations, the text is one real link away, and the existing
+assertion that the drawing renders none of the list's fields is untouched — with
+two mutation controls replacing the old one.
+
+### Evidence
+
+typecheck 0 · lint 0 errors · **`npm test` 8590 passed, 0 failed** (3 failed
+*files* are the recorded Windows shebang baseline) · build passes · authenticated
+**desktop 9 passed + 1 flaky**, **mobile 9 passed + 1 flaky**, all green, against
+`next start` on a rebuilt artifact with the server restarted after every rebuild
+· **zero fixture residue** with a two-sided control (4 of 5 tables hold rows the
+open pattern matches, so the fixture-pattern zeros are absences rather than empty
+tables).
+
+**The one retry is documented where it is configured.** Measured across eleven
+runs: the **first Server Action against a freshly started server** can sit past a
+sixty-second wait with `pending` true while its row is already committed. Every
+later action settles in 5–15s, including the second company save through the
+identical dialog. It is a warm-up cost, not a wrong result — no run produced a
+wrong value or a write that should not have happened — and it is **named open**
+rather than claimed fixed.
+
+### Slice 2P.7 re-audited against this branch, before any edit
+
+Ten requirements, and **two of them raise the same shape of question
+`2P-PERSON-001` just raised — a field the schema does not have.** Both need the
+owner before 2P.7 starts.
+
+| Requirement | State measured on `4523f38` |
+|---|---|
+| `2P-CALENDAR-001` day, week and **month** navigation | **the calendar has no month.** `CALENDAR_ORIENTATIONS` is `["day","week","agenda"]`, and `DEFAULT_ORIENTATION` and `MOBILE_DEFAULT_ORIENTATION` are both `day`. Either the requirement's "month" means the agenda — in which case the wording needs the same kind of amendment `2P-PERSON-001` got — or it is a new view, which is real work and not a rename. **Owner decision.** |
+| `2P-CALENDAR-002` small visual vocabulary, works without colour | not measured in this pass; `calendar-item.tsx` exists and the 2M record covers its states. Re-measure. |
+| `2P-CALENDAR-003` opening or rescheduling preserves period and scroll | **partly shipped.** `calendar-reschedule.tsx` ships and routes through the task-detail command path rather than a second writer. Whether the period survives is a browser claim and is unproved. |
+| `2P-CALENDAR-004` empty, partial, loading, failed lanes distinguishable | `calendar-outcome.tsx` exists with its own test. Likely **baseline**; re-prove. |
+| `2P-CALENDAR-005` reflows on mobile without horizontal page scroll | unproved in a browser. |
+| `2P-REMINDER-001` header action, not an inline form | **gap.** `/app/reminders` mounts `ReminderForm` inline at line 162 — a three-field stacked form in the page body. |
+| `2P-REMINDER-002` groups content, schedule, **recurrence**/importance, optional links | **gap, and half of it names a field that does not exist.** `reminders` carries `id, user_id, title, remind_at, important, status, sent_at, snoozed_until, task_id, entry_id, created_at, updated_at` — **no recurrence column of any kind**. A recurrence control is a third Phase 2P migration and therefore a **stop condition**. **Owner decision**, and the same one they just made for `people.role`. |
+| `2P-REMINDER-003` create and reschedule share vocabulary, no second write path | `createReminder` is in `agent/actions.ts`; the calendar's reschedule goes through the task-detail command path. Whether reminders share it is unmeasured — check before designing. |
+| `2P-REMINDER-004` cancel writes nothing, restores focus and context | **the contract now exists and is proved** — `ConfirmDialog` plus this slice's derived-openness fix and its keyboard journey. Reuse it; do not write a fifth dialog. |
+| `2P-REMINDER-005` cards prioritize content and next occurrence | unmeasured. |
+
+**Do not start 2P.7 by writing code.** Two of its ten requirements ask for schema
+this phase is not funded for, and the honest first act is to put both to the
+owner exactly as `2P-PERSON-001` was put — with the measurement, the stop
+condition named, and a proposed amendment that preserves the prior text and
+changes no count.
+
+### Where this stops, and how to resume
+
+**PR #265 is open and awaiting CI on head `4523f38`.** Nothing is merged, and
+`main` is untouched at `1cf5959`. The next actions in order: green CI at the
+exact head, read the `database and journey` step list rather than the summary,
+review the diff and any reviews, merge, green CI again at the exact merge SHA
+with the step list read, then update the record and re-audit 2P.7 against the
+`main` the merge produces.
+
+**Seven remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half;
+`2P-CHAT-007-JOURNEY` (2P.8, with the owner's one-turn BYOK authorization);
+`RG-DEP-3`; the four missing review flows (`2P-AUTONOMY-FLOW-PROJECT`,
+`-ORGANIZATION`, `-MEMORY`, `-RELATION`); `2P-APPEARANCE-HYDRATION`; the
+remaining `revalidatePath` call sites outside the three this slice needed; and
+the **first-action warm-up**, new here.
+
+Push HTTP 403, signup, rollout and every inherited residual stay where §87, §88,
+§91, §93, §94, §95, §96 and §97 left them. **This section deliberately does not
+name what comes after Phase 2P.**
