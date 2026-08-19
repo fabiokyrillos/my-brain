@@ -209,6 +209,26 @@ which is not what the migration does or should do — that producer is `after
 update`, because the signal is a status transition. It is now a table-plus-
 timing pair list with a negative control on the wrong timing.
 
+**And the full-diff review found two more, in my own new code.** Neither was a
+test failure; both were found by reading.
+
+1. **The actions swallowed a failed save.** A `<form action>` re-renders the
+   server tree when the action resolves, so a swallowed error would have put the
+   stored value back in the select with no explanation — the owner would believe
+   they had changed *who may write without asking them*, and nothing would have
+   changed. For an authority control that is the worst available failure mode,
+   and worse than an error the user can see. Both actions now raise.
+   `2P-SETTINGS-007` — a failed save preserves input and names its section —
+   belongs to slice 2P.5, which introduces the sections; until then, refusing
+   loudly is the honest behaviour.
+2. **Six identical accessible names.** Six categories mean six forms whose
+   submit buttons all read *"Salvar política"*, so a screen-reader user would
+   hear the same name six times with nothing to tell them apart. The **form**
+   now carries `aria-labelledby` pointing at its category heading, rather than
+   the button carrying an `aria-label` — which would override the visible label
+   and break voice control, since *"click Salvar política"* would no longer
+   match anything on screen.
+
 ## 7. Where this stops
 
 ### `CHECKPOINT DO DONO — CALIBRAÇÃO REAL NECESSÁRIA`

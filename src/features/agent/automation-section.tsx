@@ -59,11 +59,12 @@ function CategoryRow({
   const automatic = permitsAutomaticWrite(decision);
   const selectId = `automation-state-${decision.category}`;
   const evidenceId = `automation-evidence-${decision.category}`;
+  const headingId = `automation-heading-${decision.category}`;
 
   return (
     <li className="automation-row">
       <div className="automation-row-heading">
-        <h3>{category.name}</h3>
+        <h3 id={headingId}>{category.name}</h3>
         <p
           className={automatic ? "automation-state automation-state-active" : "automation-state"}
           data-reason={decision.reason}
@@ -118,7 +119,18 @@ function CategoryRow({
         ) : null}
       </div>
 
-      <form action={saveAction} className="automation-form">
+      {/*
+        `aria-labelledby` on the FORM, not on the button.
+
+        Six categories mean six forms whose submit buttons all read "Save
+        policy", so a screen-reader user tabbing through the section would hear
+        the same name six times with nothing to tell them apart. Naming the form
+        after its category gives each button its context without overriding its
+        visible label — which an `aria-label` would do, and which then breaks
+        voice control, since "click Save policy" would no longer match anything
+        on screen.
+      */}
+      <form action={saveAction} className="automation-form" aria-labelledby={headingId}>
         <input type="hidden" name="locale" value={locale} />
         <input type="hidden" name="category" value={decision.category} />
         <label htmlFor={selectId}>{copy.stateLabel}</label>

@@ -63,7 +63,24 @@ export async function setAutomationCategoryPolicy(formData: FormData): Promise<v
     p_state: state.data,
     p_operation_key: randomUUID(),
   });
-  if (error) return;
+  /*
+    A failed save RAISES rather than returning quietly, and for this control
+    specifically.
+
+    A `<form action>` re-renders the server tree when the action resolves, so a
+    swallowed error would put the stored value back in the select with no
+    explanation — the owner would believe they changed who may write without
+    asking them, and nothing would have changed. That is the worst failure mode
+    an authority control has, and it is worse than an error the user can see.
+
+    `2P-SETTINGS-007` — a failed save preserves input and names its section —
+    belongs to slice 2P.5, which introduces the settings sections this will live
+    in. Until then the honest behaviour is to refuse loudly rather than to
+    report a success that did not happen.
+  */
+  if (error) {
+    throw new Error(`set_automation_category_policy failed: ${error.code ?? "unknown"}`);
+  }
 
   revalidatePath(`/${locale}/app/settings`);
 }
@@ -75,7 +92,15 @@ export async function undoAutomationCategoryPolicy(formData: FormData): Promise<
 
   const { supabase } = await requireUser(locale);
   const { error } = await supabase.rpc("undo_operation", { p_undo_id: undoId.data });
-  if (error) return;
+  /*
+    Same rule, and the same reason. `55P03` here means the category moved since
+    the operation was recorded — the handler refuses rather than overwriting a
+    newer decision with an older one — and reporting that as a successful undo
+    would tell the owner their policy had been restored when it had not.
+  */
+  if (error) {
+    throw new Error(`undo_operation failed: ${error.code ?? "unknown"}`);
+  }
 
   revalidatePath(`/${locale}/app/settings`);
 }

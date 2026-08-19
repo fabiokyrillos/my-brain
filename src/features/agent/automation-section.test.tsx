@@ -162,6 +162,17 @@ describe("the control and its reversal", () => {
     expect(container.querySelectorAll('input[type="hidden"][name="category"]')).toHaveLength(6);
   });
 
+  it("names each form after its category, so six identical buttons are distinguishable", () => {
+    // Six forms whose submit buttons all read "Salvar política" would be six
+    // identical accessible names in a row. The form carries the category name;
+    // the button keeps its visible label, so voice control still matches it.
+    renderSection(allSix);
+    for (const name of ["Tarefas", "Pessoas", "Projetos", "Empresas", "Memórias", "Relações"]) {
+      expect(screen.getByRole("form", { name })).toBeInTheDocument();
+    }
+    expect(screen.getAllByRole("button", { name: "Salvar política" })).toHaveLength(6);
+  });
+
   it("describes each select by its own evidence block, so the refusal is announced with it", () => {
     renderSection([decision("relation")]);
     const select = screen.getByLabelText("Política");
