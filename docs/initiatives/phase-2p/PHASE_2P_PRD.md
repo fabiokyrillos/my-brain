@@ -133,7 +133,9 @@ provider, retain audio, or silently absorb Phase 2N/2O residuals.
 
 ### 3.7 `2P-PERSON` — direct relationship editing (4)
 
-- **2P-PERSON-001:** Company and role are editable from their displayed section with one explicit action.
+- **2P-PERSON-001:** The associated company is editable directly in the person's main section with one explicit action, and each role is edited in the context of the relationship that carries it.
+
+  *Corrected by the owner on 2026-08-19; see ADR-121's amendment of the same date.* Superseded wording, preserved: *"Company and role are editable from their displayed section with one explicit action."* It named a field the product does not have — `people` carries no `role` column, and adding one would be a third Phase 2P migration and therefore a stop condition. The signed replacement: the company is editable on the person's page; there is **no global role for a person**; a project role belongs to `person_projects`; a task role belongs to `task_people`; each is edited in its own relation's context; neither is duplicated onto `people`; no global title is synthesized from the several roles; and the absence of a role produces no inference. The count stays 87 and no ID is renumbered.
 - **2P-PERSON-002:** Selecting an existing company or creating a new one happens in one flow.
 - **2P-PERSON-003:** A created-but-not-linked company is reported distinctly and cannot invite a duplicate retry.
 - **2P-PERSON-004:** Mobile and keyboard users can complete the flow without nested dialogs or lost focus.

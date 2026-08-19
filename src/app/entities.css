@@ -186,6 +186,55 @@
   overflow-wrap: anywhere;
 }
 
+/*
+  The company, edited where it is displayed (2P-PERSON-001).
+
+  The panel wraps the line rather than replacing it, so the value keeps the hero
+  idiom above and the control sits under it instead of beside the name — the
+  header stays an answer to "what is this" and gains one action.
+*/
+.entity-company {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.entity-company .entity-relation-line {
+  margin-top: 0;
+}
+
+/*
+  A person's role on one task (2P-PERSON-001).
+
+  A row per `task_people` row, because the primary key is
+  `(task_id, person_id, role)` and one person may hold two roles on one task.
+*/
+.entity-task-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.entity-task-role {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.entity-task-role-label {
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+/* The editor's own form takes the full row once it opens. */
+.entity-task-role .relation-form {
+  flex: 1 1 100%;
+}
+
 @media (max-width: 600px) {
   .entity-edit-form {
     padding: 18px;

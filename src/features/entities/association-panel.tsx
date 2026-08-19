@@ -38,6 +38,7 @@ import type { Locale } from "@/lib/preferences";
 import { getEntityCopy } from "./copy";
 import { idleEntityEditState, type EntityEditState } from "./edit-state";
 import type { EntityEditAction } from "./entity-edit-form";
+import { RoleEditor } from "./role-editor";
 
 export type AssociationRow = {
   readonly id: string;
@@ -233,26 +234,8 @@ function AssociationRowItem({
   target: AssociationTarget;
 }) {
   const copy = getEntityCopy(locale);
-  const fieldId = useId();
   const fields = hiddenFields(target, row.id);
   const [endState, end, ending] = useActionState(endAction, idleEntityEditState);
-  const [roleState, saveRole, savingRole] = useActionState(
-    roleAction ?? endAction,
-    idleEntityEditState,
-  );
-
-  /**
-   * The same state-identity derivation the create forms use.
-   *
-   * A plain boolean never cleared on success left the role editor open after a
-   * successful save, showing the value it had just written with no confirmation
-   * — the only signal was the spinner stopping, and a screen-reader user got
-   * nothing at all.
-   */
-  const [openedFor, setOpenedFor] = useState<EntityEditState | null>(null);
-  const [dismissed, setDismissed] = useState<EntityEditState | null>(null);
-  const editingRole = openedFor === roleState
-    || (roleState.status === "error" && dismissed !== roleState);
 
   const endLabel =
     target.kind === "person-context"
@@ -270,18 +253,25 @@ function AssociationRowItem({
 
       <div className="relation-row-actions">
         {/*
-          Named for what it does and for which row it does it to. `copy.roleLabel`
-          alone was both the wrong kind of label — "Papel" is a noun, not an
-          action — and a duplicate of the `<label>` of the field it opens.
+          `2P-PERSON-001`. The open control, the field, the announcement and the
+          cancel semantics moved into `RoleEditor` when the slice added the second
+          relation that carries a role. This panel keeps deciding *which ids
+          travel*; it no longer keeps its own copy of how a role is edited.
+
+          The control is still named for what it does and for which row it does
+          it to — `copy.roleLabel` alone was the wrong kind of label and a
+          duplicate of the field's own.
         */}
-        {roleAction && !editingRole ? (
-          <button
-            aria-label={`${copy.editRole}: ${row.label}`}
-            onClick={() => setOpenedFor(roleState)}
-            type="button"
-          >
-            {copy.editRole}
-          </button>
+        {roleAction ? (
+          <RoleEditor
+            action={roleAction}
+            fields={Object.fromEntries(
+              Object.entries(fields).filter(([, value]) => value !== null) as Array<[string, string]>,
+            )}
+            locale={locale}
+            subject={row.label}
+            value={row.role ?? null}
+          />
         ) : null}
         <form action={end}>
           <input name="locale" type="hidden" value={locale} />
@@ -296,53 +286,9 @@ function AssociationRowItem({
         </form>
       </div>
 
-      {roleAction && editingRole ? (
-        <form action={saveRole} className="relation-form">
-          <input name="locale" type="hidden" value={locale} />
-          <input name="personId" type="hidden" value={fields.personId} />
-          <div aria-atomic="true" aria-busy={savingRole} aria-live="polite" className="sr-only" role="status">
-            {savingRole ? copy.saving : roleState.status === "idle" ? "" : roleState.message}
-          </div>
-          {"projectId" in fields ? <input name="projectId" type="hidden" value={fields.projectId} /> : null}
-          {fields.origin ? <input name="origin" type="hidden" value={fields.origin} /> : null}
-          <label htmlFor={`${fieldId}-role`}>
-            {copy.roleLabel}
-            <input
-              defaultValue={roleState.submitted?.role ?? row.role ?? ""}
-              disabled={savingRole}
-              id={`${fieldId}-role`}
-              maxLength={120}
-              name="role"
-              placeholder={copy.rolePlaceholder}
-              type="text"
-            />
-          </label>
-          <div className="entity-edit-actions">
-            <button className="entity-edit-save" disabled={savingRole} type="submit">
-              {savingRole ? <LoaderCircle aria-hidden="true" className="spin" size={16} /> : null}
-              {savingRole ? copy.saving : copy.saveRole}
-            </button>
-            <button
-              className="entity-edit-cancel"
-              disabled={savingRole}
-              onClick={() => { setDismissed(roleState); setOpenedFor(null); }}
-              type="button"
-            >
-              {copy.cancel}
-            </button>
-          </div>
-          {roleState.status === "error" ? (
-            <p className="entity-edit-feedback error" role="alert">{roleState.message}</p>
-          ) : null}
-        </form>
-      ) : null}
-
       <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
         {endState.status === "idle" ? "" : endState.message}
       </div>
-      {roleState.status === "success" ? (
-        <p className="entity-edit-feedback success">{roleState.message}</p>
-      ) : null}
       {endState.status === "error" ? (
         <p className="entity-edit-feedback error" role="alert">{endState.message}</p>
       ) : null}

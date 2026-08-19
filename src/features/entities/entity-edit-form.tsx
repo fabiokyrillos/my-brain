@@ -90,6 +90,7 @@ const NAME_MAX_LENGTH: Readonly<Record<EntityEditFields["kind"], number>> = {
 
 export function EntityEditForm({
   action,
+  companyField = "select",
   createOrganizationAction,
   fields,
   locale,
@@ -97,11 +98,28 @@ export function EntityEditForm({
 }: {
   action: EntityEditAction;
   /**
+   * Whether this form owns the company control, or merely carries its value
+   * (`2P-PERSON-001`).
+   *
+   * The person page moved the company into its main section, where the value is
+   * displayed — a dialog rather than a selector reached through two disclosures.
+   * Two live company controls on one page would be two answers to one question,
+   * and the second would silently win.
+   *
+   * It is `"hidden"` rather than absent because `personUpdateSchema` is
+   * `.strict()` and `organizationId` is required: dropping the field would make
+   * every name-and-notes save an invalid-input refusal. The hidden value is the
+   * stored one, re-rendered by the server after any company change, so this form
+   * writes back exactly what is already there.
+   */
+  companyField?: "select" | "hidden";
+  /**
    * Create a company and assign it here, in one act (EGC-ORG-005).
    *
    * Optional because only the two kinds that *have* a company can offer it.
    * Passing it for an organization or a context would be a control that creates
-   * a row and then has nowhere to put it.
+   * a row and then has nowhere to put it — and the person page no longer passes
+   * it at all, because its company dialog owns both halves of that flow.
    */
   createOrganizationAction?: EntityEditAction;
   fields: EntityEditFields;
@@ -288,7 +306,15 @@ export function EntityEditForm({
         select holds one option anyway — "no company" — so it offers nothing to
         get wrong, and the hint says why.
       */}
-      {hasCompany ? (
+      {hasCompany && companyField === "hidden" ? (
+        <input
+          name="organizationId"
+          type="hidden"
+          value={restored("organizationId") ?? fields.organizationId ?? ""}
+        />
+      ) : null}
+
+      {hasCompany && companyField === "select" ? (
         <>
           <label htmlFor={`${fieldId}-organization`}>
             {copy.organizationLabel}
@@ -332,7 +358,7 @@ export function EntityEditForm({
       ) : null}
     </form>
 
-    {hasCompany && createOrganizationAction ? (
+    {hasCompany && companyField === "select" && createOrganizationAction ? (
       <InlineOrganizationCreate
         action={createOrganizationAction}
         locale={locale}

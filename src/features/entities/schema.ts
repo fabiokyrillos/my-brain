@@ -247,5 +247,57 @@ export const personUpdateSchema = z.object({
   organizationId: optionalRelation,
 }).strict();
 
+/**
+ * `2P-PERSON-001` — assigning an existing company, and nothing else.
+ *
+ * Narrow on purpose. The alternative was to reuse `personUpdateSchema` from the
+ * company control by carrying the stored `name` and `notes` as hidden inputs,
+ * and that is the shape slice 2P.5 had to repair one domain over: a payload
+ * assembled from values rendered earlier overwrites whatever changed in between,
+ * so a note edited in another tab would be silently reverted by a company
+ * change. Two fields, so nothing can be clobbered by a field this form never
+ * showed.
+ */
+export const personOrganizationSchema = z.object({
+  personId: z.string().uuid(),
+  locale: z.enum(["pt-BR", "en"]),
+  organizationId: optionalRelation,
+}).strict();
+
+/**
+ * `2P-PERSON-001` — a person's role **on one task**.
+ *
+ * `task_people`'s primary key is `(task_id, person_id, role)` and its check
+ * constraint admits exactly four values, so unlike `person_projects.role` — the
+ * owner's own words, free text — this is a closed vocabulary and the same person
+ * may legitimately hold two roles on one task. `previousRole` is therefore part
+ * of the request rather than derivable: it identifies **which** of the rows is
+ * being changed.
+ */
+export const TASK_PERSON_ROLES = ["requester", "involved", "assignee", "waiting_on"] as const;
+export type TaskPersonRole = (typeof TASK_PERSON_ROLES)[number];
+
+/**
+ * A stored role, narrowed — or `null` for a value outside the vocabulary.
+ *
+ * The check constraint makes an unknown value impossible today, and this is not
+ * defensive about the database: it is what lets the surface render the raw token
+ * instead of guessing a label, and lets it withhold an editor whose `select`
+ * could not offer the row's own current value. Choosing the first option instead
+ * would be a control that silently rewrites a role nobody asked to change — the
+ * same posture `describeRelationshipType` takes for `person_relationships`.
+ */
+export function asTaskPersonRole(value: string): TaskPersonRole | null {
+  return (TASK_PERSON_ROLES as readonly string[]).includes(value) ? (value as TaskPersonRole) : null;
+}
+
+export const taskPersonRoleSchema = z.object({
+  personId: z.string().uuid(),
+  taskId: z.string().uuid(),
+  locale: z.enum(["pt-BR", "en"]),
+  previousRole: z.enum(TASK_PERSON_ROLES),
+  role: z.enum(TASK_PERSON_ROLES),
+}).strict();
+
 export type ProjectUpdateInput = z.infer<typeof projectUpdateSchema>;
 export type PersonUpdateInput = z.infer<typeof personUpdateSchema>;

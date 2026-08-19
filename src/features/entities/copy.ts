@@ -1,5 +1,7 @@
 import type { Locale } from "@/lib/preferences";
 
+import type { TaskPersonRole } from "./schema";
+
 /**
  * The entity-editing copy, as one typed record per locale (ADR-036).
  *
@@ -115,6 +117,43 @@ type EntityCopy = {
   readonly saveRole: string;
   /** The control that opens the role editor — a verb, and distinct from the field's own label. */
   readonly editRole: string;
+  /**
+   * `2P-PERSON-001` — the four values `task_people_role_check` admits.
+   *
+   * A closed vocabulary, unlike `person_projects.role`, which is the owner's own
+   * words and is never translated. These are database tokens and must be, so the
+   * label is the only place a reader meets them.
+   */
+  readonly taskRoles: Readonly<Record<TaskPersonRole, string>>;
+  /** Said when the person already holds the role the owner moved them to. */
+  readonly roleAlreadyHeld: string;
+  /** Said when the submitted role is the one already stored — no write happened. */
+  readonly roleUnchanged: string;
+  /** The role a task link carries, on the person page's own task rows. */
+  readonly taskRoleLabel: string;
+  /**
+   * `2P-PERSON-001`/`-002` — the company control that now lives in the person's
+   * main section rather than behind an edit disclosure.
+   */
+  readonly companyEdit: string;
+  readonly companyDialogTitle: string;
+  readonly companyDialogDescription: string;
+  readonly companySaved: string;
+  readonly companyClose: string;
+  /** The two halves of the one flow: pick what exists, or add what does not. */
+  readonly companyChooseLabel: string;
+  readonly companyChooseSubmit: string;
+  readonly companyCreateToggle: string;
+  readonly companyCreateBack: string;
+  /**
+   * What the owner is told after a company was created and the link failed.
+   *
+   * Distinct from `createdButNotLinked`, which the action returns: this is the
+   * sentence the *panel* adds when it sends the owner back to the selector, and
+   * it exists so the instruction is on screen next to the control that carries
+   * it out rather than only in the error line above.
+   */
+  readonly companyCreatedNotLinkedHint: string;
   /**
    * EGC-REL-009. The Person page shows Company and relationship-to-owner as two
    * separate concerns, and each says what it is for — a company is where someone
@@ -302,6 +341,27 @@ const copy = {
     rolePlaceholder: "Ex.: revisora do contrato",
     saveRole: "Salvar papel",
     editRole: "Editar papel",
+    taskRoles: {
+      requester: "Quem pediu",
+      involved: "Envolvida",
+      assignee: "Responsável",
+      waiting_on: "Aguardando",
+    },
+    roleAlreadyHeld: "Essa pessoa já tem esse papel nesta tarefa.",
+    roleUnchanged: "O papel continua o mesmo.",
+    taskRoleLabel: "Papel na tarefa",
+    companyEdit: "Editar empresa",
+    companyDialogTitle: "Empresa",
+    companyDialogDescription:
+      "Escolha uma empresa que você já cadastrou ou crie uma nova. O cargo não fica aqui: ele pertence a cada projeto ou tarefa.",
+    companySaved: "Empresa atualizada.",
+    companyClose: "Fechar",
+    companyChooseLabel: "Empresa",
+    companyChooseSubmit: "Salvar empresa",
+    companyCreateToggle: "Criar nova empresa",
+    companyCreateBack: "Escolher uma empresa existente",
+    companyCreatedNotLinkedHint:
+      "A empresa já existe e está na lista acima. Selecione-a — criar de novo faria uma cópia.",
     companyExplainer: "Onde a pessoa trabalha.",
     relationshipExplainer: "Quem essa pessoa é para você.",
     editSummary: "Editar",
@@ -438,6 +498,27 @@ const copy = {
     removePersonAssociation: "End the person link",
     noPeopleToAssociate: "Add a person before linking them to this project.",
     roleLabel: "Role",
+    taskRoles: {
+      requester: "Asked for it",
+      involved: "Involved",
+      assignee: "Responsible",
+      waiting_on: "Waiting on",
+    },
+    roleAlreadyHeld: "This person already has that role on this task.",
+    roleUnchanged: "The role is unchanged.",
+    taskRoleLabel: "Role on the task",
+    companyEdit: "Edit company",
+    companyDialogTitle: "Company",
+    companyDialogDescription:
+      "Pick a company you already have, or create a new one. A job title does not live here: it belongs to each project or task.",
+    companySaved: "Company updated.",
+    companyClose: "Close",
+    companyChooseLabel: "Company",
+    companyChooseSubmit: "Save company",
+    companyCreateToggle: "Create a new company",
+    companyCreateBack: "Pick an existing company",
+    companyCreatedNotLinkedHint:
+      "The company already exists and is in the list above. Select it — creating it again would make a copy.",
     rolePlaceholder: "e.g. contract reviewer",
     saveRole: "Save role",
     editRole: "Edit role",

@@ -43,12 +43,45 @@ import {
   contextUpdateSchema,
   organizationCreateSchema,
   organizationUpdateSchema,
+  personOrganizationSchema,
   personUpdateSchema,
   projectUpdateSchema,
 } from "./schema";
 
 /** The routing id `createOrganizationForSubject` assigns to, held to the same bar as every other. */
 const subjectIdSchema = z.string().uuid();
+
+/**
+ * Invalidate the person surfaces (slice 2P.6).
+ *
+ * ## The route patterns, whole
+ *
+ * Under a `[locale]` dynamic segment a literal path invalidates nothing, which
+ * slice 2P.4 measured against the deployed app. A *hybrid* —
+ * `/[locale]/app/people/<uuid>` — is worse than either, because it looks
+ * targeted and matches no route file at all: Next tags cache entries by route
+ * structure, and that string is neither the structure nor a resolved path. The
+ * first draft of `linkPersonOrganization` shipped one.
+ *
+ * ## Synchronous, and that was established by execution
+ *
+ * The call was briefly moved into `after()` to keep it off the response path,
+ * on the reasoning that both routes are dynamic (`ƒ` in the build output) and
+ * therefore have no full-route cache to rebuild. The authenticated journey
+ * refuted it immediately: the company saved, the dialog closed, and the page
+ * went on rendering *Sem empresa*. **A Server Action's response carries a fresh
+ * render only when the action revalidated something synchronously**, so moving
+ * it after the response is indistinguishable from not calling it at all — the
+ * write lands and the owner is looking at the old value.
+ *
+ * It stays where it is for that reason, and the cost is real: invalidating the
+ * pattern makes the response re-render a page that issues eighteen queries in
+ * three rounds. That is a property of the person workspace, not of this write.
+ */
+function revalidatePeople(): void {
+  revalidatePath("/[locale]/app/people/[personId]", "page");
+  revalidatePath("/[locale]/app/people", "page");
+}
 
 /**
  * A unique-index violation, told apart from every other write failure.
@@ -86,7 +119,15 @@ function failed(
     | "createdButNotLinked",
   submitted: EntityEditSubmission | null = null,
 ): EntityEditState {
-  return { status: "error", message: getEntityCopy(locale)[key], submitted };
+  return {
+    status: "error",
+    message: getEntityCopy(locale)[key],
+    submitted,
+    // Only the two a surface branches on carry a token; the rest stay
+    // message-only, because nothing renders differently for them. See
+    // `edit-state.ts` on why this is not a string comparison at the call site.
+    code: key === "createdButNotLinked" || key === "duplicateName" ? key : null,
+  };
 }
 
 /**
@@ -212,8 +253,15 @@ export async function updatePerson(
   });
   if (audit.error) console.error("Person edit audit failed", audit.error.message);
 
-  revalidatePath(`/${parsed.data.locale}/app/people/${personId}`);
-  revalidatePath(`/${parsed.data.locale}/app/people`);
+  /*
+   * Repaired in slice 2P.6 because this slice's own surface needs it: the
+   * disclosure that submits here now carries the company as a hidden field, so a
+   * save from it must leave the page showing the stored values rather than the
+   * ones it was rendered with. ADR-123's amendment scopes the repair
+   * deliberately — the remaining `revalidatePath` call sites across the
+   * repository stay recorded debt rather than being rewritten silently.
+   */
+  revalidatePeople();
   return { status: "success", message: getEntityCopy(locale).saved };
 }
 
@@ -430,6 +478,92 @@ export async function updateContext(
  * the atomicity: making this transactional would need an RPC, which is a new
  * privileged boundary this initiative does not take.
  */
+/**
+ * `2P-PERSON-001`, `2P-PERSON-002` — assign an **existing** company to a person,
+ * from the person's own section.
+ *
+ * ## Why this is not `updatePerson`
+ *
+ * `updatePerson` writes name, notes and company together over a `.strict()`
+ * schema, so a company control submitting to it would have to carry the stored
+ * name and notes as hidden inputs — values rendered at some earlier moment. That
+ * is precisely the cross-section clobber slice 2P.5 had to repair in
+ * `updateProfile`: a note edited elsewhere would be reverted by a company
+ * change, silently, with the audit row recording the revert as intentional.
+ *
+ * ## Why it is not a *new* write path either
+ *
+ * `createOrganizationForSubject` already writes this exact column with this
+ * exact audit shape — it just gets there by creating the row first. This is its
+ * other half, and the two are deliberately symmetric: same predicate, same
+ * pre-read, same `update_person` audit row over `organization_id`. What the
+ * slice removes is the *third* route, the nested disclosure that made the owner
+ * open an edit form to reach a selector.
+ *
+ * Clearing the company is a first-class outcome: `optionalRelation` maps the
+ * empty option to `null`, and "this person no longer works there" is a fact the
+ * owner must be able to record without deleting anything.
+ */
+export async function linkPersonOrganization(
+  _previous: EntityEditState,
+  formData: FormData,
+): Promise<EntityEditState> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const fields = submittedFields(formData);
+  const parsed = personOrganizationSchema.safeParse(fields);
+  if (!parsed.success) return failed(locale, "invalidInput", fields);
+  const { personId, organizationId } = parsed.data;
+
+  const { supabase, user } = await requireUser(parsed.data.locale);
+
+  // Read before write, in the same ownership scope, so the audit row can say
+  // which company was replaced rather than only which one is now set. An
+  // assignment that overwrites is the common case here, not the exception.
+  const before = await supabase
+    .from("people")
+    .select("organization_id")
+    .eq("id", personId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (before.error) return failed(locale, "saveFailed");
+  if (!before.data) return failed(locale, "notFound");
+
+  /*
+   * The foreign key is NOT re-proved here, and it does not need to be.
+   * `people_organization_id_fkey` plus forced RLS on `organizations` means an
+   * id belonging to someone else fails the constraint rather than linking, and
+   * the selector is built from `loadOrganizationOptions`, which is owner-scoped
+   * already. A membership query would be a third opinion about ownership that
+   * could drift from the other two.
+   */
+  const { data: after, error } = await supabase
+    .from("people")
+    .update({ organization_id: organizationId, updated_at: new Date().toISOString() })
+    .eq("id", personId)
+    .eq("user_id", user.id)
+    .select("organization_id")
+    .maybeSingle();
+
+  if (error) return failed(locale, "saveFailed", fields);
+  if (!after) return failed(locale, "notFound");
+
+  const audit = await supabase.from("audit_logs").insert({
+    user_id: user.id,
+    action_type: "update_person",
+    entity_type: "person",
+    entity_id: personId,
+    actor: "user",
+    before_state: before.data,
+    after_state: after,
+    reason: "Owner set the person's company from the person page",
+  });
+  if (audit.error) console.error("Person company audit failed", audit.error.message);
+
+  revalidatePeople();
+  return { status: "success", message: getEntityCopy(locale).companySaved };
+}
+
 export async function createOrganizationForSubject(
   _previous: EntityEditState,
   formData: FormData,
@@ -527,7 +661,13 @@ export async function createOrganizationForSubject(
   });
   if (linkAudit.error) console.error("Organization link audit failed", linkAudit.error.message);
 
-  revalidatePath(`/${parsed.data.locale}/app/organizations`);
-  revalidatePath(`/${parsed.data.locale}/app/${subject === "person" ? "people" : "projects"}/${subjectId}`);
+  // The company dialog's create pane submits here, so this is one of the call
+  // sites slice 2P.6's own surface needs. Off the response path for the reason
+  // `revalidatePeople` records.
+  revalidatePath("/[locale]/app/organizations", "page");
+  revalidatePath(
+    subject === "person" ? "/[locale]/app/people/[personId]" : "/[locale]/app/projects/[projectId]",
+    "page",
+  );
   return { status: "success", message: getEntityCopy(locale).createdAndLinked };
 }

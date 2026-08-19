@@ -213,15 +213,64 @@ describe("2N-RELATION-007: one projection, two presentations, one bound", () => 
     }
   });
 
-  it("renders the text alternative BEFORE the drawing, in the page's own order", () => {
+  /*
+   * RETARGETED, not relaxed (2026-08-19, slice 2P.6).
+   *
+   * This block used to assert that `<RelationList` appeared before
+   * `<RelationDiagram` in the page source. `OD-2P-10` — signed by the owner in
+   * ADR-121 — says Relations **opens on the drawing** and keeps a complete text
+   * tab, so that literal ordering can no longer hold and asserting it would be a
+   * guard demanding the product contradict a signed decision.
+   *
+   * What the ordering was ever a proxy for is `2N-RELATION-007`: the text
+   * equivalent carries everything the drawing does and is never a degraded
+   * fallback. That property did not move, and it is now asserted **directly**
+   * rather than through a DOM position:
+   *
+   *   1. both presentations render from the SAME `projection` variable, so the
+   *      drawing is a filter over what the list holds and cannot acquire
+   *      exclusive information;
+   *   2. the text is reachable from the drawing by a real link, not a gesture;
+   *   3. the drawing still renders none of the fields the list does — asserted
+   *      unchanged two blocks above, and that assertion is the one that would
+   *      catch information migrating into the picture.
+   *
+   * The mutation controls below are the same shape as before: each detector is
+   * shown refusing the thing it exists to refuse.
+   */
+  it("feeds the drawing and the text from one projection, so neither can diverge", () => {
     const page = code(PAGE);
-    expect(page.indexOf("<RelationList")).toBeGreaterThan(-1);
-    expect(page.indexOf("<RelationList")).toBeLessThan(page.indexOf("<RelationDiagram"));
+    expect(page).toMatch(/<RelationList[^>]*projection=\{projection\}/);
+    expect(page).toMatch(/<RelationDiagram[^>]*projection=\{projection\}/);
+    // And that variable is the loaded projection, narrowed only by focus.
+    expect(page).toContain("focusProjection(outcome.projection, focusId)");
   });
 
-  it("mutation control: the order assertion fails when the drawing comes first", () => {
-    const mutated = "<RelationDiagram /> <RelationList />";
-    expect(mutated.indexOf("<RelationList")).toBeGreaterThan(mutated.indexOf("<RelationDiagram"));
+  it("mutation control: the one-projection assertion fails when they are fed separately", () => {
+    const mutated = "<RelationList projection={listProjection} /> <RelationDiagram projection={drawn} />";
+    expect(/<RelationList[^>]*projection=\{projection\}/.test(mutated)).toBe(false);
+    // And passes on the shape it exists to accept, so a detector that matched
+    // nothing at all could not be mistaken for one that found no violation.
+    expect(/<RelationList[^>]*projection=\{projection\}/.test("<RelationList projection={projection} />")).toBe(true);
+  });
+
+  it("keeps the text one link away from the drawing, never behind a gesture", () => {
+    const page = code(PAGE);
+    // The tabs are the reachability, and they are links: `relationViewHref`
+    // builds an address per view, so the text tab resolves with JavaScript off.
+    expect(page).toContain("<RelationViewTabs");
+    const tabs = code(`${FEATURE}/relation-view-controls.tsx`);
+    expect(tabs).toContain("relationViewHref");
+    expect(tabs).toMatch(/<Link/);
+    // No handler-only tab: a click listener as the sole path is exactly what
+    // `2N-ACCESS-004` refuses.
+    expect(tabs).not.toMatch(/onClick/);
+  });
+
+  it("mutation control: the reachability assertion fails on a click-only tab", () => {
+    const mutated = 'const Tabs = () => <button onClick={() => setView("links")}>All links</button>;';
+    expect(/onClick/.test(mutated)).toBe(true);
+    expect(mutated.includes("relationViewHref")).toBe(false);
   });
 });
 

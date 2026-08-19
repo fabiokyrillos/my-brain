@@ -110,6 +110,14 @@ Use the shared modal/sheet and tab contracts for direct person-company editing,
 memory creation, and Drawing/All links. Preserve owner scope, soft lifecycle,
 provenance, masking and text-equivalent completeness.
 
+`2P-PERSON-001` was corrected by the owner on 2026-08-19 (ADR-121's amendment of
+that date) after the slice's re-audit found it named a `people.role` column that
+does not exist. **No column is added**: the company is edited on the person's
+page, a project role stays in `person_projects`, a task role stays in
+`task_people`, each is edited in its own relation's context, and nothing
+synthesizes a global title from them. **Zero migrations** — ADR-123's amendment
+of the same date records the posture, and a third remains a stop condition.
+
 ### 2P.7 — planning surfaces
 
 Recompose calendar hierarchy and move reminder creation/rescheduling into the

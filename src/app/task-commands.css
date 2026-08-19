@@ -276,6 +276,120 @@
   color: var(--text-primary);
 }
 
+/*
+  A dialog whose content is a real form, not one submit button (2P.6).
+
+  The three original consumers put a single-button form inside a row of
+  controls, which is what `.task-command-dialog form { display: inline }` is
+  for. A dialog holding a labelled field needs the opposite, so the modifier is
+  opt-in and those three are untouched.
+*/
+.task-command-dialog-form {
+  width: min(100%, 520px);
+  text-align: left;
+}
+
+.task-command-dialog-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-command-dialog-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: var(--type-label);
+  color: var(--text-secondary);
+}
+
+.task-command-dialog-form input,
+.task-command-dialog-form select,
+.task-command-dialog-form textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+
+.task-command-dialog-form textarea {
+  min-height: 140px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.task-command-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.task-command-dialog-actions button {
+  min-height: 44px;
+}
+
+.task-command-dialog-form .task-command-dialog-cancel {
+  margin-left: 0;
+}
+
+/*
+  Qualified by the panel, not written as a bare class.
+
+  `.task-command-dialog p` above is (0,1,1) and a bare `.task-command-dialog-note`
+  is (0,1,0), so the shared paragraph rule would win and the margin reset would
+  silently do nothing — the drift is invisible until somebody measures the
+  rendered page.
+*/
+.task-command-dialog .task-command-dialog-note {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.task-command-dialog .task-command-dialog-review {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/*
+  The mobile sheet (2P-PERSON-004, 2P-MOBILE).
+
+  Placed AFTER every base rule above on purpose: a media query written before
+  the rules it means to override adds no specificity, so a later base
+  declaration simply wins and the mobile layout is silently dead. This
+  repository has already paid for that once.
+*/
+@media (max-width: 640px) {
+  .task-command-dialog-backdrop {
+    padding: 0;
+    place-items: end stretch;
+  }
+
+  .task-command-dialog {
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+    border-bottom: none;
+  }
+
+  .task-command-dialog-form {
+    width: 100%;
+  }
+}
+
 /* --- the cancelled-task recovery surface (2E-DESTRUCTIVE-006) --- */
 
 .task-command-recovery-link {

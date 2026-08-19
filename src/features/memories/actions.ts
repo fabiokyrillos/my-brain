@@ -401,7 +401,12 @@ export async function createProposedMemory(
     "create_memory",
     null,
     { content, kind },
-    "Owner confirmed a memory proposed by the assistant composer",
+    // The one expression `origin` reaches. Two callers write identically and
+    // the trail must not claim the assistant proposed a sentence the owner
+    // typed on the memories page.
+    parsed.data.origin === "memories"
+      ? "Owner wrote a memory from the memories page"
+      : "Owner confirmed a memory proposed by the assistant composer",
   );
 
   revalidateMemory(parsed.data.locale, created.id);

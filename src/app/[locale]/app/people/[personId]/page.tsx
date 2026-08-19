@@ -3,7 +3,7 @@ import { ArrowLeft, UserRound } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createOrganizationForSubject, updatePerson } from "@/features/entities/actions";
+import { createOrganizationForSubject, linkPersonOrganization, updatePerson } from "@/features/entities/actions";
 import { AssociationPanel } from "@/features/entities/association-panel";
 import {
   associatePersonContext,
@@ -11,7 +11,11 @@ import {
   endPersonContext,
   endPersonProject,
   updatePersonProjectRole,
+  updateTaskPersonRole,
 } from "@/features/entities/associations";
+import { CompanyPanel } from "@/features/entities/company-panel";
+import { RoleEditor } from "@/features/entities/role-editor";
+import { asTaskPersonRole, TASK_PERSON_ROLES } from "@/features/entities/schema";
 import { loadContextOptions } from "@/features/entities/contexts";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
@@ -349,6 +353,20 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   );
 
   const roleByProjectId = new Map(projectLinks.map((link) => [link.project_id, link.role]));
+  /*
+   * `2P-PERSON-001` — the roles this page has always READ and never rendered.
+   *
+   * A list per task, not a value: `task_people`'s primary key is
+   * `(task_id, person_id, role)`, so the same person may legitimately be both
+   * `involved` and `waiting_on` on one task. Collapsing that to a single role
+   * would silently hide one of the owner's own facts and would make the editor
+   * rewrite whichever row it happened to find first.
+   */
+  const taskRoles = new Map<string, string[]>();
+  for (const link of taskLinks) {
+    taskRoles.set(link.task_id, [...(taskRoles.get(link.task_id) ?? []), link.role]);
+  }
+  const taskRoleOptions = TASK_PERSON_ROLES.map((role) => ({ value: role, label: copy.taskRoles[role] }));
   const organizationName = organizations.find((item) => item.id === person.organization_id)?.name ?? null;
   const formatDate = (value: string) => formatInstant(value, "day", locale, timeZone) ?? "";
 
@@ -421,17 +439,31 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             </p>
           )}
           {/*
-            EGC-REL-009. Company and relationship-to-owner are visibly distinct
-            concerns: this line says where they work, and the relationship panel
-            below says who they are to the owner. The explainer is what stops the
-            Company field from reading as a way to describe a personal
-            relationship — the confusion the Camila scenario exposed.
+            EGC-REL-009, and `2P-PERSON-001` since slice 2P.6. Company and
+            relationship-to-owner are visibly distinct concerns: this line says
+            where they work, and the relationship panel below says who they are
+            to the owner. The explainer is what stops the Company field from
+            reading as a way to describe a personal relationship — the confusion
+            the Camila scenario exposed.
+
+            The line is now the panel's own, so the value and the control that
+            changes it are the same thing. Editing a company used to mean opening
+            the disclosure below, finding a selector inside a nine-field form,
+            and — to add one that did not exist — opening a second disclosure
+            beside it. There is **no role control here**: the owner's correction
+            of `2P-PERSON-001` puts a project role on `person_projects` and a task
+            role on `task_people`, each edited in its own relation's context
+            further down this page, and forbids synthesizing a global one.
           */}
-          <p className="entity-relation-line">
-            <span>{copy.company}</span>
-            <strong>{organizationName ?? copy.companyNone}</strong>
-            <small>{copy.companyExplainer}</small>
-          </p>
+          <CompanyPanel
+            createAction={createOrganizationForSubject}
+            linkAction={linkPersonOrganization}
+            locale={locale}
+            organizationId={person.organization_id}
+            organizationName={organizationName}
+            organizations={organizations}
+            personId={person.id}
+          />
           {/*
             `2N-PERSON-004`, `2N-PROV-001`. Everything in this header — the name,
             the note, the company, the nicknames — is a field the owner typed
@@ -453,9 +485,17 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
       */}
       <details className="entity-edit-disclosure">
         <summary>{copy.editSummary}</summary>
+        {/*
+          `2P-PERSON-001`. The company left this form for the section that
+          displays it, so what remains here is the name and the note. The value
+          still travels — `personUpdateSchema` is `.strict()` and requires it —
+          as a hidden field carrying the stored id, which the server re-renders
+          after any company change. Two live company controls on one page would
+          be two answers to one question, and the stale one would win.
+        */}
         <EntityEditForm
           action={updatePerson}
-          createOrganizationAction={createOrganizationForSubject}
+          companyField="hidden"
           fields={{
             kind: "person",
             id: person.id,
@@ -543,6 +583,51 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
                       provenance={provenance}
                       subject={provenanceCopy.taskSubject(index + 1)}
                     />
+                    {/*
+                      `2P-PERSON-001` — the role, in the context of the relation
+                      that carries it.
+
+                      One editor per `task_people` row, because each row IS a
+                      role and the person may hold two on one task. The
+                      `previousRole` a row submits is what tells the action which
+                      of them is being changed; without it the write would have
+                      to guess and could rewrite the wrong one.
+
+                      The task's title is NOT passed as the editor's subject: it
+                      is the string `ProtectedContent` above may be withholding,
+                      and an accessible name carrying it would hand the masked
+                      text to assistive technology. The role's own label is a
+                      four-value closed vocabulary and carries no content.
+                    */}
+                    <span className="entity-task-roles">
+                      {(taskRoles.get(task.id) ?? []).map((role) => {
+                        const known = asTaskPersonRole(role);
+                        return (
+                          <span className="entity-task-role" data-task-role={role} key={role}>
+                            <span className="entity-task-role-label">
+                              {copy.taskRoleLabel}: {known ? copy.taskRoles[known] : role}
+                            </span>
+                            {/*
+                              No editor for a value outside the vocabulary. Its
+                              `select` could not offer the row's own role, so
+                              opening it would present the first option as
+                              current and a save would rewrite a role nobody
+                              asked to change.
+                            */}
+                            {known ? (
+                              <RoleEditor
+                                action={updateTaskPersonRole}
+                                fields={{ personId: person.id, taskId: task.id, previousRole: known }}
+                                locale={locale}
+                                options={taskRoleOptions}
+                                subject={provenanceCopy.taskSubject(index + 1)}
+                                value={known}
+                              />
+                            ) : null}
+                          </span>
+                        );
+                      })}
+                    </span>
                   </article>
                   );
                 })}
