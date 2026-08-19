@@ -9683,10 +9683,42 @@ behavioural probes green, including **the non-vacuity control where the gate
 really does say yes** at 63 reviewed and 0.9683 precision. Zero residue
 measured, with the real data still visible as the control.
 
-pgTAP is **not installed hosted**, so the 44-assertion suite is CI-only — but it
+pgTAP is **not installed hosted**, so the 47-assertion suite is CI-only — but it
 was dry-run verbatim against the deployed schema with minimal shims for `is`,
-`has_table`, `lives_ok` and `throws_ok`. **44 run, 0 failed.** CI remains the
-authority.
+`has_table`, `lives_ok`, `ok` and `throws_ok`. **47 run, 0 failed.** CI remains the
+authority — and the section below is what that sentence is for.
+
+### CI caught what thirteen green probes could not, and it was severe
+
+**The append-only trigger blocked account deletion.** Its first cut covered
+`update or delete`, and the comment beside it claimed *"the account cascade
+deletes rows through the foreign key, which does not fire this trigger"*. That
+is **false**: an `on delete cascade` performs a real DELETE, row triggers fire,
+and it refused them — so **no account could be deleted at all**. The cascade
+drill named it: `42501: automation_calibration_observations is append-only`.
+
+**The tree had already written this down.**
+`202608070081_phase_2h_rate_limiting.sql:182-188` records the identical defect
+from 2H.2, in as many words. The comment I wrote asserted the opposite of a fact
+the repository already knew, which is the exact shape §90 and §94 keep recording
+from the other direction.
+
+The trigger now covers **UPDATE only**. Deletion is governed by grants, as on
+every other append-only table here: `authenticated` holds `SELECT` and nothing
+else, so no client can mutate a row, and the cascade stays the whole cleanup
+story.
+
+**Why thirteen green probes missed it.** None of them deleted a user, so none
+could reach the cascade. The suite now proves it directly — create an account,
+give it a policy row and an observation, delete it, measure both tables empty —
+and that is why it is 47 assertions rather than 44. *A probe that never performs
+the operation cannot see the operation fail.*
+
+**Second defect, same run.** The SELECT policies carried no role list, so they
+applied to `PUBLIC`, and `phase_2o_privacy_enumeration.sql` requires every
+counted table to carry a SELECT policy **naming `authenticated`** — a PUBLIC
+policy is not evidence that the *owner* can read their own rows. Both now say
+`to authenticated`.
 
 ### A guard must forbid the act, not the word — again
 

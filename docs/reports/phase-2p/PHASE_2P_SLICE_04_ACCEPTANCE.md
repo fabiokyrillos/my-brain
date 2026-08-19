@@ -116,7 +116,7 @@ subject tests a different artifact.
 | 4 | producer | `approved` / `corrected` / `rejected`; **`retained` produces nothing** — 4 resolutions, 3 observations |
 | 5 | replay | no-op |
 | 6 | another owner | A=3, B=1 |
-| 7 | append-only | UPDATE **and** DELETE refused, `42501` |
+| 7 | append-only | UPDATE refused, `42501` — **and this probe's first cut also asserted DELETE was refused, which is the defect §5a records** |
 | 8 | **non-vacuity** | at 63 reviewed and 0.9683 precision the gate says **yes** |
 | 9 | recent undo | blocks an otherwise eligible category |
 | 10 | disable | immediate, outranks the calibration |
@@ -131,10 +131,12 @@ Zero residue after each, **with a non-vacuity control**: 0 `automation%` tables,
 ### The pgTAP suite, dry-run before CI
 
 pgTAP is not installed on the hosted project, so the suite itself is CI-only.
-`phase_2p_automation_policy.sql` — **44 assertions** — was nevertheless executed
+`phase_2p_automation_policy.sql` — **47 assertions** — was nevertheless executed
 verbatim against the deployed schema with minimal shims for `is`, `has_table`,
-`lives_ok` and `throws_ok`, inside a rolled-back transaction. **44 run, 0
-failed.** CI remains the authority.
+`lives_ok`, `ok` and `throws_ok`, inside a rolled-back transaction. **47 run, 0
+failed.** CI remains the authority — and §5a is what that sentence is for: this
+dry run passed while two real defects were still in the tree, because it never
+deleted a user.
 
 Its first cut failed on two assertions, and the failure is recorded because the
 correction is the interesting part — see §6.
@@ -192,6 +194,43 @@ The only new privileges are `SELECT` on the two new tables and `EXECUTE` on the
 two new `public` functions, all to `authenticated`. Nothing in `private` is
 granted to anyone. No `product_events` vocabulary value, name or surface was
 added.
+
+## 5a. CI found two defects the hosted dry run could not, and one was severe
+
+**The append-only trigger blocked account deletion.** Its first cut covered
+`update or delete`, and its comment claimed *"the account cascade deletes rows
+through the foreign key, which does not fire this trigger"*. **That is false.**
+An `on delete cascade` performs a real DELETE on the child table, row triggers
+fire, and this refused it — so no account could be deleted at all. The failure
+surfaced in `signup_hardening_cascade_drill.sql` as
+`42501: automation_calibration_observations is append-only` inside
+`DELETE FROM ONLY "public"."automation_calibration_observations"`.
+
+**This repository had already paid for the identical defect**, and had written
+it down. `202608070081_phase_2h_rate_limiting.sql:182-188` says in as many
+words: *"2H.2's cascade defect was an append-only trigger on a table whose rows
+cascade: the cascade **is** a delete, so the trigger refused it and no account
+could be deleted at all."* The comment I wrote asserted the opposite of a fact
+the tree already recorded.
+
+The trigger now covers **UPDATE only**. Deletion is governed where it is
+governed on every other append-only table here — by grants: `authenticated`
+holds `SELECT` and nothing else, so no client can update or delete a row, and
+the cascade stays the complete cleanup story.
+
+**Why the hosted dry run missed it, and what changed because of that.** Thirteen
+probes ran against the deployed schema and none of them deleted a user, so none
+of them could reach the cascade. The suite now proves it directly: an account is
+created, given a policy row and an observation, deleted, and both tables are
+measured empty afterwards — the assertion whose absence let the defect through.
+The suite is 47 assertions, not 44.
+
+**The SELECT policies did not name `authenticated`.** A policy with no role list
+applies to `PUBLIC`, and `phase_2o_privacy_enumeration.sql` requires every
+counted table to carry a SELECT policy naming `authenticated` — because a PUBLIC
+policy is not evidence that the *owner* can read their own rows, which is the
+property that assertion exists to establish. Both policies now say
+`to authenticated`, and the suite pins it.
 
 ## 6. Two corrections worth recording
 

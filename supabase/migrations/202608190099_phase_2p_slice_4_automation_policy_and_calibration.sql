@@ -61,9 +61,15 @@ create table public.automation_category_policies (
 alter table public.automation_category_policies enable row level security;
 alter table public.automation_category_policies force row level security;
 
+-- `to authenticated` is explicit, not decorative. A policy with no role list
+-- applies to PUBLIC, and `phase_2o_privacy_enumeration.sql` requires every
+-- counted table to carry a SELECT policy naming `authenticated` -- because a
+-- PUBLIC policy is not evidence that the owner can read their own rows, which
+-- is the property that assertion exists to establish.
 create policy automation_category_policies_select_own
   on public.automation_category_policies
   for select
+  to authenticated
   using (user_id = (select auth.uid()));
 
 revoke all on table public.automation_category_policies from public, anon, authenticated;
@@ -139,13 +145,32 @@ alter table public.automation_calibration_observations force row level security;
 create policy automation_calibration_observations_select_own
   on public.automation_calibration_observations
   for select
+  to authenticated
   using (user_id = (select auth.uid()));
 
 revoke all on table public.automation_calibration_observations from public, anon, authenticated;
 grant select on table public.automation_calibration_observations to authenticated;
 
--- Append-only, enforced rather than described. The account cascade deletes
--- rows through the foreign key, which does not fire this trigger.
+-- UPDATE ONLY, AND THE OMISSION OF DELETE IS THE WHOLE POINT.
+--
+-- The first cut of this trigger covered `update or delete`, and its comment
+-- claimed "the account cascade deletes rows through the foreign key, which does
+-- not fire this trigger". That is FALSE, and CI proved it false: an
+-- `on delete cascade` performs a real DELETE on the child table, row triggers
+-- fire, and this refused it -- so no account could be deleted at all.
+--
+-- This repository has already paid for exactly this defect once.
+-- `202608070081_phase_2h_rate_limiting.sql:182-188` records it in as many
+-- words: *"2H.2's cascade defect was an append-only trigger on a table whose
+-- rows cascade: the cascade **is** a delete, so the trigger refused it and no
+-- account could be deleted at all."*
+--
+-- Deletion is governed where it is actually governed on every other append-only
+-- table here -- by grants. `authenticated` holds SELECT and nothing else, so no
+-- client can update or delete a row. This trigger is the second lock on the one
+-- operation a future grant widening or a definer bug could still reach, and it
+-- deliberately says nothing about DELETE, so the account cascade stays the
+-- complete cleanup story.
 create or replace function private.refuse_calibration_observation_mutation()
 returns trigger
 language plpgsql
@@ -160,7 +185,7 @@ $$;
 revoke all on function private.refuse_calibration_observation_mutation() from public, anon, authenticated;
 
 create trigger automation_calibration_observations_append_only
-  before update or delete on public.automation_calibration_observations
+  before update on public.automation_calibration_observations
   for each row execute function private.refuse_calibration_observation_mutation();
 
 -- ---------------------------------------------------------------------------

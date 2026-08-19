@@ -22,7 +22,7 @@
 -- that depend on recency are deterministic because of it.
 
 begin;
-select plan(44);
+select plan(47);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures -- two owners, one entry and one interpretation each.
@@ -353,12 +353,51 @@ select throws_ok(
   'the evidence is append-only: an update is refused'
 );
 
-select throws_ok(
-  $$delete from public.automation_calibration_observations
-     where user_id = '4a000001-0000-4000-8000-000000000001'$$,
-  '42501',
-  null,
-  'the evidence is append-only: a delete is refused'
+-- DELETE IS GOVERNED BY GRANTS, NOT BY THE TRIGGER, AND THIS IS WHY.
+--
+-- The first cut of this file asserted that a DELETE was refused, and the
+-- trigger that made it pass ALSO refused the `auth.users` cascade -- so no
+-- account could be deleted. CI caught it; the hosted dry run did not, because
+-- it never deleted a user.
+--
+-- `authenticated` holds SELECT and nothing else, so no client can delete a row.
+-- That is where deletion is governed on every other append-only table here, and
+-- the cascade stays the complete cleanup story.
+select ok(
+  not has_table_privilege('authenticated', 'public.automation_calibration_observations', 'DELETE')
+  and not has_table_privilege('authenticated', 'public.automation_calibration_observations', 'UPDATE')
+  and not has_table_privilege('authenticated', 'public.automation_calibration_observations', 'INSERT'),
+  'no client can delete, update or insert evidence -- SELECT is the only privilege authenticated holds'
+);
+
+-- And the cascade really does clean up, proved rather than assumed. This is the
+-- assertion whose absence let the defect through.
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+) values (
+  '4a000003-0000-4000-8000-000000000003', 'authenticated', 'authenticated',
+  '2p4-cascade@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+);
+insert into public.automation_category_policies (user_id, category, state)
+values ('4a000003-0000-4000-8000-000000000003', 'task', 'disabled');
+insert into public.automation_calibration_observations
+  (user_id, category, outcome, source_kind, subject_key, observation_key)
+values ('4a000003-0000-4000-8000-000000000003', 'task', 'approved', 'task_candidate',
+        'cascade-subject', 'cascade-observation');
+
+select lives_ok(
+  $$delete from auth.users where id = '4a000003-0000-4000-8000-000000000003'$$,
+  'deleting an account is NOT blocked by the append-only trigger -- the cascade is a delete, and 2H.2 already paid for forgetting that'
+);
+
+select is(
+  (select count(*)::int from public.automation_calibration_observations
+    where user_id = '4a000003-0000-4000-8000-000000000003')
+  + (select count(*)::int from public.automation_category_policies
+    where user_id = '4a000003-0000-4000-8000-000000000003'),
+  0,
+  'and both tables really went with the account -- the cascade is the whole cleanup story'
 );
 
 -- The owner taking an acceptance back is a distinct signal, and it is
@@ -542,6 +581,20 @@ select is(
       and privilege_type <> 'SELECT'),
   0,
   'authenticated holds SELECT and nothing else on either new table'
+);
+
+-- The SELECT policy must NAME `authenticated`. A policy with no role list
+-- applies to PUBLIC, which is not evidence that the owner can read their own
+-- rows -- and `phase_2o_privacy_enumeration.sql` fails on exactly that, which
+-- is how the first cut of this migration was caught.
+select is(
+  (select count(*)::int from pg_catalog.pg_policies
+    where schemaname = 'public'
+      and tablename in ('automation_category_policies', 'automation_calibration_observations')
+      and cmd = 'SELECT'
+      and 'authenticated' = any(roles)),
+  2,
+  'both tables carry an owner-scoped SELECT policy that names authenticated'
 );
 
 select is(
