@@ -289,17 +289,28 @@ test failure; both were found by reading.
 ### `CHECKPOINT DO DONO — CALIBRAÇÃO REAL NECESSÁRIA`
 
 The structure is complete and **no category can be enabled**, because the
-reference set does not exist. Measured on the deployed database at this
-baseline:
+reference set does not exist.
 
-| Category | Reviewed today | Approved | Corrected | Rejected | Undone | Needed | Still missing | Producer exists? |
-|---|---|---|---|---|---|---|---|---|
-| tasks | **2** | 1 | 0 | 1 | 0 | 50 | **48** | yes |
-| people | **3** | 2 | 1 | 0 | 0 | 80 | **77** | yes |
-| projects | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
-| companies | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
-| memories | **0** | 0 | 0 | 0 | 0 | 80 | **80** | **no** |
-| relations | **0** | 0 | 0 | 0 | 0 | 100 | **100** | **no** |
+**The calibration evidence is zero for all six**, and that is stronger than it
+first looks. The producer is an `after insert` trigger, so it cannot see rows
+that already existed: the owner's pre-existing hosted resolutions produce **no**
+observations, and none are backfilled. Manufacturing evidence for reviews that
+predate the contract is the fabrication ADR-123 Decision 4 forbids.
+
+The two numbers are therefore different things and are stated separately, so
+neither can be read as the other:
+
+| Category | **Calibration evidence** | Pre-existing reviews (not evidence) | Needed | Still missing | Producer exists? |
+|---|---|---|---|---|---|
+| tasks | **0** | 2 — 1 confirmed, 1 dismissed¹ | 50 | **50** | yes |
+| people | **0** | 3 — 2 confirmed, 1 rejected | 80 | **80** | yes |
+| projects | **0** | 0 | 60 | **60** | **no** |
+| companies | **0** | 0 | 60 | **60** | **no** |
+| memories | **0** | 0 | 80 | **80** | **no** |
+| relations | **0** | 0 | 100 | **100** | **no** |
+
+¹ And under the corrected semantics that dismissal would not have counted as a
+rejection anyway — see §6.
 
 *(The task and person counts are the pre-existing hosted resolutions. The
 producer is new, so those rows will be created for decisions made from now on;
