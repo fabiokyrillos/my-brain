@@ -43,6 +43,7 @@ import {
   contextUpdateSchema,
   organizationCreateSchema,
   organizationUpdateSchema,
+  personOrganizationSchema,
   personUpdateSchema,
   projectUpdateSchema,
 } from "./schema";
@@ -86,7 +87,15 @@ function failed(
     | "createdButNotLinked",
   submitted: EntityEditSubmission | null = null,
 ): EntityEditState {
-  return { status: "error", message: getEntityCopy(locale)[key], submitted };
+  return {
+    status: "error",
+    message: getEntityCopy(locale)[key],
+    submitted,
+    // Only the two a surface branches on carry a token; the rest stay
+    // message-only, because nothing renders differently for them. See
+    // `edit-state.ts` on why this is not a string comparison at the call site.
+    code: key === "createdButNotLinked" || key === "duplicateName" ? key : null,
+  };
 }
 
 /**
@@ -430,6 +439,96 @@ export async function updateContext(
  * the atomicity: making this transactional would need an RPC, which is a new
  * privileged boundary this initiative does not take.
  */
+/**
+ * `2P-PERSON-001`, `2P-PERSON-002` — assign an **existing** company to a person,
+ * from the person's own section.
+ *
+ * ## Why this is not `updatePerson`
+ *
+ * `updatePerson` writes name, notes and company together over a `.strict()`
+ * schema, so a company control submitting to it would have to carry the stored
+ * name and notes as hidden inputs — values rendered at some earlier moment. That
+ * is precisely the cross-section clobber slice 2P.5 had to repair in
+ * `updateProfile`: a note edited elsewhere would be reverted by a company
+ * change, silently, with the audit row recording the revert as intentional.
+ *
+ * ## Why it is not a *new* write path either
+ *
+ * `createOrganizationForSubject` already writes this exact column with this
+ * exact audit shape — it just gets there by creating the row first. This is its
+ * other half, and the two are deliberately symmetric: same predicate, same
+ * pre-read, same `update_person` audit row over `organization_id`. What the
+ * slice removes is the *third* route, the nested disclosure that made the owner
+ * open an edit form to reach a selector.
+ *
+ * Clearing the company is a first-class outcome: `optionalRelation` maps the
+ * empty option to `null`, and "this person no longer works there" is a fact the
+ * owner must be able to record without deleting anything.
+ */
+export async function linkPersonOrganization(
+  _previous: EntityEditState,
+  formData: FormData,
+): Promise<EntityEditState> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const fields = submittedFields(formData);
+  const parsed = personOrganizationSchema.safeParse(fields);
+  if (!parsed.success) return failed(locale, "invalidInput", fields);
+  const { personId, organizationId } = parsed.data;
+
+  const { supabase, user } = await requireUser(parsed.data.locale);
+
+  // Read before write, in the same ownership scope, so the audit row can say
+  // which company was replaced rather than only which one is now set. An
+  // assignment that overwrites is the common case here, not the exception.
+  const before = await supabase
+    .from("people")
+    .select("organization_id")
+    .eq("id", personId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (before.error) return failed(locale, "saveFailed");
+  if (!before.data) return failed(locale, "notFound");
+
+  /*
+   * The foreign key is NOT re-proved here, and it does not need to be.
+   * `people_organization_id_fkey` plus forced RLS on `organizations` means an
+   * id belonging to someone else fails the constraint rather than linking, and
+   * the selector is built from `loadOrganizationOptions`, which is owner-scoped
+   * already. A membership query would be a third opinion about ownership that
+   * could drift from the other two.
+   */
+  const { data: after, error } = await supabase
+    .from("people")
+    .update({ organization_id: organizationId, updated_at: new Date().toISOString() })
+    .eq("id", personId)
+    .eq("user_id", user.id)
+    .select("organization_id")
+    .maybeSingle();
+
+  if (error) return failed(locale, "saveFailed", fields);
+  if (!after) return failed(locale, "notFound");
+
+  const audit = await supabase.from("audit_logs").insert({
+    user_id: user.id,
+    action_type: "update_person",
+    entity_type: "person",
+    entity_id: personId,
+    actor: "user",
+    before_state: before.data,
+    after_state: after,
+    reason: "Owner set the person's company from the person page",
+  });
+  if (audit.error) console.error("Person company audit failed", audit.error.message);
+
+  // The route PATTERN, never the resolved path: under a `[locale]` dynamic
+  // segment a literal path invalidates nothing, which slice 2P.4 measured
+  // against the deployed app.
+  revalidatePath(`/[locale]/app/people/${personId}`, "page");
+  revalidatePath("/[locale]/app/people", "page");
+  return { status: "success", message: getEntityCopy(locale).companySaved };
+}
+
 export async function createOrganizationForSubject(
   _previous: EntityEditState,
   formData: FormData,

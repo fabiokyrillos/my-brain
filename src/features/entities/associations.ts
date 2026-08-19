@@ -49,6 +49,7 @@ import {
   personContextSchema,
   personProjectEndSchema,
   personProjectSchema,
+  taskPersonRoleSchema,
 } from "./schema";
 
 /** A unique-index violation on a live pair, told apart from an outage. */
@@ -286,6 +287,113 @@ export async function updatePersonProjectRole(
   if (audit.error) console.error("Person-project role audit failed", audit.error.message);
 
   revalidateBoth(parsed.data.locale, personId, `projects/${projectId}`);
+  return { status: "success", message: getEntityCopy(locale).saved };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Person <-> Task                                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `2P-PERSON-001` — a person's role **on one task**, edited in the context of
+ * that task's own row on the person page.
+ *
+ * ## Three ways this table differs from `person_projects`, all load-bearing
+ *
+ * 1. **The role is a closed vocabulary**, not the owner's words:
+ *    `task_people_role_check` admits `requester`, `involved`, `assignee` and
+ *    `waiting_on`, and `taskPersonRoleSchema` mirrors it. A free-text field here
+ *    would produce a `23514` the owner could not read.
+ * 2. **The role is part of the primary key** — `(task_id, person_id, role)` — so
+ *    the same person may hold two roles on one task, and "the role of this
+ *    person on this task" is not a well-formed question. `previousRole`
+ *    identifies which row is being changed; without it the statement would have
+ *    to guess, and guessing would silently rewrite the wrong one.
+ * 3. **Moving onto a role the person already holds is a collision**, not an
+ *    update. Postgres reports the primary-key violation as `23505`, and the
+ *    honest answer is that they already have it — not that the save failed.
+ *
+ * ## Why it is an UPDATE rather than a delete-then-insert
+ *
+ * Updating a primary-key column is ordinary SQL, and it keeps the change to one
+ * statement whose failure leaves the old row exactly where it was. A
+ * delete-then-insert has a window in which the person holds no role on the task
+ * at all, and a second-statement failure would leave them holding none — a
+ * silent unlink dressed as a role edit.
+ *
+ * The task itself is untouched: this writes no title, status or due date, and
+ * `2P-PERSON-001`'s correction is explicit that a role lives on the relation
+ * rather than being copied onto either endpoint.
+ */
+export async function updateTaskPersonRole(
+  _previous: EntityEditState,
+  formData: FormData,
+): Promise<EntityEditState> {
+  const locale = resolveLocale(formData.get("locale"));
+
+  const fields = submittedRelationFields(formData);
+  const parsed = taskPersonRoleSchema.safeParse(fields);
+  if (!parsed.success) return failedRelation(locale, "invalidInput", fields);
+  const { personId, taskId, previousRole, role } = parsed.data;
+
+  const { supabase, user } = await requireUser(parsed.data.locale);
+
+  // Nothing to do, and saying so beats writing a row that changes nothing and
+  // an audit entry claiming a change that did not happen.
+  if (previousRole === role) {
+    return { status: "success", message: getEntityCopy(locale).roleUnchanged };
+  }
+
+  const before = await supabase
+    .from("task_people")
+    .select("task_id,person_id,role")
+    .eq("user_id", user.id)
+    .eq("task_id", taskId)
+    .eq("person_id", personId)
+    .eq("role", previousRole)
+    .maybeSingle();
+  if (before.error) return failedRelation(locale, "saveFailed");
+  if (!before.data) return failedRelation(locale, "notFound");
+
+  const { data: after, error } = await supabase
+    .from("task_people")
+    .update({ role })
+    .eq("user_id", user.id)
+    .eq("task_id", taskId)
+    .eq("person_id", personId)
+    .eq("role", previousRole)
+    .select("task_id,person_id,role")
+    .maybeSingle();
+
+  if (error) {
+    return failedRelation(locale, isDuplicateAssociation(error) ? "roleAlreadyHeld" : "saveFailed", fields);
+  }
+  if (!after) return failedRelation(locale, "notFound");
+
+  /*
+   * The role tokens themselves are in the audit row, and that is safe: they are
+   * a four-value closed vocabulary fixed by a check constraint, not content.
+   * The task's title is NOT — it is governed by the sensitivity contract the
+   * person page derives from the task's source entry, and an audit reason
+   * carrying it would put governed text into a table the surface never masks.
+   */
+  const audit = await supabase.from("audit_logs").insert({
+    user_id: user.id,
+    action_type: "update_task_person_role",
+    entity_type: "task_person",
+    entity_id: taskId,
+    actor: "user",
+    before_state: { person_id: personId, role: before.data.role },
+    after_state: { person_id: personId, role: after.role },
+    reason: "Owner changed a task role from the person page",
+  });
+  if (audit.error) console.error("Task-person role audit failed", audit.error.message);
+
+  // The route PATTERN: both surfaces sit under `[locale]`, where a resolved
+  // path invalidates nothing.
+  revalidatePath(`/[locale]/app/people/${personId}`, "page");
+  // The task's own surface is `/app/work/[taskId]`; `/app/tasks` is the list.
+  revalidatePath(`/[locale]/app/work/${taskId}`, "page");
   return { status: "success", message: getEntityCopy(locale).saved };
 }
 

@@ -31,7 +31,14 @@ export type RelationFailure =
   | "notFound"
   | "saveFailed"
   | "duplicateRelation"
-  | "foreignTarget";
+  | "foreignTarget"
+  /**
+   * `2P-PERSON-001`. Its own key for the same reason `duplicateRelation` is:
+   * `task_people`'s primary key is `(task_id, person_id, role)`, so moving a
+   * person onto a role they already hold on that task is a `23505` — and the
+   * next step is nothing at all, not "try again".
+   */
+  | "roleAlreadyHeld";
 
 export function failedRelation(
   locale: Locale,

@@ -8,6 +8,7 @@ import {
   endPersonContext,
   endPersonProject,
   updatePersonProjectRole,
+  updateTaskPersonRole,
 } from "./associations";
 import { idleEntityEditState } from "./edit-state";
 
@@ -316,5 +317,139 @@ describe("the same row, written from either surface", () => {
     expect(fromPerson.audit.action_type).toBe(fromProject.audit.action_type);
     expect(fromPerson.audit.entity_type).toBe(fromProject.audit.entity_type);
     expect(fromPerson.audit.after_state).toEqual(fromProject.audit.after_state);
+  });
+});
+
+/**
+ * `2P-PERSON-001` — a role on a task, which is a different animal from a role on
+ * a project.
+ *
+ * The cases are written around the three properties `task_people`'s shape makes
+ * possible to get wrong, and each one costs the owner something real:
+ *
+ *  1. the role is **part of the primary key**, so a write that does not name
+ *     which row it is changing can rewrite the wrong one;
+ *  2. moving onto a role the person already holds is a **collision**, whose
+ *     honest answer is "they already have it" rather than "the save failed";
+ *  3. the vocabulary is **closed**, so a value outside it must be refused before
+ *     the database refuses it with a constraint name.
+ */
+describe("updateTaskPersonRole", () => {
+  const TASK_ID = "66666666-6666-4666-8666-666666666666";
+
+  const roleForm = (fields: Partial<Record<string, string>> = {}) => form({
+    locale: "pt-BR",
+    personId: PERSON_ID,
+    taskId: TASK_ID,
+    previousRole: "involved",
+    role: "assignee",
+    ...fields,
+  });
+
+  it("names the row it is changing, so the person's other role on the task survives", async () => {
+    // The primary key is `(task_id, person_id, role)`. A statement scoped only by
+    // task and person would match BOTH rows of somebody who is `involved` and
+    // `waiting_on`, and would collapse them.
+    const links = tableStub(
+      { data: { task_id: TASK_ID, person_id: PERSON_ID, role: "involved" }, error: null },
+      { data: { task_id: TASK_ID, person_id: PERSON_ID, role: "assignee" }, error: null },
+    );
+    const { supabase, audit } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateTaskPersonRole(idleEntityEditState, roleForm());
+
+    expect(result.status).toBe("success");
+    expect(links.calls).toContainEqual(["role", "involved"]);
+    expect(links.calls).toContainEqual(["user_id", USER_ID]);
+    expect(links.calls).toContainEqual(["task_id", TASK_ID]);
+    expect(links.calls).toContainEqual(["person_id", PERSON_ID]);
+    // Twice: once on the pre-read, once on the write. Neither may be unscoped.
+    expect(links.calls.filter(([column]) => column === "user_id")).toHaveLength(2);
+    expect(links.calls.filter(([column]) => column === "role")).toHaveLength(2);
+    expect(links.payloads[0]).toEqual({ role: "assignee" });
+    expect(audit).toHaveBeenCalledTimes(1);
+    expect(audit.mock.calls[0]![0]).toMatchObject({
+      action_type: "update_task_person_role",
+      entity_type: "task_person",
+      entity_id: TASK_ID,
+      actor: "user",
+      before_state: { person_id: PERSON_ID, role: "involved" },
+      after_state: { person_id: PERSON_ID, role: "assignee" },
+    });
+  });
+
+  it("says the person already holds that role, rather than reporting an outage", async () => {
+    // A `23505` here is the primary key doing its job, and the next step is
+    // nothing at all — not a retry, which is what "could not save" would invite.
+    const links = tableStub(
+      { data: { task_id: TASK_ID, person_id: PERSON_ID, role: "involved" }, error: null },
+      { data: null, error: { code: "23505", message: "duplicate key value" } },
+    );
+    const { supabase } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateTaskPersonRole(idleEntityEditState, roleForm());
+
+    expect(result.status).toBe("error");
+    expect(result.message).toBe("Essa pessoa já tem esse papel nesta tarefa.");
+  });
+
+  it("refuses a role outside the check constraint before touching the database", async () => {
+    const links = tableStub({ data: null, error: null });
+    const { supabase } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateTaskPersonRole(idleEntityEditState, roleForm({ role: "owner" }));
+
+    expect(result.status).toBe("error");
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the role did not change", async () => {
+    // A no-op write would produce an audit row claiming a change that never
+    // happened, which is worse than the absence of one.
+    const links = tableStub({ data: null, error: null });
+    const { supabase, audit } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateTaskPersonRole(
+      idleEntityEditState,
+      roleForm({ previousRole: "assignee", role: "assignee" }),
+    );
+
+    expect(result.status).toBe("success");
+    expect(result.message).toBe("O papel continua o mesmo.");
+    expect(supabase.from).not.toHaveBeenCalled();
+    expect(audit).not.toHaveBeenCalled();
+  });
+
+  it("reports a vanished row as gone rather than as a retryable failure", async () => {
+    const links = tableStub({ data: null, error: null });
+    const { supabase } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    const result = await updateTaskPersonRole(idleEntityEditState, roleForm());
+
+    expect(result.status).toBe("error");
+    expect(result.message).toBe("Este registro não existe mais.");
+  });
+
+  it("keeps the task's own title out of the audit trail", async () => {
+    // A task title is governed by the sensitivity contract the person page
+    // derives from the task's source entry. An audit reason carrying it would
+    // put masked text into a table no surface masks.
+    const links = tableStub(
+      { data: { task_id: TASK_ID, person_id: PERSON_ID, role: "involved" }, error: null },
+      { data: { task_id: TASK_ID, person_id: PERSON_ID, role: "assignee" }, error: null },
+    );
+    const { supabase, audit } = client({ task_people: links });
+    vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: USER_ID } } as never);
+
+    await updateTaskPersonRole(idleEntityEditState, roleForm());
+
+    const row = audit.mock.calls[0]![0] as Record<string, unknown>;
+    expect(JSON.stringify(row)).not.toContain("title");
+    expect(row.reason).toBe("Owner changed a task role from the person page");
   });
 });

@@ -25,10 +25,29 @@
  */
 export type EntityEditSubmission = Readonly<Record<string, string>>;
 
+/**
+ * Why a refusal happened, as a token rather than as a sentence.
+ *
+ * `2P-PERSON-003` asks the created-but-not-linked outcome to be *reported
+ * distinctly* and to not invite a duplicate retry, and the surface has to
+ * **behave** differently for it: the company exists, so the panel must return to
+ * the selector rather than keep offering to create one. Deciding that from
+ * `message === copy.createdButNotLinked` would be a comparison against a
+ * localized string — it would break the moment either translation is reworded,
+ * and it would break silently, leaving the owner staring at a create form that
+ * would produce a duplicate.
+ *
+ * Only the codes a surface actually branches on are listed. The rest of the
+ * failures stay message-only, because nothing renders differently for them.
+ */
+export type EntityEditFailureCode = "createdButNotLinked" | "duplicateName";
+
 export type EntityEditState = {
   status: "idle" | "success" | "error";
   message: string;
   submitted?: EntityEditSubmission | null;
+  /** Present only on the refusals a surface changes shape for. */
+  code?: EntityEditFailureCode | null;
 };
 
 /*

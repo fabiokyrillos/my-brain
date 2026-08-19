@@ -49,11 +49,26 @@ const FOCUSABLE = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(", ");
 
+/**
+ * The default id prefix, which is also the one the first three consumers were
+ * written against.
+ *
+ * The ids used to be literals. That was safe while one dialog existed; slice
+ * 2P.6 mounts this component on three more surfaces, and two dialogs rendered at
+ * once would have produced duplicate `id`s — which does not throw, it silently
+ * gives `aria-labelledby` the wrong element. A prefix with this default keeps
+ * every existing consumer's DOM byte-for-byte identical while making a
+ * collision impossible for anyone who passes their own.
+ */
+const DEFAULT_ID_PREFIX = "task-command-dialog";
+
 export function ConfirmDialog({
   open,
   title,
   description,
   cancelLabel,
+  className,
+  idPrefix = DEFAULT_ID_PREFIX,
   onClose,
   children,
 }: {
@@ -61,6 +76,18 @@ export function ConfirmDialog({
   title: string;
   description: string;
   cancelLabel: string;
+  /**
+   * An extra class on the panel, for a consumer whose content is a real form
+   * rather than one submit button.
+   *
+   * `.task-command-dialog form { display: inline }` is correct for the three
+   * consumers that put a single-button form in a row, and wrong for a dialog
+   * holding a labelled field. The modifier is opt-in so those three keep exactly
+   * the layout they have.
+   */
+  className?: string;
+  /** Namespaces the two generated ids. Defaults to the original literals. */
+  idPrefix?: string;
   onClose: () => void;
   children: React.ReactNode;
 }) {
@@ -117,15 +144,15 @@ export function ConfirmDialog({
   return (
     <div className="task-command-dialog-backdrop">
       <div
-        aria-describedby="task-command-dialog-description"
-        aria-labelledby="task-command-dialog-title"
+        aria-describedby={`${idPrefix}-description`}
+        aria-labelledby={`${idPrefix}-title`}
         aria-modal="true"
-        className="task-command-dialog"
+        className={className ? `task-command-dialog ${className}` : "task-command-dialog"}
         ref={panel}
         role="dialog"
       >
-        <h3 id="task-command-dialog-title">{title}</h3>
-        <p id="task-command-dialog-description">{description}</p>
+        <h3 id={`${idPrefix}-title`}>{title}</h3>
+        <p id={`${idPrefix}-description`}>{description}</p>
         {children}
         <button className="task-command-dialog-cancel" onClick={close} type="button">
           {cancelLabel}
