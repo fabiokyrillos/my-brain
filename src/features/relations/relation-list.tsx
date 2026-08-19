@@ -53,6 +53,7 @@ import {
   unattributableEdges,
   type RelationProjection,
 } from "./projection";
+import { relationAnchorId } from "./view";
 
 /**
  * The three relation tables, keyed by edge kind and **typed** by
@@ -82,6 +83,19 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
   const byId = nodesById(projection);
   const drawn = drawableEdges(projection);
   const undrawn = unattributableEdges(projection);
+
+  /*
+   * `2P-RELATION-003` — each row's anchor, so the drawing's compact list can
+   * open the explanation of one link.
+   *
+   * Positional over the projection's own ordered list rather than `edge.key`,
+   * which embeds the stored relationship type: an `id` built from it would put
+   * the owner's word about another person into the DOM and, when followed, into
+   * the address bar and browser history. The two groups below re-order the rows,
+   * so the position is resolved from the unsplit list — indexing each group
+   * would give two rows the same anchor.
+   */
+  const positionOf = new Map(projection.edges.items.map((edge, index) => [edge.key, index]));
 
   if (projection.edges.items.length === 0) {
     return (
@@ -117,6 +131,7 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
         <ul className="relations-rows" data-relation-group="drawn">
           {drawn.map((edge) => (
             <RelationRow
+              anchor={relationAnchorId(positionOf.get(edge.key) ?? 0)}
               byId={byId}
               edge={edge}
               key={edge.key}
@@ -136,6 +151,7 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
           <ul className="relations-rows" data-relation-group="undrawn">
             {undrawn.map((edge) => (
               <RelationRow
+                anchor={relationAnchorId(positionOf.get(edge.key) ?? 0)}
                 byId={byId}
                 edge={edge}
                 key={edge.key}
@@ -172,11 +188,20 @@ function NodeLabel({ copy, node }: { copy: ReturnType<typeof getRelationsCopy>; 
 }
 
 export function RelationRow({
+  anchor,
   byId,
   edge,
   locale,
   timeZone,
 }: {
+  /**
+   * The row's own DOM id, so the drawing's compact list can link to it.
+   *
+   * Supplied by the list rather than derived here: only the list knows the
+   * edge's position in the unsplit projection, and deriving it per row would
+   * give the drawn and undrawn groups two rows carrying the same anchor.
+   */
+  readonly anchor?: string;
   readonly byId: ReadonlyMap<string, RelationNode>;
   readonly edge: RelationEdge;
   readonly locale: Locale;
@@ -197,7 +222,7 @@ export function RelationRow({
   const since = formatInstant(edge.since, "day", locale, timeZone);
 
   return (
-    <li className="relations-row" data-edge-kind={edge.kind} data-origin={edge.origin.kind}>
+    <li className="relations-row" data-edge-kind={edge.kind} data-origin={edge.origin.kind} id={anchor}>
       <p className="relations-row-main">
         <NodeLabel copy={copy} node={from} />
         <span className="relations-row-relation">{relationLabel}</span>

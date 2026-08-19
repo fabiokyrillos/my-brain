@@ -138,10 +138,18 @@ export const AI_ROUTE_CONTRACTS = [
     routeKey: "embeddingModel",
     operation: "semantic_search",
     disposition: "uncontrolled",
+    /*
+     * Three, not four, since slice 2P.6. `src/features/operations/actions.ts`
+     * was a reader because `createRecord`'s memory branch embedded the sentence
+     * it inserted. That branch is deleted — the memories page writes through
+     * `createProposedMemory`, whose `embedMemory` performs the identical call
+     * with the identical gate — so the route lost a call site rather than a
+     * behaviour, and the census says so rather than keeping a name that no
+     * longer reads the column.
+     */
     callSites: [
       "src/features/chat/actions.ts",
       "src/features/memories/actions.ts",
-      "src/features/operations/actions.ts",
       "supabase/functions/process-jobs/entry.ts",
     ],
     fallbackModel: "text-embedding-3-small",

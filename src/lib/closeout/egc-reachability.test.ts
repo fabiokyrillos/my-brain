@@ -220,16 +220,24 @@ const INVENTORY: readonly RouteEntry[] = [
       {
         section: "Memories",
         table: "memories",
-        // `createRecord`, not `createMemory`: the Memories list page authors a
-        // memory through the shared inline-create action, and the dedicated
-        // module handles the lifecycle afterwards. Naming the wrong export was
-        // caught by this very assertion on its first run, which is the point of
-        // checking the symbol rather than the module.
+        /*
+         * `createProposedMemory` since slice 2P.6, and the change of name here
+         * is the assertion doing its job for the second time.
+         *
+         * It used to be `createRecord`, the shared inline-create action — the
+         * Memories list page authored a memory through it and the dedicated
+         * module handled the lifecycle afterwards. `2P-MEMORY-001` replaced that
+         * one-line field with a composer, and its branch of `createRecord` was
+         * deleted rather than left dormant, so this declaration named an export
+         * the destination page no longer imports. Naming the *wrong* export was
+         * caught by this assertion on its first run; naming a *stale* one was
+         * caught by it now, which is why it checks the symbol and not the module.
+         */
         writer: {
           kind: "elsewhere",
           route: "memories",
-          module: "src/features/operations/actions.ts",
-          exportName: "createRecord",
+          module: "src/features/memories/actions.ts",
+          exportName: "createProposedMemory",
         },
       },
       {

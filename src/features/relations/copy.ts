@@ -79,6 +79,31 @@ export type RelationsCopy = {
   readonly edgeSummary: (from: string, relation: string, to: string) => string;
   /** `2N-RELATION-005` — what a stored confidence would mean, if one were shown. */
   readonly confidenceNeverShown: string;
+
+  /**
+   * `2P-RELATION-001` … `-004` — the two tabs, the focus control, and the
+   * compact list a phone gets beside the drawing.
+   *
+   * `listAlwaysComplete` is the sentence that keeps the drawing from reading as
+   * the whole answer. `2N-RELATION-007` makes the text carry everything the
+   * picture does and more; saying so where the picture is is what stops a reader
+   * concluding the drawing is the record.
+   */
+  readonly tabsLabel: string;
+  readonly diagramTab: string;
+  readonly linksTab: string;
+  readonly listAlwaysComplete: string;
+  readonly focusLabel: string;
+  readonly focusAll: string;
+  readonly focusApply: string;
+  readonly focusClear: string;
+  readonly focusedOn: (name: string) => string;
+  readonly focusEmpty: string;
+  readonly compactHeading: string;
+  readonly compactIntro: string;
+  readonly compactMore: (shown: number) => string;
+  readonly explainLink: string;
+  readonly explainLinkFor: (from: string, to: string) => string;
 };
 
 const PT_NODE_TYPE: Record<RelationNodeType, string> = {
@@ -157,6 +182,24 @@ const PT: RelationsCopy = {
   failedBody: "Isto é uma falha de leitura, não uma ausência de vínculos. Tente novamente.",
   loading: "Carregando as relações",
 
+  tabsLabel: "Como ver as relações",
+  diagramTab: "Desenho",
+  linksTab: "Todos os vínculos",
+  listAlwaysComplete:
+    "Tudo o que está no desenho está em Todos os vínculos — e o que não pode ser desenhado também.",
+  focusLabel: "Focar em uma pessoa",
+  focusAll: "Todas as pessoas",
+  focusApply: "Focar",
+  focusClear: "Ver todas",
+  focusedOn: (name) => `Mostrando apenas os vínculos de ${name}.`,
+  focusEmpty: "Nenhuma pessoa tem vínculos para focar ainda.",
+  compactHeading: "Os vínculos desenhados, em texto",
+  compactIntro:
+    "A mesma coisa que o desenho mostra, em lista, para quando a figura não couber na tela.",
+  compactMore: (shown) => `Mostrando ${shown}. Abra Todos os vínculos para ver o restante.`,
+  explainLink: "Ver a explicação",
+  explainLinkFor: (from, to) => `Ver a explicação do vínculo entre ${from} e ${to}`,
+
   openNode: (label, type) => `Abrir ${type.toLowerCase()}: ${label}`,
   edgeSummary: (from, relation, to) => `${from} — ${relation} — ${to}`,
   confidenceNeverShown:
@@ -206,6 +249,24 @@ const EN: RelationsCopy = {
   failedHeading: "Your relations could not be loaded",
   failedBody: "This is a read failure, not an absence of links. Please try again.",
   loading: "Loading relations",
+
+  tabsLabel: "How to view relations",
+  diagramTab: "Drawing",
+  linksTab: "All links",
+  listAlwaysComplete:
+    "Everything in the drawing is in All links — and so is everything that cannot be drawn.",
+  focusLabel: "Focus on a person",
+  focusAll: "Everyone",
+  focusApply: "Focus",
+  focusClear: "See everyone",
+  focusedOn: (name) => `Showing only ${name}'s links.`,
+  focusEmpty: "Nobody has links to focus on yet.",
+  compactHeading: "The drawn links, in text",
+  compactIntro:
+    "The same thing the drawing shows, as a list, for when the figure does not fit the screen.",
+  compactMore: (shown) => `Showing ${shown}. Open All links for the rest.`,
+  explainLink: "See the explanation",
+  explainLinkFor: (from, to) => `See the explanation of the link between ${from} and ${to}`,
 
   openNode: (label, type) => `Open ${type.toLowerCase()}: ${label}`,
   edgeSummary: (from, relation, to) => `${from} — ${relation} — ${to}`,

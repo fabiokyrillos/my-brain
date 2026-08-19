@@ -387,10 +387,206 @@ a.relations-node:focus-visible {
 }
 
 /* -------------------------------------------------------------------------- */
+/* The two tabs, the focus control and the compact list (2P-RELATION-001…-004)  */
+/* -------------------------------------------------------------------------- */
+
+/*
+  Links styled as tabs, not `role="tab"`.
+
+  Each view is a different address, so the browser supplies focus, activation,
+  history and bookmarking. `aria-current="page"` — not colour — is what says
+  which one the reader is standing in, and it is also what this rule selects on,
+  so the visual state and the announced state cannot drift apart.
+*/
+.relations-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.relations-tabs > ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relations-tabs a {
+  display: inline-flex;
+  align-items: center;
+  /* The repository's touch-target minimum. */
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-body);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.relations-tabs a[aria-current="page"] {
+  border-color: var(--text-primary);
+  background: var(--background-subtle-strong);
+  color: var(--text-primary);
+}
+
+.relations-tabs a:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.relations-tabs-note {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.relations-focus {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.relations-focus > label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font: var(--type-label);
+  color: var(--text-secondary);
+}
+
+.relations-focus select {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+
+.relations-focus button {
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.relations-focus button:focus-visible,
+.relations-focus select:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.relations-focus-state,
+.relations-focus-empty {
+  flex: 1 1 100%;
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+/*
+  The compact list.
+
+  Hidden where the figure fits and shown where it does not — the narrow-viewport
+  block below turns it on. It is NOT a replacement for the drawing: the canvas
+  stays and still scrolls, so a phone gets both the picture it can pan and a list
+  it can read.
+*/
+.relations-compact {
+  display: none;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-default);
+}
+
+.relations-compact > h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.relations-compact-rows {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relations-compact-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.relations-compact-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+.relations-compact-relation {
+  font: var(--type-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.relations-compact-explain {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--link);
+  font-weight: 650;
+}
+
+.relations-compact-explain:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+.relations-compact-more {
+  margin: 10px 0 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Narrow viewports                                                            */
 /* -------------------------------------------------------------------------- */
 
 @media (max-width: 899px) {
+  /*
+    `2P-RELATION-004`. The bounded readable representation appears exactly where
+    the figure stops fitting.
+
+    This declaration sits AFTER `.relations-compact { display: none }` above.
+    A media query written before the rule it overrides adds no specificity, so
+    the later base declaration would simply win and the alternative would be
+    silently dead on every phone — a failure this repository has already paid
+    for once, and one only a rendered-page measurement catches.
+  */
+  .relations-compact {
+    display: block;
+  }
+
   .relations-page {
     gap: 22px;
   }

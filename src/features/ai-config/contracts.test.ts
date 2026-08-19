@@ -127,7 +127,28 @@ describe("2O-AICONFIG-003 direction A: every declared call site really reads its
     // scan that ran from the wrong directory and a guard that read zero files.
     expect(TREE.paths.length).toBeGreaterThan(500);
     expect(AI_ROUTE_CONTRACTS.length).toBe(7);
-    expect(AI_ROUTE_CONTRACTS.flatMap((route) => route.callSites).length).toBeGreaterThan(8);
+    /*
+     * The floor moved from 8 to 5 in slice 2P.6, and it was made STRONGER in the
+     * same change rather than merely lower.
+     *
+     * `embedding_model` legitimately lost a call site: `createRecord`'s memory
+     * branch was deleted when the memories page moved to `createProposedMemory`,
+     * which performs the identical embedding through `embedMemory`. A global
+     * count pinned one above the current total is a tripwire for exactly that —
+     * an ordinary, correct deletion — while saying nothing about the failure it
+     * exists to catch, which is a corpus or a contract that came back empty.
+     *
+     * So the emptiness check is now per route and per direction: every route
+     * that pays for an operation must name at least one site, and the total
+     * keeps a floor well clear of a single deletion.
+     */
+    expect(AI_ROUTE_CONTRACTS.flatMap((route) => route.callSites).length).toBeGreaterThan(5);
+    for (const route of AI_ROUTE_CONTRACTS) {
+      // A route with an operation is a route something calls. Zero sites there
+      // is the vacuity this assertion is really about.
+      if (route.operation === null) continue;
+      expect(route.callSites.length, `${route.column} declares no call site`).toBeGreaterThan(0);
+    }
   });
 
   it("rejects a planted site that reads nothing", () => {
