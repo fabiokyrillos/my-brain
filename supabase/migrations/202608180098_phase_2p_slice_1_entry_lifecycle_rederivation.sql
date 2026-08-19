@@ -270,12 +270,86 @@ $$;
 revoke all on function private.entry_lifecycle_state(uuid, uuid) from public, anon, authenticated;
 
 -- ---------------------------------------------------------------------------
+-- 2b. THE ONE NARROW EXCEPTION: a re-derivation preserves entries.updated_at.
+--
+-- Owner decision, slice 2P.1: a change of DERIVED state alone must not make an
+-- old entry look new, and must not silently move it to the top of "Needs You".
+-- public.list_needs_attention orders by entries.updated_at, and
+-- public.set_updated_at writes now(), which is TRANSACTION time -- so without
+-- this, resolving one decision would both re-rank that entry and collapse
+-- every entry re-derived in the same transaction onto a single timestamp,
+-- destroying the queue's deterministic order.
+--
+-- Real changes of content keep stamping updated_at exactly as they do today.
+-- The exception is built so that it cannot be widened by accident:
+--
+--   * public.set_updated_at is NOT modified. Every other table, and every
+--     other update of public.entries, keeps today's behaviour.
+--   * No trigger is ever disabled, so there is no window in which another
+--     session's write escapes the timestamp rule.
+--   * The marker is a TRANSACTION-LOCAL setting (set_config(..., true)). It is
+--     invisible to other sessions, dies with the transaction and does not
+--     survive a rollback -- which is what makes it safe under concurrency,
+--     where a table flag or an advisory lock would not be.
+--   * It carries the ENTRY ID rather than a boolean, and the trigger compares
+--     it against the row it is deciding about. A marker somehow left set could
+--     therefore only ever concern the one entry already being concluded about.
+--   * rederive_entry_lifecycle restores the previous marker value immediately
+--     after its update, so no state leaks forward to a later operation in the
+--     same transaction.
+--   * AND the trigger independently requires that `status` is the ONLY column
+--     that changed. A real content change is therefore still stamped even if
+--     both mechanisms above were defeated. The comparison is written over the
+--     whole row rather than column by column, so a column added later is
+--     protected without anyone remembering to add it here.
+--
+-- PostgreSQL fires BEFORE ROW triggers in name order, and this name sorts
+-- after entries_updated_at, so it runs last and sees what set_updated_at wrote.
+-- ---------------------------------------------------------------------------
+
+create or replace function private.preserve_updated_at_on_rederivation()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  -- Not this entry's re-derivation: leave the stamp exactly as written.
+  if pg_catalog.current_setting('my_brain.lifecycle_rederivation_entry', true)
+     is distinct from new.id::text
+  then
+    return new;
+  end if;
+  -- Nothing derived actually moved.
+  if new.status is not distinct from old.status then
+    return new;
+  end if;
+  -- Something other than the derived state moved: that is a real change.
+  if (pg_catalog.to_jsonb(new) - 'status' - 'updated_at')
+     is distinct from (pg_catalog.to_jsonb(old) - 'status' - 'updated_at')
+  then
+    return new;
+  end if;
+  new.updated_at := old.updated_at;
+  return new;
+end;
+$$;
+
+revoke all on function private.preserve_updated_at_on_rederivation() from public, anon, authenticated;
+
+drop trigger if exists entries_zz_preserve_updated_at_on_rederivation on public.entries;
+create trigger entries_zz_preserve_updated_at_on_rederivation
+before update on public.entries
+for each row execute function private.preserve_updated_at_on_rederivation();
+
+-- ---------------------------------------------------------------------------
 -- 3. Applying the contract.
 --
 -- Locks the entry first, so two concurrent resolutions serialize on the row
 -- they both conclude about rather than racing to write different answers.
 -- Writes only when the status actually changes, so a replay produces no second
--- audit row. Touches no column other than status.
+-- audit row. Touches no column other than status -- and, per 2b, not even the
+-- timestamp that would otherwise follow from touching it.
 -- ---------------------------------------------------------------------------
 
 create or replace function private.rederive_entry_lifecycle(p_user_id uuid, p_entry_id uuid)
@@ -287,6 +361,7 @@ as $$
 declare
   previous_status text;
   next_status text;
+  previous_marker text;
 begin
   if p_user_id is null or p_entry_id is null then
     return null;
@@ -305,9 +380,19 @@ begin
     return previous_status;
   end if;
 
+  -- Marked, written, unmarked. The marker is transaction-local and names this
+  -- entry, and the previous value is restored rather than cleared so a nested
+  -- re-derivation could not strand it. See 2b.
+  previous_marker := pg_catalog.current_setting('my_brain.lifecycle_rederivation_entry', true);
+  perform pg_catalog.set_config('my_brain.lifecycle_rederivation_entry', p_entry_id::text, true);
+
   update public.entries
   set status = next_status
   where id = p_entry_id and user_id = p_user_id;
+
+  perform pg_catalog.set_config(
+    'my_brain.lifecycle_rederivation_entry', coalesce(previous_marker, ''), true
+  );
 
   insert into public.audit_logs (
     user_id, action_type, entity_type, entity_id, actor,
@@ -640,7 +725,281 @@ on conflict (action_type) do update
       description = excluded.description;
 
 -- ---------------------------------------------------------------------------
--- 7. The entries the defect already stranded.
+-- 7. Aligning the queue with the contract.
+--
+-- Until now entries.status could never move, so the branch
+--   entry_status in ('awaiting_review','partially_processed') -> review_interpretation
+-- was only ever reached by an entry nobody had touched, and the finer reasons
+-- below it were gated on status = 'completed'. Making the status truthful makes
+-- those finer reasons LESS reachable, not more: an entry with one unconfirmed
+-- candidate is now correctly 'awaiting_review', and the generic branch would
+-- swallow 'confirm_existing_candidates'. The entry never wrongly LEAVES the
+-- queue -- it stays under a less specific reason -- but that is a regression
+-- against 2P-ATTENTION-004, "the entry states exactly what remains unresolved".
+--
+-- The correction, authorized by the owner inside this same migration:
+--
+--   * the finer predicates are evaluated BEFORE the generic status branch;
+--   * they no longer depend on status = 'completed', but on the three statuses
+--     this contract actually governs -- the same gate private.entry_pending_
+--     decisions uses, so the queue and the status cannot disagree;
+--   * review_interpretation therefore now means exactly one thing: only the
+--     interpretation-wide confirmation is left, i.e. exactly what
+--     public.confirm_entry_interpretation exists to clear;
+--   * an unresolved person candidate is a real pending decision (owner
+--     decision, slice 2P.1) and reports 'confirm_existing_candidates' -- the
+--     deployed reason whose copy in both locales already reads "decide about
+--     the suggestions / choose what should happen to each pending suggestion",
+--     which is precisely this. It is NOT routed to review_interpretation,
+--     which would be the generic reason this section exists to stop, and it
+--     does NOT need a sixth reason: the five-value vocabulary that
+--     needs_attention_item_opened validates inside the database is unchanged.
+--
+-- Nothing else about the projection changes: same signature, same grants, same
+-- ordering, same keyset, same error and job branches, same predicates.
+-- ---------------------------------------------------------------------------
+
+create or replace function public.list_needs_attention(
+  p_limit integer default 21,
+  p_cursor_occurred_at timestamptz default null,
+  p_cursor_entry_id uuid default null
+)
+returns table (
+  entry_id uuid,
+  reason text,
+  occurred_at timestamptz,
+  current_interpretation_id uuid,
+  job_id uuid,
+  open_question_id uuid
+)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  with scoped_user as (
+    select auth.uid() as id
+  ),
+  bound as (
+    select least(greatest(coalesce(p_limit, 21), 1), 200) as lim
+  ),
+  candidate_entries as (
+    select e.id
+    from public.entries e, scoped_user u
+    where e.user_id = u.id
+      and e.status in ('awaiting_review', 'partially_processed', 'recoverable_error', 'terminal_error')
+    union
+    select e.id
+    from public.entries e
+    join public.entry_interpretations ei on ei.id = e.current_interpretation_id
+    cross join scoped_user u
+    where e.user_id = u.id
+      and e.status = 'completed'
+      and ei.is_record_only = false
+      and jsonb_array_length(coalesce(ei.task_candidates, '[]'::jsonb)) > 0
+    union
+    -- 2P.1: a completed entry whose people were never resolved. Unreachable
+    -- through the product today, because confirm_entry_interpretation refuses
+    -- while any other decision remains -- kept so the queue agrees with the
+    -- contract without depending on that fact staying true.
+    select e.id
+    from public.entries e
+    join public.entry_interpretations ei on ei.id = e.current_interpretation_id
+    cross join scoped_user u
+    where e.user_id = u.id
+      and e.status = 'completed'
+      and ei.is_record_only = false
+      and exists (
+        select 1
+        from generate_series(0, jsonb_array_length(coalesce(ei.extracted_people, '[]'::jsonb)) - 1) as person_slot(idx)
+        where not exists (
+          select 1 from public.entry_person_candidate_resolutions as person_resolution
+          where person_resolution.user_id = e.user_id
+            and person_resolution.entry_id = e.id
+            and person_resolution.interpretation_id = e.current_interpretation_id
+            and person_resolution.candidate_index = person_slot.idx
+        )
+      )
+    union
+    select e.id
+    from public.entries e
+    cross join scoped_user u
+    where e.user_id = u.id
+      and e.status = 'completed'
+      and exists (
+        select 1 from public.pending_questions pq
+        where pq.user_id = u.id and pq.entry_id = e.id
+          -- widened (Slice 2D.2): open, or snoozed past its deadline
+          and (
+            pq.status = 'open'
+            or (pq.status = 'snoozed' and pq.snoozed_until is not null and pq.snoozed_until <= now())
+          )
+      )
+    union
+    select e.id
+    from public.entries e
+    cross join scoped_user u
+    where e.user_id = u.id
+      and e.status = 'saved'
+      and exists (
+        select 1
+        from public.jobs j
+        where j.user_id = u.id
+          and j.type = 'interpret_entry'
+          and (j.payload ->> 'entry_id')::uuid = e.id
+          and (
+            j.status = 'completed'
+            or j.status not in ('pending', 'running', 'failed', 'completed', 'exhausted')
+          )
+      )
+  ),
+  latest_job as (
+    select distinct on (j.user_id, (j.payload ->> 'entry_id'))
+      (j.payload ->> 'entry_id')::uuid as entry_id,
+      j.id as job_id,
+      j.status as job_status,
+      j.next_attempt_at as job_retry_at
+    from public.jobs j, scoped_user u
+    where j.user_id = u.id
+      and j.type = 'interpret_entry'
+      and (j.payload ->> 'entry_id')::uuid in (select id from candidate_entries)
+    order by j.user_id, (j.payload ->> 'entry_id'), j.created_at desc
+  ),
+  facts as (
+    select
+      e.id as entry_id,
+      e.status as entry_status,
+      e.updated_at as entry_updated_at,
+      e.current_interpretation_id,
+      lj.job_id,
+      lj.job_status,
+      lj.job_retry_at,
+      coalesce(ei.is_record_only, false) as record_only,
+      jsonb_array_length(coalesce(ei.task_candidates, '[]'::jsonb)) as candidate_count,
+      exists (
+        select 1 from public.pending_questions pq
+        where pq.user_id = e.user_id and pq.entry_id = e.id
+          -- widened (Slice 2D.2): open, or snoozed past its deadline
+          and (
+            pq.status = 'open'
+            or (pq.status = 'snoozed' and pq.snoozed_until is not null and pq.snoozed_until <= now())
+          )
+      ) as has_open_question,
+      (
+        -- uuid has no min() aggregate; order+limit picks the oldest open
+        -- question deterministically instead.
+        select pq.id from public.pending_questions pq
+        where pq.user_id = e.user_id and pq.entry_id = e.id
+          -- widened (Slice 2D.2): open, or snoozed past its deadline
+          and (
+            pq.status = 'open'
+            or (pq.status = 'snoozed' and pq.snoozed_until is not null and pq.snoozed_until <= now())
+          )
+        order by pq.created_at, pq.id
+        limit 1
+      ) as open_question_id,
+      exists (
+        select 1
+        from generate_series(0, jsonb_array_length(coalesce(ei.task_candidates, '[]'::jsonb)) - 1) as candidate_slot(idx)
+        where not exists (
+          select 1 from public.tasks t
+          where t.user_id = e.user_id
+            and t.source_entry_id = e.id
+            and t.candidate_index = candidate_slot.idx
+            and t.status <> 'cancelled'
+            and (
+              t.source_interpretation_id = e.current_interpretation_id
+              or t.source_interpretation_id is null
+            )
+        )
+        and not exists (
+          select 1
+          from public.entry_task_candidate_resolutions as resolution_row
+          where resolution_row.user_id = e.user_id
+            and resolution_row.entry_id = e.id
+            and resolution_row.interpretation_id = e.current_interpretation_id
+            and resolution_row.candidate_index = candidate_slot.idx
+        )
+      ) as has_unconfirmed_candidate,
+      -- 2P.1: the same predicate private.entry_pending_decisions uses for its
+      -- 'person_candidate' class, so the queue and the status agree.
+      exists (
+        select 1
+        from generate_series(0, jsonb_array_length(coalesce(ei.extracted_people, '[]'::jsonb)) - 1) as person_slot(idx)
+        where not exists (
+          select 1
+          from public.entry_person_candidate_resolutions as person_resolution
+          where person_resolution.user_id = e.user_id
+            and person_resolution.entry_id = e.id
+            and person_resolution.interpretation_id = e.current_interpretation_id
+            and person_resolution.candidate_index = person_slot.idx
+        )
+      ) as has_unresolved_person_candidate
+    from public.entries e
+    left join public.entry_interpretations ei on ei.id = e.current_interpretation_id
+    left join latest_job lj on lj.entry_id = e.id
+    where e.id in (select id from candidate_entries)
+  ),
+  resolved as (
+    select
+      f.entry_id,
+      f.current_interpretation_id,
+      f.job_id,
+      f.open_question_id,
+      f.entry_updated_at as occurred_at,
+      case
+        when f.job_status is not null and f.job_status not in ('pending', 'running', 'failed', 'completed', 'exhausted')
+          then 'resolve_consistency'
+        when f.entry_status = 'terminal_error' or f.job_status = 'exhausted'
+          then 'retry_processing'
+        when f.job_status in ('pending', 'running')
+          then null
+        when f.job_status = 'failed' and f.job_retry_at is not null and f.job_retry_at > now()
+          then null
+        when f.entry_status in ('interpreting', 'reprocessing')
+          then null
+        when f.entry_status = 'recoverable_error'
+          then 'retry_processing'
+        -- 2P.1: the finer reasons come FIRST, and are gated on the three
+        -- statuses this contract governs rather than on 'completed' alone.
+        when f.entry_status in ('awaiting_review', 'partially_processed', 'completed')
+          and f.has_open_question
+          then 'answer_existing_question'
+        when f.entry_status in ('awaiting_review', 'partially_processed', 'completed')
+          and not f.record_only
+          and f.candidate_count > 0
+          and f.has_unconfirmed_candidate
+          then 'confirm_existing_candidates'
+        when f.entry_status in ('awaiting_review', 'partially_processed', 'completed')
+          and not f.record_only
+          and f.has_unresolved_person_candidate
+          then 'confirm_existing_candidates'
+        -- 2P.1: reached only when every finer decision is resolved, so it now
+        -- means exactly "the interpretation itself is still unconfirmed".
+        when f.entry_status in ('awaiting_review', 'partially_processed')
+          then 'review_interpretation'
+        when f.entry_status = 'saved' and f.job_status = 'completed'
+          then 'resolve_consistency'
+        else null
+      end as reason
+    from facts f
+  )
+  select r.entry_id, r.reason, r.occurred_at, r.current_interpretation_id, r.job_id, r.open_question_id
+  from resolved r, bound b
+  where r.reason is not null
+    and (
+      p_cursor_occurred_at is null
+      or (r.occurred_at, r.entry_id) < (p_cursor_occurred_at, p_cursor_entry_id)
+    )
+  order by r.occurred_at desc, r.entry_id desc
+  limit (select lim from bound);
+$$;
+
+grant execute on function public.list_needs_attention(integer, timestamptz, uuid) to authenticated;
+revoke all on function public.list_needs_attention(integer, timestamptz, uuid) from public, anon;
+
+-- ---------------------------------------------------------------------------
+-- 8. The entries the defect already stranded.
 --
 -- The triggers only fire when something changes, and an entry with nothing
 -- left to resolve will never be changed again -- so without this the two

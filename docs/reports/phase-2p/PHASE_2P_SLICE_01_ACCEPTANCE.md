@@ -175,25 +175,154 @@ completing an entry whose people the owner never resolved — is the larger one.
 
 ---
 
-## 5. What shipped
+## 5. The owner's decisions, and what they changed
 
-*(completed after implementation)*
+The first CI round stopped this slice on three findings (Appendix A). Two were
+fixed in place. The third was a design decision in two parts, and both parts
+were decided by the owner rather than assumed here.
+
+### Decision (i) — a re-derivation preserves `entries.updated_at`
+
+**Signed contract:** a change of *derived* state alone must not make an old
+entry look new, and must not silently move it to the top of Needs You. Real
+changes of content keep stamping the instant. The exception must be narrow,
+local to the re-derivation contract, documented, safe under concurrency, must
+not weaken `set_updated_at` globally, must not disable triggers, and must not
+leak session state into another operation.
+
+**What was built** (migration section `2b`): a dedicated `before update` trigger
+on `public.entries` whose name sorts *after* `entries_updated_at`, so it runs
+last and sees what `set_updated_at` wrote. It restores the previous instant only
+when **both** conditions hold:
+
+1. a **transaction-local** setting (`set_config(..., true)`) names **this entry
+   id** — set by `private.rederive_entry_lifecycle` immediately before its update
+   and restored to its previous value immediately after; and
+2. `status` is the **only** column that changed — compared over the whole row as
+   jsonb, so a column added later is covered without anyone remembering to.
+
+Each guarantee the owner asked for, and where it is discharged:
+
+| Requirement | How |
+|---|---|
+| narrow, local to the contract | two independent conditions, both false for every other write in the product |
+| `set_updated_at` not weakened | the function is **not modified**; every other table and every other update of `entries` is untouched |
+| no triggers disabled | nothing is disabled at any point; there is no window |
+| safe under concurrency | the marker is transaction-local — invisible to other sessions, dies with the transaction, does not survive a rollback; and the entry row is already `for update` locked |
+| no leak to another operation | the previous marker value is restored right after the one statement, **and** condition 2 independently protects any real change |
+| re-derivation preserves the instant | proved — see below |
+| a real change still advances it | proved with two positive controls |
+| queue order preserved | proved |
+
+**Proved against the deployed schema, before CI.** The mechanism was created
+inside a transaction on the hosted database and rolled back. Transaction
+semantics were themselves proved first — a probe schema created and rolled back
+did not survive — and zero residue was then **measured, not assumed**: the
+function, the trigger, the whole contract and `confirm_entry_interpretation` all
+absent afterwards, 97 migrations, parity `202608160097` unchanged, and every
+entry still carrying its original `updated_at`.
+
+| Probe | Result |
+|---|---|
+| marked, status-only change | `updated_at` **preserved** |
+| …and the status really moved | `awaiting_review` → `partially_processed`, so preservation is not a no-op |
+| **unmarked**, status-only change | `updated_at` **advanced** — the exception is not a property of the write's shape |
+| marked, but content also moved | `updated_at` **advanced** — condition 2 is a real second lock |
+
+The same four facts are pinned in pgTAP, plus the consequence the owner named:
+re-deriving the *older* of two queued entries leaves the queue in the order it
+was already in.
+
+### Decision (ii) — an unresolved person candidate is a real pending decision
+
+**Signed contract:** such an entry stays in Needs You, receives *the correct
+specific reason*, cannot be completed because the other elements were resolved,
+leaves only on resolution / explicit discard / another true terminal outcome,
+and creates no identity automatically.
+
+Four of the five were already discharged by the central contract, which counts
+`person_candidate` among the classes that block completion and never writes to
+`people`. The fifth — the *specific* reason — is what changed here.
+
+**It reports `confirm_existing_candidates`, and needs no new vocabulary.** That
+reason's deployed copy already reads *"Decida sobre as sugestões / Escolha o
+destino de cada sugestão pendente"* and *"Resolve the suggestions / Choose what
+should happen to each pending suggestion"* — it says *suggestions*, not *tasks*,
+and an unresolved person candidate is exactly a pending suggestion whose
+destination the owner must choose. Routing it to `review_interpretation` would
+have used the generic reason this correction exists to stop.
+
+**The alternative was rejected deliberately.** A sixth reason would have meant
+widening `needs_attention_item_opened`'s `attentionReason` enum, which is
+validated **inside the database** against exactly five names
+(`202607170024:205-212`), plus the TS contract, both locales' copy, the mappers
+and the analytics types. That is a deployed-vocabulary widening — the shape this
+phase's own plan names as a stop condition — to express a distinction the
+existing reason already expresses correctly.
+
+### Correction 3(a) — the queue names what actually remains
+
+Authorized inside the same migration (section `7`). `list_needs_attention` now
+evaluates `answer_existing_question`, `confirm_existing_candidates` (tasks) and
+`confirm_existing_candidates` (people) **before** the generic status branch, and
+gates them on the three statuses the central contract governs rather than on
+`status = 'completed'`. `review_interpretation` is reached only when every finer
+decision is resolved, so it now means exactly one thing: **the interpretation
+itself is still unconfirmed** — precisely what `confirm_entry_interpretation`
+exists to clear.
+
+Nothing else about the projection moved: same signature, same grants, same
+ordering, same keyset, same error and job branches, same predicates.
+
+**The guard was replaced, not relaxed.** `phase-2p-foundation-guard` used to
+assert that this migration must **not** redefine the projection. That assertion
+is gone and a stricter one stands in its place: the exact eight-step decision
+order, the three-status gate appearing exactly three times, the two-status gate
+on `review_interpretation`, all three predicates present, and the reason set
+still being exactly the deployed five. Its **two-sided control is the real
+predecessor**, read from `202607230048` on disk — the bytes that actually
+shipped the defect — proved to fail the new pin and to have decided
+`review_interpretation` before both finer reasons. Nothing is mutated to produce
+the control, so a run that dies mid-test cannot leave the tree dirty.
+
+### One correction to Appendix A's own count
+
+Appendix A says **eight** pgTAP assertions failed. **Ten** did. The two it does
+not list are in `resolve_pending_question_v2.sql`: *"a deferred question leaves
+the Needs Attention queue until its deadline"* and *"a dismissed question leaves
+the Needs Attention queue terminally"*.
+
+They are not a defect in the contract — they are the contract working. Those
+fixtures force `status = 'completed'` with a comment claiming *"the only
+attention reason can be the open question"*, and that claim was **false**:
+`model_only_element_trust` scores a model-only interpretation at
+`confidence * 0.20 + 0.05`, never above 0.25, so it returns
+`block_until_confirmation` at **every** confidence. The element policy is
+therefore a real pending decision on those entries, and after the question is
+deferred or dismissed they legitimately stay in Needs You under
+`review_interpretation`.
+
+The fixture's premise was made **true** rather than the assertion re-baselined:
+`element_policy` is cleared on exactly the two entries those assertions read.
+The positive control that requires the entry to be *listed* for its open
+question first, and the reactivation check that requires it to come *back* when
+the snooze deadline passes, both still stand unchanged.
 
 ## 6. Verification
 
-*(completed after implementation)*
+*(completed after deployment)*
 
 ## 7. Threats dispositioned
 
-*(completed after implementation)*
+*(completed after deployment)*
 
 ## 8. Where this stops
 
-*(completed after implementation)*
+*(completed after deployment)*
 
 ---
 
-## 5. Where this stopped, and the three findings that stopped it
+## Appendix A — the first CI round, and the three findings that stopped it
 
 **Status: NOT MERGED, NOT DEPLOYED.** Branch `codex/phase-2p-slice-1`, PR #259,
 head `b115431`. **97 hosted, parity `202608160097` — unchanged. Nothing was

@@ -16,10 +16,23 @@
 -- It also proves the property the whole slice exists for: a resolution now
 -- moves the entry's status, list_needs_attention agrees with the real state,
 -- another owner is isolated, and none of it is vacuous.
+--
+-- And the two corrections CI forced, each with a two-sided control:
+--
+--   (a) the queue names the SPECIFIC decision that remains -- an open question,
+--       an unconfirmed task candidate, an unresolved person candidate -- on
+--       entries whose status is NOT 'completed'. Making the status truthful had
+--       made those finer reasons LESS reachable, because they sat after the
+--       generic status branch and were gated on 'completed'.
+--   (b) a re-derivation preserves entries.updated_at (owner decision (i)), so
+--       recalculating derived state cannot make an old entry look new or move
+--       it up Needs You -- proved together with a negative control (an ordinary
+--       status write is still stamped) and two positive controls (a real
+--       content change is still stamped, even while the marker is set).
 
 begin;
 
-select plan(56);
+select plan(67);
 
 -- Helpers --------------------------------------------------------------------
 
@@ -298,6 +311,38 @@ select is(
   'the contract returns nothing for an entry the caller does not own'
 );
 
+-- The queue says exactly what remains (2P-ATTENTION-004) ----------------------
+--
+-- Making the status truthful made the FINER reasons less reachable, not more:
+-- they were gated on status = 'completed' and sequenced after the generic
+-- status branch, so an entry with one unconfirmed candidate became
+-- 'awaiting_review' and reported the generic 'review_interpretation'. The three
+-- assertions below are the whole of that correction, each on an entry whose
+-- status is NOT 'completed'.
+
+select is(
+  pg_temp.queue_reason('2ba10002-0000-4000-8000-000000000002'),
+  'answer_existing_question',
+  'a partially_processed entry with an open question says so, not review_interpretation'
+);
+
+select is(
+  pg_temp.queue_reason('2ba10003-0000-4000-8000-000000000003'),
+  'confirm_existing_candidates',
+  'an awaiting_review entry with an unconfirmed task candidate says so'
+);
+
+-- Owner decision (slice 2P.1): an unresolved person candidate is a real pending
+-- decision. It reports the deployed finer reason whose copy already reads
+-- "decide about the suggestions" in both locales -- never the generic one, and
+-- without adding a sixth value to the five-name vocabulary that
+-- needs_attention_item_opened validates inside the database.
+select is(
+  pg_temp.queue_reason('2ba10005-0000-4000-8000-000000000005'),
+  'confirm_existing_candidates',
+  'an unresolved person candidate reports the specific reason, not review_interpretation'
+);
+
 -- Defect 3: a real decision cannot be confirmed away ---------------------------
 
 select is(
@@ -554,6 +599,120 @@ select is(
    from phase2p1_refs refs),
   'completed',
   'the entry can be confirmed again after an undo'
+);
+
+-- Owner decision (i): a re-derivation preserves entries.updated_at -----------------------
+--
+-- A change of DERIVED state alone must not make an old entry look new, and must
+-- not move it to the top of Needs You. Every assertion here has to plant its own
+-- instant, because pgTAP runs in ONE transaction and public.set_updated_at
+-- writes now(), which is transaction time -- so inside this file every ordinary
+-- write lands on the identical timestamp and "did it advance?" is unanswerable
+-- without a planted past value. Planting is done with the timestamp trigger
+-- disabled, the same technique needs_attention_projection.sql already uses, and
+-- re-enabled immediately: it is a fixture device and never the product contract.
+
+create function pg_temp.plant(p_entry uuid, p_status text, p_at timestamptz)
+returns void language plpgsql as $$
+begin
+  alter table public.entries disable trigger entries_updated_at;
+  update public.entries
+  set status = coalesce(p_status, status), updated_at = p_at
+  where id = p_entry;
+  alter table public.entries enable trigger entries_updated_at;
+end;
+$$;
+
+create function pg_temp.stamp(p_entry uuid)
+returns timestamptz language sql as $$
+  select updated_at from public.entries where id = p_entry;
+$$;
+
+-- NEGATIVE CONTROL, first: the exception is not a property of the SHAPE of the
+-- write. A direct status-only update, by anyone, is still stamped -- so the
+-- contract has not been globally weakened and set_updated_at still governs
+-- every write that is not this one re-derivation.
+select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+update public.entries set status = 'partially_processed'
+where id = '2ba10001-0000-4000-8000-000000000001';
+select is(
+  pg_temp.stamp('2ba10001-0000-4000-8000-000000000001'),
+  now(),
+  'NEGATIVE CONTROL: a direct status-only write still advances updated_at'
+);
+
+-- The exception itself, on a status that genuinely moves.
+select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+select is(
+  private.rederive_entry_lifecycle(
+    '2ba00001-0000-4000-8000-000000000001', '2ba10001-0000-4000-8000-000000000001'
+  ),
+  'completed',
+  'NON-VACUITY: the re-derivation really moves this status, so preservation is not a no-op'
+);
+select is(
+  pg_temp.stamp('2ba10001-0000-4000-8000-000000000001'),
+  now() - interval '9 days',
+  'OWNER DECISION (i): a re-derivation preserves entries.updated_at exactly'
+);
+
+-- POSITIVE CONTROLS: a real change of the owner's content still advances the
+-- instant, and does so even while the marker names this very entry -- because
+-- the trigger independently requires that status is the ONLY column that moved.
+select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', null, now() - interval '9 days');
+select set_config('my_brain.lifecycle_rederivation_entry', '2ba10001-0000-4000-8000-000000000001', true);
+update public.entries set locale = 'pt-BR' where id = '2ba10001-0000-4000-8000-000000000001';
+select is(
+  pg_temp.stamp('2ba10001-0000-4000-8000-000000000001'),
+  now(),
+  'POSITIVE CONTROL: a real content change advances updated_at even with the marker set'
+);
+
+select pg_temp.plant('2ba10001-0000-4000-8000-000000000001', 'awaiting_review', now() - interval '9 days');
+update public.entries set status = 'partially_processed', locale = 'en'
+where id = '2ba10001-0000-4000-8000-000000000001';
+select is(
+  pg_temp.stamp('2ba10001-0000-4000-8000-000000000001'),
+  now(),
+  'POSITIVE CONTROL: a change that moves status AND content is stamped, marker or not'
+);
+select set_config('my_brain.lifecycle_rederivation_entry', '', true);
+
+-- And the consequence the owner asked to be proved: recalculating only the
+-- lifecycle leaves the queue in the order it was already in.
+select pg_temp.plant('2ba10005-0000-4000-8000-000000000005', 'partially_processed', now() - interval '2 days');
+select pg_temp.plant('2ba10003-0000-4000-8000-000000000003', 'partially_processed', now() - interval '3 days');
+
+select is(
+  (
+    select array_agg(queue.entry_id order by queue.occurred_at desc, queue.entry_id desc)
+    from public.list_needs_attention(200, null, null) as queue
+    where queue.entry_id in (
+      '2ba10003-0000-4000-8000-000000000003', '2ba10005-0000-4000-8000-000000000005'
+    )
+  ),
+  array['2ba10005-0000-4000-8000-000000000005', '2ba10003-0000-4000-8000-000000000003']::uuid[],
+  'ORDERING BASELINE: the queue lists the more recently touched entry first'
+);
+
+select is(
+  private.rederive_entry_lifecycle(
+    '2ba00001-0000-4000-8000-000000000001', '2ba10003-0000-4000-8000-000000000003'
+  ),
+  'awaiting_review',
+  'NON-VACUITY: re-deriving the OLDER entry really changes its status'
+);
+
+select is(
+  (
+    select array_agg(queue.entry_id order by queue.occurred_at desc, queue.entry_id desc)
+    from public.list_needs_attention(200, null, null) as queue
+    where queue.entry_id in (
+      '2ba10003-0000-4000-8000-000000000003', '2ba10005-0000-4000-8000-000000000005'
+    )
+  ),
+  array['2ba10005-0000-4000-8000-000000000005', '2ba10003-0000-4000-8000-000000000003']::uuid[],
+  'ORDERING: recalculating only the lifecycle does not move the entry up the queue'
 );
 
 -- Non-vacuity of the contract itself ----------------------------------------------------
