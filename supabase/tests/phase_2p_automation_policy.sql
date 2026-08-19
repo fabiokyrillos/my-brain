@@ -12,8 +12,9 @@
 --
 -- The negative controls matter as much: an unknown state must degrade WITHOUT
 -- raising (a refusal the owner cannot read is not fail-closed, it is a broken
--- screen), `retained` must produce no evidence at all, and another owner's
--- reviews must not calibrate this one.
+-- screen); `retained` and `dismissed` must produce no evidence at all, because
+-- the product's own copy tells the owner that neither says the suggestion was
+-- wrong; and another owner's reviews must not calibrate this one.
 
 -- ORDERING IS EXPLICIT, NOT INCIDENTAL. `now()` is transaction time, so every
 -- row this file inserts carries the SAME default instant and "the 20 most
@@ -22,7 +23,7 @@
 -- that depend on recency are deterministic because of it.
 
 begin;
-select plan(47);
+select plan(48);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures -- two owners, one entry and one interpretation each.
@@ -51,7 +52,7 @@ insert into public.entry_interpretations (
   ('4a001001-0000-4000-8000-000000000001', '4a000001-0000-4000-8000-000000000001',
    '4a00e001-0000-4000-8000-000000000001', 1, 'pgtap', 'v1', 'v1', 0.95, '{}'::jsonb,
    'Interpretacao do dono',
-   '[{"title":"Comprar leite"},{"title":"Ligar para Ana"},{"title":"Revisar contrato"},{"title":"Adiado"}]'::jsonb),
+   '[{"title":"Comprar leite"},{"title":"Ligar para Ana"},{"title":"Revisar contrato"},{"title":"Dispensado"},{"title":"Mantido"}]'::jsonb),
   ('4a001002-0000-4000-8000-000000000002', '4a000002-0000-4000-8000-000000000002',
    '4a00e002-0000-4000-8000-000000000002', 1, 'pgtap', 'v1', 'v1', 0.95, '{}'::jsonb,
    'Interpretacao do outro dono',
@@ -249,36 +250,53 @@ select is(
 insert into public.entry_task_candidate_resolutions
   (user_id, entry_id, interpretation_id, candidate_index, disposition)
 values ('4a000001-0000-4000-8000-000000000001', '4a00e001-0000-4000-8000-000000000001',
-        '4a001001-0000-4000-8000-000000000001', 2, 'dismissed');
+        '4a001001-0000-4000-8000-000000000001', 2, 'rejected');
 
 select is(
   (select outcome from public.automation_calibration_observations
     where user_id = '4a000001-0000-4000-8000-000000000001'
       and subject_key = 'task_candidate:4a001001-0000-4000-8000-000000000001:2'),
   'rejected',
-  'dismissing a candidate is a rejection'
+  'REJECTED is the only disposition that means the suggestion was wrong, and it is recorded as one'
 );
 
--- NEGATIVE CONTROL: a deferral is not a verdict. Counting `retained` as
--- approval would be treating absence of review as approval.
+-- TWO NEGATIVE CONTROLS, and the product's own copy is what decides them.
+-- `task-candidate-form.tsx:79-94` tells the owner, in both locales, that
+-- `dismissed` "closes it WITHOUT SAYING THE SUGGESTION WAS WRONG" and that
+-- `retained` "keeps it only in this entry's history". Neither is a claim about
+-- correctness, so neither is evidence -- and counting them would put a verdict
+-- in the owner's mouth that the interface promised not to take.
 insert into public.entry_task_candidate_resolutions
   (user_id, entry_id, interpretation_id, candidate_index, disposition)
 values ('4a000001-0000-4000-8000-000000000001', '4a00e001-0000-4000-8000-000000000001',
-        '4a001001-0000-4000-8000-000000000001', 3, 'retained');
+        '4a001001-0000-4000-8000-000000000001', 3, 'dismissed');
 
 select is(
   (select count(*)::int from public.automation_calibration_observations
     where user_id = '4a000001-0000-4000-8000-000000000001'
       and subject_key = 'task_candidate:4a001001-0000-4000-8000-000000000001:3'),
   0,
-  'a RETAINED candidate produces no evidence at all -- a deferral is not a verdict'
+  'a DISMISSED candidate produces no evidence -- the product promises it says nothing about correctness'
+);
+
+insert into public.entry_task_candidate_resolutions
+  (user_id, entry_id, interpretation_id, candidate_index, disposition)
+values ('4a000001-0000-4000-8000-000000000001', '4a00e001-0000-4000-8000-000000000001',
+        '4a001001-0000-4000-8000-000000000001', 4, 'retained');
+
+select is(
+  (select count(*)::int from public.automation_calibration_observations
+    where user_id = '4a000001-0000-4000-8000-000000000001'
+      and subject_key = 'task_candidate:4a001001-0000-4000-8000-000000000001:4'),
+  0,
+  'a RETAINED candidate produces no evidence -- keeping something as a record is not a verdict'
 );
 
 select is(
   (select count(*)::int from public.automation_calibration_observations
     where user_id = '4a000001-0000-4000-8000-000000000001' and category = 'task'),
   3,
-  'four resolutions produced exactly three observations'
+  'five resolutions produced exactly three observations -- two said nothing about correctness'
 );
 
 -- Replay: the producer re-invoked for the same source row changes nothing.

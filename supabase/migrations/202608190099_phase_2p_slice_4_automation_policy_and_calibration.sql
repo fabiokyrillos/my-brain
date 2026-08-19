@@ -770,8 +770,28 @@ revoke all on function private.record_automation_calibration_observation(
 -- 10a. Task candidates.
 --
 -- `confirmed` with a title the owner changed is `corrected`, not `approved`:
--- the suggestion was useful and it was wrong. `retained` produces nothing --
--- it is a deferral. The title comparison reads content and stores none.
+-- the suggestion was useful and it was wrong. The title comparison reads
+-- content and stores none.
+--
+-- ONLY `rejected` IS A REJECTION, AND THE PRODUCT'S OWN COPY IS WHY.
+--
+-- `task-candidate-form.tsx:79-94` defines all four dispositions to the owner,
+-- in both locales:
+--
+--   confirmed  "Criar tarefa"          / "Creates a task with the selected edits."
+--   rejected   "Rejeitar sugestao"     / "Marks the suggestion as INCORRECT OR UNSUITABLE."
+--   retained   "Manter como registro"  / "Keeps it only in this entry's history."
+--   dismissed  "Dispensar sugestao"    / "Closes it WITHOUT SAYING THE SUGGESTION WAS WRONG."
+--
+-- So `rejected` is the only one that means the suggestion was wrong.
+-- `retained` says the owner wanted it as a record rather than a task, and
+-- `dismissed` says in as many words that no claim about correctness is being
+-- made. Counting either as a miss would systematically understate the model
+-- and would put a verdict in the owner's mouth that the interface promised not
+-- to take -- which is the same failure as treating absence of review as
+-- approval, in the other direction.
+--
+-- Both therefore produce NO observation at all.
 create or replace function private.automation_observation_from_task_resolution()
 returns trigger
 language plpgsql
@@ -799,9 +819,11 @@ begin
       when stored_title is distinct from candidate_title then 'corrected'
       else 'approved'
     end;
-  elsif new.disposition in ('rejected', 'dismissed') then
+  elsif new.disposition = 'rejected' then
     outcome := 'rejected';
   else
+    -- 'retained' and 'dismissed': see the header. Neither is a claim that the
+    -- suggestion was wrong, so neither is evidence.
     return null;
   end if;
 

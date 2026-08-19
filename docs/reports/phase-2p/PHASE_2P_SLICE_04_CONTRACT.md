@@ -120,12 +120,19 @@ Four outcomes, distinct as the owner required:
 |---|---|
 | `approved` | the owner confirmed the suggestion unchanged |
 | `corrected` | the owner confirmed it but changed what it said |
-| `rejected` | the owner rejected or dismissed it |
+| `rejected` | the owner marked it incorrect or unsuitable — and **only** that |
 | `undone` | the owner reversed their own acceptance afterwards |
 
-`retained` — the task disposition meaning *"keep it pending"* — produces **no**
-observation. It is a deferral, not a verdict, and counting it as approval would
-be *"tratar ausência de revisão como aprovação"*.
+**Only `rejected` is a rejection**, and the product's own copy is what decides
+that. `task-candidate-form.tsx:79-94` tells the owner, in both locales, that
+`rejected` *"marks the suggestion as incorrect or unsuitable"*, that `retained`
+*"keeps it only in this entry's history"*, and that `dismissed` *"closes it
+without saying the suggestion was wrong"*.
+
+So `retained` and `dismissed` produce **no observation at all**. Counting either
+as a miss would understate the model and would put a verdict in the owner's
+mouth that the interface promised not to take — the same failure as treating
+absence of review as approval, in the other direction.
 
 ### 6.2 Content-minimal, structurally
 

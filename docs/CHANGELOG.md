@@ -30,8 +30,9 @@ All notable technical changes are recorded here. The format follows Keep a Chang
   `entry_task_candidate_resolutions`, `entry_person_candidate_resolutions` and
   `undo_operations`, so superseded resolver versions, routes the application
   never calls and direct DML all produce evidence. Correction, rejection and
-  undo are **distinct** signals; `retained` produces nothing, because a deferral
-  is not a verdict.
+  undo are **distinct** signals; `retained` and `dismissed` produce nothing,
+  because the product's own copy tells the owner that neither says the
+  suggestion was wrong.
 - **Per-category thresholds, never one number.** 50/0.90 for tasks (fully
   reversible) up to 100/0.98 for relations (`2N-RELATION-TRIGGER` is a hard
   boundary), plus a freshness window and a recent-undo block. Eligibility needs
@@ -40,8 +41,8 @@ All notable technical changes are recorded here. The format follows Keep a Chang
   rolled back, with rollback semantics proved first and the migration's exact
   bytes read from disk: 13 behavioural probes green, including a **non-vacuity
   control where the gate really does say yes**, and zero residue measured
-  against real data that stayed visible. The 47-assertion pgTAP suite was
-  dry-run the same way: 47 run, 0 failed.
+  against real data that stayed visible. The 48-assertion pgTAP suite was
+  dry-run the same way: 48 run, 0 failed.
 - **CI then caught two defects those thirteen green probes could not**, and one
   was severe. The append-only trigger covered `delete` as well as `update`, and
   an `on delete cascade` **is** a delete - so it **blocked account deletion
@@ -51,7 +52,7 @@ All notable technical changes are recorded here. The format follows Keep a Chang
   deletion is governed by grants as on every other append-only table here. None
   of the probes had deleted a user, so none could reach the cascade - the suite
   now creates an account, gives it rows, deletes it and measures both tables
-  empty, which is why it is 47 assertions rather than 44. The SELECT policies
+  empty. The SELECT policies
   also carried no role list, so they applied to `PUBLIC` rather than naming
   `authenticated`, which `phase_2o_privacy_enumeration.sql` requires.
 - **Three existing files moved, each of which would have failed CI.** The

@@ -113,7 +113,7 @@ subject tests a different artifact.
 | 1 | six categories by default | all `suggest_only` / `suggest_only_by_owner` / `eligible=false` |
 | 2 | armed but uncalibrated | `insufficient_calibration`, `eligible=false` |
 | 3 | stored state `'autonomous'` — the value `autonomy_level` really holds | degrades to `suggest_only`, **does not raise** |
-| 4 | producer | `approved` / `corrected` / `rejected`; **`retained` produces nothing** — 4 resolutions, 3 observations |
+| 4 | producer | `approved` / `corrected` / `rejected`; **`retained` and `dismissed` produce nothing** — 5 resolutions, 3 observations |
 | 5 | replay | no-op |
 | 6 | another owner | A=3, B=1 |
 | 7 | append-only | UPDATE refused, `42501` — **and this probe's first cut also asserted DELETE was refused, which is the defect §5a records** |
@@ -131,9 +131,9 @@ Zero residue after each, **with a non-vacuity control**: 0 `automation%` tables,
 ### The pgTAP suite, dry-run before CI
 
 pgTAP is not installed on the hosted project, so the suite itself is CI-only.
-`phase_2p_automation_policy.sql` — **47 assertions** — was nevertheless executed
+`phase_2p_automation_policy.sql` — **48 assertions** — was nevertheless executed
 verbatim against the deployed schema with minimal shims for `is`, `has_table`,
-`lives_ok`, `ok` and `throws_ok`, inside a rolled-back transaction. **47 run, 0
+`lives_ok`, `ok` and `throws_ok`, inside a rolled-back transaction. **48 run, 0
 failed.** CI remains the authority — and §5a is what that sentence is for: this
 dry run passed while two real defects were still in the tree, because it never
 deleted a user.

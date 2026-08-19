@@ -9683,9 +9683,9 @@ behavioural probes green, including **the non-vacuity control where the gate
 really does say yes** at 63 reviewed and 0.9683 precision. Zero residue
 measured, with the real data still visible as the control.
 
-pgTAP is **not installed hosted**, so the 47-assertion suite is CI-only — but it
+pgTAP is **not installed hosted**, so the 48-assertion suite is CI-only — but it
 was dry-run verbatim against the deployed schema with minimal shims for `is`,
-`has_table`, `lives_ok`, `ok` and `throws_ok`. **47 run, 0 failed.** CI remains the
+`has_table`, `lives_ok`, `ok` and `throws_ok`. **48 run, 0 failed.** CI remains the
 authority — and the section below is what that sentence is for.
 
 ### CI caught what thirteen green probes could not, and it was severe
@@ -9711,7 +9711,7 @@ story.
 **Why thirteen green probes missed it.** None of them deleted a user, so none
 could reach the cascade. The suite now proves it directly — create an account,
 give it a policy row and an observation, delete it, measure both tables empty —
-and that is why it is 47 assertions rather than 44. *A probe that never performs
+and that is why the suite grew. *A probe that never performs
 the operation cannot see the operation fail.*
 
 **Second defect, same run.** The SELECT policies carried no role list, so they
