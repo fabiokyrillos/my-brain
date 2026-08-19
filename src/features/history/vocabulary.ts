@@ -68,6 +68,11 @@ export const HISTORY_ENTITY_TYPES = [
   "person_relationship",
   "person_context",
   "person_project",
+  // Phase 2P slice 2P.4. `set_automation_category_policy` is the first writer to
+  // record it. Deliberately **not** linkable in `subject-route.ts`: `entity_id`
+  // is the undo operation's own id, not a row with a page — the place to see the
+  // policy is the automation section on Settings, which this id does not carry.
+  "automation_category_policy",
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -117,6 +122,10 @@ export const HISTORY_ACTION_TYPES = [
   "interpretation_confirmed",
   "entry_interpretation_corrected",
   "entry_interpretation_correction_undone",
+  // Phase 2P slice 2P.4 -- the owner arming, disarming or switching off one
+  // automation category. It is `changed` rather than `lifecycle`: the category
+  // stays, and what moved is an attribute of it.
+  "automation_policy_changed",
   "entry_person_candidates_resolved",
   "entry_person_candidates_undone",
   "entry_interpretation_failed",
@@ -225,6 +234,7 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // the same shape as `reminder_cancelled` and `end_person_project`.
   entry_awaiting_ai_configuration: "lifecycle",
   entry_interpretation_correction_undone: "undone",
+  automation_policy_changed: "changed",
   entry_person_candidates_resolved: "created",
   entry_person_candidates_undone: "undone",
   entry_interpretation_failed: "failed",

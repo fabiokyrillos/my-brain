@@ -176,9 +176,10 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     // 2N.7 and a fourth is a stop condition. So the newest migration in the tree
     // is still M3's.
     // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
-    expect(migrations.length).toBe(98);
+    // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning.
+    expect(migrations.length).toBe(99);
     expect(migrations.sort().at(-1)).toBe(
-      "202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql",
+      "202608190099_phase_2p_slice_4_automation_policy_and_calibration.sql",
     );
   });
 

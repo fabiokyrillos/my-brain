@@ -353,10 +353,12 @@ select is(
         and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
-  -- Thirty-four of the fifty-three public base tables deviate from the norm, and
-  -- every one of them deviates because a named migration said so. The five
-  -- shapes, so a reader can check a line against an intent rather than against
-  -- a memory:
+  -- Thirty-eight of the fifty-seven public base tables deviate from the norm,
+  -- and every one of them deviates because a named migration said so. (The
+  -- sentence read "thirty-four of the fifty-three" while the literal below
+  -- already listed thirty-six; the count was re-taken from the database in
+  -- slice 2P.4 rather than from the prose.) The five shapes, so a reader can
+  -- check a line against an intent rather than against a memory:
   --
   --   (none)                 RPC-only: no client touches the table at all --
   --                          account_deletion_attempts, account_deletion_log,
@@ -365,7 +367,9 @@ select is(
   --   SELECT                 read-only to the client: it is written by an RPC,
   --                          a trigger or the platform -- account_lifecycle,
   --                          ai_model_pricing, ai_usage_events,
-  --                          attachment_interpretations, entity_attachments,
+  --                          attachment_interpretations,
+  --                          automation_calibration_observations,
+  --                          automation_category_policies, entity_attachments,
   --                          entry_entities, entry_interpretations,
   --                          entry_task_candidate_resolutions, heartbeat_runs,
   --                          notification_consents, notification_deliveries,
@@ -396,6 +400,15 @@ select is(
   || E'attachments -> INSERT,SELECT\n'
   || E'audit_logs -> INSERT,SELECT\n'
   || E'auth_event_attempts -> (none)\n'
+  -- Phase 2P slice 2P.4. Both are read-only to the client because both are
+  -- authority: the policy is written only by set_automation_category_policy,
+  -- which audits and registers an undo, and the evidence is written only by the
+  -- SECURITY DEFINER producer behind three triggers. An authority table with
+  -- direct DML is an authority anybody can rewrite without leaving a trace.
+  -- The position of these two lines was MEASURED against the database rather
+  -- than assumed: collation, not intuition, decides where an underscore sorts.
+  || E'automation_calibration_observations -> SELECT\n'
+  || E'automation_category_policies -> SELECT\n'
   || E'conversation_messages -> INSERT,SELECT\n'
   || E'credential_validation_attempts -> INSERT,SELECT\n'
   || E'entity_attachments -> SELECT\n'

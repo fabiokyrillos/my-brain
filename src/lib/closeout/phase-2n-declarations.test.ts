@@ -310,12 +310,14 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     const mine = migrations.filter((name) => /phase[_-]?2n/i.test(name));
     expect(mine.length, `a fourth Phase 2N migration is a STOP CONDITION: ${mine.join(", ")}`)
       .toBeLessThanOrEqual(3);
-    // Phase 2P slice 2P.1 spent one authorized migration after this phase
-    // closed. It is counted explicitly and pinned at exactly one, so an
-    // unattributed migration still fails the total below.
+    // Phase 2P spent two authorized migrations after this phase closed, each
+    // under a named owner authorization: slice 2P.1's under ADR-122's
+    // amendment, and slice 2P.4's under ADR-123. They are counted explicitly
+    // and pinned at exactly two, so an unattributed migration still fails the
+    // total below. A THIRD is a stop condition, and this pin is where it fails.
     const laterPhase2p = migrations.filter((name) => /phase[_-]?2p/i.test(name));
-    expect(laterPhase2p, `Phase 2P must have exactly one migration: ${laterPhase2p.join(", ")}`)
-      .toHaveLength(1);
+    expect(laterPhase2p, `Phase 2P must have exactly two migrations: ${laterPhase2p.join(", ")}`)
+      .toHaveLength(2);
     expect(
       migrations,
       "a migration appeared that belongs to neither the pre-phase baseline nor this phase",

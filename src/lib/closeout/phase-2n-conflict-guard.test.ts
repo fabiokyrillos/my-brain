@@ -232,8 +232,9 @@ describe("2N.4 spends no migration, no RPC and no new authority", () => {
   it("creates no migration", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((file) => file.endsWith(".sql"));
     // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
-    expect(migrations).toHaveLength(98);
-    expect(migrations[migrations.length - 1]).toBe("202608180098_phase_2p_slice_1_entry_lifecycle_rederivation.sql");
+    // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning.
+    expect(migrations).toHaveLength(99);
+    expect(migrations[migrations.length - 1]).toBe("202608190099_phase_2p_slice_4_automation_policy_and_calibration.sql");
     for (const file of migrations) {
       expect(file, "no migration may belong to this slice").not.toContain("phase_2n_slice_4");
     }
