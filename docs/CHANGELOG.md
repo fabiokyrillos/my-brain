@@ -6,7 +6,10 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 - `2P-AUTONOMY-001` … `-010`. **One migration** - `202608190099`, the phase's
   **second and final**, authorized by **ADR-123**. A third is a stop condition.
-  No provider call and no BYOK spend.
+  Merged at `ab13b26` and **deployed**: 99 local = 99 hosted, parity
+  `202608190099`, applied after the seven gates in order, with CI green on the
+  exact merge SHA and its step list read (41 `success`, 2 `skipped`, zero
+  `cancelled`). No provider call and no BYOK spend.
 - **Nothing was enabled, and that is the deliverable.** All six categories -
   tasks, people, projects, companies, memories, relations - read
   `suggest_only` / `suggest_only_by_owner` / `eligible=false`. The migration
@@ -63,11 +66,29 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - **No existing grant, RLS policy, retention rule or `EXECUTE` privilege
   changed**, and no `product_events` vocabulary value was added - the audit
   trail uses `audit_logs`, whose `action_type` carries no constraint.
-- **Stops at `CHECKPOINT DO DONO - CALIBRAÇÃO REAL NECESSÁRIA`.** The hosted
-  reference set is 2 reviewed task candidates and 3 reviewed person candidates;
-  the other four categories have **no producer at all**, because the product has
-  no review flow for them. Nothing would be automated today and everything stays
-  in "Precisa de você". **5 built, 1 baseline, 1 partial, 4
+- **The authenticated browser journey ran, and it earned its keep.**
+  `e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+  DEPLOYED database and drives the real surface: 6/6 desktop, 6/6 mobile. It
+  found a defect nothing local could - the write always committed and the PAGE
+  never re-rendered, so the undo control never appeared until a manual reload,
+  while the uncontrolled select LOOKED updated because it held the owner's own
+  click. Four mechanisms were measured: `revalidatePath` with the RESOLVED path
+  does nothing for a route under a dynamic `[locale]` segment (Next matches
+  those by route pattern plus a type), a `redirect` to the same URL is a no-op,
+  the route-pattern form fixed the save on desktop, and `router.refresh()` still
+  lagged a generation - for the undo on desktop and for the save on mobile. Both
+  controls now navigate for real, and the asymmetry that briefly stood was
+  removed rather than documented because the mobile lane falsified it. The
+  test's own first cut was vacuous and is recorded: it asserted the select value
+  as evidence of persistence and passed over a stale DOM.
+- **Stops at `CHECKPOINT DO DONO - CALIBRAÇÃO REAL NECESSÁRIA`.** The
+  calibration evidence is **zero for all six**: the producer is an `after
+  insert` trigger, so the owner's pre-existing resolutions (2 task, 3 person)
+  produce no observations, and none are backfilled - manufacturing evidence for
+  reviews that predate the contract is what ADR-123 Decision 4 forbids. The
+  other four categories additionally have **no producer at all**, because the
+  product has no review flow for them. Nothing would be automated today and
+  everything stays in "Precisa de você". **5 built, 1 baseline, 1 partial, 4
   not-built-by-rule; cumulative 42 of 87.**
 
 ## 2026-08-19 - Slice 2P.1: one central lifecycle contract, and a resolved entry can leave Needs You

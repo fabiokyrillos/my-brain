@@ -9626,10 +9626,20 @@ deliberately does not name what comes after Phase 2P.**
 
 ## §95 — Slice 2P.4 builds the whole automation contract and enables nothing, because the evidence to enable it does not exist (2026-08-19)
 
-**Branch `codex/phase-2p-slice-4-automation-policy`.** Baseline `main`
-`02c41d13`, clean and synchronized, zero open PRs, **98 local = 98 hosted,
-parity `202608180098`** — read live from `supabase_migrations.schema_migrations`,
-not quoted. Signup closed; rollout 25 pass · 3 fail · 2 owner-signature.
+**Merge SHA `ab13b26d9aba6ea005553a544f3c7246a40d67e7`.** `main` synchronized
+and clean, **99 local = 99 hosted, parity `202608190099`** — read live from
+`supabase_migrations.schema_migrations`, not quoted. The baseline was
+`02c41d13` at 98/98. Signup closed; rollout 25 pass · 3 fail · 2
+owner-signature.
+
+**The phase's second and final authorized migration is now SPENT.** A third is
+a stop condition requiring a new owner authorization.
+
+CI was green on the exact head and again on the exact merge SHA, with the
+`database and journey` step list read at both points — **41 `success`, 2
+`skipped`, zero `cancelled`** on the merge SHA, `Install the browser` and `Run
+the deterministic foundation journey` both `success`, and pgTAP reporting
+`Files=68, Tests=2595, Result: PASS`.
 
 **The owner authorized a second Phase 2P migration, recorded as ADR-123.** A
 third is a stop condition.
@@ -9761,14 +9771,20 @@ re-taken from the database and is now thirty-eight of fifty-seven.
 
 ### CHECKPOINT DO DONO — CALIBRAÇÃO REAL NECESSÁRIA
 
-| Category | Reviewed | Approved | Corrected | Rejected | Undone | Needed | Missing | Producer? |
-|---|---|---|---|---|---|---|---|---|
-| tasks | **2** | 1 | 0 | 1 | 0 | 50 | **48** | yes |
-| people | **3** | 2 | 1 | 0 | 0 | 80 | **77** | yes |
-| projects | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
-| companies | **0** | 0 | 0 | 0 | 0 | 60 | **60** | **no** |
-| memories | **0** | 0 | 0 | 0 | 0 | 80 | **80** | **no** |
-| relations | **0** | 0 | 0 | 0 | 0 | 100 | **100** | **no** |
+**The calibration evidence is ZERO for all six**, and that is stronger than it
+first looks. The producer is an `after insert` trigger, so it cannot see rows
+that already existed: the owner's pre-existing hosted resolutions produce **no**
+observations, and none are backfilled. The two numbers are different things and
+are stated apart, so neither can be read as the other.
+
+| Category | **Calibration evidence** | Pre-existing reviews (not evidence) | Needed | Missing | Producer? |
+|---|---|---|---|---|---|
+| tasks | **0** | 2 | 50 | **50** | yes |
+| people | **0** | 3 | 80 | **80** | yes |
+| projects | **0** | 0 | 60 | **60** | **no** |
+| companies | **0** | 0 | 60 | **60** | **no** |
+| memories | **0** | 0 | 80 | **80** | **no** |
+| relations | **0** | 0 | 100 | **100** | **no** |
 
 **Four of the six have no producer at all**, because the product has no review
 flow for projects, companies, memories or relations. That is a measured fact
@@ -9781,18 +9797,69 @@ reviews that predate the contract is the fabrication ADR-123 Decision 4 forbids.
 **What would be automated today: nothing. What stays in "Precisa de você":
 everything.**
 
+### The authenticated journey ran, and it earned its keep
+
+`e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+**deployed** database and drives the real surface: **6/6 desktop, 6/6 mobile**.
+First time this surface has been rendered in a real authenticated browser.
+
+**It found a defect nothing local could.** The write always committed and the
+**page never re-rendered** — the reason stayed `suggest_only_by_owner`, the
+history stayed empty, the undo control never appeared until a manual reload —
+while the `<select>` *looked* updated, because it is uncontrolled and held the
+owner's own click. A failed save would have looked identical.
+
+Four mechanisms measured against the deployed app:
+
+| Mechanism | Result |
+|---|---|
+| `revalidatePath` with the **resolved** path — what every other action here uses | **nothing**. `/app/settings` is under a dynamic `[locale]` segment; Next matches those by route pattern plus a type |
+| `redirect` to the same URL | **nothing** — a no-op navigation |
+| `revalidatePath("/[locale]/app/settings", "page")` | fixed the **save** on desktop; kept |
+| `router.refresh()` on top | still one generation behind: undo on desktop, **and the save on mobile** |
+
+Both controls now navigate for real. The asymmetry that briefly stood
+(`router.refresh()` for the save, a reload for the undo) was **removed rather
+than documented** — it rested on the save's refresh being reliable, and the
+mobile lane falsified that.
+
+**The test's own first cut was vacuous:** it asserted the select's value as
+evidence of persistence and passed over a stale DOM. It now asserts only
+server-rendered facts.
+
+**And the cascade fix was re-proved on production.** Three probe accounts holding
+policy, undo and audit rows were deleted through `admin/users/{id}` — all `200`,
+`audit_logs` back to exactly **342**.
+
 ### What is deliberately NOT claimed
 
 - **No category was enabled**, and none may be until the owner signs the
   thresholds and the reference set exists.
 - **No automatic write has ever executed**, so `-005` … `-008` are encoded rules
   rather than proved behaviours — classified `not-built-by-rule`, never `built`.
-- **The surface has not been rendered in a real authenticated browser.** CI's
-  journey lane is unauthenticated or fixture-rendered and cannot see the RSC
-  boundary — the defect class that has shipped twice here.
 - **No live two-session race** on the policy control.
+- **Nothing about real hardware** — the mobile lane is a Pixel 7 emulation, and
+  `2P-MOBILE-005`'s NOT EXECUTED rule is untouched.
 
 ### Where this stops, and how to resume
+
+**This is a safe boundary between slices.** 2P.4 is merged, green on its exact
+merge SHA with the step list read at both points, deployed, parity proved live,
+zero residue measured with a non-vacuity control. `main` is synchronized and
+clean; nothing is half-written.
+
+**Deployed facts, read live rather than quoted:** 99 local = 99 hosted at
+`202608190099`; two tables; nine functions; **18** undo handlers (was 17);
+**zero policy rows and zero observation rows for any account**, which is the
+fail-closed property measured rather than argued. `audit_logs` is unchanged at
+342 — the migration performs no backfill, and its only top-level `insert` is the
+registry row. The four hand-written `database.types.ts` blocks were regenerated
+from the deployed schema afterwards and are **byte-identical**.
+
+**Next action: an owner decision at the calibration checkpoint**, then slice
+2P.5 — settings sections and notifications, re-audited against this `main`
+before any edit. It needs no migration, and it is where `2P-CHAT-004-MOBILE` is
+due and where the fifth mobile bar slot frees up.
 
 **Cumulative: 42 of 87 requirements, two migrations spent of two authorized.**
 Four remainders open and unabsorbed: `2P-ATTENTION-008`'s browser half,

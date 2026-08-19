@@ -43,6 +43,49 @@ function resolveLocale(raw: FormDataEntryValue | null): Locale {
   return typeof raw === "string" && isLocale(raw) ? raw : "pt-BR";
 }
 
+/**
+ * Invalidate the route, and let the client ask for it again.
+ *
+ * ## What was measured, in a real browser against the deployed database
+ *
+ * `revalidatePath` alone committed the write and **did not refresh the page**:
+ * the category's reason still read `suggest_only_by_owner`, the history list
+ * stayed empty, and the undo control never appeared until the owner reloaded by
+ * hand. A `redirect` back to the same URL did not fix it either — Next treats a
+ * navigation to the current route as a no-op, so the router cache kept serving
+ * the entry it already had.
+ *
+ * That is the same practical failure this repository already recorded from the
+ * opposite direction — *"revalidatePath destroys the undo control"* — arriving
+ * here as *the undo control never appears*. For `2P-AUTONOMY-009` the undo has
+ * to be reachable at the moment the owner changes the policy, which is exactly
+ * when they might want it back.
+ *
+ * ## The two halves, and why neither replaces the other
+ *
+ * This one invalidates the server's cache, so the next render is fresh. The
+ * client half — `router.refresh()` in `automation-policy-form.tsx` and
+ * `automation-undo-button.tsx` — makes the next render *happen*. It is the
+ * pattern `features/operations/undo-affordance.tsx` already uses after a task
+ * command.
+ */
+function invalidateSettings(): void {
+  /*
+    THE ROUTE PATTERN, NOT THE RESOLVED PATH, AND THE DIFFERENCE WAS MEASURED.
+
+    With `revalidatePath(`/${locale}/app/settings`)` — the shape every other
+    action in this repository uses — the client's refresh request really was
+    sent (the network shows `POST` then a fresh `GET` with `_rsc`) and the
+    server answered it with the OLD render. `/app/settings` lives under a
+    dynamic `[locale]` segment, and Next matches those by ROUTE PATTERN plus a
+    type rather than by resolved URL.
+
+    It takes no locale for the same reason: the pattern covers every locale, so
+    there is nothing here for a request-supplied value to influence.
+  */
+  revalidatePath("/[locale]/app/settings", "page");
+}
+
 export async function setAutomationCategoryPolicy(formData: FormData): Promise<void> {
   const locale = resolveLocale(formData.get("locale"));
   const category = categorySchema.safeParse(formData.get("category"));
@@ -82,7 +125,7 @@ export async function setAutomationCategoryPolicy(formData: FormData): Promise<v
     throw new Error(`set_automation_category_policy failed: ${error.code ?? "unknown"}`);
   }
 
-  revalidatePath(`/${locale}/app/settings`);
+  invalidateSettings();
 }
 
 export async function undoAutomationCategoryPolicy(formData: FormData): Promise<void> {
@@ -102,5 +145,5 @@ export async function undoAutomationCategoryPolicy(formData: FormData): Promise<
     throw new Error(`undo_operation failed: ${error.code ?? "unknown"}`);
   }
 
-  revalidatePath(`/${locale}/app/settings`);
+  invalidateSettings();
 }

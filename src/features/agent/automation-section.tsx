@@ -2,7 +2,10 @@ import type { Locale } from "@/lib/preferences";
 
 import type { AutomationPolicyChange } from "./automation-data";
 import { getAutomationCopy } from "./automation-copy";
+import { AutomationPolicyForm } from "./automation-policy-form";
+import { AutomationUndoButton } from "./automation-undo-button";
 import {
+  AUTOMATION_POLICY_STATES,
   calibrationShortfall,
   permitsAutomaticWrite,
   type AutomationCategoryDecision,
@@ -57,7 +60,6 @@ function CategoryRow({
   const category = copy.categories[decision.category];
   const shortfall = calibrationShortfall(decision);
   const automatic = permitsAutomaticWrite(decision);
-  const selectId = `automation-state-${decision.category}`;
   const evidenceId = `automation-evidence-${decision.category}`;
   const headingId = `automation-heading-${decision.category}`;
 
@@ -129,28 +131,27 @@ function CategoryRow({
         visible label — which an `aria-label` would do, and which then breaks
         voice control, since "click Save policy" would no longer match anything
         on screen.
+
+        The form itself is a client component for one reason, recorded in that
+        file: without a `router.refresh()` the page does not re-render after the
+        action, so the undo control never appears at the moment the owner
+        changes the policy. Everything it renders arrives as props from here.
       */}
-      <form action={saveAction} className="automation-form" aria-labelledby={headingId}>
-        <input type="hidden" name="locale" value={locale} />
-        <input type="hidden" name="category" value={decision.category} />
-        <label htmlFor={selectId}>{copy.stateLabel}</label>
-        <select
-          id={selectId}
-          name="automationCategoryState"
-          defaultValue={decision.state}
-          aria-describedby={evidenceId}
-        >
-          {(["disabled", "suggest_only", "automatic_when_eligible"] as const).map((state) => (
-            <option key={state} value={state}>
-              {copy.states[state]}
-            </option>
-          ))}
-        </select>
-        <p className="automation-state-help">{copy.stateHelp[decision.state]}</p>
-        <button type="submit" className="automation-save">
-          {copy.save}
-        </button>
-      </form>
+      <AutomationPolicyForm
+        category={decision.category}
+        headingId={headingId}
+        evidenceId={evidenceId}
+        locale={locale}
+        state={decision.state}
+        stateLabel={copy.stateLabel}
+        stateOptions={AUTOMATION_POLICY_STATES.map((state) => ({
+          value: state,
+          label: copy.states[state],
+        }))}
+        stateHelp={copy.stateHelp[decision.state]}
+        saveLabel={copy.save}
+        saveAction={saveAction}
+      />
     </li>
   );
 }
@@ -200,13 +201,12 @@ export function AutomationSection({
                   {copy.states[change.from ?? "suggest_only"]} → {copy.states[change.to]}
                 </span>
                 {change.undoable ? (
-                  <form action={undoAction}>
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="undoId" value={change.undoId} />
-                    <button type="submit" className="automation-undo">
-                      {copy.undo}
-                    </button>
-                  </form>
+                  <AutomationUndoButton
+                    locale={locale}
+                    undoId={change.undoId}
+                    label={copy.undo}
+                    undoAction={undoAction}
+                  />
                 ) : null}
               </li>
             ))}
