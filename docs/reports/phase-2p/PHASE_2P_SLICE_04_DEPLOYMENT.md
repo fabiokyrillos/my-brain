@@ -188,16 +188,38 @@ migrations at `202608190099`. `audit_logs` is unchanged at 342 — the migration
 performs no backfill and writes no audit row, which the file itself proves: its
 only top-level `insert` is the undo-handler registry row.
 
+## 7.6 The authenticated browser journey, executed after application
+
+`e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+deployed database and drives the real surface. **6 of 6 pass on desktop and 6 of
+6 on mobile** — the first time this surface has been rendered in a real
+authenticated browser.
+
+It found a defect no local test could: the write always committed and the **page
+never re-rendered**, so the undo control never appeared until the owner reloaded
+by hand. Four mechanisms were measured before one worked; the acceptance record
+carries the table. Both controls now navigate for real.
+
+**The cascade fix was re-proved on production while cleaning up.** Three
+disposable probe accounts holding policy rows, undo rows and audit rows were
+deleted through `admin/users/{id}`; all three returned `200`, and `audit_logs`
+returned to exactly **342** — the append-only defect CI caught, proved closed on
+the deployed database rather than only in CI.
+
+**Residue after all of it: zero, with the same non-vacuity control.** 2 users, 3
+entries, 9 tasks, 342 audit rows; 0 journey accounts, 0 policy rows, 0
+observations, 0 automation undo rows, 0 automation audit rows; parity
+`202608190099`.
+
 ## 8. What this deployment does **not** prove
 
 - **That any category can be automated.** None can, and none was enabled. The
   calibration evidence is zero for all six.
 - **That an automatic write behaves correctly**, because none exists.
   `2P-AUTONOMY-005` … `-008` are encoded rules, classified `not-built-by-rule`.
-- **The browser journeys for this surface.** The automation section has not been
-  rendered in a real authenticated browser; CI's foundation journey is
-  unauthenticated or fixture-rendered and cannot see the RSC boundary.
 - **A live two-session race** on the policy control.
+- **Anything about real hardware.** §7.6's mobile lane is a Pixel 7 emulation;
+  `2P-MOBILE-005`'s rule that hardware claims stay NOT EXECUTED is untouched.
 - **A restorable backup artifact.** §2 — `RG-DEP-3` stays INCOMPLETE.
 
 ## 9. What this deployment did not touch

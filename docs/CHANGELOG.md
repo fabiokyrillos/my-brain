@@ -66,6 +66,21 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - **No existing grant, RLS policy, retention rule or `EXECUTE` privilege
   changed**, and no `product_events` vocabulary value was added - the audit
   trail uses `audit_logs`, whose `action_type` carries no constraint.
+- **The authenticated browser journey ran, and it earned its keep.**
+  `e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+  DEPLOYED database and drives the real surface: 6/6 desktop, 6/6 mobile. It
+  found a defect nothing local could - the write always committed and the PAGE
+  never re-rendered, so the undo control never appeared until a manual reload,
+  while the uncontrolled select LOOKED updated because it held the owner's own
+  click. Four mechanisms were measured: `revalidatePath` with the RESOLVED path
+  does nothing for a route under a dynamic `[locale]` segment (Next matches
+  those by route pattern plus a type), a `redirect` to the same URL is a no-op,
+  the route-pattern form fixed the save on desktop, and `router.refresh()` still
+  lagged a generation - for the undo on desktop and for the save on mobile. Both
+  controls now navigate for real, and the asymmetry that briefly stood was
+  removed rather than documented because the mobile lane falsified it. The
+  test's own first cut was vacuous and is recorded: it asserted the select value
+  as evidence of persistence and passed over a stale DOM.
 - **Stops at `CHECKPOINT DO DONO - CALIBRAÇÃO REAL NECESSÁRIA`.** The
   calibration evidence is **zero for all six**: the producer is an `after
   insert` trigger, so the owner's pre-existing resolutions (2 task, 3 person)

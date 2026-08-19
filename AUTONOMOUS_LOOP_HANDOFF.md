@@ -9797,16 +9797,49 @@ reviews that predate the contract is the fabrication ADR-123 Decision 4 forbids.
 **What would be automated today: nothing. What stays in "Precisa de você":
 everything.**
 
+### The authenticated journey ran, and it earned its keep
+
+`e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+**deployed** database and drives the real surface: **6/6 desktop, 6/6 mobile**.
+First time this surface has been rendered in a real authenticated browser.
+
+**It found a defect nothing local could.** The write always committed and the
+**page never re-rendered** — the reason stayed `suggest_only_by_owner`, the
+history stayed empty, the undo control never appeared until a manual reload —
+while the `<select>` *looked* updated, because it is uncontrolled and held the
+owner's own click. A failed save would have looked identical.
+
+Four mechanisms measured against the deployed app:
+
+| Mechanism | Result |
+|---|---|
+| `revalidatePath` with the **resolved** path — what every other action here uses | **nothing**. `/app/settings` is under a dynamic `[locale]` segment; Next matches those by route pattern plus a type |
+| `redirect` to the same URL | **nothing** — a no-op navigation |
+| `revalidatePath("/[locale]/app/settings", "page")` | fixed the **save** on desktop; kept |
+| `router.refresh()` on top | still one generation behind: undo on desktop, **and the save on mobile** |
+
+Both controls now navigate for real. The asymmetry that briefly stood
+(`router.refresh()` for the save, a reload for the undo) was **removed rather
+than documented** — it rested on the save's refresh being reliable, and the
+mobile lane falsified that.
+
+**The test's own first cut was vacuous:** it asserted the select's value as
+evidence of persistence and passed over a stale DOM. It now asserts only
+server-rendered facts.
+
+**And the cascade fix was re-proved on production.** Three probe accounts holding
+policy, undo and audit rows were deleted through `admin/users/{id}` — all `200`,
+`audit_logs` back to exactly **342**.
+
 ### What is deliberately NOT claimed
 
 - **No category was enabled**, and none may be until the owner signs the
   thresholds and the reference set exists.
 - **No automatic write has ever executed**, so `-005` … `-008` are encoded rules
   rather than proved behaviours — classified `not-built-by-rule`, never `built`.
-- **The surface has not been rendered in a real authenticated browser.** CI's
-  journey lane is unauthenticated or fixture-rendered and cannot see the RSC
-  boundary — the defect class that has shipped twice here.
 - **No live two-session race** on the policy control.
+- **Nothing about real hardware** — the mobile lane is a Pixel 7 emulation, and
+  `2P-MOBILE-005`'s NOT EXECUTED rule is untouched.
 
 ### Where this stops, and how to resume
 

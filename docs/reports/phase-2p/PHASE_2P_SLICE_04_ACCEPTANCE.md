@@ -344,6 +344,47 @@ yet".
 
 **5 built, 1 baseline, 1 partial, 4 not-built-by-rule. Cumulative: 42 of 87.**
 
+### The authenticated browser journey, executed — and the defect it found
+
+`e2e/online-phase-2p-automation.spec.ts` signs a disposable account into the
+**deployed** database and drives the real surface. **6 of 6 pass on desktop and
+6 of 6 on mobile.** This is the first time the surface has been rendered in a
+real authenticated browser, which is the defect class this repository has
+shipped twice.
+
+**It found one, and no local test could have.** The write always committed; the
+**page never re-rendered**. The category's reason still read
+`suggest_only_by_owner`, the history list stayed empty, and the undo control
+never appeared until the owner reloaded by hand — while the `<select>` *looked*
+updated, because it is uncontrolled and what was on screen was the owner's own
+click. A failed save would have looked identical.
+
+Four mechanisms were measured against the deployed app:
+
+| Mechanism | Result |
+|---|---|
+| `revalidatePath` with the **resolved** path — the shape every other action here uses | **no refresh at all**; `/app/settings` is under a dynamic `[locale]` segment, and Next matches those by route pattern plus a type |
+| `redirect` back to the same URL | **nothing** — a navigation to the current route is a no-op |
+| `revalidatePath("/[locale]/app/settings", "page")` | fixed the **save** on desktop; kept |
+| `router.refresh()` on top | request sent, server answers, screen still one generation behind — for the undo on desktop, and for the **save** on a phone viewport |
+
+Both controls now navigate for real. An asymmetry briefly stood — `router.refresh()`
+for the save, a reload for the undo — and was **removed rather than documented**,
+because it rested on the save's refresh being reliable and the mobile lane
+falsified that. A claim that survives one project and not the other is not a
+property.
+
+**The test's own first cut was vacuous** and is recorded because that is the
+more useful half: it asserted the select's value as evidence the save persisted,
+and passed over a stale DOM while the page had not re-rendered at all. It now
+asserts only server-rendered facts.
+
+**The cascade fix was re-proved on production.** Three disposable probe accounts
+holding policy rows, undo rows and audit rows were deleted through
+`admin/users/{id}`; all three returned `200` and `audit_logs` returned to
+exactly **342**. That is the append-only defect proved closed on the deployed
+database, not only in CI.
+
 ### Deliberately not claimed
 
 1. **No category was enabled**, and none may be until the owner signs the
@@ -351,10 +392,10 @@ yet".
 2. **No automatic write has ever executed**, so `-005` … `-008` are encoded
    rules rather than proved behaviours. They are classified `not-built-by-rule`
    rather than `built`.
-3. **The surface has not been rendered in a real authenticated browser.** CI's
-   journey lane is unauthenticated or fixture-rendered and cannot see the RSC
-   boundary — the defect class that has shipped twice here.
-4. **No live two-session race** on the policy control.
+3. **No live two-session race** on the policy control.
+4. **No real device.** The mobile lane is a Pixel 7 emulation, which
+   `2P-MOBILE-005` distinguishes from hardware; `2P-MOBILE-005`'s own rule that
+   hardware-dependent claims stay NOT EXECUTED is untouched by this slice.
 
 ### Remainders preserved, not absorbed
 
