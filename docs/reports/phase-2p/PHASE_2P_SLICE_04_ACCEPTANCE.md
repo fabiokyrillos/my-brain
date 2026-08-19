@@ -141,6 +141,22 @@ deleted a user.
 Its first cut failed on two assertions, and the failure is recorded because the
 correction is the interesting part — see §6.
 
+### How the producer writes past `force row level security`, measured rather than assumed
+
+Both tables carry `force row level security` and **only a SELECT policy**, so
+there is no policy that would admit the producer's `INSERT`. It works because
+`postgres` — which owns the `SECURITY DEFINER` producer and the tables — carries
+`rolbypassrls = true`, read from `pg_roles` rather than assumed:
+`authenticated` **false**, `service_role` **true**, `postgres` **true**,
+`supabase_admin` **true**.
+
+This is the same mechanism every other definer writer in this tree relies on,
+and it is recorded here because the alternative reading — *"there must be an
+INSERT policy somewhere"* — is false and would send the next reader looking for
+one. If the attribute ever changed, the producer would **raise** rather than
+silently drop evidence: it carries no exception handler, so the owner's own
+resolution would fail loudly.
+
 ### Local gates
 
 | Gate | Result |
