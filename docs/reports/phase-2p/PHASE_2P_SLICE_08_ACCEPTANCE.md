@@ -474,8 +474,8 @@ not resumed.
 | Gate | Result |
 |---|---|
 | `npm run typecheck` | 0 errors |
-| `npm run lint` | see the PR record — zero errors in this slice's files |
-| `npm test` | see the PR record |
+| `npm run lint` | **6 errors, 6 warnings — every error inside gitignored `.worktrees/`.** Outside it, one pre-existing warning (`costs/page.tsx`, unused `Coins`) and nothing from this slice |
+| `npm test` | **8688 passed, 0 failed tests.** 3 failed *files* with zero tests are the recorded Windows shebang baseline — `hosted-auth-parity`, `signup-hardening-admin-boundary`, `storage-orphan-scanner` — green in CI |
 | `npm run build` | passes |
 | `scripts/generate-phase-2p-traceability.mjs --check` | matches its sources, 87 classified |
 | `e2e/online-phase-2p-closeout.spec.ts` | **12 × 3 lanes = 36 passing** (desktop, Pixel 7, WebKit iPhone) |
