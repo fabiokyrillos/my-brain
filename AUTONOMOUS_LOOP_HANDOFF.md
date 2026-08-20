@@ -11145,3 +11145,236 @@ saw. **No database, migration, RLS, automation or product rule changed.**
 `PHASE_2P_OWNER_DEVICE_CHECKLIST_ROUND_THREE.md` — the two rejected items only,
 ~5 minutes, no VoiceOver. **This section deliberately does not name what comes
 after Phase 2P**, and nothing about it was started or planned.
+
+## §106 — Revisões, redesenhada: three tabs, a page per review, and the Markdown that had never been rendered (2026-08-20)
+
+**Baseline `main` `d5eedc4`** — §105's merge. Clean worktree, `0 0` against
+`origin/main`, **zero open PRs**, CI **green 3/3** on the merge SHA, **99 local =
+99 hosted, parity `202608190099`**, read live before anything was written.
+**ZERO MIGRATIONS.** Phase 2P **does not close**, and Phase 2Q is neither started
+nor planned.
+
+### The owner's decision, and what it cost to honour
+
+*"Cada aba mostra a revisão do período atual, suas ações e, abaixo, o histórico
+das revisões anteriores daquele mesmo tipo."* Three tabs. Plus: every generated
+review gets its own page and stable URL.
+
+The design is `docs/reports/phase-2p/PHASE_2P_REVIEWS_EXPERIENCE_DESIGN.md`,
+written before any code and re-audited for migrations (none needed; two were
+identified and **refused**).
+
+### Four facts the census found that the plan did not have
+
+**1. `period_end` is the day the review was WRITTEN, not the period's last day.**
+`reviewWindow` sets `endDate` to today, which is why the owner's screenshot
+showed a weekly review as `17/08/2026 — 20/08/2026`: a Monday to a Thursday.
+**Only `period_start` identifies a period.** And `generateReview` upserts on
+`(user_id, period_type, period_start, period_end)` — so **regenerating on a later
+day of the same week INSERTS a second row**. A week can hold several snapshots of
+itself. They are real history, kept together above the list, newest first.
+`generateReview` is untouched; the read side learned to describe what the write
+side always did.
+
+**2. The Dia tab could render the WEEKLY review as its own.** The generated read
+was `period_start <= today <= period_end` — "any review covering today" — so a
+weekly review generated today satisfied it exactly as a daily one did, both ended
+on the same date, and `order by period_end desc limit 1` chose between them **by
+nothing at all**. Each tab now reads only its own `period_type` values.
+
+**3. `period_type` has FOUR values and the owner asked for THREE tabs.** Semana
+carries `weekly_review` **and** `weekly_plan`. This is the design's load-bearing
+decision and it is what dissolves the row of four generate buttons without losing
+a control: Dia offers one, Semana two, Mês one.
+
+**4. The product has NO Markdown renderer.** No `remark`, `rehype`, `marked`,
+`markdown-it` or `dompurify` in `package.json`; the only `markdown` matches under
+`src/` are closeout guards reading `docs/`. So one was written:
+`reviews/markdown.ts` parses to a **typed AST**, `rendered-markdown.tsx` renders
+React elements. No HTML produced, parsed or accepted; no
+`dangerouslySetInnerHTML` anywhere on the path.
+
+### `summaries` has no relationships, and that is a recorded pendência
+
+`Relationships: []`. The provider returns `citedSourceIds` and `generateReview`
+**discards them**, so a stored review names **no record that can be proved to
+exist and to belong to the reader**. Consequences, all deliberate:
+
+- The Markdown renderer's link allow-set is **empty** on this surface, so every
+  link in every review degrades to its own words. The mechanism exists and is
+  tested **in both directions** — an id in the set renders an anchor, the same id
+  out of it renders text — so the check cannot pass by refusing everything
+  forever.
+- The page **states the limit to the owner** rather than showing an empty list of
+  sources.
+- Fixing it means persisting the citations, which is a migration. **Refused.**
+
+### The second refused migration: telemetry
+
+`dayReviewScopes` is `["day", "next_day"]` and the deployed `product_events`
+validator refuses anything else **silently** — this repository has already lost
+weeks of a funnel to exactly that. So the projection carries
+`telemetryScope: DayReviewScope | null`, `null` on week and month, and the view
+records **nothing** there. `scope: "day"` on a monthly action would be an untrue
+row in an append-only ledger. Q3's funnel keeps measuring what it was defined to
+measure.
+
+### Three defects in my own work, each caught by a guard rather than by review
+
+- **A function prop crossing the server-to-client boundary.**
+  `reviewHref={(id) => …}` typechecked, built, and **would have thrown at render
+  in production**. `client-boundary-serializability-guard.test.ts` failed the
+  build. It is a string prefix now.
+- **A source file silently became binary.** `markdown.ts` and its test were first
+  written with literal U+202E and C0 control characters inside string literals;
+  `grep` reported both as binary. The strip is now a **code-point predicate**
+  rather than a character class, and the test builds fixtures with
+  `String.fromCharCode`. Twice, before it was written the third way.
+- **Text wrapped in a pointless `<span>`.** The renderer boxed every run of prose
+  to carry a `key`, so `getByText(…).tagName` on a heading returned `SPAN`. A
+  `Fragment` carries the key and emits no element.
+
+### Two Playwright assertions were wrong, not the product
+
+- **`daily-surfaces` demanded the failure section be visible on a page that
+  succeeded** — the exact defect the owner asked to remove. Rewritten as **two
+  assertions**: absent when everything was read, present with its `role="status"`
+  when a source really failed.
+- **The keyboard-reachability loop tried six Tabs.** The tab strip legitimately
+  added three focusable links ahead of the row. The bound only terminates the
+  search; it grew, and the reason is written where the number is.
+
+### A pre-existing defect, proven pre-existing
+
+`accessibility.spec.ts`'s **global search** and **Work bulk bar** dark-mode scans
+fail on the `iphone-emulated` (WebKit) project: axe `color-contrast`, impact
+`serious`, **count 7**. Proven **not mine** by reverting `src/app/globals.css` to
+`HEAD` and re-running — identical failures.
+
+**Why nothing has caught it:** `ci.yml:276` runs `accessibility.spec.ts` with
+`--project=desktop --project=mobile` only. The WebKit lane is never used for it.
+Left as its own task; **not fixed here**, because the scope of this unit is
+Revisões and those two surfaces are not it.
+
+### VoiceOver
+
+**NOT EXECUTED.** Dispensed by the owner, recorded as not executed, **never as
+approved**. Unchanged by this unit.
+
+### Verified
+
+| Gate | Result |
+|---|---|
+| `tsc --noEmit` | zero errors |
+| `eslint` over the changed source | zero errors (local lint noise is `.worktrees/`, gitignored, absent in CI) |
+| `npm run build` | exit 0; `reviews/[reviewId]` present in `routes-manifest` |
+| `git diff --cached --check` | clean — no CRLF injected |
+| Unit suite | **8 790 / 8 790**, 3 known Windows-local file failures |
+| `daily-surfaces` × desktop/mobile/iphone-emulated | **126 / 126** |
+| Authenticated online journey × desktop / Pixel 7 / iPhone WebKit | **33 / 33** |
+| Migrations | **ZERO**; parity `202608190099` unchanged |
+
+### What the online journey cost to get right, and what it proved
+
+It failed three times before it passed, and **not once was the product wrong**.
+Each cause is worth carrying forward:
+
+1. **An orphan `next dev` held port 3000.** `reuseExistingServer` pointed every
+   test at it, a fresh `npm run dev` silently took 3001 and received no traffic,
+   and every test reported *"This page couldn't load"*. Next also refuses the
+   second server naming a **different** PID from the one holding the port, so
+   both had to be killed. With a clean server the route answers `200` with zero
+   server errors.
+2. **The host lost Supabase entirely** — 0 of 6 probes completed while GitHub
+   stayed reachable. Every read threw, `error.tsx` answered 200, and an
+   assertion expecting 404 failed as though the route leaked. Probe
+   reachability before believing an online failure.
+3. **Three assertions of mine were wrong, in three different ways.**
+   - `expect(status).toBe(404)` measured the **rendering mode**, not isolation.
+     `not-found.md` states plainly that Next returns 200 for streamed responses
+     and 404 for non-streamed ones, because the headers are already sent. The
+     test now seeds a **genuinely foreign review** on a second account and
+     proves the foreign id and a nonexistent one render **identically**, with
+     Next's own `<meta robots noindex>` as the positive marker that the
+     not-found path really ran — and a control that the reader's OWN review
+     still opens.
+   - A tab measured **0px tall on Pixel 7** because the measurement ran before
+     the stream settled. **This repository had already paid for that lesson**
+     on the mobile navigation depth check, and it was repeated here.
+   - `goBack()` on WebKit failed ambiguously; the URL is waited on first now, so
+     a history that did not move says so.
+4. **`loading.tsx` renders a second `<main>`.** A `main, body` locator is a
+   strict-mode violation while a route streams — which is also the proof that
+   this route streams, and therefore why it answers 200.
+
+### What the VISUAL review found, which no measurement had
+
+The journey proved there is no sideways scroll and that every target is 44px.
+Both were true while the page was still wrong. Screenshots of both surfaces at
+three viewports found four defects, and one of them had already leaked off this
+phase entirely:
+
+1. **`.review-facts` was a name that already had an owner.**
+   `entry-review.tsx` renders it and `operations.css` draws it as a row of
+   monospace pills. Two things followed. The new Fontes section inherited the
+   pill treatment and read as debug output — and, because `reviews.css` loads
+   **after** `operations.css`, the new rules **silently restyled the entry
+   review on `/app/inbox/[entryId]`**, a page this unit never touched. Nothing
+   failed; nothing would have, until somebody opened it.
+   Renamed to `.review-source-facts`, and
+   `reviews-stylesheet-scope-guard.test.ts` now fails the build when this sheet
+   styles a class no reviews surface renders. Its control is planted with
+   `review-facts` itself, and it asserts the corpus really contains that class
+   first — the first draft planted a name nobody rendered and reported a
+   working scan while proving nothing.
+
+2. **Every list from the Markdown had lost its markers.** Tailwind preflight
+   sets `ul, ol { list-style: none }` globally, so the structure the parser
+   worked to recover arrived as indented paragraphs. Restored explicitly.
+
+3. **The page was still "uma coleção extensa de caixas idênticas"** — the
+   owner's complaint, still literally true. Round two had given
+   `.day-review-page > section` a card each, which fixed a real absence of
+   boundaries and over-corrected into seven identical white surfaces; the
+   phone page ran to **6 885px**. Parte A is now one column with **dividers**,
+   and exactly **one card** — the section that carries the generate controls,
+   so a card now means *there are actions here* rather than *this is a
+   section*. `.day-review-page > section` is (0,1,1), so the exception is
+   written at (0,2,1); a bare class could never have won.
+
+4. **The rendered headings sat at 13px** under a 28px serif, so the outline the
+   parser produced did not read as one.
+
+**How the collision was found:** by asking the browser which rules matched the
+element, rather than grepping for a guess. The answer was `.review-facts div`,
+and `grep` then named the owner in one line. The class audit that followed found
+five collisions in total; four are deliberate supersessions confined to the
+reviews surfaces, and the fifth was the leak.
+
+### A local red that is not a defect, diagnosed rather than tolerated
+
+`phase-2f-documentation.test.ts` (the A13 successor check) and
+`reports-taxonomy-guard.test.ts` (the markdown link resolver) went red several
+times in full local runs and **passed every time in isolation**. The message is
+the answer and it is not an assertion:
+
+```
+Error: Test timed out in 5000ms.
+```
+
+Both walk the repository tree. At vitest's 5s default they finish comfortably on
+an idle machine and do not when three Playwright browsers are running beside
+them. CI is idle and green on both. **Do not raise the timeout to make a local
+run quiet** — the number is not the problem, and the same red is what a genuinely
+slow walk would show.
+
+The lesson generalises: on this machine, run the unit suite and the Playwright
+lanes **one at a time**. Every "transient" guard failure in this unit — A13,
+reports-taxonomy, heartbeat-disposition — was this, and each cost a diagnosis.
+
+### Next
+
+The owner's checklist is
+`docs/reports/phase-2p/PHASE_2P_OWNER_CHECKLIST_REVIEWS.md` — eight steps, about
+six minutes, iPhone plus a desktop glance. **Phase 2P does not close on it**, and
+**Phase 2Q is not to be started or planned.**

@@ -2,6 +2,76 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-20 - Revisões, redesenhada: Dia · Semana · Mês, uma página por revisão, e o Markdown que nunca tinha sido renderizado
+
+**The owner's decision, implemented: each tab shows the current period's review, its actions, and the history of that same kind below it. Every generated review now has its own page and stable URL. ZERO MIGRATIONS; 99 local = 99 hosted, parity `202608190099`. Phase 2P does NOT close, and Phase 2Q is neither started nor planned.**
+
+### Added
+
+- **Dia · Semana · Mês as the page's primary navigation**, immediately under its own name. The three controls are **links**, and the tab is `?period=day|week|month` — so reload, back and forward preserve the choice, and a shared URL opens the period it names. There is no component state that could disagree with the address. Both parameters fail closed (`period` to `day`, `scope` to `day`): a repeated parameter arrives as an array, and two values is a malformed request rather than a choice between them.
+- **A page per review — `/{locale}/app/reviews/[reviewId]`**, keyed on `summaries.id`, following `memories/[memoryId]`, `people/[personId]`, `projects/[projectId]` and `inbox/[entryId]`. No second identity system: the row already had a primary key. It carries the way back, the kind, the period, the generation time, the state, the rendered content, the sources, the links it can prove, and the contextual actions.
+- **A Markdown renderer, because the product had none.** A census found no `remark`, `rehype`, `marked`, `markdown-it` or `dompurify` in `package.json` — the only `markdown` matches under `src/` are closeout guards that read `docs/`. `summaries.content` reached the screen through `<p>{content}</p>`, which collapses newlines and leaves `##`, `###` and `**` visible. `reviews/markdown.ts` parses to a **typed AST**; `rendered-markdown.tsx` renders it to React elements. No HTML is produced, parsed or accepted anywhere on the path, and there is no `dangerouslySetInnerHTML`.
+- **`src/app/reviews.css`**, imported from `globals.css` and inlined by the `daily-surfaces` fixture lane. Tokens only.
+
+### Changed
+
+- **The four generate buttons moved to the tabs whose periods they write.** `summaries_period_type_check` admits four values and the owner asked for three tabs, so Semana carries **both** `weekly_review` and `weekly_plan`. Dia offers one control, Semana two, Mês one. No capability is lost; the undifferentiated row of four stops existing.
+- **The history lists only the selected kind, and no longer discloses anything.** `ReviewBody` used to mount per row and reveal the summary inside the list. Under OD-2J-1 every summary is masked — `summaries` has no sensitivity column — so a preview there would be masked content exposed through a listing, which the owner's own instruction forbids. Each row now carries type, period, state and *Abrir revisão*. The disclosure moved to the review's own page, which is also the only place the content is read from the database at all: `loadReviewListProjection` no longer selects `content`, and `toReviewSummaryView` has no such field to render.
+- **The day review's projection takes a window rather than a date.** The same five reads, the same per-source scoring, the same limits; only the bounds move, resolved through `localRangeBounds`, `startOfLocalWeek`, `startOfLocalMonth` and `daysInLocalMonth`. The Dia tab passes the day window and reads exactly what it read before.
+- **`ReviewBody` became `ReviewDisclosure` and takes `children`.** It withholds; it no longer formats. The `resolveContent("review_summary", "highly_sensitive", …)` call the convergence guard requires is unchanged.
+
+### Fixed
+
+- **The Dia tab could render the *weekly* review as its own.** The generated-review read was `period_start <= today <= period_end` — "any review that covers today" — so a weekly review generated today satisfied it exactly as a daily one did, both ended on the same date, and `order by period_end desc limit 1` chose between them by nothing at all. Each tab now reads only its own `period_type` values.
+- **The same review was rendered twice on one screen** — once as the day review's *Revisão gerada* card and again in the list below it. The current period is now excluded from the history **in the query**, by `period_start`, so a page of results cannot silently come back short.
+- **"O que não pôde ser lido" rendered on every visit**, falling back to a *"nothing was unreadable"* empty state. A heading whose entire purpose is to report failure, standing over a page that succeeded. It is now conditional, and the success case is one quiet line in the synthesis block.
+- **The day review ended with a link to `/app/reviews` — the page it was already on.** It links to each review's own page now.
+
+### Discovered
+
+- **`period_end` records the day a review was *written*, not the period's last day.** `reviewWindow` sets `endDate` to today, which is why the owner's screenshot showed a weekly review as `17/08/2026 — 20/08/2026`: a Monday to a Thursday. Only `period_start` identifies the period. And because `generateReview` upserts on all four key columns, **regenerating on a later day of the same week inserts a second row** rather than replacing the first — so a week can hold several snapshots of itself. They are kept together above the history, newest first, because they are real history rather than duplicates. `generateReview` itself is untouched.
+- **A function prop cannot cross the server-to-client boundary, and only a guard caught it.** `reviewHref={(id) => …}` typechecked, built, and would have thrown at render in production. `client-boundary-serializability-guard.test.ts` failed the build instead. The prop is a string prefix now.
+- **A source file can silently become binary.** `markdown.ts` and its test were first written with literal U+202E and C0 control characters inside their string literals; `grep` reported both as binary. The strip is a code-point predicate rather than a character class, and the test builds its fixtures with `String.fromCharCode`.
+
+### Security
+
+- **Model output is data, structurally rather than by care.** A tag in a stored review is never parsed as a tag — it arrives at the renderer as the literal characters a reader should see. That is stronger than sanitising, because it has no allow-list of elements to get wrong. Unrecognised syntax (images, tables, block quotes, raw HTML, entities) renders as **text, never nothing**: stripping would let a model delete words from its own report by wrapping them in a syntax the parser does not implement.
+- **A link exists only where the caller vouched for the id.** `authorizeHref` admits an internal app route carrying one UUID **that is in the allow-set the caller passes**, and nothing else — `javascript:`, `data:`, `http(s):`, `mailto:`, protocol-relative, a fabricated id, and a well-formed path whose id nobody supplied all render as their own words. **The reviews surface passes an empty set**, because `summaries` carries no foreign key and `generateReview` discards the provider's `citedSourceIds`, so no id inside a stored review has been proved to exist or to belong to the reader. The mechanism is tested in both directions, so the check cannot pass by refusing everything forever.
+- **Bidirectional overrides and control characters are removed before parsing**, so a summary cannot render in an order its source does not have.
+- **A review of another account is indistinguishable from one that never existed.** One `notFound()` arm covers removed, foreign and never-existed alike; there is deliberately no branch that could tell them apart, so the page cannot become a probe for whether a foreign review id is real.
+- **Regenerating is offered only where it would update the review on screen.** `generateReview` upserts on a key computed from *now*, so the control on a past review's page would have written a different row while appearing to refresh this one.
+
+### Fixed after looking at it
+
+The journey proved no sideways scroll and 44px targets. Both were true while the
+page was still wrong; screenshots at three viewports found four more defects.
+
+- **`.review-facts` was a class name that already had an owner**, and taking it
+  did damage in two directions. `entry-review.tsx` renders it and
+  `operations.css` draws it as monospace pills, so the new Fontes section read
+  as debug output — and because `reviews.css` loads **after** `operations.css`,
+  the new rules **silently restyled the entry review on `/app/inbox/[entryId]`**,
+  a page this work never touched. Renamed to `.review-source-facts`.
+  `reviews-stylesheet-scope-guard.test.ts` now fails the build when this sheet
+  styles a class no reviews surface renders, with the offending class itself as
+  its planted control.
+- **Every Markdown list had lost its markers.** Tailwind preflight sets
+  `ul, ol { list-style: none }` globally, so the structure the parser recovered
+  arrived as indented paragraphs.
+- **Parte A was still a stack of identical cards** — the owner's complaint,
+  still literally true, at **6 885px** on a phone. Round two had given every
+  section a card, fixing an absence of boundaries by over-correcting. It is one
+  column with dividers now, and exactly one card: the section that carries the
+  generate controls, so a card means *there are actions here*.
+- **The rendered headings sat at 13px** under a 28px serif.
+
+### Not done, recorded honestly
+
+- **VoiceOver — NOT EXECUTED.** Dispensed by the owner; recorded as not executed, never as approved.
+- **Per-item links from a review to the records it was written from.** The provider returns `citedSourceIds` and `generateReview` discards them; persisting them is a migration, and the owner's instruction is explicit that none is to be spent enriching this page. The page states the limit to the owner instead of showing an empty list.
+- **Product events for the Semana and Mês tabs.** `dayReviewScopes` is `["day", "next_day"]` and the deployed `product_events` validator refuses anything else, silently. The projection carries `telemetryScope: null` for those tabs and nothing is recorded — a false `scope: "day"` on a monthly action would be an untrue row in an append-only ledger.
+- **Per-review sensitivity classification.** `summaries` has no such column, which is OD-2J-1's own stated cost: every summary is masked, including one that contains nothing sensitive.
+
 ## 2026-08-20 - Round two on the iPhone: the calendar's filters, and a Revisões page that queried a table that never existed
 
 **Everything approved except two items, both fixed. Zero migrations; 99 local = 99 hosted, parity `202608190099`. 87 of 87 classified, unchanged. Phase 2P does NOT close: a third device pass is required.**

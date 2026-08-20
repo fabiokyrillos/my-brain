@@ -42,6 +42,17 @@ function item(id: string, overrides: Record<string, unknown> = {}) {
 function projection(overrides: Partial<DayReviewProjection> = {}): DayReviewProjection {
   return {
     scope: "day",
+    tab: "day",
+    telemetryScope: "day",
+    window: {
+      tab: "day",
+      startIso: "2026-08-11T03:00:00.000Z",
+      endIso: "2026-08-12T03:00:00.000Z",
+      startKey: "2026-08-11",
+      endKey: "2026-08-11",
+      startDate: { year: 2026, month: 8, day: 11 },
+      endDate: { year: 2026, month: 8, day: 11 },
+    },
     day: "2026-08-11",
     isToday: true,
     timezone: "America/Sao_Paulo",
@@ -50,7 +61,7 @@ function projection(overrides: Partial<DayReviewProjection> = {}): DayReviewProj
     planned: [],
     due: [],
     captured: [],
-    generated: null,
+    generated: [],
     sourceStates: { completed: "read", planned: "read", due: "read", captured: "read", generated: "read" },
     unreadable: [],
     truncated: [],
@@ -71,12 +82,17 @@ function mount(overrides: Partial<DayReviewProjection> = {}, props: Record<strin
   return render(<DayReviewView
     action={vi.fn()}
     dateBounds={{ min: "2024-08-11", max: "2028-08-11" }}
+    generateControls={<button type="button">Generate this period</button>}
     locale="en"
+    periodRange="Tuesday, 11 August 2026"
     projection={projection(overrides)}
     reviewsHref="/en/app/reviews"
     {...props}
   />);
 }
+
+/** The tab's empty copy, resolved the same way the view resolves it. */
+const emptyCopy = copy.empty("day");
 
 describe("2M-REVIEW-001: it says what it could not read", () => {
   it("says a source could not be read instead of rendering it empty", () => {
@@ -85,13 +101,13 @@ describe("2M-REVIEW-001: it says what it could not read", () => {
     expect(within(section).getByText(copy.unavailable(copy.sections.completed))).toBeTruthy();
     // The negative control: the empty sentence is the one thing that must NOT be
     // on screen, because it is a claim about the day rather than about the read.
-    expect(within(section).queryByText(copy.empty.completed)).toBeNull();
+    expect(within(section).queryByText(emptyCopy.completed)).toBeNull();
   });
 
   it("says nothing happened only when the read succeeded", () => {
     mount();
     const section = screen.getByRole("region", { name: copy.sections.completed });
-    expect(within(section).getByText(copy.empty.completed)).toBeTruthy();
+    expect(within(section).getByText(emptyCopy.completed)).toBeTruthy();
     expect(within(section).queryByText(copy.unavailable(copy.sections.completed))).toBeNull();
   });
 
@@ -105,7 +121,28 @@ describe("2M-REVIEW-001: it says what it could not read", () => {
 
   it("states plainly that everything was read when it was", () => {
     mount();
-    expect(screen.getByText(copy.unreadableNone)).toBeTruthy();
+    expect(screen.getByText(copy.allSourcesRead)).toBeTruthy();
+  });
+
+  it("does not render the failure section at all when nothing failed", () => {
+    /*
+     * The owner's instruction, and the defect behind it: this section used to
+     * render on every visit with a "nothing was unreadable" empty state, so a
+     * page that succeeded opened with a heading announcing what could not be
+     * read.
+     */
+    mount();
+    expect(screen.queryByRole("region", { name: copy.unreadableHeading })).toBeNull();
+
+    // The control: it must still appear when a source really did fail, or this
+    // check is passing because the section was deleted outright.
+    cleanup();
+    mount({
+      sourceStates: { completed: "unavailable", planned: "read", due: "read", captured: "read", generated: "read" },
+      unreadable: ["completed"],
+    });
+    expect(screen.getByRole("region", { name: copy.unreadableHeading })).toBeTruthy();
+    expect(screen.queryByText(copy.allSourcesRead)).toBeNull();
   });
 });
 
@@ -186,22 +223,65 @@ describe("2M-REVIEW-006 and -007: the preferences are said back, and nothing is 
   });
 });
 
+const storedReview = (id: string, overrides: Record<string, unknown> = {}) => ({
+  id,
+  title: "Resumo",
+  periodType: "daily" as const,
+  tab: "day" as const,
+  periodLabel: "Daily summary",
+  statusLabel: "Completed",
+  statusTone: "positive" as const,
+  periodLabelRange: "11/08/2026 — 11/08/2026",
+  periodStart: "2026-08-11",
+  periodEnd: "2026-08-11",
+  ...overrides,
+});
+
 describe("2M-REVIEW-008: a stored review renders through the contract's own fields", () => {
   it("renders the contract's labels and no formatting of its own", () => {
-    mount({
-      generated: {
-        id: "r1",
-        title: "Resumo",
-        content: "corpo",
-        periodLabel: "Daily summary",
-        statusLabel: "Completed",
-        statusTone: "positive",
-        periodLabelRange: "11/08/2026 — 11/08/2026",
-      },
-    });
-    const region = screen.getByRole("region", { name: copy.generatedHeading });
+    mount({ generated: [storedReview("r1")] });
+    const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
     expect(within(region).getByText("Daily summary")).toBeTruthy();
     expect(within(region).getByText("11/08/2026 — 11/08/2026")).toBeTruthy();
+  });
+
+  it("links each review to its own page instead of back to this one", () => {
+    // The surface used to end with an anchor to `/app/reviews` — the page it was
+    // already on — and the words were disclosed inside the list below.
+    mount({ generated: [storedReview("r1")] });
+    const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
+    const link = within(region).getByRole("link", { name: new RegExp(copy.openReview) });
+    expect(link.getAttribute("href")).toBe("/en/app/reviews/r1");
+    expect(within(region).queryByRole("link", { name: /see every review/i })).toBeNull();
+    // The name says WHICH review, not just that there is one — several of
+    // these stand on a week's tab, and identical names make the list
+    // untraversable by a screen reader.
+    expect(link.getAttribute("aria-label")).toContain("Daily summary");
+    expect(link.getAttribute("aria-label")).toContain("11/08/2026 — 11/08/2026");
+  });
+
+  it("renders every snapshot of the period, not just the newest", () => {
+    mount({
+      generated: [
+        storedReview("newer"),
+        storedReview("older", { periodEnd: "2026-08-10", periodLabelRange: "10/08/2026 — 10/08/2026" }),
+      ],
+    });
+    const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
+    const links = within(region).getAllByRole("link", { name: new RegExp(copy.openReview) });
+    expect(links).toHaveLength(2);
+    // …and the two are distinguishable by name, which is the whole point of
+    // rendering both rather than only the newest.
+    const names = links.map((link) => link.getAttribute("aria-label"));
+    expect(new Set(names).size, `two links share one accessible name: ${names.join(" | ")}`).toBe(2);
+  });
+
+  it("mounts the generate controls inside the period's own section", () => {
+    // They used to sit in an undifferentiated row of four below the history,
+    // describing no period at all.
+    mount();
+    const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
+    expect(within(region).getByRole("button", { name: "Generate this period" })).toBeTruthy();
   });
 });
 
@@ -219,7 +299,7 @@ describe("2M-ACCESS-004 and 2M-MOBILE-004: one announcement, above every list", 
 
   it("labels every region, so the page has an outline a screen reader can use", () => {
     mount();
-    for (const name of [copy.schedule.heading, copy.unreadableHeading, copy.sections.completed, copy.sections.planned, copy.sections.due, copy.sections.captured, copy.generatedHeading]) {
+    for (const name of [copy.schedule.heading, copy.sections.completed, copy.sections.planned, copy.sections.due, copy.sections.captured, copy.generatedHeading("day")]) {
       expect(screen.getByRole("region", { name }), `${name} is not a labelled region`).toBeTruthy();
     }
   });

@@ -18,8 +18,7 @@
  *
  * There were three ways out and only one is available:
  *
- *   1. classify summaries — a new column, a third migration, a **stop
- *      condition** under ADR-095's budget;
+ *   1. classify summaries — a new column, a migration, a **stop condition**;
  *   2. mask nothing and hope — the decision forbids it;
  *   3. **treat every summary as potentially sensitive** and mask by default.
  *
@@ -30,9 +29,25 @@
  *
  * The reveal is **local and transient**, like every other reveal in this
  * contract — no preference is written, and reopening the page hides it again.
+ *
+ * ## What changed when reviews got their own page
+ *
+ * This used to take `content: string` and render `<p>{content}</p>`, which is
+ * how the stored Markdown reached the screen with its `##`, `###` and `**`
+ * intact and its newlines collapsed. It now takes **`children`** — the caller
+ * parses and renders, this decides only whether the reader may see it.
+ *
+ * That is the same division `ProtectedContent` uses, and it is deliberate: a
+ * disclosure that also formats is a disclosure with an opinion about what it is
+ * withholding. It is not `ProtectedContent` itself because that component
+ * resolves a **row's** classification, and this surface's level belongs to the
+ * surface — every summary, always, whatever the row says.
+ *
+ * The control also moved: the history list no longer discloses anything, so the
+ * only place this mounts is a review's own page.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { NO_REVEALS, resolveContent } from "@/features/sensitivity/contracts";
 import type { Locale } from "@/lib/preferences";
@@ -50,13 +65,14 @@ const copy = {
   },
 } as const;
 
-export function ReviewBody({
+export function ReviewDisclosure({
+  children,
   reviewId,
-  content,
   locale,
 }: {
+  /** What the page would have rendered. Never read here, only withheld or passed through. */
+  children: ReactNode;
   reviewId: string;
-  content: string;
   locale: Locale;
 }) {
   const [revealed, setRevealed] = useState(false);
@@ -80,9 +96,7 @@ export function ReviewBody({
 
   return (
     <div className="review-body">
-      {state.show ? (
-        <p>{content}</p>
-      ) : (
+      {state.show ? children : (
         <p className="review-masked" data-masked="true">{text.hidden}</p>
       )}
       {state.revealable ? (

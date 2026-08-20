@@ -79,6 +79,7 @@ const load = (supabase: unknown, overrides: Record<string, unknown> = {}) =>
     day: DAY,
     today: DAY,
     scope: "day",
+    tab: "day",
     nowLocalMinutes: 23 * 60,
     ...overrides,
   });
@@ -291,15 +292,95 @@ describe("2M-REVIEW-008: a stored review renders through the presentation contra
         error: null,
       },
     }));
-    expect(result.generated?.periodLabel).toBe("Resumo do dia");
-    expect(result.generated?.statusTone).toBe("positive");
+    expect(result.generated[0]?.periodLabel).toBe("Resumo do dia");
+    expect(result.generated[0]?.statusTone).toBe("positive");
   });
 
-  it("returns null rather than a half-rendered card when the row fails the contract", async () => {
+  it("drops a row that fails the contract rather than half-rendering a card", async () => {
     const result = await load(client({
       summaries: { data: [{ id: "r1", title: "Resumo", content: "corpo", period_type: "invented", period_start: "2026-08-11", period_end: "2026-08-11", status: "generated" }], error: null },
     }));
-    expect(result.generated).toBeNull();
+    expect(result.generated).toEqual([]);
+  });
+
+  it("carries no content into the projection, so no listing can render one", async () => {
+    // The words live on a review's own page, behind the OD-2J-1 disclosure. A
+    // projection that carried them would put masked prose into the payload of a
+    // page that never shows them.
+    const result = await load(client({
+      summaries: {
+        data: [{
+          id: "r1",
+          title: "Resumo",
+          content: "conteúdo secreto",
+          period_type: "daily",
+          period_start: "2026-08-11",
+          period_end: "2026-08-11",
+          status: "generated",
+        }],
+        error: null,
+      },
+    }));
+    expect(result.generated).toHaveLength(1);
+    expect(JSON.stringify(result.generated)).not.toContain("secreto");
+  });
+
+  it("keeps every snapshot of one period, newest first", async () => {
+    /*
+     * `generateReview` stores `period_end` as the day it RAN and upserts on all
+     * four key columns, so regenerating on a later day of the same week inserts
+     * a second row rather than replacing the first. Both describe the same
+     * period and both belong here.
+     */
+    const row = (id: string, end: string) => ({
+      id,
+      title: "Revisão semanal",
+      content: "corpo",
+      period_type: "weekly_review",
+      period_start: "2026-08-10",
+      period_end: end,
+      status: "generated",
+    });
+    const result = await load(
+      client({ summaries: { data: [row("newer", "2026-08-13"), row("older", "2026-08-11")], error: null } }),
+      { tab: "week" },
+    );
+    expect(result.generated.map((item) => item.id)).toEqual(["newer", "older"]);
+  });
+});
+
+describe("the window follows the tab", () => {
+  it("reads a single day for the Dia tab", async () => {
+    const result = await load(client({}));
+    expect(result.window.startKey).toBe("2026-08-11");
+    expect(result.window.endKey).toBe("2026-08-11");
+    expect(result.tab).toBe("day");
+  });
+
+  it("reads the Monday-based week for the Semana tab", async () => {
+    // 2026-08-11 is a Tuesday, so the week runs Monday the 10th to Sunday the 16th.
+    const result = await load(client({}), { tab: "week" });
+    expect(result.window.startKey).toBe("2026-08-10");
+    expect(result.window.endKey).toBe("2026-08-16");
+  });
+
+  it("reads the whole local month for the Mês tab", async () => {
+    const result = await load(client({}), { tab: "month" });
+    expect(result.window.startKey).toBe("2026-08-01");
+    expect(result.window.endKey).toBe("2026-08-31");
+  });
+
+  it("records a telemetry scope for the day and none for the other two", async () => {
+    /*
+     * `dayReviewScopes` is `["day", "next_day"]` and the deployed
+     * `product_events` validator refuses anything else, silently. Widening it is
+     * a migration. So week and month report nothing rather than reporting
+     * `scope: "day"` for an action that did not happen on a day.
+     */
+    expect((await load(client({}))).telemetryScope).toBe("day");
+    expect((await load(client({}), { scope: "next_day" })).telemetryScope).toBe("next_day");
+    expect((await load(client({}), { tab: "week" })).telemetryScope).toBeNull();
+    expect((await load(client({}), { tab: "month" })).telemetryScope).toBeNull();
   });
 });
 

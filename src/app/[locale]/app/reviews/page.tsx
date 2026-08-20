@@ -1,12 +1,15 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { generateReview } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { ReviewButton } from "@/features/agent/forms";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { DayReviewView } from "@/features/day-review/day-review-view";
+import { getDayReviewCopy } from "@/features/day-review/copy";
 import { loadDayReviewProjection } from "@/features/day-review/day-review-projection";
 import { DayReviewOpened } from "@/features/product-analytics/interaction-events";
-import { ReviewBody } from "@/features/reviews/review-body";
+import { formatReviewPeriodRange } from "@/features/reviews/period-format";
+import { parseReviewTab, periodTypesFor, REVIEW_TABS } from "@/features/reviews/review-periods";
 import { loadReviewListProjection } from "@/features/reviews/review-list";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { undoWorkOperation } from "@/features/task-commands/actions";
@@ -18,30 +21,50 @@ import { isLocale } from "@/lib/preferences";
 import { addLocalDays, localDateOf, localDayBoundsForDate } from "@/lib/time/local-day";
 
 /**
- * `2M-REVIEW-001` … `-008` — the day review, **on the surface reviews already
- * had**.
+ * `/app/reviews` — Dia · Semana · Mês.
  *
- * The generated-review list, its four period buttons and its pagination are
- * untouched below; the day review is composed above them from records that
- * already exist. One destination for "closing a period", rather than a second
- * review surface the user has to know about — and `review-presentation.ts` is
- * the only thing that turns a stored review row into words on either half
- * (`2M-REVIEW-008`).
+ * ## The shape the owner signed
  *
- * **The events attribute to `calendar`.** That is the surface migration
- * `202608110090` deployed for this phase, and its declaration names the
- * calendar, the planner and the day review as its three residents. A `reviews`
- * surface value the deployed CHECK does not admit would be a fourth migration in
- * a phase whose three are allocated by name — a stop condition, not a routing
- * detail. Attribution by product area rather than by route is the shape
- * `task_command` has had since Phase 2E.
+ * *"Cada aba mostra a revisão do período atual, suas ações e, abaixo, o
+ * histórico das revisões anteriores daquele mesmo tipo."* So the page is two
+ * parts and a tab strip, and each part answers one question:
+ *
+ * - **Parte A** — what this period contained, what was written about it, and
+ *   what can be done about either. Composed from records that already exist.
+ * - **Parte B** — the same kind of review, for periods that have passed. Type,
+ *   period, state, and a way in. Nothing else.
+ *
+ * ## Why the tab is a URL parameter
+ *
+ * "Recarregar, voltar e avançar no navegador deve preservar a opção
+ * selecionada" is a property of the address bar. The three controls are links,
+ * the selection is read from `searchParams`, and there is no component state
+ * that could fall out of step with what the URL says.
+ *
+ * Both parameters **fail closed**: `period` to `day`, `scope` to `day`. A
+ * repeated parameter arrives as an array and is refused for the same reason
+ * either way — two values is a malformed request, and choosing one would mean
+ * showing a period the URL does not name.
+ *
+ * ## The events attribute to `calendar`
+ *
+ * That is the surface migration `202608110090` deployed for this phase, and its
+ * declaration names the calendar, the planner and the day review as its three
+ * residents. A `reviews` surface value the deployed CHECK does not admit would
+ * be a migration, and this unit spends none. `DayReviewOpened` also mounts only
+ * on the **Dia** tab: `dayReviewScopes` is `["day", "next_day"]`, so a week or a
+ * month has no legal value to report, and no row is more honest than a wrong one.
  */
 export default async function ReviewsPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string | string[]; scope?: string | string[] }>;
+  searchParams: Promise<{
+    page?: string | string[];
+    period?: string | string[];
+    scope?: string | string[];
+  }>;
 }) {
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
@@ -49,10 +72,11 @@ export default async function ReviewsPage({
   const pt = locale === "pt-BR";
   const query = await searchParams;
   const page = parsePage(query.page);
-  // Fail-closed to the day, never to an arbitrary scope: a repeated parameter
-  // arrives as an array and is refused for the same reason the planner refuses
-  // one — two values is a malformed request, and picking one would be guessing.
-  const scope = query.scope === "next_day" ? "next_day" : "day";
+  const tab = parseReviewTab(query.period);
+  // The day/next-day scope belongs to the Dia tab. On the other two it is
+  // forced back to `day` rather than merely ignored, so nothing downstream can
+  // read a scope the visible controls do not offer.
+  const scope = tab === "day" && query.scope === "next_day" ? "next_day" : "day";
 
   const { supabase, user } = await requireUser(locale);
 
@@ -75,34 +99,68 @@ export default async function ReviewsPage({
   const todayBounds = localDayBoundsForDate(today, timezone);
   const nowLocalMinutes = Math.max(0, Math.floor((now.getTime() - todayBounds.start) / 60_000));
 
-  const [projection, { items, hasNext }] = await Promise.all([
-    loadDayReviewProjection(supabase, {
-      userId: user.id,
-      locale,
-      timezone,
-      day,
-      today,
-      scope,
-      nowLocalMinutes,
-    }),
-    loadReviewListProjection(supabase, { userId: user.id, locale, page }),
-  ]);
+  const projection = await loadDayReviewProjection(supabase, {
+    userId: user.id,
+    locale,
+    timezone,
+    day,
+    today,
+    scope,
+    tab,
+    nowLocalMinutes,
+  });
+
+  /*
+   * The history is read **after** the projection rather than beside it, because
+   * it needs the window the projection resolved: the current period is excluded
+   * from the list below by its own start date, which is how the same review
+   * stops appearing twice on one screen.
+   */
+  const { items, hasNext } = await loadReviewListProjection(supabase, {
+    userId: user.id,
+    locale,
+    page,
+    tab,
+    excludePeriodStart: projection.window.startKey,
+  });
+
+  const copy = getDayReviewCopy(locale);
+  const tabHref = (value: (typeof REVIEW_TABS)[number]) => `/${locale}/app/reviews?period=${value}`;
 
   return <div className="content-page reviews-page">
-    <DayReviewOpened locale={locale} scope={scope} />
     {/*
-      The page's own name, **first**.
-
-      It used to sit below the day review, so `/app/reviews` opened on a heading
-      two levels down and the `<h1>` arrived after several screens of content.
-      One `<h1>` was already true; the *order* was the half the count did not
-      check, and the outline is what a screen-reader user navigates by.
+      Only on the Dia tab. See the header note: the scope vocabulary is closed
+      and deployed, so the week and month tabs have nothing legal to say.
     */}
+    {tab === "day" ? <DayReviewOpened locale={locale} scope={scope} /> : null}
+
     <header className="reviews-header">
       <p className="eyebrow">{pt ? "FECHAMENTO SOB DEMANDA" : "ON-DEMAND REVIEW"}</p>
       <h1>{pt ? "Revisões" : "Reviews"}</h1>
       <p className="reviews-lead">{pt ? "Gere uma revisão quando quiser; nada é executado por horário configurado." : "Generate a review when you choose; nothing runs from a configured schedule."}</p>
     </header>
+
+    {/*
+      The tab strip — the page's primary navigation, immediately under its own
+      name. Links rather than buttons, so the browser's back and forward move
+      between periods and a shared URL opens the period it names.
+
+      `aria-current="page"` marks the selection, which is what a screen reader
+      announces; the visual state is `[aria-current]` in CSS rather than a
+      second class, so the two cannot disagree.
+    */}
+    <nav aria-label={copy.tabsLabel} className="review-tabs">
+      {REVIEW_TABS.map((value) => (
+        <Link
+          aria-current={tab === value ? "page" : undefined}
+          className="review-tab"
+          href={tabHref(value)}
+          key={value}
+        >
+          {copy.tabs[value]}
+        </Link>
+      ))}
+    </nav>
 
     <DayReviewView
       /*
@@ -115,29 +173,83 @@ export default async function ReviewsPage({
        */
       action={applyTaskDetailCommand}
       dateBounds={dateBounds(now, timezone)}
+      /*
+       * One control per `period_type` this tab owns: Dia writes `daily`, Semana
+       * writes `weekly_review` and `weekly_plan`, Mês writes `monthly`. Derived
+       * from `periodTypesFor` rather than listed here, so a tab can never offer
+       * a button whose output files under a different tab.
+       *
+       * `generateReview` itself is untouched — same gate, same rate limit, same
+       * ledger, same upsert. What changed is which button is on screen.
+       */
+      generateControls={periodTypesFor(tab).map((periodType) => (
+        <ReviewButton action={generateReview} key={periodType} locale={locale} period={periodType} />
+      ))}
       locale={locale}
+      periodRange={formatReviewPeriodRange(projection.window, locale)}
       projection={projection}
       reviewsHref={`/${locale}/app/reviews`}
       undoAction={undoWorkOperation}
     />
 
+    {/*
+      Parte B. Below the current period, visually quieter, and holding only what
+      the owner's decision names: type, period, state, and "Abrir revisão".
+
+      There is **no preview and no expander**. `ReviewBody` used to mount per row
+      and disclose the summary inside the list; under OD-2J-1 every summary is
+      masked, so a preview here would be the *"conteúdo mascarado exposto por
+      meio de prévias"* the instruction forbids. The words live on the review's
+      own page, behind the same disclosure, which is also the only place they are
+      read from the database at all.
+    */}
     <section aria-labelledby="reviews-history" className="reviews-history">
-      <h2 id="reviews-history">{pt ? "Revisões geradas" : "Generated reviews"}</h2>
+      <h2 id="reviews-history">{copy.historyHeading(tab)}</h2>
+      <p className="reviews-history-lead">{copy.historyLead(tab)}</p>
+      {items.length ? (
+        <ul className="review-history-list">
+          {items.map((review) => (
+            <li className="review-history-item" key={review.id}>
+              <div>
+                <span className="review-card-period">{review.periodLabel}</span>
+                <h3>{review.title}</h3>
+                <p className="review-card-range">{review.periodLabelRange}</p>
+              </div>
+              <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
+              {/* Named by period, for the reason the card above is: a list of
+                  links all called "Abrir revisão" is one a screen reader
+                  cannot tell apart. Structural labels only — never the
+                  review's words. */}
+              <Link
+                aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
+                className="review-open"
+                href={`/${locale}/app/reviews/${review.id}`}
+              >
+                {copy.openReview}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <UniversalStateView
+          description={copy.historyEmptyDescription(tab)}
+          locale={locale}
+          state="empty"
+          title={copy.historyEmptyTitle(tab)}
+        />
+      )}
       {/*
-        The section says what its four buttons do before offering them. It read
-        as a toolbar with no subject: the day review above closes a day from
-        records that already exist, and these ask the assistant to write a
-        period up — a different act, and the only one on this page that spends
-        anything.
+        The whole page state travels with the page number. Without the tab, page
+        2 of the month history would silently return to the day; without the
+        scope, paging while reviewing tomorrow would silently return to today.
       */}
-      <p className="reviews-history-lead">
-        {pt
-          ? "Cada botão pede ao Brain uma síntese escrita do período. Nada aqui roda sozinho — e nada é alterado por gerar uma revisão."
-          : "Each button asks Brain to write up a period. Nothing here runs on its own, and generating a review changes nothing."}
-      </p>
-      <div className="review-buttons"><ReviewButton action={generateReview} locale={locale} period="daily" /><ReviewButton action={generateReview} locale={locale} period="weekly_review" /><ReviewButton action={generateReview} locale={locale} period="weekly_plan" /><ReviewButton action={generateReview} locale={locale} period="monthly" /></div>
-      {items.length ? <div className="review-list">{items.map((review) => <article className="review-card" key={review.id}><header><div><span>{review.periodLabel}</span><h3>{review.title}</h3></div><span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span></header><ReviewBody reviewId={review.id} content={review.content} locale={locale} /><footer>{review.periodLabelRange}</footer></article>)}</div> : <UniversalStateView description={pt ? "Gere uma revisão quando houver atividade no período." : "Generate a review when there is activity in the period."} locale={locale} state="empty" title={pt ? "Nenhuma revisão ainda" : "No reviews yet"} />}
-      <PaginationLinks locale={locale} path="reviews" page={page} hasNext={hasNext} />
+      <PaginationLinks
+        locale={locale}
+        path="reviews"
+        page={page}
+        hasNext={hasNext}
+        query={scope === "next_day" ? { period: tab, scope } : { period: tab }}
+      />
     </section>
   </div>;
 }

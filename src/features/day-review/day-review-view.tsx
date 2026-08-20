@@ -49,7 +49,7 @@
  * **Any gesture.** OD-2M-6 A: visible, labelled controls only.
  */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { UniversalStateLine } from "@/features/experience/universal-state";
 
@@ -78,16 +78,38 @@ const NO_RELATIONS: TaskDetailRelationOptions = Object.freeze({
 export function DayReviewView({
   action,
   dateBounds,
+  generateControls,
   locale,
+  periodRange,
   projection,
   reviewsHref,
   undoAction,
 }: {
   action: TaskDetailCommandHandler;
   dateBounds: TaskDetailDateBounds;
+  /**
+   * The generate buttons for **this tab's** period types, rendered by the page.
+   *
+   * They are passed in rather than built here for the reason the authority guard
+   * enforces: `generateReview` is a Server Action, and nothing under
+   * `src/features/day-review/` may reach one. The page owns the action; this
+   * component owns where it sits.
+   */
+  generateControls: ReactNode;
   locale: Locale;
+  /** The window's dates, already formatted for the locale by the page. */
+  periodRange: string;
   projection: DayReviewProjection;
-  /** Where the generated-review list lives. Navigation only. */
+  /**
+   * This surface's own route. A review's page is `${reviewsHref}/${id}`.
+   *
+   * A `reviewHref(id)` **function** would have been the obvious shape and it is
+   * the wrong one: this is a client component, so a function prop cannot cross
+   * the boundary and React throws at render.
+   * `client-boundary-serializability-guard.test.ts` catches it at build time,
+   * which is where it should be caught — the failure is otherwise invisible until
+   * the page is actually rendered in production.
+   */
   reviewsHref: string;
   undoAction?: TaskUndoHandler;
 }) {
@@ -95,6 +117,12 @@ export function DayReviewView({
   const [outcome, setOutcome] = useState<TaskDetailCommandState | null>(null);
 
   const synthesis = summarizeDayReview(projection);
+  /*
+   * Resolved once, at the top. `empty` became a function of the tab when the
+   * surface learned to review a week and a month — "Nada foi concluído neste
+   * dia" under a monthly heading is a sentence about the wrong span.
+   */
+  const emptyCopy = copy.empty(projection.tab);
 
   /**
    * Q3's numerator, recorded by a wrapper around the action rather than by an
@@ -110,8 +138,26 @@ export function DayReviewView({
     return async (state, formData) => {
       const next = await handler(state, formData);
       setOutcome(next);
-      if (next.status === "applied") {
-        recordDayReviewActionApplied({ scope: projection.scope, actionKind: verb.kind, locale });
+      /*
+       * `telemetryScope` is `null` on the week and month tabs, and the event is
+       * then not recorded at all.
+       *
+       * `dayReviewScopes` is `["day", "next_day"]`, the deployed `product_events`
+       * validator refuses anything outside it, and it refuses **silently** —
+       * this repository has already lost weeks of a funnel to exactly that.
+       * Widening it is a migration, and this unit spends none.
+       *
+       * So the choice was between a false row and no row, and no row is the only
+       * honest one: `scope: "day"` on an action taken from a monthly review is a
+       * claim about when it happened that is simply untrue, written into an
+       * append-only ledger.
+       */
+      if (next.status === "applied" && projection.telemetryScope !== null) {
+        recordDayReviewActionApplied({
+          scope: projection.telemetryScope,
+          actionKind: verb.kind,
+          locale,
+        });
       }
       return next;
     };
@@ -246,7 +292,7 @@ export function DayReviewView({
           // claims, and only one of them is true here.
           <p role="status">{copy.unavailable(heading)}</p>
         ) : items.length === 0 ? (
-          <UniversalStateLine description={copy.empty[source]} locale={locale} state="empty" />
+          <UniversalStateLine description={emptyCopy[source]} locale={locale} state="empty" />
         ) : (
           <ul>{items.map((item) => <Row item={item} key={item.taskId} source={source} />)}</ul>
         )}
@@ -269,25 +315,42 @@ export function DayReviewView({
       parts → `<h2>` the history below it.
     */
     <section aria-labelledby="day-review-title" className="day-review-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope)}</h2>
-          <p>{copy.description(projection.scope)}</p>
+      <header className="day-review-header">
+        <div className="day-review-heading">
+          <p className="eyebrow">{copy.eyebrow(projection.tab)}</p>
+          <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope, projection.tab)}</h2>
+          {/*
+            The span, next to the name of the period rather than buried in a
+            section below it. `periodRange` is formatted by the page from the
+            window the projection actually read, so the dates on screen and the
+            dates the queries used cannot disagree.
+          */}
+          <p className="day-review-range">{periodRange}</p>
+          <p className="day-review-description">{copy.description(projection.scope, projection.tab)}</p>
           {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
-          <UniversalStateLine description={copy.nothingScheduled} locale={locale} state="empty" />
+          <p className="day-review-promise">{copy.nothingScheduled}</p>
         </div>
-        <nav aria-label={copy.scopeLabel} className="day-review-scope-nav">
-          {(["day", "next_day"] as const).map((scope) => (
-            <a
-              aria-current={projection.scope === scope ? "page" : undefined}
-              href={`${reviewsHref}?scope=${scope}`}
-              key={scope}
-            >
-              {copy.scopes[scope]}
-            </a>
-          ))}
-        </nav>
+        {/*
+          The day/next-day control belongs to the **Dia** tab and only to it.
+
+          It answers "which day am I closing", which is a question a week and a
+          month do not have — and rendering it on all three would have put two
+          period controls on one screen, the tab strip above saying one thing and
+          this saying another.
+        */}
+        {projection.tab === "day" ? (
+          <nav aria-label={copy.scopeLabel} className="day-review-scope-nav">
+            {(["day", "next_day"] as const).map((scope) => (
+              <a
+                aria-current={projection.scope === scope ? "page" : undefined}
+                href={`${reviewsHref}?period=day&scope=${scope}`}
+                key={scope}
+              >
+                {copy.scopes[scope]}
+              </a>
+            ))}
+          </nav>
+        ) : null}
       </header>
 
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
@@ -307,10 +370,10 @@ export function DayReviewView({
         derivation and its own account of why `partial` is a field rather than a
         footnote.
       */}
-      <section aria-label={copy.synthesis.heading} className="day-review-synthesis">
-        <h3>{copy.synthesis.heading}</h3>
+      <section aria-label={copy.synthesis.heading(projection.tab)} className="day-review-synthesis">
+        <h3>{copy.synthesis.heading(projection.tab)}</h3>
         {synthesis.quiet ? (
-          <UniversalStateLine description={copy.synthesis.quiet} locale={locale} state="empty" />
+          <UniversalStateLine description={copy.synthesis.quiet(projection.tab)} locale={locale} state="empty" />
         ) : (
           <ul className="day-review-counts">
             <li>{copy.synthesis.completed(synthesis.completed)}</li>
@@ -329,7 +392,19 @@ export function DayReviewView({
               synthesis.partial.map((source) => copy.sections[source]).join(", "),
             )}
           </p>
-        ) : null}
+        ) : (
+          /*
+            The positive half, said quietly and in one line.
+
+            It replaces a whole `<section>` headed "O que não pôde ser lido"
+            which rendered on **every** visit and fell back to a "nothing was
+            unreadable" empty state. A heading whose entire purpose is to report
+            failure, standing over a page that succeeded, tells the reader there
+            is a problem before they have read a word — and the owner reported
+            the page as looking broken for exactly this class of reason.
+          */
+          <p className="day-review-all-read">{copy.allSourcesRead}</p>
+        )}
         {/*
           The pendências are **not listed here**, and that is deliberate.
 
@@ -368,12 +443,21 @@ export function DayReviewView({
         </p>
       </section>
 
-      <section aria-label={copy.unreadableHeading} className="day-review-unreadable">
-        <h3>{copy.unreadableHeading}</h3>
-        {projection.unreadable.length === 0 ? (
-          <UniversalStateLine description={copy.unreadableNone} locale={locale} state="empty" />
-        ) : (
-          /*
+      {/*
+        Rendered **only when something really could not be read**.
+
+        This is the owner's instruction — *"Não exiba uma seção intitulada 'O
+        que não pôde ser lido' quando todas as fontes foram lidas"* — and it is
+        also the correct reading of `2M-REVIEW-001`, which asks the flow to state
+        plainly what it could not read. A permanent section reporting that
+        nothing failed states nothing plainly; it just puts the word "não" at the
+        top of a successful page. The success case is one line in the synthesis
+        above.
+      */}
+      {projection.unreadable.length > 0 ? (
+        <section aria-label={copy.unreadableHeading} className="day-review-unreadable">
+          <h3>{copy.unreadableHeading}</h3>
+          {/*
             `role="status"` on the wrapper, not on the `<ul>`.
 
             An explicit role *replaces* the element's implicit one, so
@@ -381,7 +465,7 @@ export function DayReviewView({
             no list parent — which is exactly what axe reported on the live page.
             The announcement and the list structure are two different jobs, and
             they now sit on two different elements.
-          */
+          */}
           <div role="status">
             <ul>
               {projection.unreadable.map((source) => (
@@ -389,8 +473,8 @@ export function DayReviewView({
               ))}
             </ul>
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       {section(projection.completed, "completed")}
       {section(projection.planned, "planned")}
@@ -401,7 +485,7 @@ export function DayReviewView({
         {projection.sourceStates.captured === "unavailable" ? (
           <p role="status">{copy.unavailable(copy.sections.captured)}</p>
         ) : projection.captured.length === 0 ? (
-          <UniversalStateLine description={copy.empty.captured} locale={locale} state="empty" />
+          <UniversalStateLine description={emptyCopy.captured} locale={locale} state="empty" />
         ) : (
           <ul>
             {projection.captured.map((capture) => (
@@ -424,34 +508,73 @@ export function DayReviewView({
         )}
       </section>
 
-      <section aria-label={copy.generatedHeading} className="day-review-section" data-source="generated">
-        <h3>{copy.generatedHeading}</h3>
+      {/*
+        The written reviews of **this** period, and the controls that write them.
+
+        Three things changed here and each answers a complaint the owner made:
+
+        - The four generate buttons used to sit in a row of their own below the
+          history, describing no period. They are `generateControls` now, in the
+          section about the period they write, and each tab carries only its own
+          — one for Dia, two for Semana, one for Mês.
+        - The card used to render one review and then link to `/app/reviews`,
+          the page it was already on. It now links to the review's **own page**.
+        - It is a list, because `generateReview` stores `period_end` as the day
+          it ran, so a week can hold several snapshots of itself. They belong
+          together, newest first, not scattered into "anteriores".
+      */}
+      <section aria-label={copy.generatedHeading(projection.tab)} className="day-review-generated" data-source="generated">
+        <h3>{copy.generatedHeading(projection.tab)}</h3>
+        <p className="day-review-generate-lead">{copy.generateLead}</p>
+        <div className="review-buttons">{generateControls}</div>
         {projection.sourceStates.generated === "unavailable" ? (
-          <p role="status">{copy.unavailable(copy.generatedHeading)}</p>
-        ) : projection.generated === null ? (
-          <UniversalStateLine description={copy.generatedNone} locale={locale} state="empty" />
+          <p role="status">{copy.unavailable(copy.generatedHeading(projection.tab))}</p>
+        ) : projection.generated.length === 0 ? (
+          <UniversalStateLine description={emptyCopy.generated} locale={locale} state="empty" />
         ) : (
           /*
-           * `2M-REVIEW-008`. Every field here comes from `toReviewListItemView`
-           * — the `review_summary` presentation contract — and this surface adds
-           * no formatting of its own to a stored review's period, status or
-           * words. A review rendered around the contract would be a second
-           * opinion on what "outdated" means.
+           * `2M-REVIEW-008`. Every field here comes from `toReviewSummaryView` —
+           * the `review_summary` presentation contract — and this surface adds
+           * no formatting of its own to a stored review's period or status. It
+           * adds no *words* either: the content is not read into this projection
+           * at all, so a card cannot leak what the OD-2J-1 disclosure withholds.
            */
-          <article className="review-card">
-            <header>
-              <div>
-                <span>{projection.generated.periodLabel}</span>
-                <h4>{projection.generated.title}</h4>
-              </div>
-              <span className="status-badge" data-tone={projection.generated.statusTone}>
-                {projection.generated.statusLabel}
-              </span>
-            </header>
-            <footer>{projection.generated.periodLabelRange}</footer>
-          </article>
+          <ul className="review-list">
+            {projection.generated.map((review) => (
+              <li className="review-card" key={review.id}>
+                <div className="review-card-head">
+                  <div>
+                    <span className="review-card-period">{review.periodLabel}</span>
+                    <h4>{review.title}</h4>
+                    <p className="review-card-range">{review.periodLabelRange}</p>
+                  </div>
+                  <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
+                </div>
+                {/*
+                  An accessible name that says WHICH review.
+
+                  Several of these can stand on one screen — a week holds a
+                  review and a plan, and a regenerated period holds a
+                  snapshot per day — and a list of links all named "Abrir
+                  revisão" is a list a screen reader cannot tell apart.
+
+                  The name is built from the **period label and range**,
+                  which are structural, and never from the review's words:
+                  those are what the OD-2J-1 disclosure withholds, and an
+                  `aria-label` carrying them would hand the withheld string
+                  straight to assistive technology.
+                */}
+                <a
+                  aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
+                  className="review-open"
+                  href={`${reviewsHref}/${review.id}`}
+                >
+                  {copy.openReview}
+                </a>
+              </li>
+            ))}
+          </ul>
         )}
-        <p><a className="row-action" href={reviewsHref}>{copy.openReviews}</a></p>
       </section>
     </section>
   );
