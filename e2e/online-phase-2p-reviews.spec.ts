@@ -409,9 +409,24 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     */
     await page.goBack();
     await page.waitForURL((url) => !url.search.includes("period=week"));
+    /*
+      The placeholder has to clear before the heading is looked for.
+
+      A history move is a full navigation: `loading.tsx` goes back up while the
+      new render streams, and on the WebKit lane under load that can outlast a
+      plain `toBeVisible` wait — which then reports "element not found" and reads
+      exactly like a page that did not update.
+
+      It was worth telling those two apart rather than raising a timeout. Driven
+      by hand on WebKit, this same sequence gives `/pt-BR/app/reviews` with
+      "Hoje" and then `?period=week` with "Esta semana": the navigation is
+      correct, and only the wait was.
+    */
+    await expect(page.locator(".route-loading")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "Hoje" })).toBeVisible();
     await page.goForward();
     await page.waitForURL((url) => url.search.includes("period=week"));
+    await expect(page.locator(".route-loading")).toHaveCount(0);
     await expect(page.getByRole("heading", { level: 2, name: "Esta semana" })).toBeVisible();
 
     // Opening the address directly lands on the same period.
@@ -468,6 +483,7 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     // Masked until asked for — `summaries` carries no classification, so the
     // surface treats every summary as sensitive.
     await expect(page.locator('[data-masked="true"]')).toBeVisible();
+    await expect(page.locator(".route-loading")).toHaveCount(0);
     await page.getByRole("button", { name: "Mostrar resumo" }).click();
 
     const content = page.locator(".review-content");
@@ -491,7 +507,8 @@ test.describe("the reviews experience: three periods, and a page per review", ()
   test("a hostile summary reaches the screen as text, with no element and no script", async ({ page }) => {
     await signIn(page);
     await page.goto("/pt-BR/app/reviews?period=week");
-    await page.locator(".review-history-list").getByRole("link", { name: "Abrir revisão" }).click();
+    await page.locator(".review-history-list").getByRole("link", { name: /Abrir revisão/ }).click();
+    await expect(page.locator(".route-loading")).toHaveCount(0);
     await page.getByRole("button", { name: "Mostrar resumo" }).click();
 
     const content = page.locator(".review-content");
@@ -620,6 +637,10 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     // And the review's own page, where the long content lives.
     await page.goto("/pt-BR/app/reviews?period=week");
     await page.locator(".day-review-generated").getByRole("link", { name: /Abrir revisão/ }).click();
+    // Settled before the press. A click that lands while the route is still
+    // streaming reaches a button whose handler is not attached yet, so the
+    // disclosure never opens and the failure reads as missing content.
+    await expect(page.locator(".route-loading")).toHaveCount(0);
     await page.getByRole("button", { name: "Mostrar resumo" }).click();
     await expect(page.locator(".review-content")).toBeVisible();
     const overflow = await page.evaluate(

@@ -158,7 +158,10 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
  * that something is owed; it does not decide what is worth paying first, and
  * nobody read this entry as the calendar defect it was.
  */
-const RECORDED_UNSTYLED = 44;
+/* 44 -> 43 on 2026-08-20: the day review's schedule paragraphs were drawn by
+   the user-agent default and are now typed, as part of demoting that section
+   from a card to a footnote. The ratchet only ever goes down. */
+const RECORDED_UNSTYLED = 43;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

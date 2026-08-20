@@ -129,8 +129,12 @@ aparecer numa revisão antiga (ele escreveria outra linha, não aquela).
 - Abra Revisões no computador.
 - **Esperado:** a faixa Dia · Semana · Mês fica **compacta**, do tamanho do
   conteúdo — não uma barra gigante atravessando a tela.
-- **Esperado:** a página tem hierarquia — o período atual é o assunto, o
-  histórico é mais discreto embaixo. Não é uma pilha de caixas iguais.
+- **Esperado — o ponto que eu mesmo reprovei antes de te entregar:** a página
+  **não é uma pilha de caixas brancas iguais**. As seções do período correm numa
+  única coluna separadas por **linhas finas**, e existe **um único cartão** — o
+  bloco *Revisões desta semana*, que é o único que tem botões. Se você contar
+  mais de um cartão na parte de cima, reprove.
+- **Esperado:** o histórico embaixo é mais discreto que o período atual.
 
 ---
 

@@ -11307,6 +11307,71 @@ Each cause is worth carrying forward:
    strict-mode violation while a route streams — which is also the proof that
    this route streams, and therefore why it answers 200.
 
+### What the VISUAL review found, which no measurement had
+
+The journey proved there is no sideways scroll and that every target is 44px.
+Both were true while the page was still wrong. Screenshots of both surfaces at
+three viewports found four defects, and one of them had already leaked off this
+phase entirely:
+
+1. **`.review-facts` was a name that already had an owner.**
+   `entry-review.tsx` renders it and `operations.css` draws it as a row of
+   monospace pills. Two things followed. The new Fontes section inherited the
+   pill treatment and read as debug output — and, because `reviews.css` loads
+   **after** `operations.css`, the new rules **silently restyled the entry
+   review on `/app/inbox/[entryId]`**, a page this unit never touched. Nothing
+   failed; nothing would have, until somebody opened it.
+   Renamed to `.review-source-facts`, and
+   `reviews-stylesheet-scope-guard.test.ts` now fails the build when this sheet
+   styles a class no reviews surface renders. Its control is planted with
+   `review-facts` itself, and it asserts the corpus really contains that class
+   first — the first draft planted a name nobody rendered and reported a
+   working scan while proving nothing.
+
+2. **Every list from the Markdown had lost its markers.** Tailwind preflight
+   sets `ul, ol { list-style: none }` globally, so the structure the parser
+   worked to recover arrived as indented paragraphs. Restored explicitly.
+
+3. **The page was still "uma coleção extensa de caixas idênticas"** — the
+   owner's complaint, still literally true. Round two had given
+   `.day-review-page > section` a card each, which fixed a real absence of
+   boundaries and over-corrected into seven identical white surfaces; the
+   phone page ran to **6 885px**. Parte A is now one column with **dividers**,
+   and exactly **one card** — the section that carries the generate controls,
+   so a card now means *there are actions here* rather than *this is a
+   section*. `.day-review-page > section` is (0,1,1), so the exception is
+   written at (0,2,1); a bare class could never have won.
+
+4. **The rendered headings sat at 13px** under a 28px serif, so the outline the
+   parser produced did not read as one.
+
+**How the collision was found:** by asking the browser which rules matched the
+element, rather than grepping for a guess. The answer was `.review-facts div`,
+and `grep` then named the owner in one line. The class audit that followed found
+five collisions in total; four are deliberate supersessions confined to the
+reviews surfaces, and the fifth was the leak.
+
+### A local red that is not a defect, diagnosed rather than tolerated
+
+`phase-2f-documentation.test.ts` (the A13 successor check) and
+`reports-taxonomy-guard.test.ts` (the markdown link resolver) went red several
+times in full local runs and **passed every time in isolation**. The message is
+the answer and it is not an assertion:
+
+```
+Error: Test timed out in 5000ms.
+```
+
+Both walk the repository tree. At vitest's 5s default they finish comfortably on
+an idle machine and do not when three Playwright browsers are running beside
+them. CI is idle and green on both. **Do not raise the timeout to make a local
+run quiet** — the number is not the problem, and the same red is what a genuinely
+slow walk would show.
+
+The lesson generalises: on this machine, run the unit suite and the Playwright
+lanes **one at a time**. Every "transient" guard failure in this unit — A13,
+reports-taxonomy, heartbeat-disposition — was this, and each cost a diagnosis.
+
 ### Next
 
 The owner's checklist is

@@ -183,7 +183,7 @@ export default async function ReviewDetailPage({
       <section aria-labelledby="review-sources" className="review-detail-sources">
         <h2 id="review-sources">{copy.sourcesHeading}</h2>
         <p className="section-explainer">{copy.sourcesExplainer}</p>
-        <dl className="review-facts">
+        <dl className="review-source-facts">
           <div>
             <dt>{copy.periodLabel}</dt>
             <dd>{review.periodLabelRange}</dd>

@@ -41,6 +41,30 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 - **A review of another account is indistinguishable from one that never existed.** One `notFound()` arm covers removed, foreign and never-existed alike; there is deliberately no branch that could tell them apart, so the page cannot become a probe for whether a foreign review id is real.
 - **Regenerating is offered only where it would update the review on screen.** `generateReview` upserts on a key computed from *now*, so the control on a past review's page would have written a different row while appearing to refresh this one.
 
+### Fixed after looking at it
+
+The journey proved no sideways scroll and 44px targets. Both were true while the
+page was still wrong; screenshots at three viewports found four more defects.
+
+- **`.review-facts` was a class name that already had an owner**, and taking it
+  did damage in two directions. `entry-review.tsx` renders it and
+  `operations.css` draws it as monospace pills, so the new Fontes section read
+  as debug output — and because `reviews.css` loads **after** `operations.css`,
+  the new rules **silently restyled the entry review on `/app/inbox/[entryId]`**,
+  a page this work never touched. Renamed to `.review-source-facts`.
+  `reviews-stylesheet-scope-guard.test.ts` now fails the build when this sheet
+  styles a class no reviews surface renders, with the offending class itself as
+  its planted control.
+- **Every Markdown list had lost its markers.** Tailwind preflight sets
+  `ul, ol { list-style: none }` globally, so the structure the parser recovered
+  arrived as indented paragraphs.
+- **Parte A was still a stack of identical cards** — the owner's complaint,
+  still literally true, at **6 885px** on a phone. Round two had given every
+  section a card, fixing an absence of boundaries by over-correcting. It is one
+  column with dividers now, and exactly one card: the section that carries the
+  generate controls, so a card means *there are actions here*.
+- **The rendered headings sat at 13px** under a 28px serif.
+
 ### Not done, recorded honestly
 
 - **VoiceOver — NOT EXECUTED.** Dispensed by the owner; recorded as not executed, never as approved.

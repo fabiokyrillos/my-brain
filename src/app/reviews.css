@@ -104,6 +104,64 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Parte A is ONE column with dividers, not a stack of identical cards.
+
+   Round two gave `.day-review-page > section` `.home-section`'s card treatment,
+   which fixed a real defect — the sections had run together with no boundary at
+   all. It over-corrected: seven bordered white surfaces of equal weight, one per
+   section, is exactly the *"coleção extensa de caixas idênticas"* the owner then
+   asked not to have. Measured on a phone, the page ran to 6 885px.
+
+   A divider draws the same boundary and claims none of the importance. The one
+   section that keeps a card is the one that DOES something — it carries the
+   generate controls and the period's written reviews — so the card now means
+   "there are actions here" rather than "this is a section".
+
+   `.day-review-page > section` is (0,1,1), so a bare `.day-review-generated`
+   could never win regardless of order. The exception is written at (0,2,1).
+   --------------------------------------------------------------------------- */
+.day-review-page > section {
+  border: 0;
+  border-bottom: 1px solid var(--border-divider);
+  border-radius: 0;
+  background: transparent;
+  padding: var(--space-5) 0;
+}
+
+.day-review-page > section > h3 {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+/* The schedule is a footnote about a preference, not a peer of the day's own
+   facts. It kept a full section's weight while saying the least. */
+.day-review-schedule p {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.day-review-page > section.day-review-generated {
+  margin-top: var(--space-6);
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.day-review-page > section.day-review-generated > h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-title-2);
+  letter-spacing: -.01em;
+  text-transform: none;
+}
+
+/* ---------------------------------------------------------------------------
    The written reviews of this period, and the controls that write them
    --------------------------------------------------------------------------- */
 .day-review-generated {
@@ -294,7 +352,10 @@
 }
 
 .review-content > h3 { font: var(--type-title-2); }
-.review-content > h4 { font: var(--type-section); }
+/* `--type-section` computes to 13px, which under a 28px serif h3 read as a
+   caption rather than as the next level down. The scale is set here so the
+   document's own outline is legible as an outline. */
+.review-content > h4 { font: var(--type-lead); font-weight: 650; }
 .review-content > h5 { font: var(--type-label); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 
 .review-content > :first-child { margin-top: 0; }
@@ -305,15 +366,26 @@
   font: var(--type-reading);
 }
 
+/* Markers restored explicitly.
+
+   Tailwind's preflight sets `ul, ol { list-style: none }` globally, so a list
+   rendered from Markdown arrived on screen as a run of indented paragraphs —
+   the structure the parser worked to recover was invisible again. Every other
+   list in this product is a styled component that wants no markers; this one is
+   prose, and prose lists need them. */
 .review-content ul,
 .review-content ol {
   margin: 0 0 var(--space-4);
   padding-left: var(--space-6);
   color: var(--text-secondary);
   font: var(--type-reading);
+  list-style-position: outside;
 }
 
-.review-content li { margin-bottom: var(--space-2); }
+.review-content ul { list-style-type: disc; }
+.review-content ol { list-style-type: decimal; }
+.review-content li { margin-bottom: var(--space-1); }
+.review-content li::marker { color: var(--text-muted); }
 
 .review-content strong { color: var(--text-primary); font-weight: 700; }
 
@@ -326,21 +398,32 @@
 
 .review-content-link { color: var(--link); }
 
-.review-facts {
+/* `.review-source-facts`, NOT `.review-facts`.
+
+   `.review-facts` is already taken: `entry-review.tsx` renders it and
+   `operations.css` draws it as a row of monospace pills. Reusing the name did
+   two things at once — it made this section look like debug chips, and, because
+   this sheet loads after `operations.css`, it silently restyled the entry
+   review's own facts on a page this unit never touched. A class name is an
+   interface; this one had an owner. */
+.review-source-facts {
   display: grid;
   gap: var(--space-4);
   margin: 0 0 var(--space-4);
   max-width: var(--width-reading);
 }
 
-.review-facts dt {
+.review-source-facts dt {
   color: var(--text-secondary);
-  font: var(--type-eyebrow);
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  font: var(--type-label);
 }
 
-.review-facts dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+.review-source-facts dd {
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
 
 .review-detail-unlinked,
 .review-detail-past {
