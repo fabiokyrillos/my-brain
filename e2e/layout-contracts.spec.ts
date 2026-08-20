@@ -152,15 +152,43 @@ function inboxRow(title: string) {
   return `<a href="#" class="list-row"><div class="list-row-main"><strong>${title}</strong><p>Preciso revisar o contrato da Aurora antes da reunião.</p></div><div class="list-meta"><span>29/07/2026, 11:32</span><span class="list-attention-hint">Revise a interpretação</span><span class="status-badge needs_attention">precisa de você</span></div></a>`;
 }
 
-/** Mirrors the panel markup in `src/features/shell/home-dashboard.tsx:53-62`. */
+/**
+ * Mirrors Hoje as `src/features/shell/home-view.tsx` renders it **today**.
+ *
+ * ## This fixture was stale, and the stale copy passed for the whole time
+ *
+ * It mirrored `.panel` / `.attention-panel` / `.dashboard-recent-list`, which
+ * the Hoje rewrite deleted. Measured on 2026-08-20 against the tree: **none of
+ * those three class names exists anywhere in `src/` any more.** The product
+ * renders `.home-section` containing `.home-list`, in three places on Hoje.
+ *
+ * So every assertion below has been measuring a surface the product does not
+ * render — the third time this file has caught its own mirror going stale, and
+ * the first where the drift hid a **live defect**: `.dashboard-recent-list`
+ * establishes containment and `.home-list` does not, so the container query
+ * written to stop titles wrapping one word per line never applied to Hoje at
+ * all. The owner found it on a real iPhone; this lane could not have.
+ *
+ * `home-mirror-guard.test.ts` now derives the class names from the component,
+ * so a fourth drift fails instead of passing quietly.
+ */
 function homeBody() {
-  return `<div class="dashboard">
-    <section class="hero"><p class="eyebrow">QUINTA-FEIRA, 30 DE JULHO</p><h1>Boa tarde.<br><span>O que merece sua atenção agora?</span></h1></section>
-    <section class="dashboard-grid">
-      <article class="panel priority-panel"><header><div><h2>Prioridades de hoje</h2></div><span class="count">2</span></header><div class="dashboard-task-list"><a class="dashboard-task" href="#"><strong>${LONG_TITLE}</strong><span>31 jul.</span></a></div></article>
-      <article class="panel attention-panel" data-testid="attention-panel"><header><div><h2>Precisa de você</h2></div><span class="count attention-count">2</span></header><div class="dashboard-recent-list">${attentionRow(LONG_TITLE)}</div></article>
-      <article class="panel recent-panel" data-testid="recent-panel"><header><div><h2>Atividade recente</h2></div></header><div class="dashboard-recent-list">${inboxRow(LONG_TITLE)}</div></article>
-    </section>
+  return `<div class="dashboard home-dashboard today-page">
+    <header class="hero today-hero"><p class="eyebrow">QUINTA-FEIRA, 30 DE JULHO</p><h1>Boa tarde.<br><span>O que merece sua atenção agora?</span></h1></header>
+    <div class="today-columns">
+      <div class="today-main">
+        <section class="home-section" data-testid="attention-panel" aria-label="Precisa de você">
+          <header><div><h2>Precisa de você</h2></div><span class="count attention-count">2</span></header>
+          <div class="home-list">${attentionRow(LONG_TITLE)}</div>
+        </section>
+      </div>
+      <aside class="today-side" aria-label="Contexto do dia">
+        <section class="home-section" data-testid="recent-panel" aria-label="Atividade recente">
+          <header><div><h2>Atividade recente</h2></div></header>
+          <div class="home-list">${inboxRow(LONG_TITLE)}</div>
+        </section>
+      </aside>
+    </div>
   </div>`;
 }
 
@@ -247,7 +275,7 @@ test("usable content width never shrinks as the viewport grows", async ({ page }
   for (const viewport of VIEWPORTS) {
     await render(page, homeBody(), viewport.width, viewport.height);
     const content = await page.evaluate(() =>
-      Math.round(document.querySelector(".dashboard-grid")!.getBoundingClientRect().width),
+      Math.round(document.querySelector(".today-columns")!.getBoundingClientRect().width),
     );
     widths.push({ viewport: viewport.name, content });
   }

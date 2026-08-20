@@ -16,7 +16,21 @@ import { presentationFor } from "@/features/sensitivity/contracts";
 import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { formatInstant } from "@/lib/time/instant-format";
 import type { Locale } from "@/lib/preferences";
+import { getMessages } from "@/i18n/messages";
+import { getNavigationHref } from "./capabilities";
 import { getHomeCopy, withCount } from "./home-copy";
+
+/**
+ * The destinations Hoje offers directly, as capability **keys**.
+ *
+ * Keys rather than literals so the href and the label both come from the
+ * navigation registry that owns them: `getNavigationHref` builds the route and
+ * `messages.nav` supplies the word. A second spelling of "Lembretes" here would
+ * be a second thing to keep in step with the rail, the palette and the bar —
+ * and the fixture drift this same session had to repair on Hoje is what that
+ * costs when it is not done.
+ */
+const TODAY_DESTINATION_KEYS = ["calendar", "reminders", "reviews"] as const;
 
 /**
  * Hoje's presentation, with no data access of its own.
@@ -244,6 +258,12 @@ export function HomeView({
     ? presentationFor("hoje", leadAttention.sensitivity).outcome === "mask"
     : false;
 
+  const navCopy = getMessages(locale).nav;
+  const destinations = TODAY_DESTINATION_KEYS.map((key) => ({
+    href: getNavigationHref(locale, key),
+    label: navCopy[key],
+  }));
+
   return (
     <div className="dashboard home-dashboard today-page">
       <header className="hero today-hero">
@@ -266,6 +286,74 @@ export function HomeView({
         the order is the requirement rather than a layout preference: an
         onboarding that came first would put a guide between a first-time owner
         and the one interaction this product is built around.
+      */}
+      {/*
+        The day's other destinations (`2P-MOBILE-001`, owner report of
+        2026-08-20).
+
+        ## Why this exists, and why it is on Hoje
+
+        Slice 2P.5 retired `Mais` from the mobile bar and replaced one generic
+        path to every `more` destination with a set of specific ones, recorded
+        as a census in `capabilities.ts`. Two of those specific paths turned out
+        to be **reachable and not discoverable**, which the owner established on
+        a real iPhone: Lembretes was found only via Trabalho → Calendário →
+        *Todos os lembretes*, three hops through a surface it does not belong to,
+        and Revisões was found only through global search.
+
+        Both claims in the census were true. `mobile-reachability-guard` proves
+        the links exist and is a **source-text** assertion — it can show a link
+        is rendered and unconditional, and it cannot show anyone can find it.
+        Hoje's link to Revisões sits in the **last** of seven sections, roughly
+        fourteen screens down on a phone.
+
+        ## The principle this overrides, deliberately and in the open
+
+        `capabilities.ts` records a refusal: *"putting a permanent control on the
+        cockpit to satisfy a census would be arranging the product around its own
+        bookkeeping."* That refusal is right, and it does not cover this. The
+        driver here is not a census: it is a person who could not find two
+        primary destinations on their own device. **Arranging the product around
+        its bookkeeping and arranging it around its owner are different things**,
+        and only the first was refused.
+
+        ## Why these three, and why not a sixth bar slot
+
+        Calendário, Lembretes and Revisões are the *time and attention* family,
+        and Hoje is the time-and-attention surface — so this is one tap from a
+        bar slot rather than a new one. The bar stays five, odd, with capture at
+        its midpoint, which `mobile-bar-centring.test.ts` pins; the owner asked
+        for a coherent solution rather than more buttons in the footer, and a row
+        that can take a fourth destination without touching the bar is the
+        scalable half of that.
+
+        Nothing about the data moves. A reminder is still a reminder, and this
+        adds no relationship to a task or a project.
+      */}
+      <nav aria-label={sections.destinations.label} className="today-destinations">
+        <span aria-hidden="true" className="today-destinations-label">
+          {sections.destinations.label}
+        </span>
+        <ul>
+          {destinations.map((destination) => (
+            <li key={destination.href}>
+              <Link className="today-destination" href={destination.href}>
+                {destination.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/*
+        The onboarding guide follows the destinations, and that ordering is
+        load-bearing rather than aesthetic.
+
+        Placed after it, the row measured **several screens down on a fresh
+        account** — the guide is seven steps tall — which is the same defect it
+        was added to fix, moved a few hundred pixels. `2O-ONBOARD-001` requires
+        the guide to sit after capture and to be offered rather than imposed;
+        neither clause says it must precede the page's navigation.
       */}
       {onboarding}
 

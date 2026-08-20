@@ -295,12 +295,33 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
    * test keeps passing. This is the only path to Lembretes that does not require
    * a reminder to already exist, so its absence is a route becoming unreachable.
    */
-  it("offers the one unconditional way into Lembretes", () => {
+  it("offers Lembretes unconditionally, below the band rather than inside it", () => {
+    /*
+      Retargeted after the owner's device findings of 2026-08-20, and **not
+      weakened**: the link is still asserted to exist, to be unconditional, to
+      carry the same href and the same words. What changed is where it may sit.
+
+      It used to be the last child of `.calendar-navigation`, which put a link to
+      another page in the row with *previous period*, *today* and *next period*,
+      wearing the same pill. That is half of what the owner reported as
+      *"filtros estranhos e pouco claros"*, and the assertion below now requires
+      the opposite arrangement — inside `.calendar-destinations`, and provably
+      **not** inside the control band.
+
+      This is no longer the product's only path to Lembretes either; Hoje offers
+      it directly. The sentence above that called this "the only path" was true
+      when it was written and is recorded here as superseded rather than deleted.
+    */
     view();
-    const link = document.querySelector(".calendar-navigation .calendar-reminders-link");
+    const link = document.querySelector(".calendar-destinations .calendar-reminders-link");
     expect(link, "the unconditional reminders link is gone").not.toBeNull();
     expect(link!.getAttribute("href")).toBe("/pt-BR/app/reminders");
     expect(link!.textContent).toBe("Todos os lembretes");
+    // The other direction, so a revert cannot pass this test silently.
+    expect(
+      document.querySelector(".calendar-toolbar .calendar-reminders-link"),
+      "a destination is back inside the control band",
+    ).toBeNull();
   });
 
   it("relates the calendar to Trabalho without moving its route", () => {

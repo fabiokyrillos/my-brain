@@ -63,6 +63,15 @@ export type HomeCopy = {
      */
     readonly organizing: { readonly title: string; readonly hint: string };
     /** `2J-HOJE-004`. Up to three, and the heading never promises three. */
+    /**
+     * The day's other destinations, named once (owner report of 2026-08-20).
+     *
+     * One string: the row's label, which is both the `<nav>`'s accessible name
+     * and the visible eyebrow above it. The destinations themselves reuse the
+     * navigation registry's own copy rather than restating three labels here —
+     * a second spelling of "Lembretes" is a second thing to keep in step.
+     */
+    readonly destinations: { readonly label: string };
     /** `2J-DAY-002`/`003`. Closing the day, from Hoje. */
     readonly endOfDay: {
       readonly title: string;
@@ -128,6 +137,7 @@ export const homeCopy = {
         title: "Sendo organizado",
         hint: "O {agent} está lendo. Você não precisa esperar aqui.",
       },
+      destinations: { label: "Ir para" },
       endOfDay: {
         title: "Encerrar o dia",
         hint: "Veja o que ficou em aberto e gere a revisão do dia quando quiser.",
@@ -199,6 +209,7 @@ export const homeCopy = {
         title: "Being organized",
         hint: "{agent} is reading. You do not have to wait here.",
       },
+      destinations: { label: "Go to" },
       endOfDay: {
         title: "Close the day",
         hint: "See what is still open and generate the daily review whenever you want.",

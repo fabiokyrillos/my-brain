@@ -157,9 +157,12 @@ function page(locale: Locale, items: string[]): string {
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
+  <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
     <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
-    <nav aria-label="Orientação" class="calendar-orientation"><ul>
+    <nav aria-label="Orientação" class="calendar-orientation">
+      <span aria-hidden="true" class="calendar-control-label">Formato</span>
+      <ul>
       <li><a href="?orientation=day" aria-current="true">Dia</a></li>
       <li><a href="?orientation=week">Semana</a></li>
       <li><a href="?orientation=agenda">Agenda</a></li>
@@ -169,8 +172,8 @@ function page(locale: Locale, items: string[]): string {
       <p aria-live="polite" class="calendar-range">sáb., 15 ago.</p>
       <a href="?date=2026-08-15">Hoje</a>
       <a href="?date=2026-08-16" rel="next">Próximo</a>
-    <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
     </nav>
+    <p class="calendar-destinations"><a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a></p>
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <ol class="calendar-days"><li class="calendar-day" data-today="true">
       <h2>sáb., 15 ago.</h2>
@@ -178,7 +181,7 @@ function page(locale: Locale, items: string[]): string {
         ? `<p class="calendar-empty">${copy.empty}</p>`
         : `<ul class="calendar-day-items">${items.join("")}</ul>`}
     </li></ol>
-  </section></main></body></html>`;
+  </section></div></main></body></html>`;
 }
 
 async function open(target: Page, locale: Locale, items: string[]): Promise<void> {
@@ -205,15 +208,20 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
+  <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
     <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
     <div class="calendar-toolbar">
-      <nav aria-label="Orientação" class="calendar-orientation"><ul>
+      <nav aria-label="Orientação" class="calendar-orientation">
+        <span aria-hidden="true" class="calendar-control-label">Formato</span>
+        <ul>
         <li><a href="?orientation=day">Dia</a></li>
         <li><a href="?orientation=week" aria-current="true">Semana</a></li>
         <li><a href="?orientation=agenda">Agenda</a></li>
       </ul></nav>
-      <nav aria-label="Faixas" class="calendar-lanes"><ul>
+      <nav aria-label="Faixas" class="calendar-lanes">
+        <span aria-hidden="true" class="calendar-control-label">O que mostrar</span>
+        <ul>
         ${lane("Prazos", true)}${lane("Intenções", false)}
       </ul></nav>
       <nav aria-label="Anterior" class="calendar-navigation">
@@ -221,9 +229,9 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
         <p aria-live="polite" class="calendar-range">seg., 10 ago. – dom., 16 ago.</p>
         <a href="?date=2026-08-15">Hoje</a>
         <a href="?date=2026-08-17" rel="next">Próximo</a>
-      <a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a>
       </nav>
     </div>
+    <p class="calendar-destinations"><a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a></p>
     <p class="calendar-bound" role="status">${copy.atLatest}</p>
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <div class="calendar-week-scroll"><table class="calendar-week">
@@ -235,7 +243,7 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
           ? `<ul class="calendar-day-items">${items.join("")}</ul>`
           : `<p class="calendar-empty">${copy.empty}</p>`}</td>`).join("")}</tr></tbody>
     </table></div>
-  </section></main></body></html>`;
+  </section></div></main></body></html>`;
 }
 
 async function openWeek(target: Page, locale: Locale, items: string[]): Promise<void> {
@@ -605,6 +613,7 @@ function monthPage(locale: Locale, busyCount = 0): string {
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
+  <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
     <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
     <div class="calendar-toolbar">
@@ -630,7 +639,7 @@ function monthPage(locale: Locale, busyCount = 0): string {
       <h2>${locale === "en" ? "Days with items this month" : "Dias com itens neste mês"}</h2>
       ${listDays}
     </div>
-  </section></main></body></html>`;
+  </section></div></main></body></html>`;
 }
 
 /**

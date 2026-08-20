@@ -144,8 +144,21 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
  * rule anywhere in `src/app/*.css`, plus two the modality tabs took with them
  * when they were deleted. Nothing was styled to move this number; it moved
  * because the surface those classes live on was rebuilt.
+ *
+ * **45 -> 44, after the owner's device findings of 2026-08-20.** One element
+ * left the census: `.calendar-header`, which had **no rule in any stylesheet**
+ * — which is why the calendar's `<h1>` inherited body size and rendered
+ * *smaller than the range label beside the arrows*, and why the page read as
+ * though it had no title at all. The owner reported it as *"hierarquia visual
+ * ruim"*; the census had been carrying it as a number the whole time.
+ *
+ * That is worth stating plainly: this guard **knew**. It counts elements drawn
+ * only by the user-agent default, and a page heading in that list is not a
+ * rounding error — it is a title with no typography. A debt counter records
+ * that something is owed; it does not decide what is worth paying first, and
+ * nobody read this entry as the calendar defect it was.
  */
-const RECORDED_UNSTYLED = 45;
+const RECORDED_UNSTYLED = 44;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();
