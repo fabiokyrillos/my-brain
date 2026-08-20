@@ -302,3 +302,23 @@ Inherited residuals — push HTTP 403 / Android, retention scheduling, SMTP, the
 restore drill, the legal and monitoring signatures, four touch-target exceptions,
 the unstyled elements, `2N-FILES-WRITER`, `2N-IDENTITY-EXTRACTION`,
 `2N-RELATION-TRIGGER` — remain untouched and unclaimed.
+
+---
+
+## 9. The merge
+
+PR #268, head `ff09684`, **merge SHA `03a978e`**. Green at the exact head and
+again at the exact merge SHA, both times on all three jobs, with the
+`database and journey` step list read at both points: **21 success · 2 skipped ·
+0 cancelled**. The two skipped are the artifact collectors, which run only on
+failure. Every substantive step executed — the whole migration chain applied to
+an empty database, the pgTAP suite, `db lint`, the three concurrency proofs, the
+deterministic foundation journey, and the re-grant rollback rehearsal.
+
+Two earlier runs on the branch show `cancelled`; both were superseded by a later
+push, and their step counts confirm they were interrupted rather than failed.
+**Neither was counted as green.**
+
+Parity was re-read live **after** the merge rather than cited from before it:
+**99 local = 99 hosted, `202608190099`**, unchanged. Worktree clean, zero open
+PRs.
