@@ -11271,7 +11271,41 @@ approved**. Unchanged by this unit.
 | `git diff --cached --check` | clean — no CRLF injected |
 | Unit suite | **8 790 / 8 790**, 3 known Windows-local file failures |
 | `daily-surfaces` × desktop/mobile/iphone-emulated | **126 / 126** |
+| Authenticated online journey × desktop / Pixel 7 / iPhone WebKit | **33 / 33** |
 | Migrations | **ZERO**; parity `202608190099` unchanged |
+
+### What the online journey cost to get right, and what it proved
+
+It failed three times before it passed, and **not once was the product wrong**.
+Each cause is worth carrying forward:
+
+1. **An orphan `next dev` held port 3000.** `reuseExistingServer` pointed every
+   test at it, a fresh `npm run dev` silently took 3001 and received no traffic,
+   and every test reported *"This page couldn't load"*. Next also refuses the
+   second server naming a **different** PID from the one holding the port, so
+   both had to be killed. With a clean server the route answers `200` with zero
+   server errors.
+2. **The host lost Supabase entirely** — 0 of 6 probes completed while GitHub
+   stayed reachable. Every read threw, `error.tsx` answered 200, and an
+   assertion expecting 404 failed as though the route leaked. Probe
+   reachability before believing an online failure.
+3. **Three assertions of mine were wrong, in three different ways.**
+   - `expect(status).toBe(404)` measured the **rendering mode**, not isolation.
+     `not-found.md` states plainly that Next returns 200 for streamed responses
+     and 404 for non-streamed ones, because the headers are already sent. The
+     test now seeds a **genuinely foreign review** on a second account and
+     proves the foreign id and a nonexistent one render **identically**, with
+     Next's own `<meta robots noindex>` as the positive marker that the
+     not-found path really ran — and a control that the reader's OWN review
+     still opens.
+   - A tab measured **0px tall on Pixel 7** because the measurement ran before
+     the stream settled. **This repository had already paid for that lesson**
+     on the mobile navigation depth check, and it was repeated here.
+   - `goBack()` on WebKit failed ambiguously; the URL is waited on first now, so
+     a history that did not move says so.
+4. **`loading.tsx` renders a second `<main>`.** A `main, body` locator is a
+   strict-mode violation while a route streams — which is also the proof that
+   this route streams, and therefore why it answers 200.
 
 ### Next
 

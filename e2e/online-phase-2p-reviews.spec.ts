@@ -250,6 +250,15 @@ test.describe("the reviews experience: three periods, and a page per review", ()
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
   let owner: { email: string; id: string };
+  /**
+   * A second account, and one review that belongs to it.
+   *
+   * The isolation claim is *"nem descobrir sua existência pela diferença de
+   * mensagens"*, and the only way to prove a difference is absent is to have
+   * both cases in hand: a review that exists and is not yours, and an id that is
+   * nobody's at all.
+   */
+  let stranger: { email: string; id: string; reviewId: string };
   /** The stored Markdown, exactly as a generated review carries it. */
   const WEEKLY_MARKDOWN = [
     "## Revisão da semana",
@@ -334,15 +343,35 @@ test.describe("the reviews experience: three periods, and a page per review", ()
         }),
       ]),
     });
+
+    // The stranger, and their own review. Deleted in `afterAll` like the owner.
+    const other = await createAccount();
+    const [strangerReview] = (await admin("summaries", {
+      method: "POST",
+      body: JSON.stringify([
+        {
+          user_id: other.id,
+          period_type: "monthly",
+          period_start: dateOnly(shift(-40)),
+          period_end: dateOnly(shift(-35)),
+          title: "Revisão mensal",
+          status: "generated",
+          content: "Conteúdo que pertence a outra conta.",
+          original_content: "Conteúdo que pertence a outra conta.",
+        },
+      ]),
+    })) as { id: string }[];
+    stranger = { ...other, reviewId: strangerReview.id };
   });
 
   test.afterAll(async () => {
-    if (!owner?.id) return;
-    const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${owner.id}`, {
-      method: "DELETE",
-      headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}` },
-    });
-    expect(response.ok, "fixture teardown failed").toBe(true);
+    for (const id of [owner?.id, stranger?.id].filter(Boolean)) {
+      const response = await fetch(`${supabaseUrl}/auth/v1/admin/users/${id}`, {
+        method: "DELETE",
+        headers: { apikey: serviceRoleKey!, authorization: `Bearer ${serviceRoleKey}` },
+      });
+      expect(response.ok, "fixture teardown failed").toBe(true);
+    }
   });
 
   const signIn = (page: Page) => signInOnline(page, { email: owner.email, locale: "pt-BR" });
@@ -369,10 +398,20 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     await expect(page.locator(".review-tabs").getByRole("link", { name: "Semana" }))
       .toHaveAttribute("aria-current", "page");
 
-    // …and so do back and forward, because there is no local state to disagree.
+    /*
+      …and so do back and forward, because there is no local state to disagree.
+
+      The URL is waited on before the heading, and that ordering is the point: if
+      history did not move, the failure says so, instead of reporting a missing
+      heading twenty seconds later and leaving it ambiguous whether the page is
+      wrong or the navigation never happened. WebKit reported exactly that
+      ambiguity on the first run.
+    */
     await page.goBack();
+    await page.waitForURL((url) => !url.search.includes("period=week"));
     await expect(page.getByRole("heading", { level: 2, name: "Hoje" })).toBeVisible();
     await page.goForward();
+    await page.waitForURL((url) => url.search.includes("period=week"));
     await expect(page.getByRole("heading", { level: 2, name: "Esta semana" })).toBeVisible();
 
     // Opening the address directly lands on the same period.
@@ -486,26 +525,64 @@ test.describe("the reviews experience: three periods, and a page per review", ()
 
   test("a review belonging to another account is indistinguishable from one that never existed", async ({ page }) => {
     await signIn(page);
-    // A well-formed id nobody owns. The page must answer exactly as it does for
-    // a foreign review — one arm, so the difference cannot be used to probe.
-    const response = await page.goto("/pt-BR/app/reviews/00000000-0000-0000-0000-000000000000");
-    /*
-      Both halves, and the order matters.
 
-      The status is asserted first because it is the half that fails
-      **informatively**: a 200 here means the page rendered *something*, and
-      the two things it could be are the not-found surface (a defect in the
-      route) or the error boundary (the database was unreachable). This run
-      hit the second on 2026-08-20, when the host lost its connection to
-      Supabase entirely — 0 of 6 probes completed — so every read threw and
-      `error.tsx` answered 200. A test that only checked the body would have
-      reported a passing absence over a page that never loaded.
+    /*
+      The status code is deliberately NOT the assertion, and the Next.js docs are
+      why: `not-found.md` states that Next returns **200 for streamed responses
+      and 404 for non-streamed ones**, because "the response headers have already
+      been sent to the client, the status code of the response cannot be
+      updated". This route streams, so it answers 200 — a rendering-mode fact,
+      not a security one, and asserting it would make this test fail the day a
+      sibling route started or stopped streaming.
+
+      What the requirement actually asks is that a person cannot "descobrir sua
+      existência pela diferença de mensagens". So the two cases are fetched and
+      **compared to each other**: a review that really exists and is not the
+      reader's, and an id that is nobody's at all.
     */
-    expect(response?.status(), "a missing review did not answer 404").toBe(404);
-    // …and the property itself: nothing of a review is on the page.
-    await expect(page.getByRole("heading", { level: 1, name: "Revisão semanal" })).toHaveCount(0);
-    await expect(page.locator(".review-content")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Mostrar resumo" })).toHaveCount(0);
+    const read = async (id: string) => {
+      await page.goto(`/pt-BR/app/reviews/${id}`);
+      /*
+        Settled on the placeholder being GONE, not on some element being
+        visible.
+
+        `loading.tsx` renders `<main role="status" class="route-loading">`,
+        so while the route streams there are two `<main>` elements on the
+        page — which is both why a `main, body` locator was a strict-mode
+        violation and why a measurement taken here reads the placeholder
+        rather than the answer.
+      */
+      await expect(page.locator(".route-loading")).toHaveCount(0);
+      return {
+        // Next injects this on every not-found render. It is the POSITIVE marker
+        // that the not-found path was actually taken — without it the absence
+        // assertions below would pass just as well over a blank page or an error
+        // boundary, which is the trap this repository has already recorded.
+        noindex: await page.locator('meta[name="robots"][content*="noindex"]').count(),
+        heading: await page.locator("h1").allInnerTexts(),
+        content: await page.locator(".review-content, [data-masked]").count(),
+      };
+    };
+
+    const foreign = await read(stranger.reviewId);
+    const missing = await read("00000000-0000-0000-0000-000000000000");
+
+    // Both took the not-found path…
+    expect(foreign.noindex, "the foreign review did not render as not-found").toBeGreaterThan(0);
+    expect(missing.noindex, "the missing review did not render as not-found").toBeGreaterThan(0);
+    // …neither rendered any part of a review…
+    expect(foreign.content).toBe(0);
+    expect(missing.content).toBe(0);
+    // …and the two are the same page, which is the property itself.
+    expect(foreign.heading, "a foreign review reads differently from a missing one")
+      .toEqual(missing.heading);
+
+    // The control: the reader's OWN review must render, or every check above
+    // passes because this route shows nothing to anybody.
+    await page.goto("/pt-BR/app/reviews?period=week");
+    await page.locator(".day-review-generated").getByRole("link", { name: /Abrir revisão/ }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Revisão semanal" })).toBeVisible();
+    expect(await page.locator('meta[name="robots"][content*="noindex"]').count()).toBe(0);
   });
 
   test("neither page scrolls sideways, and every control is a comfortable target", async ({ page }, testInfo) => {
@@ -513,6 +590,19 @@ test.describe("the reviews experience: three periods, and a page per review", ()
 
     for (const address of ["/pt-BR/app/reviews?period=week", "/pt-BR/app/reviews?period=month"]) {
       await page.goto(address);
+      /*
+        Waited on before ANY measurement is taken.
+
+        `page.goto` resolves on `load`, and App Router streams: the placeholder
+        from `loading.tsx` can still be on screen, or the real markup can be
+        present but not yet laid out. Measuring at that instant returns zeroes —
+        which is exactly what this lane reported on Pixel 7, as "a period control
+        is 0px tall". This repository has already paid for the same lesson once,
+        on the mobile navigation depth measurement.
+      */
+      await expect(page.locator(".review-tabs")).toBeVisible();
+      await expect(page.locator(".review-tab").first()).toBeVisible();
+
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );
@@ -529,8 +619,9 @@ test.describe("the reviews experience: three periods, and a page per review", ()
 
     // And the review's own page, where the long content lives.
     await page.goto("/pt-BR/app/reviews?period=week");
-    await page.locator(".day-review-generated").getByRole("link", { name: "Abrir revisão" }).click();
+    await page.locator(".day-review-generated").getByRole("link", { name: /Abrir revisão/ }).click();
     await page.getByRole("button", { name: "Mostrar resumo" }).click();
+    await expect(page.locator(".review-content")).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
