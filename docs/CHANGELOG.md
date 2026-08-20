@@ -4,7 +4,7 @@ All notable technical changes are recorded here. The format follows Keep a Chang
 
 ## 2026-08-19 - Slice 2P.7: the calendar gets a real month, a reminder is written in a dialog, and the first working revalidatePath on that route froze it
 
-**`2P-CALENDAR-001` … `-005`, `2P-REMINDER-001` … `-005` — five built, five baseline. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live. Cumulative 73 of 87.**
+**`2P-CALENDAR-001` … `-005`, `2P-REMINDER-001` … `-005` — five built, five baseline. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live. Cumulative 72 of 87 (the inherited 73 double-counted a closed remainder; see the acceptance record).**
 
 ### Added
 

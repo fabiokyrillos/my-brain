@@ -10657,7 +10657,7 @@ artefact.
 
 ### Slice 2P.8, and what is open
 
-**Cumulative: 73 of 87.** `2P-CALENDAR-001` … `-005` and `2P-REMINDER-001` …
+**Cumulative: 72 of 87.** The inherited 73 double-counted `2P-CHAT-004`'s remainder closing, which slice 2P.2 had already counted as one of the seven CHAT requirements. The families sum to 87 only at 72 + 15, and the earlier records are not rewritten. `2P-CALENDAR-001` … `-005` and `2P-REMINDER-001` …
 `-005` are classified in the acceptance record: five built, five baseline, with
 `2P-CALENDAR-003`'s **scroll half explicitly not claimed**.
 

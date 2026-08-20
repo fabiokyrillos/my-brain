@@ -187,7 +187,27 @@ those call sites can turn a dead call into a live freeze.**
 | `2P-REMINDER-004` | **built** | cancel and Escape close without writing, focus returns, the draft does not survive |
 | `2P-REMINDER-005` | baseline | title first, a state-aware next-occurrence label, and `.danger` is outline-only rather than filled |
 
-**Cumulative: 73 of 87.**
+**Cumulative: 72 of 87 — and that is one fewer than the inherited number, deliberately.**
+
+The families divide the phase exactly: FOUNDATION 7, ATTENTION 8, CHAT 7,
+CAPTURE 10, AUTONOMY 10, SETTINGS 8, PERSON 4, MEMORY 4, RELATION 4,
+CALENDAR 5, REMINDER 5, MOBILE 5, ACCESS 5, CLOSE 5 — **87**. Slices 2P.0
+through 2P.6 own the first seven groups, which is **62**, and this slice adds
+CALENDAR and REMINDER, which is **72**. Slice 2P.8 owns MOBILE, ACCESS and
+CLOSE — **15** — and 72 + 15 = 87.
+
+The recorded figure was 63 after 2P.6, and it traces to one line: slice 2P.5
+counted *"42 at the close of 2P.4, plus eight `2P-SETTINGS` requirements, plus
+the `2P-CHAT-004` remainder closing"* as 51. Closing that remainder was real
+work, but `2P-CHAT-004` is one of the seven CHAT requirements slice 2P.2 had
+already counted — so it was added twice, and the off-by-one propagated through
+2P.6.
+
+**The earlier records are not rewritten.** They are the record of what was
+believed when they were written, and the arithmetic is corrected forward from
+here rather than backwards over a signature. The count of *requirements* is 72;
+the closed remainder is real and stays real — it is simply not an 88th
+requirement.
 
 ---
 
