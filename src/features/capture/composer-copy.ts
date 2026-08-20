@@ -20,6 +20,8 @@ export type ComposerCopy = {
   readonly send: string;
   readonly sending: string;
   readonly attach: string;
+  /** `2P-ACCESS-001` — the upload state, for the composer's persistent live region. */
+  readonly attachmentSending: string;
   readonly sendFile: string;
   readonly removeFile: string;
   readonly rejectedType: string;
@@ -38,6 +40,7 @@ export const composerCopy: Record<Locale, ComposerCopy> = {
     send: "Registrar",
     sending: "Salvando…",
     attach: "Anexar arquivo",
+    attachmentSending: "Enviando arquivo…",
     sendFile: "Enviar arquivo",
     removeFile: "Remover anexo",
     rejectedType: "Este tipo de arquivo não é aceito. Envie imagem, PDF, texto, CSV, DOCX ou XLSX.",
@@ -56,6 +59,7 @@ export const composerCopy: Record<Locale, ComposerCopy> = {
     send: "Capture",
     sending: "Saving…",
     attach: "Attach a file",
+    attachmentSending: "Uploading file…",
     sendFile: "Upload file",
     removeFile: "Remove attachment",
     rejectedType: "That file type is not accepted. Send an image, PDF, text, CSV, DOCX, or XLSX.",

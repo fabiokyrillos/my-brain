@@ -263,7 +263,23 @@ describe("HomeDashboard", () => {
     // what proves it. The old assertion pinned it to `.attention-panel`, which
     // the attention-first layout no longer has.
     expect(screen.getByTestId("needs-attention-view-marker")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("2 itens precisam de você.");
+    /*
+      Queried by its sentence and then checked for the role, rather than by role
+      alone.
+
+      `getByRole("status")` was unique only while this page had exactly one live
+      region, and slice 2P.8 gave the composer a persistent one — an empty
+      `sr-only` polite region that has to exist *before* its text arrives, which
+      is `2P-ACCESS-001`. Two polite regions on one page is correct here: they
+      announce different things, the day's state and the composer's send state,
+      and neither is `assertive`.
+
+      This asserts the same two facts the old line did — the sentence is
+      rendered, and it is rendered *in a status region* — without depending on
+      being the only one.
+    */
+    const dayStatus = screen.getByText("2 itens precisam de você.");
+    expect(dayStatus).toHaveAttribute("role", "status");
   });
 
   it("shows a `+` suffix on the count when the queue has more items than the preview page", async () => {

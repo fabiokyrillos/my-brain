@@ -368,11 +368,24 @@ export async function createReminder(
    * measured rather than assumed.**
    *
    * The obvious code here is `revalidatePath("/[locale]/app/reminders", "page")`
-   * — the route pattern, since a resolved path matches nothing under a dynamic
-   * `[locale]` segment. It was written, and it is the first *working*
-   * revalidation this route has ever had: `applyReminderCommand` above still
-   * uses a resolved path, so no action on this page has ever actually re-rendered
-   * it.
+   * — the route pattern, which revalidates **every** locale's instance of the
+   * route at once.
+   *
+   * **Correction, measured on 2026-08-20 (slice 2P.8).** This paragraph used to
+   * continue *"a resolved path matches nothing under a dynamic `[locale]`
+   * segment, so no action on this page has ever actually re-rendered it"*, and
+   * **that was wrong**. `applyReminderCommand`'s resolved-path call above does
+   * work: snooze, reschedule, edit, cancel and restore all re-render the list
+   * **in place**. It was established with a mutation control rather than by
+   * reading — deleting that one line, rebuilding, restarting `next start` and
+   * re-running the journey makes the list stop updating and the new assertion
+   * fail; restoring it makes both pass. `revalidatePath` accepts a literal
+   * resolved segment as well as a route pattern; what a resolved path cannot do
+   * is reach the *other* locale's copy, which is a narrower fact than the one
+   * that was recorded.
+   *
+   * What the measurement below found is therefore about the **route-pattern**
+   * form specifically, not about revalidation in general.
    *
    * With it, the page re-render happens inside the action's own transition, and
    * the transition intermittently never settles. Measured against `next start`
@@ -404,6 +417,31 @@ export async function createReminder(
    * So the refresh moved to the client, *after* the dialog has closed — see
    * `reminder-composer.tsx`. The list still updates; it simply no longer
    * updates inside the transition that decides whether a dialog is open.
+   *
+   * ## Slice 2P.8 re-measured all of it, under the owner's authorization
+   *
+   * The owner signed a repair for this remainder. Reproducing first — which the
+   * authorization required — is what stopped one being written:
+   *
+   * | Claim as recorded | Re-measured on `f52755c` |
+   * |---|---|
+   * | the list never re-renders | **false** — it does, proved by mutation control |
+   * | the creation dialog freezes | **did not reproduce** — 12/12 at ~14.5s, desktop |
+   * | the same on a phone | did not reproduce — Pixel 7 lifecycle green |
+   *
+   * The shape below is therefore **left exactly as it is**, and the reason is
+   * that it is the shape that measures clean. Changing `createReminder` to the
+   * resolved-path call `applyReminderCommand` uses would be the tempting
+   * "consistency" edit; it would also put the re-render back inside the
+   * transition that governs the dialog, which is the one thing the ten-run
+   * measurement above says not to do. **A defect that does not reproduce is not
+   * repaired by rewriting the code that avoids it.**
+   *
+   * What slice 2P.8 added instead is proof that the properties hold, so a
+   * regression cannot return in silence: `e2e/online-reminders.spec.ts` now
+   * asserts that a write is reflected with no manual reload, that `pending`
+   * ends, that a replayed operation writes once, and that a diverging stale
+   * write is refused in words rather than reported as a success.
    */
 
   return { status: "success", message: copy.creation.created, reminderId: inserted.data.id };

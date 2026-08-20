@@ -476,10 +476,43 @@ export function Composer({
         {attachmentError !== null ? (
           <p className="capture-error" role="alert">{attachmentError}</p>
         ) : null}
+        {/*
+          The composer's one persistent status channel (`2P-ACCESS-001`).
+
+          **A live region has to exist before its text arrives.** Every announcing
+          element on this surface used to be rendered conditionally — the
+          attachment result appeared *with* its `role="status"` already
+          populated, and a region created in the same commit as its content is
+          frequently not announced at all, because there was no region for the
+          screen reader to have been observing. Slice 2P.8 measured it: the idle
+          composer carried no live region of any kind, so "announce upload and
+          send states" was true of the visible text and not of the audible one.
+
+          `role="alert"` is deliberately left where it is. An alert is announced
+          on insertion by design, which is exactly why errors use it and why
+          they are not routed through here — and routing them through here as
+          well would announce every failure twice.
+
+          Empty when idle, `sr-only` always: the visible echoes below stay
+          visible and stay silent, so nothing is read out twice.
+        */}
+        <div aria-atomic="true" aria-live="polite" className="sr-only" role="status">
+          {pending
+            ? copy.sending
+            : attachmentPending
+              ? copy.attachmentSending
+              : showAttachmentFeedback && attachmentState.status === "success"
+                ? attachmentState.message
+                : ""}
+        </div>
+
         {showAttachmentFeedback && attachmentState.message.length > 0 ? (
           <p
             className={attachmentState.status === "error" ? "capture-error" : "composer-attachment-sent"}
-            role={attachmentState.status === "error" ? "alert" : "status"}
+            // The success echo is now visual only: its sentence reaches a screen
+            // reader through the persistent region above, and carrying a second
+            // `role="status"` here would deliver it twice.
+            role={attachmentState.status === "error" ? "alert" : undefined}
           >
             {attachmentState.message}
           </p>
