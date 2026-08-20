@@ -491,6 +491,25 @@ Every browser proof ran against `next start` on a **rebuilt** artifact, with the
 server stopped and restarted after each rebuild — and the stop was **verified by
 port**, because the first attempt left the old build serving.
 
+### The generator, shown refusing
+
+A generator demonstrated only passing is the weaker artifact: its whole value is
+in what it declines. Three end-to-end controls were executed against the real
+tree and the tree restored after each.
+
+| Control | Result |
+|---|---|
+| rename the closeout record's classification heading | **62 refusals** — 59 unclassified plus the three rule citations. It fails **closed**: a misspelled heading loses its rows rather than passing quietly |
+| reduce a `partial`'s evidence to *"it is partial"* | refusal 6 — *`2P-ATTENTION-008` is `partial` and its remainder says nothing* |
+| classify `2P-INVENTED-042`, undeclared, with a valid class | refusal 1 — *the PRD does not declare it and it is not a registered remainder* |
+
+A fourth attempt was a **bad control and is recorded as one**: deleting the
+words *"Destination: the owner…"* from `2P-CHAT-007`'s row did **not** produce a
+refusal, because the same cell still says *"Remainder…"* and *"the owner's
+authorization"*. The generator was right and the mutation was wrong — it removed
+one token while several others still satisfied the check. *A control that fails
+to break the thing proves nothing about the thing.*
+
 ---
 
 ## 13. Where this stops
