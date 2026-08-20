@@ -374,6 +374,35 @@ Android, retention scheduling, SMTP, the restore drill, the legal and monitoring
 signatures, the four touch-target exceptions, `2N-FILES-WRITER`,
 `2N-IDENTITY-EXTRACTION` and `2N-RELATION-TRIGGER`.
 
+### All twenty threats, dispositioned at closeout
+
+`2P-CLOSE-003` names five concerns; the threat model names twenty. Every one is
+answered, and **"not reached" is used only where this slice genuinely touched
+nothing** — it is a statement about scope, not a way of avoiding the question.
+
+| Threat | Disposition |
+|---|---|
+| `T-1` second entry writer | **held.** `capture-write-path-guard.test.ts` passes; the direct-write allowlist still holds exactly one entry. This slice added no write path |
+| `T-2` transcript submitted before review | **held.** Explicit send remains the only entry mutation; the composer change is a live region, not a control |
+| `T-3` audio survives success, error or navigation | **held.** `no-durable-audio-guard.test.ts` passes; memory-only, four discard paths, no storage or schema route |
+| `T-4` restored draft replays an old authority | **held.** `composer-draft.ts` stores text only — no key, no bytes, no authority |
+| `T-5` raw confidence authorizes a wrong mutation | **held by construction.** No automatic writer exists; all six categories `suggest_only`, read live |
+| `T-6` automation creates duplicate people | **held by the same fact.** No automatic writer; `2P-AUTONOMY-006` is `not-built-by-rule` under ADR-123 Decision 3 |
+| `T-7` co-mention becomes a relationship fact | **held.** `2N-RELATION-TRIGGER` stands and was not touched; `2P-AUTONOMY-008` remains `not-built-by-rule` |
+| `T-8` automatic write cannot be explained or undone | **held.** The registry requires a handler before an operation may be recorded; the reminder undo is proved through the surface here |
+| `T-9` confirmation replay duplicates materialization | **held, and re-proved this slice at the surface.** A content-derived operation key makes a second submit an idempotent replay: one write, verified at microsecond precision |
+| `T-10` queue removal hides an unresolved question | **held.** Slice 2P.1's terminal predicate derives from every unresolved class; not re-opened here |
+| `T-11` conversation error exposes provider or user content | **re-proved at the browser boundary.** A refused turn renders no key material, model id, SQLSTATE or stack frame; `error_events` has no free-text column |
+| `T-12` chat navigation promotes a broken route | **held.** The route was repaired before promotion in slice 2P.2; this slice renders it authenticated and it works |
+| `T-13` attachment affordance bypasses validation | **held.** The upload action and schema are unchanged; selection, drag, drop and paste share one validation |
+| `T-14` settings tabs duplicate or reset writes | **held.** No settings writer changed; section ownership and preservation tests pass |
+| `T-15` moving notification controls disconnects consumers | **held.** No route or consumer moved in this slice |
+| `T-16` nested modals lose focus or submit twice | **re-proved.** The reminder dialog traps and releases focus on all three lanes including WebKit; the pending lock holds and the replay case proves no double write |
+| `T-17` graph reveals inferred or masked data | **held.** The Relations text alternative is re-proved rendering on the iPhone lane; no inferred fact is persisted or drawn |
+| `T-18` calendar/modal loses timezone context | **held.** Slice 2P.7 moved the writer precisely to fix this; nothing here changed a date boundary |
+| `T-19` tests claim real-device accessibility | **held, and now executable.** Every record marks hardware NOT EXECUTED, and the generator **refuses** a record claiming hardware or VoiceOver evidence without disclaiming it. The new lane is named `iphone-emulated` for the same reason |
+| `T-20` implementation absorbs rollout/push residuals | **held.** §11 carries every inherited residual forward by name; rollout and signup read live and unchanged; push HTTP 403 not resumed |
+
 ---
 
 ## 9. `2P-CLOSE-004` — read live at closeout
