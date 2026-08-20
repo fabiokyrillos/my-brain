@@ -28,7 +28,7 @@ import { serializeCalendarPosition } from "./calendar-position";
 import { schedulingControlsFor } from "./calendar-scheduling";
 import {
   COMMITMENT_BY_LANE,
-  DAYS_BY_ORIENTATION,
+  rangeDayCount,
   rangeStart,
   type CalendarLane,
   type CalendarQuery,
@@ -222,7 +222,7 @@ export async function loadCalendarProjection(
   }
 
   const first = rangeStart(query);
-  const dayCount = DAYS_BY_ORIENTATION[query.orientation];
+  const dayCount = rangeDayCount(query);
   const bounds = localRangeBounds(first, dayCount, timezone);
   const last = addLocalDays(first, dayCount - 1);
   const startIso = new Date(bounds.start).toISOString();
@@ -427,6 +427,15 @@ export async function loadCalendarProjection(
     days.push({
       date: key,
       isToday: compareLocalDates(date, today) === 0,
+      /*
+       * `2P-CALENDAR-001`: *"distinguishes days outside the current month"*.
+       *
+       * Decided here rather than in the surface because the surface does not
+       * know what the period is — it receives days, and a day carries no month.
+       * For every orientation but `month` the grid *is* the period, so this is
+       * true throughout and the three existing views render exactly as before.
+       */
+      inPeriod: query.orientation !== "month" || date.month === query.anchor.month,
       items: items.filter((item) => item.date === key),
     });
   }

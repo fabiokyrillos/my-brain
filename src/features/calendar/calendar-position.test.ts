@@ -93,7 +93,7 @@ describe("2M-CAL-008: it answers null rather than a default", () => {
 
   it("refuses an unknown orientation, an unknown lane and an empty lane list", () => {
     const base = { v: CALENDAR_POSITION_VERSION, d: "2026-08-15" };
-    expect(parseCalendarPosition(encode({ ...base, o: "month", l: ["deadline"] }))).toBeNull();
+    expect(parseCalendarPosition(encode({ ...base, o: "quarter", l: ["deadline"] }))).toBeNull();
     expect(parseCalendarPosition(encode({ ...base, o: "day", l: ["invented"] }))).toBeNull();
     expect(parseCalendarPosition(encode({ ...base, o: "day", l: [] }))).toBeNull();
   });

@@ -336,3 +336,51 @@ export function startOfLocalWeek(date: LocalDate): LocalDate {
   const offset = (utc.getUTCDay() + 6) % 7;
   return addLocalDays(date, -offset);
 }
+
+/**
+ * The first day of the month `date` belongs to.
+ *
+ * `2P-CALENDAR-001` needs a month as a *range of wall-clock dates*, and this is
+ * where that arithmetic belongs: `phase-2m-local-day-guard.test.ts` fails the
+ * build on a module that derives its own boundaries, and a calendar computing
+ * "the first of the month" from an instant in some zone would be the fourth
+ * copy the guard exists to prevent.
+ *
+ * No zone is involved and none should be: the first of August is the first of
+ * August everywhere. Turning it into an instant is `localDayBoundsForDate`'s
+ * job, and it is already the only thing that does that.
+ */
+export function startOfLocalMonth(date: LocalDate): LocalDate {
+  return { year: date.year, month: date.month, day: 1 };
+}
+
+/**
+ * How many days the month containing `date` has.
+ *
+ * Derived by asking UTC for day zero of the *next* month rather than from a
+ * table with a leap-year branch, for the same reason `parseLocalDate` round-trips
+ * instead of carrying month lengths: a table is a second statement of a rule the
+ * platform already knows, and the two drift in February.
+ */
+export function daysInLocalMonth(date: LocalDate): number {
+  return new Date(Date.UTC(date.year, date.month, 0)).getUTCDate();
+}
+
+/**
+ * `date` shifted by whole calendar months, **clamped** to the target month.
+ *
+ * Clamped rather than overflowed, and that is the whole reason this is not one
+ * line of `setMonth`: 31 January plus one month is 28 February, never 3 March. A
+ * *next month* control built on the overflowing version skips February from the
+ * thirty-first — a defect that is invisible for eleven months of the year and
+ * then makes a month unreachable.
+ *
+ * Clamping the day is not "repairing" a date the user chose, the way
+ * `parseLocalDate` refuses to: the user chose a **month**, and the anchor is
+ * only there to name which one.
+ */
+export function addLocalMonths(date: LocalDate, months: number): LocalDate {
+  const shifted = new Date(Date.UTC(date.year, date.month - 1 + months, 1));
+  const target = { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1, day: 1 };
+  return { ...target, day: Math.min(date.day, daysInLocalMonth(target)) };
+}

@@ -100,8 +100,32 @@ export default async function CalendarPage({
         today={today}
         undoAction={undoWorkOperation}
       />
-      {/* Q1's producer. It ships after the vocabulary was deployed, not before. */}
-      <CalendarViewed locale={locale} orientation={query.orientation} />
+      {/*
+        Q1's producer. It ships after the vocabulary was deployed, not before —
+        and `2P-CALENDAR-MONTH-TELEMETRY` is the case where the vocabulary was
+        deployed and the orientation is newer than it.
+
+        `private.validate_product_event_properties` admits exactly
+        `['day','week','agenda']` for this event, read live against the hosted
+        database. Widening it is a third Phase 2P migration, which is a stop
+        condition, so `month` is a period the surface shows and the ledger does
+        not hear about.
+
+        **Silence is chosen over a refusal nobody would see.** `recordProductEvent`
+        maps the validator's `22023` to `invalid_payload` and returns rather than
+        throwing, so emitting anyway would produce an event that is accepted by
+        the client, refused by the database, and lost with nothing anywhere
+        saying so. Relabelling a month as `agenda` to fit the enum was the other
+        option and is worse: it would put a false statement in an append-only
+        ledger.
+
+        The narrowing is what makes this explicit rather than accidental —
+        `CalendarViewed` takes the telemetry vocabulary, so deleting this guard
+        does not silently start emitting, it stops the build.
+      */}
+      {query.orientation === "month" ? null : (
+        <CalendarViewed locale={locale} orientation={query.orientation} />
+      )}
     </>
   );
 }

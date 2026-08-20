@@ -84,6 +84,26 @@ export type CalendarCopy = {
     readonly hint: string;
     readonly unavailable: string;
   };
+  /**
+   * `2P-CALENDAR-001` — the month grid's own words.
+   *
+   * A month is the one orientation whose cells are too small to say everything,
+   * so it needs three things the other three never did: weekday column headings,
+   * a way to say *this day has more than fits*, and a heading for the readable
+   * list a phone gets instead of a seven-column grid.
+   *
+   * `outside` is a screen-reader sentence rather than a visible one. A trailing
+   * day is already distinguished visually — by its own square, not by colour
+   * alone — and printing "não é deste mês" in thirteen cells would be noise for
+   * a sighted reader and nothing at all for someone who cannot see the grid.
+   */
+  readonly month: {
+    readonly weekdays: readonly [string, string, string, string, string, string, string];
+    readonly outside: string;
+    readonly more: (count: number) => string;
+    readonly listHeading: string;
+    readonly gridLabel: (period: string) => string;
+  };
   readonly summary: (count: number) => string;
   readonly todayLabel: string;
 };
@@ -93,7 +113,7 @@ const PT_BR: CalendarCopy = {
   description: "O que os seus dias contêm, reunido a partir do que você já registrou.",
   orientation: {
     label: "Formato",
-    options: { day: "Dia", week: "Semana", agenda: "Agenda" },
+    options: { day: "Dia", week: "Semana", month: "Mês", agenda: "Agenda" },
   },
   lanes: {
     label: "O que mostrar",
@@ -146,6 +166,15 @@ const PT_BR: CalendarCopy = {
     hint: "Altere o prazo ou o dia que você pretende trabalhar nisso. Nada muda até você confirmar.",
     unavailable: "Este item não tem datas que possam ser alteradas aqui.",
   },
+  month: {
+    // Monday first, matching `startOfLocalWeek`. Two letters so the heading fits
+    // a narrow column without a title attribute nobody can hover on a phone.
+    weekdays: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
+    outside: "fora do mês",
+    more: (count) => (count === 1 ? "mais 1" : `mais ${count}`),
+    listHeading: "Dias com itens neste mês",
+    gridLabel: (period) => `Grade do mês de ${period}`,
+  },
   summary: (count) => (count === 1 ? "1 item neste período" : `${count} itens neste período`),
   todayLabel: "Hoje",
 };
@@ -155,7 +184,7 @@ const EN: CalendarCopy = {
   description: "What your days actually contain, gathered from what you have already recorded.",
   orientation: {
     label: "Layout",
-    options: { day: "Day", week: "Week", agenda: "Agenda" },
+    options: { day: "Day", week: "Week", month: "Month", agenda: "Agenda" },
   },
   lanes: {
     label: "What to show",
@@ -207,6 +236,13 @@ const EN: CalendarCopy = {
     summary: "Dates",
     hint: "Change the deadline or the day you intend to work on this. Nothing changes until you confirm.",
     unavailable: "This item has no dates that can be changed here.",
+  },
+  month: {
+    weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    outside: "outside this month",
+    more: (count) => (count === 1 ? "1 more" : `${count} more`),
+    listHeading: "Days with items this month",
+    gridLabel: (period) => `Month grid for ${period}`,
   },
   summary: (count) => (count === 1 ? "1 item in this period" : `${count} items in this period`),
   todayLabel: "Today",

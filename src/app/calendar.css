@@ -351,6 +351,153 @@
 }
 
 /*
+ * `2P-CALENDAR-001` — the month, in two presentations that are never both live.
+ *
+ * ## Why both are in the DOM, and why that is not a duplication
+ *
+ * The grid and the readable list are rendered together, and CSS picks one. The
+ * alternative was a viewport test in JavaScript, which the server cannot run —
+ * so the first paint would disagree with the second, on every load.
+ *
+ * That is only honest because the hidden one is hidden with `display: none`,
+ * which removes a subtree from the accessibility tree as well as from the page.
+ * A screen reader hears one month at any width, not two. `visibility: hidden`,
+ * `opacity: 0` and an off-screen clip would each leave both in the tree, and the
+ * reader would hear every item twice — so the property that makes this correct
+ * is the specific one being used, and `online-phase-2p-planning.spec.ts` asserts
+ * exactly one of the two is visible at each width rather than trusting this
+ * comment.
+ *
+ * ## Which one is the default
+ *
+ * The grid. Base rules describe the wide case and the media query narrows it,
+ * because a media query written above the base rules it means to override adds
+ * no specificity and simply loses — a defect this stylesheet family has already
+ * shipped once.
+ */
+
+.calendar-month-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.calendar-month {
+  border-collapse: collapse;
+  /* Seven equal columns, as on the week: a month whose columns were sized by
+     their busiest day would put the same weekday at two different widths. */
+  table-layout: fixed;
+  width: 100%;
+}
+
+.calendar-month th,
+.calendar-month td {
+  border: 1px solid var(--border-default);
+  padding: var(--space-2);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.calendar-month thead th {
+  background: var(--background-canvas);
+  font: var(--type-label);
+  color: var(--text-secondary);
+  padding-block: var(--space-2);
+}
+
+.calendar-month tbody td {
+  /* Tall enough to read as a day, and capped so six rows still fit a screen.
+     `2P-CALENDAR-001`: cells do not grow without limit — the height ceiling and
+     `MONTH_CELL_ITEM_LIMIT` are the two halves of that, and the overflow link
+     is what keeps the rest reachable. */
+  height: 7rem;
+  max-height: 9rem;
+  overflow: hidden;
+}
+
+.calendar-month-daynumber {
+  display: inline-block;
+  font: var(--type-label);
+  font-weight: 650;
+  color: var(--text-primary);
+  text-decoration: none;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+  text-align: center;
+}
+
+.calendar-month-daynumber:hover,
+.calendar-month-daynumber:focus-visible {
+  text-decoration: underline;
+}
+
+/*
+ * Today, carried by three things and colour is the third.
+ *
+ * The cell already contains the word `Hoje` (`.calendar-today`), which is the
+ * carrier `2P-CALENDAR-001` requires; the heavier border is the second; the tint
+ * is decoration on a distinction that survives without it.
+ */
+.calendar-month td[data-today="true"] {
+  border-width: 2px;
+  background: var(--background-subtle);
+}
+
+/*
+ * A day that is only there to finish a week.
+ *
+ * Recessed rather than removed: its items are the owner's items and stay
+ * readable and clickable. The distinction is carried by the background and by
+ * the muted number **and** by the `sr-only` note the surface renders inside the
+ * link, so it is never colour alone.
+ */
+.calendar-month td[data-outside="true"] {
+  background: var(--background-subtle-strong);
+}
+
+.calendar-month td[data-outside="true"] .calendar-month-daynumber {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.calendar-month-more {
+  display: inline-block;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+  /* A real target rather than a caption that happens to be a link. */
+  min-height: 2.75rem;
+  line-height: 2.75rem;
+  padding-inline: var(--space-1);
+}
+
+/*
+ * The readable list: the phone's presentation, and the wide screen's redundancy.
+ *
+ * Hidden by default, shown by the media query at the foot of this file. The
+ * month stays the selected period either way — the URL still says
+ * `orientation=month` — which is what keeps this a different *presentation* of a
+ * month rather than the plain list the requirement forbids calling one.
+ */
+.calendar-month-list {
+  display: none;
+}
+
+.calendar-month-list h2 {
+  font: var(--type-label);
+  color: var(--text-secondary);
+  margin-block-end: var(--space-3);
+}
+
+.calendar-month-list h3 {
+  font: var(--type-heading);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/*
  * `2M-MOBILE-001`. One-handed at 375 px and 412 px: the week's own container is
  * what scrolls, the control rows wrap, and nothing on the page is wider than the
  * viewport. `2M-ACCESS`'s reflow case is the same rule read at 200% zoom.
@@ -755,4 +902,25 @@
     display: inline-flex;
     align-items: center;
   }
+}
+/*
+ * `2P-CALENDAR-001` — the phone gets a legible month, not a squeezed one.
+ *
+ * Seven columns at 375 px is 53 px each, which cannot hold a day number, a lane
+ * word and an instant without either horizontal scroll (`2M-MOBILE-001` forbids
+ * it) or a column of single letters. The requirement anticipates exactly this
+ * and permits a different presentation **while the real month stays the selected
+ * period** — which it does: the URL still says `orientation=month`, the
+ * navigation still steps by months, and the label still names the month.
+ *
+ * Deliberately at the foot of the file. A media query written above the base
+ * rules it overrides carries no extra specificity and loses to whatever comes
+ * later — the failure this stylesheet family has already shipped once.
+ *
+ * `display: none` on both sides, so exactly one month is in the accessibility
+ * tree at any width. See the base rules above for why that specific property.
+ */
+@media (max-width: 47.99rem) {
+  .calendar-month-scroll { display: none; }
+  .calendar-month-list { display: block; }
 }
