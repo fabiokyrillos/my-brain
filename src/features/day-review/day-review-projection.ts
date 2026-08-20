@@ -15,7 +15,7 @@ import "server-only";
  * *generation* is an existing provider call and is unchanged, and that a new
  * model call in this slice stops and asks. So this is five owner-scoped reads and
  * a projection: completed tasks, declared intentions, deadlines, captured
- * entries, and any already-generated `reviews` row whose period covers the day.
+ * entries, and any already-generated `summaries` row whose period covers the day.
  * The generated row is rendered through `toReviewListItemView` — the
  * `review_summary` presentation contract, not around it (`2M-REVIEW-008`).
  *
@@ -43,6 +43,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/database.types";
 import { toReviewListItemView, type ReviewListItemView } from "@/features/reviews/review-presentation";
 import { deriveTaskSensitivity, type TaskSensitivity } from "@/features/sensitivity/task-derivation";
 import type { DayReviewScope } from "@/features/product-analytics/contracts";
@@ -133,7 +134,7 @@ export type DayReviewProjection = {
  * to `undetermined`.
  */
 async function loadSourceLevels(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   userId: string,
   entryIds: readonly (string | null)[],
 ): Promise<ReadonlyMap<string, string | null>> {
@@ -152,7 +153,7 @@ export function captureExcerpt(content: string): string {
 }
 
 export async function loadDayReviewProjection(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<Database>,
   input: {
     readonly userId: string;
     readonly locale: Locale;
@@ -217,8 +218,30 @@ export async function loadDayReviewProjection(
        * with the raw row shape `toReviewListItemView` declares, so the
        * presentation contract is the only thing that turns a row into words.
        */
+      /*
+       * `summaries`, not `reviews` — corrected on 2026-08-20.
+       *
+       * **`reviews` has never existed.** `information_schema` returns nothing
+       * matching `%review%` in any schema, and `database.types.ts` has no such
+       * key. The table this reads is `summaries`, which carries **exactly** the
+       * seven columns selected below, and which `loadReviewListProjection` —
+       * the list on the same page — has been reading correctly all along.
+       *
+       * So this query has always failed, `sourceStates.generated` has always
+       * been `"unavailable"`, and the day review has always rendered *"Não foi
+       * possível ler: Revisão gerada"* — **twice**, once in the partial-read
+       * notice and once in the section itself. The owner reported the page as
+       * *"visualmente muito ruim"*; a permanent error banner on every visit is
+       * a large part of why.
+       *
+       * **How it escaped every gate:** the parameter above is typed
+       * `SupabaseClient` with **no `<Database>` generic**, so `.from("reviews")`
+       * is checked against `any`. `tsc` had nothing to object to. The generic is
+       * now applied, which is what makes a wrong table name a build error
+       * instead of a silent runtime failure.
+       */
       supabase
-        .from("reviews")
+        .from("summaries")
         .select("id,title,content,period_type,period_start,period_end,status")
         .eq("user_id", userId)
         .lte("period_start", dayKey)

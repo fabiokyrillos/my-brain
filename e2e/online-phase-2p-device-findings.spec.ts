@@ -96,6 +96,18 @@ test.describe("the owner's device findings", () => {
     await signIn(page);
     await page.goto("/pt-BR/app");
 
+    /*
+      Wait for the row to be laid out before measuring how far down it is.
+
+      App Router streams, and a page measured straight after `goto` can still
+      have its subtree in an unclassed placeholder `<div>` with every box at
+      zero width — which `depthOf` correctly discards as invisible, and then
+      reports the destination as absent. It made this assertion flaky on the
+      Pixel 7 lane, and it is the same trap the calendar assertions in this file
+      already carry a wait for. **A flake is a defect**, and this one was mine.
+    */
+    await expect(page.locator(".today-destinations")).toBeVisible();
+
     const found = await depthOf(page, "/app/reminders");
     expect(found, "Hoje offers no link to Lembretes at all").not.toBeNull();
     expect(
@@ -118,6 +130,9 @@ test.describe("the owner's device findings", () => {
   test("Revisões is reachable from Hoje without scrolling to the last section", async ({ page }) => {
     await signIn(page);
     await page.goto("/pt-BR/app");
+
+    // Same wait, same reason as the Lembretes assertion above.
+    await expect(page.locator(".today-destinations")).toBeVisible();
 
     const found = await depthOf(page, "/app/reviews");
     expect(found, "Hoje offers no link to Revisões at all").not.toBeNull();
@@ -232,6 +247,123 @@ test.describe("the owner's device findings", () => {
       ).toBeGreaterThan(measured.rangeSize);
     });
   }
+
+  /* ------------------------------------------------------------------ *
+   * Round two, finding 1 — the filters, arranged rather than shrunk.
+   * ------------------------------------------------------------------ */
+
+  test("the filter groups form even rows on a phone, with no chip alone on a line", async ({
+    page,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name === "desktop",
+      "The arrangement under test is the narrow one; desktop keeps the single-row band.",
+    );
+    await signIn(page);
+    await page.goto("/pt-BR/app/calendar?orientation=month");
+    await expect(page.locator(".calendar-page")).toBeVisible();
+
+    /*
+      What the owner reported, measured rather than described.
+
+      As `flex-wrap` rows every group broke wherever the words ran out, so the
+      last chip of each fell alone onto its own line — *Datas sugeridas* under
+      four lane chips, *Próximo período* under three pager controls — and each
+      chip was only as wide as its word, leaving both edges ragged. This asserts
+      the two properties a grid gives and a wrap cannot: **equal widths within a
+      row**, and **no row holding a single chip while an earlier row holds
+      several**.
+    */
+    for (const group of [".calendar-orientation", ".calendar-lanes"]) {
+      const rows = await page.locator(`${group} a`).evaluateAll((links) => {
+        const byRow = new Map<number, number[]>();
+        for (const link of links) {
+          const box = link.getBoundingClientRect();
+          const top = Math.round(box.top);
+          byRow.set(top, [...(byRow.get(top) ?? []), Math.round(box.width)]);
+        }
+        return [...byRow.entries()].sort((a, b) => a[0] - b[0]).map(([, widths]) => widths);
+      });
+
+      expect(rows.length, `${group} rendered no rows`).toBeGreaterThan(0);
+
+      // Equal widths inside every row — the segmented look, and the thing a
+      // content-sized chip cannot produce.
+      for (const widths of rows) {
+        const spread = Math.max(...widths) - Math.min(...widths);
+        expect(spread, `${group} row widths differ by ${spread}px: ${widths.join(", ")}`).toBeLessThanOrEqual(2);
+      }
+
+      // No lone chip under a fuller row. The last row may hold fewer only when
+      // it holds the same count as the rows above it or spans the width.
+      if (rows.length > 1) {
+        const last = rows[rows.length - 1];
+        const previous = rows[rows.length - 2];
+        if (last.length < previous.length) {
+          const lastWidth = last.reduce((total, width) => total + width, 0);
+          const previousWidth = previous.reduce((total, width) => total + width, 0);
+          expect(
+            lastWidth,
+            `${group}'s last row holds ${last.length} of ${previous.length} and does not fill the width`,
+          ).toBeGreaterThanOrEqual(previousWidth - 8);
+        }
+      }
+    }
+
+    /*
+      The pager puts the period on its own line and the three controls beneath
+      it, so the month name is never squeezed to ~90px and broken mid-word.
+
+      Asserted as **two facts** rather than as a count of distinct `top` values.
+      The first version counted them and got 3, which reads as "the layout is
+      wrong" and was not: the three controls sit in one grid row and one of them
+      wraps to two lines, so their boxes differ in height and, without stretch,
+      by a pixel or two at the top. Counting rounded tops turns a sub-pixel
+      difference into a failed layout. What the arrangement actually promises is
+      that the label is above all three, and that the three are side by side.
+    */
+    const pager = await page.locator(".calendar-navigation > *").evaluateAll((nodes) => {
+      const box = (selector: string) => {
+        const node = nodes.find((candidate) => candidate.matches(selector));
+        if (!node) return null;
+        const rect = node.getBoundingClientRect();
+        return { top: rect.top, bottom: rect.bottom, left: rect.left };
+      };
+      return {
+        range: box(".calendar-range"),
+        prev: box('a[rel="prev"]'),
+        next: box('a[rel="next"]'),
+        today: box("a:not([rel])"),
+      };
+    });
+
+    expect(pager.range, "the pager has no range label").not.toBeNull();
+    for (const [name, control] of [["prev", pager.prev], ["today", pager.today], ["next", pager.next]] as const) {
+      expect(control, `the pager has no ${name} control`).not.toBeNull();
+      expect(
+        control!.top,
+        `${name} sits above or beside the period label instead of below it`,
+      ).toBeGreaterThanOrEqual(pager.range!.bottom - 1);
+    }
+    // Side by side, in reading order.
+    expect(pager.prev!.left, "prev is not left of today").toBeLessThan(pager.today!.left);
+    expect(pager.today!.left, "today is not left of next").toBeLessThan(pager.next!.left);
+
+    // And nothing anywhere pushed the page sideways.
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, `the calendar overflows by ${overflow}px`).toBeLessThanOrEqual(1);
+
+    // Every control still comfortably pressable.
+    const small = await page.locator(".calendar-toolbar a").evaluateAll((links) =>
+      links
+        .map((link) => ({ text: (link.textContent ?? "").trim(), box: link.getBoundingClientRect() }))
+        .filter(({ box }) => box.height < 44 || box.width < 44)
+        .map(({ text, box }) => `${text} ${Math.round(box.width)}×${Math.round(box.height)}`),
+    );
+    expect(small, `controls under 44px: ${small.join(" | ")}`).toEqual([]);
+  });
 
   test("the control band says what its two chip families are for", async ({ page }) => {
     await signIn(page);

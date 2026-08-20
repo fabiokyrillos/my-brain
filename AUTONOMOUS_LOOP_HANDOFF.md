@@ -11040,3 +11040,108 @@ automation categories `suggest_only`.
 minutes, **no VoiceOver**. Phase 2P does not close until the owner runs it.
 **This section deliberately does not name what comes after Phase 2P**, and
 nothing about it was started or planned.
+
+## §105 — Round two on the iPhone: two rejections, and one of them was a table that never existed (2026-08-20)
+
+**Baseline `main` `7ffd055`** — §104's merge. Clean, zero open PRs, **99 local =
+99 hosted, parity `202608190099`**, read live before editing. **Zero
+migrations.** Phase 2P **does not close**; a third device pass does.
+
+### What the owner approved, recorded as approved
+
+Direct access to Lembretes, direct access to Revisões, the Home *Precisa de
+você* card, the edges and the absence of sideways scroll — **and everything they
+did not name**. That last clause is written down rather than left ambiguous,
+because an unlisted item is otherwise re-litigated by the next reader.
+
+Rejected: the calendar's filters, and the Revisões page's appearance.
+
+### Revisões had two defects and only one of them was visual
+
+**`day-review-projection.ts` queried `.from("reviews")`, and no table by that
+name has ever existed.** `information_schema` matches nothing on `%review%` in
+any schema; `database.types.ts` has no such key. The real table is
+**`summaries`**, it carries *exactly* the seven columns the query selects, and
+`loadReviewListProjection` — the list further down the same page — has been
+reading it correctly all along.
+
+So the read always failed, `sourceStates.generated` was permanently
+`"unavailable"`, and the page rendered **“Não foi possível ler: Revisão gerada”
+on every visit, twice**: once in the partial-read notice and once in the section
+itself. *The owner called the page "visualmente muito ruim"; a permanent error
+banner is a large part of that, and it was never a styling problem.*
+
+**Two gates were passed by it, and the second is the one worth keeping.**
+
+The first is ordinary: the client parameter was `SupabaseClient` with **no
+`<Database>` generic**, so the table name was checked against `any`. The generic
+is now applied and a wrong table name is a build error.
+
+The second is not. `day-review-projection.test.ts` fakes the client **by table
+name**, and its stubs said `reviews` too. So the test and the code agreed with
+each other and both disagreed with the database — **the one arrangement a stub
+can produce and a real query cannot**. A fake that answers to whatever key the
+code asks for cannot detect the code asking for the wrong thing. The stubs now
+say `summaries`, and the surface has an authenticated lane running against the
+real database.
+
+**The visual half:** every row rendered **all five** command forms open — twenty
+blocks for four tasks, **4 125 px on desktop and 14 391 px on an iPhone**, of
+which the review's own content was a few lines at the top. The verbs moved
+behind a `<details>`, the disclosure this product already uses on the calendar.
+Nothing is removed and nothing hides behind a gesture. The eight sections became
+bordered surfaces on `.home-section`'s treatment. **After: 2 348 px and
+8 613 px.**
+
+### The filters are arranged, not shrunk
+
+Each group was a `flex-wrap` row, so the last item of each fell alone onto its
+own line — *Datas sugeridas* under four lane chips, *Próximo período* under
+three pager controls — and every chip was only as wide as its own word.
+*"Quebras desorganizadas"* is what a wrap produces when nothing tells it where
+to break.
+
+Each group is now a grid of equal columns sized for its own item count: Formato
+four, *O que mostrar* two with a lone last chip spanning, and the pager with the
+period centred on its own line above three equal controls. **No font is
+reduced**, every control keeps 44 px, DOM and keyboard order are unchanged, and
+the band still wraps rather than scrolls.
+
+*One correction inside the correction: the first attempt gave the groups equal
+columns and left the chips `inline-flex`, so each sat at the left of a wide cell
+— **Dia a small pill and Mês a circle**. Equal columns only read as a segmented
+control when the controls are equal.*
+
+### Three probe defects of mine
+
+| Probe said | What it was |
+|---|---|
+| the pager is on three rows | three controls in **one** row, one wrapping to two lines, differing by a pixel at the top. Counting rounded `top` values turns a sub-pixel difference into a failed layout |
+| the disclosure is not the first thing the keyboard reaches | the row's **title is a link** and legitimately comes first. The assertion fixed a position where it should have asserted membership |
+| Lembretes is not on Hoje (Pixel 7, intermittent) | the **streaming placeholder** again — every box zero-width, correctly discarded by the visibility filter. The same trap the calendar assertions already waited for. **A flake is a defect, and that one was mine** |
+
+### An empty account hides whole classes of defect
+
+Neither Revisões defect is visible on one: a review with no tasks renders no
+forms, and a broken section reads as merely empty. **Every lane slice 2P.8 wrote
+ran against an empty disposable account.** The new lane seeds tasks, entries and
+summaries, and deletes the account afterwards.
+
+### Evidence
+
+`typecheck` 0. `lint` clean outside gitignored `.worktrees/`. `npm test`
+**8692 passed, 0 failed tests** (3 failed *files* = the recorded Windows shebang
+baseline). `build` passes. The **exact CI foundation command** 383 passed,
+5 skipped. The new `online-phase-2p-reviews.spec.ts` and the extended
+`online-phase-2p-device-findings.spec.ts` green on desktop, Pixel 7 and WebKit
+iPhone. Matrix `--check` unchanged at 87.
+
+**Both defects failed a test before they were fixed**, and the table-name repair
+was proved by a mutation control that reproduced the exact sentence the owner
+saw. **No database, migration, RLS, automation or product rule changed.**
+
+### Where this stops
+
+`PHASE_2P_OWNER_DEVICE_CHECKLIST_ROUND_THREE.md` — the two rejected items only,
+~5 minutes, no VoiceOver. **This section deliberately does not name what comes
+after Phase 2P**, and nothing about it was started or planned.

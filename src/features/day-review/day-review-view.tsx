@@ -188,10 +188,38 @@ export function DayReviewView({
             {item.title}
           </ProtectedContent>
         </div>
+        {/*
+          The row's actions, behind a disclosure (owner report of 2026-08-20).
+
+          ## What was wrong, measured with representative data
+
+          Every row rendered **all five** command forms open — a date input, a
+          status select and their buttons, each in its own block. Two tasks
+          produced ten of them: **3 000 px of a 4 125 px desktop page**, and a
+          **14 391 px** page on an iPhone. The review's own content — what the
+          day actually contained — was a few lines at the top, and everything
+          after it was controls. The owner reported the page as *"visualmente
+          muito ruim"*, and this is the shape of it.
+
+          ## Why `<details>` rather than a new pattern
+
+          The product already answers this exact question on the calendar:
+          `.calendar-reschedule` is a `<details>` whose `<summary>` opens the
+          same `TaskDetailControls`. Inventing a second disclosure here would be
+          a second thing to keep accessible and a second thing to style.
+
+          **Nothing is removed and nothing moves behind a gesture.** The same
+          five verbs, the same command path, the same confirmation rules — one
+          press away, keyboard-operable, and announced by the native
+          `<summary>`'s own expanded state.
+        */}
         {item.verbs.length > 0 ? (
-          <div className="day-review-verbs">
-            {item.verbs.map((verb) => <VerbControls item={item} key={verb.kind} verb={verb} />)}
-          </div>
+          <details className="day-review-actions">
+            <summary className="day-review-actions-summary">{copy.rowActions}</summary>
+            <div className="day-review-verbs">
+              {item.verbs.map((verb) => <VerbControls item={item} key={verb.kind} verb={verb} />)}
+            </div>
+          </details>
         ) : null}
       </li>
     );

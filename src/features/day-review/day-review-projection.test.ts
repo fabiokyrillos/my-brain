@@ -262,10 +262,23 @@ describe("bounds are stated rather than silent", () => {
   });
 });
 
+/*
+ * These stubs said `reviews`, and that is how the defect survived.
+ *
+ * The projection queried `.from("reviews")` — a table that has **never existed
+ * in any schema** — and this file's fake client is keyed by table name, so it
+ * answered to the same wrong key. The unit test and the code agreed with each
+ * other and both disagreed with the database, which is the one arrangement a
+ * stub can produce and a real query cannot.
+ *
+ * The stubs now say `summaries`, which is the table that exists.
+ * `online-phase-2p-reviews.spec.ts` is what closes the gap for good: it runs
+ * against the real database, where a wrong table name cannot be agreed with.
+ */
 describe("2M-REVIEW-008: a stored review renders through the presentation contract", () => {
   it("returns the contract's own view for a readable row", async () => {
     const result = await load(client({
-      reviews: {
+      summaries: {
         data: [{
           id: "r1",
           title: "Resumo",
@@ -284,7 +297,7 @@ describe("2M-REVIEW-008: a stored review renders through the presentation contra
 
   it("returns null rather than a half-rendered card when the row fails the contract", async () => {
     const result = await load(client({
-      reviews: { data: [{ id: "r1", title: "Resumo", content: "corpo", period_type: "invented", period_start: "2026-08-11", period_end: "2026-08-11", status: "generated" }], error: null },
+      summaries: { data: [{ id: "r1", title: "Resumo", content: "corpo", period_type: "invented", period_start: "2026-08-11", period_end: "2026-08-11", status: "generated" }], error: null },
     }));
     expect(result.generated).toBeNull();
   });

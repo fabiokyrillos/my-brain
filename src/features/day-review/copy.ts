@@ -27,6 +27,16 @@ export type DayReviewCopy = {
   readonly unavailable: (section: string) => string;
   readonly unreadableHeading: string;
   readonly unreadableNone: string;
+  /**
+   * The disclosure that holds a row's actions (owner report of 2026-08-20).
+   *
+   * Every row used to render all five command forms open, so two tasks produced
+   * ten form blocks — 3 000 px of a 4 125 px desktop page and 14 391 px on an
+   * iPhone. The review's own content was a few lines at the top and everything
+   * below it was controls. The forms are unchanged and one press away; what
+   * changed is that a report reads as a report again.
+   */
+  readonly rowActions: string;
   readonly verbs: Readonly<Record<DayReviewActionKind, string>>;
   readonly verbHints: Readonly<Record<DayReviewActionKind, string>>;
   readonly irreversible: string;
@@ -100,6 +110,7 @@ const PT_BR: DayReviewCopy = {
   unavailable: (section) => `Não foi possível ler: ${section}. Esta seção não está vazia — ela não pôde ser lida.`,
   unreadableHeading: "O que não pôde ser lido",
   unreadableNone: "Todas as fontes desta revisão foram lidas.",
+  rowActions: "Ações",
   verbs: {
     carry_forward: "Levar para amanhã",
     reschedule: "Mudar o prazo",
@@ -166,6 +177,7 @@ const EN: DayReviewCopy = {
   unavailable: (section) => `Could not be read: ${section}. This section is not empty — it could not be read.`,
   unreadableHeading: "What could not be read",
   unreadableNone: "Every source for this review was read.",
+  rowActions: "Actions",
   verbs: {
     carry_forward: "Carry to tomorrow",
     reschedule: "Change the deadline",
