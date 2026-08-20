@@ -2,6 +2,30 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-20 - Round two on the iPhone: the calendar's filters, and a Revisões page that queried a table that never existed
+
+**Everything approved except two items, both fixed. Zero migrations; 99 local = 99 hosted, parity `202608190099`. 87 of 87 classified, unchanged. Phase 2P does NOT close: a third device pass is required.**
+
+### Fixed
+
+- **`day-review-projection.ts` queried `.from("reviews")`, and no table by that name has ever existed.** `information_schema` matches nothing on `%review%` in any schema and `database.types.ts` has no such key. The real table is **`summaries`** — it carries *exactly* the seven columns the query selects, and `loadReviewListProjection`, the list further down the same page, has been reading it correctly all along. The query therefore always failed, `sourceStates.generated` was permanently `"unavailable"`, and `/app/reviews` rendered **“Não foi possível ler: Revisão gerada” on every visit, twice** — once in the partial-read notice and once in the section itself. A permanent error banner was a large part of what the owner reported as *"visualmente muito ruim"*, and it was never a styling problem.
+- **The client is now typed.** The parameter was `SupabaseClient` with **no `<Database>` generic**, so the table name was checked against `any` and `tsc` had nothing to object to. With the generic applied, a wrong table name is a build error.
+- **Every review row rendered all five command forms, open.** A date input, a status select and their buttons, five times per row — twenty blocks for four tasks, measured at **4 125 px on desktop and 14 391 px on an iPhone**, of which the review's own content was a few lines at the top. The verbs now sit behind a `<details>`, which is the disclosure this product already uses on the calendar (`.calendar-reschedule`). Nothing is removed and nothing hides behind a gesture: same five verbs, same command path, same confirmation rules, one keyboard-operable press away.
+- **The day review's eight sections had no boundaries.** They are now bordered surfaces using `.home-section`'s treatment rather than a new one. **Measured after: desktop 4 125 → 2 348 px; iPhone 14 391 → 8 613 px.**
+- **The calendar's filter groups wrapped ragged.** Each was a `flex-wrap` row, so the last item of each fell alone onto its own line — *Datas sugeridas* under four lane chips, *Próximo período* under three pager controls — and every chip was only as wide as its own word. Each group is now a grid of equal columns sized for its own item count: Formato four, *O que mostrar* two with a lone last chip spanning, and the pager with the period centred on its own line above three equal controls. **No font is reduced**, every control keeps 44 px, and DOM and keyboard order are unchanged.
+
+### Corrected
+
+- **`day-review-projection.test.ts`'s stubs said `reviews` too.** The fake client is keyed by table name, so the test and the code agreed with each other and both disagreed with the database — the one arrangement a stub can produce and a real query cannot. The stubs now name `summaries`, and `online-phase-2p-reviews.spec.ts` runs against the real database, where a wrong table name cannot be agreed with.
+- **`e2e/daily-surfaces.spec.ts`'s keyboard test** now opens the disclosure from the keyboard before checking reachability, and asserts one thing more than it did: that the summary is itself in the tab order. Nothing was relaxed — the same five submit buttons and two named value controls are still required.
+- The calendar mirror in the same lane gained the disclosure markup, which `calendar-mirror-guard.test.ts` required as soon as the component emitted new classes.
+
+### Added
+
+- **`e2e/online-phase-2p-reviews.spec.ts`** — the first lane to exercise `/app/reviews` with **representative seeded data**. Both defects above are invisible on an empty account: a review with no tasks renders no forms, and a broken section reads as merely empty. Slice 2P.8's lanes all ran against empty disposable accounts.
+- Filter-arrangement assertions in `online-phase-2p-device-findings.spec.ts`: equal widths within a row, no lone chip under a fuller row, the pager on two rows in reading order, no page overflow, and 44 px targets.
+
+
 ## 2026-08-20 - The owner's iPhone checkpoint: steps 1–6 approved, step 7 rejected, and its four defects fixed
 
 **Zero migrations; 99 local = 99 hosted, parity `202608190099`. 87 of 87 classified — 66 built, 12 baseline, 4 partial, 5 not-built-by-rule, 0 undelivered. Phase 2P does NOT close: a second device pass is required.**

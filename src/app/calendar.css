@@ -755,6 +755,73 @@
   margin-block: var(--space-4, 1rem);
 }
 
+/*
+ * The day review's sections, as surfaces (owner report of 2026-08-20).
+ *
+ * Eight sections — how the day went, the schedule, what could not be read, what
+ * was completed, the day's intentions, its deadlines, what was captured, and
+ * the generated review — ran as one undifferentiated column of small bold
+ * headings with no boundary between them. Nothing told the eye where one
+ * finished and the next began, which is most of *"espaçamento e hierarquia
+ * visual ruins"*.
+ *
+ * The treatment is `.home-section`'s, deliberately: a bordered, rounded surface
+ * on the page background. It is what Hoje already uses for exactly this job, so
+ * Revisões stops being the one redesigned page that looks like a document.
+ *
+ * `.day-review-page > section` only — the nested `<section>`s inside a card
+ * would otherwise draw a box inside a box.
+ */
+.day-review-page > section {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  padding: var(--space-5) var(--space-5);
+}
+
+/*
+ * A row's actions, closed by default.
+ *
+ * Same shape as `.calendar-reschedule`, which is the disclosure this product
+ * already uses to put `TaskDetailControls` one press away instead of always on
+ * screen. 44px because the summary is the control.
+ */
+.day-review-actions {
+  margin-top: var(--space-2);
+}
+
+.day-review-actions-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element the standard rule
+   above does not reach, so the marker is removed in both grammars. */
+.day-review-actions-summary::-webkit-details-marker { display: none; }
+
+.day-review-actions-summary:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+.day-review-actions[open] > .day-review-actions-summary {
+  background: var(--background-subtle-strong);
+  color: var(--text-primary);
+}
+
+.day-review-actions > .day-review-verbs {
+  margin-top: var(--space-3);
+}
+
 .planner-list ul,
 .day-review-section ul {
   display: flex;
@@ -1086,4 +1153,100 @@
 @media (max-width: 47.99rem) {
   .calendar-month-scroll { display: none; }
   .calendar-month-list { display: block; }
+
+  /*
+   * The control band on a phone — **arranged**, not shrunk (owner report of
+   * 2026-08-20: *"os filtros não estão suficientemente responsivos"*).
+   *
+   * ## What wrapping produced, measured at 393 px
+   *
+   * Every group was a `flex-wrap` row, so the last item of each fell alone onto
+   * a line of its own: *Datas sugeridas* by itself under four lane chips, and
+   * *Próximo período* by itself under *Período anterior · agosto de 2026 ·
+   * Hoje*. Chips took whatever width their word needed, so the rows were ragged
+   * on both edges — *"pílulas espremidas, quebras desorganizadas e grupos
+   * visualmente confusos"* is exactly what a wrap does when nothing tells it
+   * where to break.
+   *
+   * ## Grids, because a grid decides where the break goes
+   *
+   * Each group becomes equal columns at a width chosen for the group's own item
+   * count, which is what "adapt the arrangement to the available width" means
+   * here — **no font is reduced**, and every control keeps its 44 px height.
+   *
+   * Formato is four equal columns, which is the segmented control the owner
+   * suggested and which also makes the selected period unmistakable: it is the
+   * one filled cell in a row of four identical ones.
+   */
+  .calendar-orientation ul {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Five lanes in two columns: three tidy rows instead of 4 + 1 ragged. The
+     last cell spans, so a lone chip fills its row rather than floating. */
+  .calendar-lanes ul {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calendar-lanes li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /*
+   * The chip fills its cell, and that is what makes the grid worth having.
+   *
+   * The `<li>` is the grid item and the `<a>` inside it is `inline-flex`, so
+   * without this each chip was only as wide as its own word and sat at the left
+   * of a wide cell — *Dia* a small pill, *Mês* a **circle**, the row as ragged
+   * as the wrap it replaced. Equal columns only read as a segmented control
+   * when the controls are equal.
+   */
+  .calendar-orientation li,
+  .calendar-lanes li {
+    display: grid;
+  }
+
+  /* Centred text, and padding that yields rather than forcing an overflow. */
+  .calendar-orientation a,
+  .calendar-lanes a {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+    padding-inline: var(--space-2);
+  }
+
+  /*
+   * The pager: the period on its own line, then three equal controls.
+   *
+   * `Período anterior` and `Próximo período` are long enough that a
+   * prev/label/next row leaves the month name ~90 px and breaks it mid-word.
+   * Giving the label its own row costs one line and keeps the date readable,
+   * which is the trade this surface should make — the label is the thing being
+   * read, and the three controls are the thing being pressed.
+   *
+   * Placed by area rather than by source order, so the DOM keeps prev → label →
+   * today → next and the keyboard order is unchanged.
+   */
+  .calendar-toolbar .calendar-navigation {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-areas:
+      "range range range"
+      "prev today next";
+    gap: var(--space-2);
+    margin-inline-start: 0;
+  }
+
+  .calendar-navigation .calendar-range { grid-area: range; text-align: center; }
+  .calendar-navigation a[rel="prev"] { grid-area: prev; }
+  .calendar-navigation a[rel="next"] { grid-area: next; }
+  .calendar-navigation a:not([rel]) { grid-area: today; }
+
+  .calendar-navigation a {
+    justify-content: center;
+    text-align: center;
+    padding-inline: var(--space-2);
+  }
 }

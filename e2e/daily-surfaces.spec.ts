@@ -208,13 +208,16 @@ function reviewRow(options: { locale: Locale; masked?: boolean; open?: boolean }
     </div>`;
   return `<li class="day-review-item"${options.open === undefined ? "" : ` data-open="${options.open}"`}>
     <div class="day-review-item-head">${state}${body}</div>
-    <div class="day-review-verbs">
-      ${verb("carry_forward", "set_planned", "date", "2026-08-12")}
-      ${verb("plan", "set_planned", "date")}
-      ${verb("reschedule", "reschedule_due", "date")}
-      ${verb("follow_up", "set_status", "choice", "waiting")}
-      ${verb("archive", "cancel_task", "immediate")}
-    </div>
+    <details class="day-review-actions">
+      <summary class="day-review-actions-summary">Ações</summary>
+      <div class="day-review-verbs">
+        ${verb("carry_forward", "set_planned", "date", "2026-08-12")}
+        ${verb("plan", "set_planned", "date")}
+        ${verb("reschedule", "reschedule_due", "date")}
+        ${verb("follow_up", "set_status", "choice", "waiting")}
+        ${verb("archive", "cancel_task", "immediate")}
+      </div>
+    </details>
   </li>`;
 }
 
@@ -732,6 +735,35 @@ test.describe("2M-MOBILE-004: an accidental activation is recoverable", () => {
 test.describe("2M-ACCESS-006: keyboard and focus", () => {
   test("every control on the review row is reachable by keyboard", async ({ page }) => {
     await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR" })]));
+
+    /*
+      The disclosure is opened **from the keyboard**, and that is part of the
+      assertion rather than setup around it.
+
+      The row's verbs moved inside a `<details>` on 2026-08-20, so they are one
+      press away instead of always on screen — twenty form blocks for four tasks
+      was the owner's *"visualmente muito ruim"*. A control behind a disclosure
+      is only reachable if the disclosure itself is, so this now proves two
+      things where it proved one: the **summary** takes focus and Enter opens
+      it, and every control inside is then in the tab order exactly as before.
+
+      Nothing below this line was relaxed. The same five submit buttons and the
+      same two named value controls are still required.
+    */
+    // Tabbed to, not assumed to be first: the row's title is a link and takes
+    // focus before it. What matters is that the disclosure is **in** the tab
+    // order, not where.
+    let opened = false;
+    for (let press = 0; press < 6 && !opened; press += 1) {
+      await page.keyboard.press("Tab");
+      opened = await page.evaluate(
+        () => (document.activeElement as HTMLElement | null)?.tagName.toLowerCase() === "summary",
+      );
+    }
+    expect(opened, "the actions disclosure is not reachable by keyboard").toBe(true);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".day-review-actions[open]")).toHaveCount(1);
+
     const reachable: string[] = [];
     for (let index = 0; index < 24; index += 1) {
       await page.keyboard.press("Tab");
