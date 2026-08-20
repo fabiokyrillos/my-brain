@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { BellPlus, CalendarClock, CircleOff, EyeOff, FileUp, LoaderCircle, RefreshCcw, Sparkles, Undo2 } from "lucide-react";
+import { CalendarClock, CircleOff, EyeOff, FileUp, LoaderCircle, RefreshCcw, Sparkles, Undo2 } from "lucide-react";
 import { formatInstantForDateTimeLocal, localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-date";
 import type { QuestionConsequence } from "./question-resolution-contract";
 import type { QuestionSuggestion } from "./question-suggestions";
@@ -14,10 +14,17 @@ function Feedback({ state }: { state: AgentFormState }) {
   return state.status === "idle" ? null : <span className="inline-create-feedback" role={state.status === "success" ? "status" : "alert"}>{state.message}</span>;
 }
 
-export function ReminderForm({ action, locale }: { action: AgentFormAction; locale: "pt-BR" | "en" }) {
-  const [state, formAction, pending] = useActionState(action, idleState);const pt=locale==="pt-BR";
-  return <div><form action={formAction} className="stacked-create"><input type="hidden" name="locale" value={locale}/><label>{pt?"Lembrete":"Reminder"}<input name="title" required maxLength={500}/></label><label>{pt?"Quando":"When"}<input name="remindAt" type="datetime-local" required/></label><label className="inline-check"><input name="important" type="checkbox"/> {pt?"Importante":"Important"}</label><button type="submit" disabled={pending}>{pending?<LoaderCircle className="spin" size={16}/>:<BellPlus size={16}/>} {pt?"Criar lembrete":"Create reminder"}</button></form><Feedback state={state}/></div>;
-}
+/*
+ * `ReminderForm` was deleted in slice 2P.7 (`2P-REMINDER-001`).
+ *
+ * It was an inline creation form permanently open in the reminders page
+ * header — one line of JSX carrying locale ternaries, three ungrouped
+ * controls, no explanation and no step between typing and writing. The
+ * requirement asks the header for a single action, and
+ * `reminders/reminder-composer.tsx` is that action: a dialog over the shared
+ * `ConfirmDialog`, grouping content, date and time, importance, an optional
+ * link, then save and cancel.
+ */
 
 // Phase 2D — question resolution action contract (Slice 2D.1 answer; Slice
 // 2D.2 adds the deferred/dismissed/not_relevant dispositions). Stable

@@ -50,6 +50,7 @@ import {
   compareLocalDates,
   daysInLocalMonth,
   formatLocalDate,
+  localWeekdayIndex,
   parseLocalDate,
   startOfLocalMonth,
   startOfLocalWeek,
@@ -57,21 +58,21 @@ import {
 } from "@/lib/time/local-day";
 
 /**
- * `2M-CAL-007`'s three orientations.
+ * `2M-CAL-007`'s orientations — three until slice 2P.7, four since.
  *
  * **This is the canonical declaration.** `calendarOrientations` in
- * `product-analytics/contracts.ts` restates it for the telemetry payload, and
- * `calendar-query.test.ts` holds the two to exact equality — the same drift gate
- * the Phase 2E command vocabularies get, and for the same reason: an analytics
- * module must not import a feature module, and two lists that agree by
- * inspection are one refactor from disagreeing.
- */
-/**
- * Slice 2P.7 adds a fourth, `month`, and it is **not** mirrored in the telemetry
- * vocabulary — see `2P-CALENDAR-MONTH-TELEMETRY` in `calendar-query.test.ts`.
- * The short version: the third copy of that list lives inside a deployed
- * validator, widening it needs a migration, and a migration is a stop condition.
- * `month` is a period the surface shows and the ledger does not hear about.
+ * `product-analytics/contracts.ts` restates it for the telemetry payload,
+ * because an analytics module must not import a feature module.
+ *
+ * The two lists were held to **exact equality** until `month` arrived, and they
+ * no longer are — deliberately. The third copy of the vocabulary lives inside
+ * the *deployed* `private.validate_product_event_properties`, which admits
+ * `['day','week','agenda']` and nothing else; widening it is a third Phase 2P
+ * migration and therefore a stop condition. So `month` is a period the surface
+ * shows and the ledger does not hear about, and the drift gate became an
+ * asymmetry with its own controls — `2P-CALENDAR-MONTH-TELEMETRY` in
+ * `calendar-query.test.ts` reads the enum out of the migration so the telemetry
+ * list still cannot drift from what is actually deployed.
  */
 export const CALENDAR_ORIENTATIONS = ["day", "week", "month", "agenda"] as const;
 export type CalendarOrientation = (typeof CALENDAR_ORIENTATIONS)[number];
@@ -139,17 +140,15 @@ export const DAYS_BY_ORIENTATION: Record<FixedSpanOrientation, number> = {
  */
 export function rangeDayCount(query: CalendarQuery): number {
   if (query.orientation !== "month") return DAYS_BY_ORIENTATION[query.orientation];
-  const first = rangeStart(query);
-  const monthStart = startOfLocalMonth(query.anchor);
-  const lead = daysBetween(first, monthStart);
+  /*
+   * The lead is the weekday index of the first of the month — Monday is 0 — and
+   * it is asked for rather than computed as a difference between two dates. The
+   * obvious way to write that difference divides a millisecond span by 86,400,000,
+   * which `phase-2m-fixed-offset-guard.test.ts` forbids; the guard caught exactly
+   * that here before this comment existed.
+   */
+  const lead = localWeekdayIndex(startOfLocalMonth(query.anchor));
   return Math.ceil((lead + daysInLocalMonth(query.anchor)) / 7) * 7;
-}
-
-/** Whole days from `from` to `to`, both wall-clock dates. Never a duration in hours. */
-function daysBetween(from: LocalDate, to: LocalDate): number {
-  const a = Date.UTC(from.year, from.month - 1, from.day);
-  const b = Date.UTC(to.year, to.month - 1, to.day);
-  return Math.round((b - a) / 86_400_000);
 }
 
 /**

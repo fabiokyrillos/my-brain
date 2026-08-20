@@ -40,6 +40,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { CALENDAR_ORIENTATIONS } from "@/features/calendar/calendar-query";
+import { calendarOrientations } from "@/features/product-analytics/contracts";
 
 import { recurrenceArtifacts } from "./phase-2m-recurrence-guard.test";
 
@@ -168,10 +169,50 @@ describe("2P-CALENDAR-001 means a real month, and Agenda is not it", () => {
     );
   });
 
-  it("still has no month orientation, which is why the slice has work to do", () => {
-    // Stated as a fact rather than as a bar: when 2P.7 ships the month this
-    // expectation flips, and the flip is the delivery.
-    expect([...CALENDAR_ORIENTATIONS]).toEqual(["day", "week", "agenda"]);
+  /**
+   * **The flip.** This asserted `["day","week","agenda"]` while the month was
+   * unbuilt, stated as a fact rather than as a bar precisely so that shipping it
+   * would change the assertion — and slice 2P.7 shipped it.
+   *
+   * It is written as a closed list rather than a `toContain("month")` so it
+   * keeps refusing a *fifth* orientation added without a decision, which is what
+   * the assertion was guarding all along. Agenda survives alongside Mês, exactly
+   * as the confirmation permits: *"Agenda may remain as an additional view while
+   * it stays useful"*.
+   */
+  it("now has a month orientation, and no fifth one arrived with it", () => {
+    expect([...CALENDAR_ORIENTATIONS]).toEqual(["day", "week", "month", "agenda"]);
+  });
+
+  /**
+   * `2P-CALENDAR-MONTH-TELEMETRY` — the remainder the month produced.
+   *
+   * The orientation vocabulary has a third copy inside a **deployed** validator,
+   * and widening it is a third Phase 2P migration. So the month emits no
+   * `calendar_viewed`, and the two ways of pretending otherwise are both closed
+   * here: the client list may not be widened past what the migration declares,
+   * and the month may not be relabelled as one of the three that are.
+   */
+  it("records the month's telemetry as a remainder rather than widening a deployed enum", () => {
+    const sql = readFileSync(
+      join(REPO, "supabase/migrations/202608110090_phase_2m_daily_cycle_telemetry.sql"),
+      "utf8",
+    );
+    const deployed = /require_product_event_enum\(p_properties, 'orientation', array\[([^\]]*)\]\)/
+      .exec(sql);
+    if (!deployed) throw new Error("the deployed orientation enum is no longer where this reads it");
+    const admitted = deployed[1].split(",").map((literal) => literal.trim().replace(/^'|'$/g, ""));
+
+    // Not vacuous, and not widened.
+    expect(admitted).toEqual(["day", "week", "agenda"]);
+    expect([...calendarOrientations]).toEqual(admitted);
+    expect(admitted).not.toContain("month");
+
+    // And the surface does not emit one anyway: the page guards the call rather
+    // than handing `month` to a producer whose type would no longer accept it.
+    const page = readFileSync(join(REPO, "src/app/[locale]/app/calendar/page.tsx"), "utf8");
+    expect(page).toMatch(/orientation === "month" \? null : \(/);
+    expect(page).toMatch(/2P-CALENDAR-MONTH-TELEMETRY/);
   });
 
   it("is not vacuous: the readers above really read something", () => {

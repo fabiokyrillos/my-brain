@@ -36,3 +36,29 @@ export const IDLE_REMINDER_ACTION_STATE: ReminderActionState = {
   reminderId: null,
   action: null,
 };
+
+/**
+ * `2P-REMINDER-002` — the creation form's state.
+ *
+ * Separate from `ReminderActionState` rather than folded into it, because the
+ * two answer different questions and sharing one shape would force a lie in
+ * whichever field the other flow does not have. A command names the row it acted
+ * on and the verb it used; a creation names neither until it succeeds, and
+ * `action: null` on a row that does not exist yet reads as *"a command with no
+ * verb"* rather than as *"nothing was created"*.
+ *
+ * It lives here for the same framework reason the constant above does: a
+ * `"use server"` module may export only async functions.
+ */
+export type ReminderCreationState = {
+  readonly status: "idle" | "success" | "error";
+  readonly message: string;
+  /** The row that now exists, so the surface can say which one it means. */
+  readonly reminderId: string | null;
+};
+
+export const IDLE_REMINDER_CREATION_STATE: ReminderCreationState = {
+  status: "idle",
+  message: "",
+  reminderId: null,
+};

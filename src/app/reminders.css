@@ -311,6 +311,104 @@
  * so the labels never truncate, and the snooze select and its button share a
  * line rather than each taking one.
  */
+/*
+ * `2P-REMINDER-001`/`-002` — the creation action and its dialog.
+ *
+ * The dialog's own layout is `.task-command-dialog-form`, the modifier slice
+ * 2P.6 added for a dialog whose content is a real form. What is here is only
+ * what that modifier does not cover: the header button, the two-line field
+ * label, and the result the dialog leaves behind.
+ */
+
+.reminder-compose {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.reminder-compose-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  /* The repository's touch-target minimum. This is the only way to create a
+     reminder from this page, and it is pressed with a thumb as often as with a
+     pointer. */
+  min-height: 44px;
+  padding: 11px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.reminder-compose-open:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: 2px;
+}
+
+/*
+ * A label carrying a name and a hint.
+ *
+ * `.task-command-dialog-form label` is already a column with a gap, so this only
+ * has to distinguish the two lines from each other — the name reads as the
+ * label, the hint as the sentence under it.
+ */
+.reminder-compose-label {
+  font: var(--type-label);
+  color: var(--text-secondary);
+}
+
+.reminder-compose-hint {
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+/*
+ * The importance checkbox: a row, not a column.
+ *
+ * The shared `label` rule stacks its children, which is right for a field with a
+ * caption above it and wrong for a box beside a sentence — without this the
+ * checkbox sits on its own line above its own words.
+ */
+/*
+ * Qualified by the dialog, and that is not decoration.
+ *
+ * `.task-command-dialog-form label` is `0,1,1`; a bare `.reminder-compose-check`
+ * is `0,1,0` and **loses**, so the checkbox would have gone on stacking above
+ * its own words with a rule sitting right here that looked correct. Adding the
+ * ancestor makes it `0,2,0`, which wins on specificity rather than on source
+ * order — the fragile version of the same fix.
+ */
+.task-command-dialog-form .reminder-compose-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-command-dialog-form .reminder-compose-check input {
+  /* Overrides the shared `width: 100%`, which would stretch a checkbox across
+     the dialog. The target stays 44px through the label's own height. */
+  width: auto;
+  min-height: auto;
+}
+
+.reminder-compose-result,
+.reminder-compose-error {
+  margin: 0;
+  font: var(--type-body);
+}
+
+.reminder-compose-result {
+  color: var(--text-secondary);
+}
+
+.reminder-compose-error {
+  color: var(--tone-risk-fg);
+}
+
 @media (max-width: 480px) {
   .reminder-action-row > form,
   .reminder-action-row > button {

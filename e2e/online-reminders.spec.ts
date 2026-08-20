@@ -116,19 +116,35 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
   }
 
   /**
-   * Creates one reminder through the form and returns its title.
+   * Creates one reminder and returns its title.
    *
    * A random suffix per call, so two tests in one worker cannot see each
    * other's row and mistake it for their own.
+   *
+   * Slice 2P.7 moved creation out of the page header and into a dialog
+   * (`2P-REMINDER-001`), so this opens it first. The labels changed with it —
+   * they now name what the field is for rather than repeating the noun.
    */
   async function createReminder(page: Page, locale: "pt-BR" | "en" = "pt-BR") {
     const title = `Ligar para o contador ${crypto.randomUUID().slice(0, 8)}`;
     await page.goto(`/${locale}/app/reminders`);
-    await page.getByLabel(locale === "en" ? "Reminder" : "Lembrete", { exact: true }).fill(title);
-    await page.getByLabel(locale === "en" ? "When" : "Quando").fill(futureLocal(5));
     await page
+      .getByRole("button", { name: locale === "en" ? "New reminder" : "Novo lembrete" })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog
+      .getByLabel(locale === "en" ? "What to remember" : "O que lembrar")
+      .fill(title);
+    await dialog
+      .getByLabel(locale === "en" ? "When to tell you" : "Quando avisar")
+      .fill(futureLocal(5));
+    await dialog
       .getByRole("button", { name: locale === "en" ? "Create reminder" : "Criar lembrete" })
       .click();
+    // The dialog closes on success, and the result is left on the page behind
+    // it — so waiting for the sentence also proves the dialog did not freeze.
+    await expect(dialog).toBeHidden({ timeout: 30_000 });
     await expect(
       page.getByText(locale === "en" ? "Reminder created." : "Lembrete criado."),
     ).toBeVisible({ timeout: 30_000 });

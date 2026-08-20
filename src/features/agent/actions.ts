@@ -42,18 +42,6 @@ import type {
 
 const localeSchema = z.enum(["pt-BR", "en"]);
 
-// Canonical localization mechanism (ADR-036): an explicit key type plus
-// `satisfies Record<Locale, …>`, so a missing key or a missing locale is a
-// compile error even for a key nothing reads yet. Reminder creation and
-// attachment upload previously returned Portuguese-only results to English users
-// even though both had already resolved the locale.
-type ReminderCopy = {
-  invalid: string;
-  invalidDate: string;
-  session: string;
-  failed: string;
-  created: string;
-};
 
 type UploadCopy = {
   selectFile: string;
@@ -67,22 +55,6 @@ type UploadCopy = {
   analyzed: string;
 };
 
-const reminderCopy = {
-  "pt-BR": {
-    invalid: "Revise o lembrete.",
-    invalidDate: "Data inválida.",
-    session: "Sua sessão expirou.",
-    failed: "Não foi possível criar.",
-    created: "Lembrete criado.",
-  },
-  en: {
-    invalid: "Review the reminder.",
-    invalidDate: "Invalid date.",
-    session: "Your session expired.",
-    failed: "We could not create it.",
-    created: "Reminder created.",
-  },
-} satisfies Record<Locale, ReminderCopy>;
 
 const uploadCopy = {
   "pt-BR": {
@@ -109,42 +81,21 @@ const uploadCopy = {
   },
 } satisfies Record<Locale, UploadCopy>;
 
-export async function createReminder(
-  _state: AgentFormState,
-  formData: FormData,
-): Promise<AgentFormState> {
-  const parsed = z
-    .object({
-      locale: localeSchema,
-      title: z.string().trim().min(1).max(500),
-      remindAt: z.string().min(1),
-      important: z.string().optional(),
-    })
-    .safeParse(Object.fromEntries(formData));
-  const reminderMessages = reminderCopy[resolveLocale(formData.get("locale"))];
-  if (!parsed.success)
-    return { status: "error", message: reminderMessages.invalid };
-  const when = new Date(parsed.data.remindAt);
-  if (Number.isNaN(when.getTime()))
-    return { status: "error", message: reminderMessages.invalidDate };
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { status: "error", message: reminderMessages.session };
-  await assertActiveAccount(supabase, user.id, parsed.data.locale);
-  const { error } = await supabase
-    .from("reminders")
-    .insert({
-      user_id: user.id,
-      title: parsed.data.title,
-      remind_at: when.toISOString(),
-      important: parsed.data.important === "on",
-    });
-  if (error) return { status: "error", message: reminderMessages.failed };
-  revalidatePath(`/${parsed.data.locale}/app/reminders`);
-  return { status: "success", message: reminderMessages.created };
-}
+/*
+ * `createReminder` moved to `features/reminders/actions.ts` in slice 2P.7.
+ *
+ * Not a relocation for tidiness. The version that stood here converted its
+ * `datetime-local` value with a bare `new Date(...)`, which resolves a
+ * wall-clock string in the HOST zone — UTC on the server — so a reminder set
+ * for 14:00 in Sao Paulo was stored as 14:00Z and would have fired three hours
+ * early. The reschedule command had been resolving the same kind of value
+ * against `profiles.timezone` since DEC-6, and `2P-REMINDER-003` requires the
+ * two flows to share that validation rather than each keep its own.
+ *
+ * Deleted rather than left dormant: two ways to create a reminder is the
+ * duplicated write path this repository removes on sight, and the one that
+ * stayed is the one beside the converter.
+ */
 
 // Phase 2D — question resolution flows through the versioned, audited,
 // undoable resolve_pending_question_vN family instead of a plain owner

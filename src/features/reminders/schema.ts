@@ -134,3 +134,53 @@ export const reminderSubmissionSchema = z
   .strict();
 
 export type ReminderSubmission = z.infer<typeof reminderSubmissionSchema>;
+
+/**
+ * `2P-REMINDER-002`/`-003` — creating one, in the vocabulary that already exists.
+ *
+ * ## Why this is here and not a fourth shape in `agent/schema`
+ *
+ * `2P-REMINDER-003` asks that create and reschedule *"share vocabulary and
+ * validation without creating a second write path"*. The writer this replaces
+ * lived in `agent/actions.ts` and did not: it took `remindAt` as a free string
+ * and passed it to `new Date()`, which reads a `datetime-local` value **in the
+ * host's zone**. On a server that is UTC, so a reminder set for 14:00 in São
+ * Paulo was stored as 14:00Z and fired three hours early — a real defect, not a
+ * tidiness argument, and exactly what `remindAtLocal` plus
+ * `localDateTimeToOffsetInstant` exist to prevent one command over.
+ *
+ * So the three fields the two flows share are **the same declarations**:
+ * `title` and `important` are the `edit` command's, `remindAtLocal` is the
+ * `reschedule` command's regex. A value one flow accepts, the other accepts.
+ *
+ * ## What is deliberately absent
+ *
+ * **Recurrence.** `reminders` has no column for it in any form, so
+ * `2P-REMINDER-002` was corrected by the owner and recurrence became the named
+ * remainder `2P-REMINDER-RECURRENCE`. There is no field here, no free-text
+ * convention that would encode one, and no second row written to simulate a
+ * repeat. `phase-2p-reminder-recurrence-guard.test.ts` is what keeps that true.
+ */
+export const reminderCreationSchema = z
+  .object({
+    locale: localeSchema,
+    title: z.string().trim().min(1).max(500),
+    remindAtLocal: z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+    important: checkboxSchema,
+    /**
+     * `2P-REMINDER-002`'s optional link, over the column that already exists.
+     *
+     * `reminders.task_id` is the only link a person can *choose* — `entry_id` is
+     * written by the flow that produced the reminder and is not something to
+     * pick from a list. Empty string means "none": a `<select>` submits its
+     * empty option as `""`, and turning that into `undefined` here is what keeps
+     * the action from having to know how a form serialises an absence.
+     */
+    taskId: z
+      .union([z.string().uuid(), z.literal("")])
+      .optional()
+      .transform((value) => (value === "" || value === undefined ? null : value)),
+  })
+  .strict();
+
+export type ReminderCreation = z.infer<typeof reminderCreationSchema>;

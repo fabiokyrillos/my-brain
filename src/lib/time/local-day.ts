@@ -331,10 +331,28 @@ export function localRangeBounds(
  * describe two different ranges (`2M-CAL-004`). One rule, both locales.
  */
 export function startOfLocalWeek(date: LocalDate): LocalDate {
+  return addLocalDays(date, -localWeekdayIndex(date));
+}
+
+/**
+ * Which column of a Monday-first week `date` sits in — 0 for Monday, 6 for Sunday.
+ *
+ * Extracted from `startOfLocalWeek` when the month grid needed the same number
+ * for a different purpose: how many days of the previous month the grid opens
+ * with. The alternative was subtracting two dates, and the obvious way to do
+ * that is to divide a millisecond difference by 86,400,000 — a fixed day length,
+ * which `phase-2m-fixed-offset-guard.test.ts` forbids and which this module
+ * exists to stop being written a fourth time. It is safe on UTC-midnight
+ * timestamps and it is still the pattern that produces the defect elsewhere, so
+ * the guard is right to refuse it and the answer is to not need a subtraction.
+ *
+ * `getUTCDay()` on a UTC-constructed date reads the weekday of the wall-clock
+ * date itself: no zone, no offset, no duration.
+ */
+export function localWeekdayIndex(date: LocalDate): number {
   const utc = new Date(Date.UTC(date.year, date.month - 1, date.day));
   // `getUTCDay()` is 0 for Sunday; Monday-based offset puts Sunday six days in.
-  const offset = (utc.getUTCDay() + 6) % 7;
-  return addLocalDays(date, -offset);
+  return (utc.getUTCDay() + 6) % 7;
 }
 
 /**

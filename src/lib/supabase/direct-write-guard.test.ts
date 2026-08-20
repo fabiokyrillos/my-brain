@@ -49,8 +49,21 @@ type Writer = { file: string; table: GuardedTable; op: DmlMethod };
 const TASKS_ALLOWLIST: readonly Writer[] = [];
 
 const REMINDERS_ALLOWLIST: readonly Writer[] = [
-  // `createReminder` — the documented Option C exception (PRD §2 item 6).
-  { file: "src/features/agent/actions.ts", table: "reminders", op: "insert" },
+  /*
+   * `createReminder` — the documented Option C exception (PRD §2 item 6).
+   *
+   * Slice 2P.7 moved it from `src/features/agent/actions.ts` to the reminders
+   * feature, beside the reschedule command it now shares its validation with
+   * (`2P-REMINDER-003`). The old copy built its instant with `new Date(...)`,
+   * which resolves a wall clock in the host's zone.
+   *
+   * **The length did not change, and that is the property this guard exists to
+   * hold.** The list is compared by exact equality in both directions, so the
+   * move had to be made here as well: a stale entry naming the old file fails
+   * just as loudly as a second writer would, which is what makes this a record
+   * of where the exception is rather than a permission for one more.
+   */
+  { file: "src/features/reminders/actions.ts", table: "reminders", op: "insert" },
 ];
 
 /**
