@@ -124,8 +124,8 @@ matrix or refuses entirely. It never writes a partial matrix.
 
 Phases 2C … 2O wrote records that each carried a classification section, so
 their generators could refuse one that stated none. **Phase 2P's records were
-not written that way.** Of the nine, exactly three carry a section this
-generator recognises:
+not written that way.** Of the **eight that preceded this one**, exactly three
+carry a section this generator recognises:
 
 | Record | Section | Classifies |
 |---|---|---:|

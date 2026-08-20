@@ -22,8 +22,8 @@
  * Phases 2C … 2O wrote acceptance records that each carried a classification
  * section, so their generators could refuse a record that stated none. **Phase
  * 2P's records were not written that way**, and that is a measured fact rather
- * than an assumption: of the nine records, exactly three carry a section this
- * generator recognises —
+ * than an assumption: of the **eight that precede the closeout**, exactly three
+ * carry a section this generator recognises —
  *
  * | Record | Section | Classifies |
  * |---|---|---|

@@ -10833,7 +10833,7 @@ refusals and writes the matrix or refuses entirely. **87 declared · 87
 classified · 0 unclassified** — 65 built, 13 baseline, 4 partial, 4
 not-built-by-rule, 1 undelivered.
 
-**Only three of nine records carry a machine-readable classification section**
+**Only three of the eight records preceding the closeout carry a machine-readable classification section**
 (2P.4, 2P.5, 2P.7 = 28 requirements). The other six state outcomes in prose.
 Refusing them would make the generator unusable and retrofitting sections would
 edit records the owner said to preserve — so the rule is inverted: a record
