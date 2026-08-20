@@ -2,6 +2,35 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-19 - Slice 2P.7: the calendar gets a real month, a reminder is written in a dialog, and the first working revalidatePath on that route froze it
+
+**`2P-CALENDAR-001` … `-005`, `2P-REMINDER-001` … `-005` — five built, five baseline. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live. Cumulative 73 of 87.**
+
+### Added
+
+- **A real month view.** `CALENDAR_ORIENTATIONS` is now `["day","week","month","agenda"]`. The month is a Monday-aligned grid of 28, 35 or 42 days — 28 is reachable, so nothing pads to a phantom fifth week — with navigation that steps by whole months, a label naming the month rather than the grid's two edges, today marked by a **word**, days outside the month distinguished visually and to a screen reader, cells bounded by `MONTH_CELL_ITEM_LIMIT` with a reachable overflow, and a readable list for phones. Agenda stays, as the confirmation permits.
+- **Month arithmetic in `local-day.ts`**, beside the week arithmetic, because `phase-2m-local-day-guard.test.ts` fails the build on a module that derives its own day boundaries. `addLocalMonths` **clamps**: 31 January plus one month is 28 February, never 3 March — which is how a *next month* control comes to skip February from the thirty-first.
+- **`ReminderComposer`**, the fourth consumer of `ConfirmDialog`, reusing `.task-command-dialog-form`. Groups content; date and time; importance; an optional link; then save and cancel — asserted by **DOM position**, because a presence test passes on any arrangement. The optional link is a task picker whose titles pass through the sensitivity contract: `ProtectedContent` cannot live inside an `<option>`, so `task-options.ts` asks the same question the same way and a withheld task keeps a **choosable, unreadable** option.
+- **`e2e/online-phase-2p-planning.spec.ts`** — 24 authenticated journeys passing on desktop and Pixel 7.
+
+### Removed
+
+- **`ReminderForm` and its writer.** The header carried an inline creation form permanently open above the list. `2P-REMINDER-001` asks for a single action; the form is deleted rather than left dormant.
+- **An inert `max-height` on a month `<td>`.** Table cells treat height as a minimum, so the rule claimed a ceiling it did not impose and a "capped" cell measured 240px in a real engine. A declaration that does nothing is worse than none.
+
+### Fixed
+
+- **A reminder created for 14:00 in São Paulo was stored as 14:00Z** and would have fired three hours early. The old writer converted its `datetime-local` value with a bare `new Date(...)`, which resolves a wall clock in the host's zone. `2P-REMINDER-003` is why it MOVED rather than being wrapped: the reschedule command had been resolving the same kind of value against `profiles.timezone` since DEC-6, and the creation schema now reuses those exact declarations. `schema.test.ts` runs every case through **both** parsers and compares the verdicts.
+- **`assertActiveAccount`** was carried by the previous writer, dropped in the first draft of the move, and put back.
+- **A specificity bug** exposed by removing two class names no rule reached: `.reminder-compose-check` at `0,1,0` lost to `.task-command-dialog-form label` at `0,1,1`, so the checkbox would have stacked above its own words with a rule right there that looked correct.
+
+### Notes — two new remainders, neither with an owner signature
+
+- **`2P-CALENDAR-MONTH-TELEMETRY`.** The orientation vocabulary has a third copy inside the **deployed** `private.validate_product_event_properties`, which admits exactly `['day','week','agenda']` — read live from the hosted database, not inferred from the file. Widening it is a third Phase 2P migration and therefore a stop condition. Emitting anyway would produce an event the client accepts, the database refuses and nobody sees, because `recordProductEvent` maps `22023` to a value it returns; relabelling a month as `agenda` would put a false statement in an append-only ledger. So `calendar_viewed` is not emitted for the month, the client list stays pinned to the migration's literals by a test that reads them out of it, and the type makes the omission a build error rather than an accident. Consistent with the requirement's own "creates no new write path".
+- **`2P-REMINDER-REVALIDATE-HANG`.** The first *working* `revalidatePath` this route has ever had freezes the dialog: server answers 200, nothing logged in the server, the console or as a page error, `pending` stuck true. Measured against `next start` over ten consecutive creations — no revalidation 10/10 at ~1.4s; with it ~3.9s and a hang past 120s after two to five; refresh moved to the client 10/10 at ~1.88s. **It is not this slice's code:** it reproduces with 2P.7's own loader stubbed out of the page, and a worktree at `main` `d30177f` with the old form fails the same journey 2 in 12. `applyReminderCommand` still revalidates a resolved path, so **no action on this page had ever re-rendered it**. The refresh moved to the client, after the dialog closes, where ordering — not luck — makes it safe. **A caution for the remaining `revalidatePath` repairs: fixing one can turn a dead call into a live freeze.**
+- **Five guards found real defects and none was weakened.** A fixed day length in the month's day count (fixed by not needing a subtraction); two blocklists in this slice's tests duplicating the recurrence enforcer (replaced by closed lists, following §100's *one enforcer, one recorder* rather than broadening a single-file exemption); two class names no rule reached; the writer's move; and the mirror requiring a browser lane for every class the month renders. The 2P guard's month fact assertion **flipped**, which §100 said would be the delivery, and it stays a closed list so a fifth orientation still fails it.
+- **Grid and list are both in the DOM and CSS picks one**, with `display:none` on each side — the only property that also removes a subtree from the accessibility tree, so a reader hears one month rather than two. A viewport test in JavaScript would make the first paint disagree with the second.
+
 ## 2026-08-19 - Owner decisions: 2P-CALENDAR-001 means a real month, and 2P-REMINDER-002 drops recurrence
 
 Documentation and one guard. Slice 2P.6's re-audit found two of slice 2P.7's requirements naming things the product does not have, and put both to the owner instead of resolving them. Both are now answered, in opposite directions. **The count stays 87 and no ID is renumbered.**
