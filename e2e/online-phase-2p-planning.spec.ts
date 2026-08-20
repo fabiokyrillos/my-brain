@@ -359,6 +359,77 @@ test.describe("a reminder is created through a dialog", () => {
     await expect(dialog).toBeHidden();
   });
 
+  /**
+   * Another owner's task is not offered, and is refused if submitted anyway.
+   *
+   * Two halves, because they fail differently. The **picker** is owner-scoped in
+   * its own query, so a foreign task never becomes an option — that is the half
+   * a reader can see. The **action** re-checks the submitted id against the
+   * caller's own rows, which is the half that matters: a `<select>`'s value is
+   * caller-supplied data whatever rendered the form, and the foreign key alone
+   * would happily accept a task that exists and belongs to somebody else.
+   *
+   * The refusal is a localized sentence rather than a silent unlinked reminder,
+   * so the owner is told the link did not happen instead of discovering it
+   * later.
+   */
+  test("does not offer another owner's task, and refuses one that is submitted anyway", async ({ page }) => {
+    const stranger = await createAccount("planning-stranger");
+    // The one service-role write in this file beyond account creation: a task
+    // for the OTHER account, which the product under test must never surface.
+    const seeded = await fetch(`${supabaseUrl}/rest/v1/tasks`, {
+      method: "POST",
+      headers: {
+        apikey: serviceRoleKey!,
+        authorization: `Bearer ${serviceRoleKey}`,
+        "content-type": "application/json",
+        prefer: "return=representation",
+      },
+      body: JSON.stringify({
+        user_id: stranger.id,
+        title: "Tarefa de outra pessoa",
+        status: "todo",
+      }),
+    });
+    expect(seeded.ok, await seeded.clone().text()).toBe(true);
+    const [foreign] = (await seeded.json()) as { id: string }[];
+
+    try {
+      await signInOnline(page, { email: owner.email, locale: "pt-BR" });
+      await page.goto("/pt-BR/app/reminders");
+      await page.getByRole("button", { name: COPY["pt-BR"].open }).click();
+      const dialog = page.getByRole("dialog");
+      const select = dialog.getByLabel(COPY["pt-BR"].link);
+
+      // Not offered, and not merely masked: the title is absent from the page
+      // and so is the id.
+      await expect(select.getByRole("option", { name: /Tarefa de outra pessoa/ })).toHaveCount(0);
+      expect(await select.innerHTML()).not.toContain(foreign.id);
+      await expect(page.getByText("Tarefa de outra pessoa")).toHaveCount(0);
+
+      // Submitted anyway, by planting the option the product refused to render.
+      await select.evaluate((node, id) => {
+        const option = document.createElement("option");
+        option.value = id;
+        option.textContent = "planted";
+        (node as HTMLSelectElement).append(option);
+        (node as HTMLSelectElement).value = id;
+      }, foreign.id);
+      await dialog.getByLabel(COPY["pt-BR"].content).fill("Deve ser recusado");
+      await dialog.getByLabel(COPY["pt-BR"].when).fill(futureLocal(2));
+      await dialog.getByRole("button", { name: COPY["pt-BR"].save }).click();
+
+      // Refused, said so, and nothing written.
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByText(/Essa tarefa não está disponível/)).toBeVisible();
+      await dialog.getByRole("button", { name: COPY["pt-BR"].cancel }).click();
+      await expect(page.locator(".reminder-row").filter({ hasText: "Deve ser recusado" }))
+        .toHaveCount(0);
+    } finally {
+      await deleteAccount(stranger.id);
+    }
+  });
+
   test("renders the dialog in English too", async ({ page }) => {
     await signInOnline(page, { email: owner.email, locale: "en" });
     await page.goto("/en/app/reminders");
