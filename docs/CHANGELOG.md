@@ -2,6 +2,42 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-20 - Slice 2P.8: the closeout, a defect that did not reproduce, and a record that was false
+
+**`2P-MOBILE-001` … `-005`, `2P-ACCESS-001` … `-005`, `2P-CLOSE-001` … `-005`. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live at closeout. 87 of 87 classified — 65 built, 13 baseline, 4 partial, 4 not-built-by-rule, 1 undelivered. The phase does NOT close: a real iPhone and a real VoiceOver session are ADR-122 Decision 6's gate.**
+
+### Added
+
+- **`scripts/generate-phase-2p-traceability.mjs`** — reads the PRD and the acceptance records, applies the traceability contract's twelve refusals, and writes `PHASE_2P_TRACEABILITY_MATRIX.md` or refuses entirely. `--check` fails byte for byte on a hand edit. Only three of the eight records preceding the closeout carry a machine-readable classification section, so the closeout record carries the other 59; refusing the six prose records would make the generator unusable, and retrofitting sections would edit records the owner instructed be preserved. It still fails closed — a misspelled heading drops 59 classifications and refuses.
+- **A WebKit iPhone lane.** `playwright.config.ts` gains `iphone-emulated`; `devices["iPhone 15"]` carries `defaultBrowserType: "webkit"`, so it is a genuinely different engine from the Pixel 7 project rather than Chromium in a costume. Two of three probe defects appeared only there. It proves nothing about a device, iOS Safari itself, the software keyboard, the PWA shell or VoiceOver, and **CI does not select it** — the workflow installs `chromium` only and is unchanged.
+- **`e2e/online-phase-2p-closeout.spec.ts`** — `2P-ACCESS-001` … `-004` and `2P-MOBILE-001` … `-004`, 12 tests on three lanes. All five navigation surfaces are proved to be named `<nav>` landmarks with exactly one `aria-current="page"`, real links, no ARIA tab role and no roving `tabindex`, with keyboard, Enter, back and forward moving `aria-current`.
+- **`e2e/online-phase-2p-conversation.spec.ts`** — a new conversation, a real BYOK gate refusal that leaks no key, model id, SQLSTATE or stack frame, recovery into Settings, and a round-trip that fabricates no subject.
+- **`src/lib/closeout/phase-2p-traceability.test.ts`** — every refusal exercised in both directions, including that a row cannot discharge its destination or its rule by containing its own identifier.
+- **Two reminder lifecycle proofs** in `e2e/online-reminders.spec.ts`: a write is reflected with no manual reload, and a stale second view replays rather than duplicating while a diverging one is refused in words.
+
+### Fixed
+
+- **The shared composer had no live region at all.** Every announcing element was rendered conditionally, so the `role="status"` region arrived already populated — and a live region created in the same commit as its content is frequently never announced. `2P-ACCESS-001` was true of the visible text and false of the audible one. A persistent `sr-only` polite region now carries send and upload state; `role="alert"` is left where it is because an alert *is* announced on insertion; and the visible success echo lost its role so nothing is read out twice. `composer-copy.ts` gains `attachmentSending` in both locales.
+
+### Corrected
+
+- **`applyReminderCommand`'s docstring stated something false.** Slice 2P.7 recorded that *"no action on the reminders page has ever actually re-rendered it"* and the PRD repeated it. It is **false**: every lifecycle action re-renders the list in place, established with a mutation control rather than by reading. `revalidatePath` accepts a literal resolved segment; what it cannot reach is a route that is not the URL it names — `/pt-BR/app/reminders` *is* the rendered URL, while `/pt-BR/app/settings` was not, because that surface sits under a second dynamic segment. The freeze also did not reproduce (12 of 12 creations, desktop and phone), **so no repair was written** — changing `createReminder` to match would put the re-render back inside the transition that governs the dialog.
+- **An unscoped `getByRole("status")`** in `home-dashboard.test.tsx` stopped being unique once the composer gained its region. The assertion was made precise — query by the sentence, then check the role — rather than the region removed.
+
+### Changed
+
+- `phase-2p-declarations.test.ts` flips from asserting the closeout artifacts are absent to asserting they exist, which is the flip ADR-122 Decision 2 named in advance; the sentence naming 2P.8 as the boundary is still asserted, so the flip cannot read as the rule having been dropped.
+- `package.json` gains `docs:phase-2p:traceability`.
+
+### Decisions
+
+- **ADR-122, four amendments dated 2026-08-20**, prior text preserved throughout: `2P-ACCESS-003` is interpreted as the navigation the product actually uses and **not** as ARIA tabs, reversing none of the five signed decisions; `2P-CALENDAR-MONTH-TELEMETRY` is **refused funding**, so the month keeps no event and the contract's refusal 9 must not fire on it; `2P-REMINDER-REVALIDATE-HANG` is authorized to repair without a migration and only after reproducing; and the requirement count is confirmed at **72 before this slice**, corrected forward, with no eighty-eighth requirement invented.
+
+### Not claimed
+
+- Anything on real hardware; any screen-reader run; any automation — all six categories remain `suggest_only`; any migration; and any change to signup, rollout, grants, RLS, retention or authority. Push HTTP 403 was not resumed. `2P-CHAT-007-JOURNEY`'s one real answered turn is **unspendable, not declined**: no AI credential exists in this environment.
+
+
 ## 2026-08-19 - Slice 2P.7: the calendar gets a real month, a reminder is written in a dialog, and the first working revalidatePath on that route froze it
 
 **`2P-CALENDAR-001` … `-005`, `2P-REMINDER-001` … `-005` — five built, five baseline. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live. Cumulative 72 of 87 (the inherited 73 double-counted a closed remainder; see the acceptance record).**

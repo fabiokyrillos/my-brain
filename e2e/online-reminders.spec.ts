@@ -324,6 +324,194 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await expect(row(page, title).getByText("Agendado")).toBeVisible();
   });
 
+  /**
+   * `2P-REMINDER-REVALIDATE-HANG`, second half — the list must reflect the write.
+   *
+   * ## What every other test in this file quietly worked around
+   *
+   * Read the three journeys above: **every** assertion about the list following
+   * a write is preceded by `page.reload()` or `page.goto()`. That was not
+   * caution. `applyReminderCommand` revalidated `/${locale}/app/reminders` — a
+   * **resolved** path, which matches nothing under a dynamic `[locale]`
+   * segment — so snooze, reschedule, edit, cancel and restore all wrote their
+   * row and **no action on this page ever re-rendered it**. The journeys passed
+   * because they navigated, and a reader would have concluded the surface
+   * updates itself.
+   *
+   * ## Why this test names five causes instead of asserting one outcome
+   *
+   * "The interface did not update" has five candidate explanations here, and
+   * the owner's authorization requires telling them apart rather than picking
+   * the likely one. So each is measured on its own:
+   *
+   * | # | Claim | How this test settles it |
+   * |---|---|---|
+   * | 1 | the Server Action answered | the page outcome region carries its sentence |
+   * | 2 | `pending` ended | the control that was disabled is enabled again |
+   * | 3 | the write happened | a later reload shows the same value this test read in place |
+   * | 4 | the transition is not stuck | 1 and 2 both hold, and no dialog is involved |
+   * | 5 | **the list re-rendered** | the row changes with **no reload between** |
+   *
+   * Against `main` `f52755c` rows 1–4 pass and row 5 fails, which is the exact
+   * shape of *"an action can write and leave the interface not reflecting the
+   * result"*. It is **not** the freeze half — that one is `pending` stuck true,
+   * and row 2 rules it out.
+   *
+   * ## Both row fates, and the undo
+   *
+   * Snooze keeps the row in view, so it proves an **in-place update**; cancel
+   * moves it out, so it proves an **in-place removal**; restore is cancel's undo
+   * and proves the reverse. A test that only covered one would pass on a fix
+   * that only handled that one.
+   */
+  test("a lifecycle action reflects in the list with no manual reload", async ({ page }) => {
+    await signIn(page);
+    const title = await createReminder(page);
+    // The one navigation this test is allowed: it establishes the starting
+    // list. Every assertion after it must hold without another.
+    await page.reload();
+
+    const schedule = () => row(page, title).locator(".reminder-schedule");
+    const before = await schedule().innerText();
+
+    // ---- the row stays in view: the update must be visible in place ----
+    await row(page, title).getByLabel("Adiar").selectOption("60");
+    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+
+    // 1 — the response arrived.
+    await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
+    // 2 — `pending` ended: the shared action re-enables every control it
+    //     disabled. A stuck transition would leave this button disabled
+    //     forever, which is the freeze half and is not what is happening.
+    await expect(row(page, title).getByRole("button", { name: "Adiar" })).toBeEnabled({
+      timeout: 30_000,
+    });
+    // 5 — the defect. Snoozing by an hour moves a reminder five days out to
+    //     roughly now, so the rendered instant cannot coincidentally match.
+    await expect(schedule()).not.toHaveText(before, { timeout: 30_000 });
+
+    // 3 — and what was rendered in place is what the database actually holds,
+    //     so this is a real re-render rather than an optimistic guess.
+    const inPlace = await schedule().innerText();
+    await page.reload();
+    expect(await schedule().innerText()).toBe(inPlace);
+
+    // ---- the row leaves the view: the removal must be visible in place ----
+    await row(page, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    await page.getByRole("button", { name: "Sim, cancelar" }).click();
+    await expect(outcome(page)).toHaveText("Lembrete cancelado.", { timeout: 30_000 });
+    await expect(row(page, title)).toHaveCount(0, { timeout: 30_000 });
+
+    // ---- undo: restore leaves the cancelled view, also in place ----
+    await page.goto("/pt-BR/app/reminders?view=cancelled");
+    await expect(row(page, title).getByText("Cancelado")).toBeVisible();
+    await row(page, title).getByRole("button", { name: "Reativar" }).click();
+    await expect(outcome(page)).toHaveText("Lembrete reativado.", { timeout: 30_000 });
+    await expect(row(page, title)).toHaveCount(0, { timeout: 30_000 });
+
+    // And the undo really landed: it is back in the pending view.
+    await page.goto("/pt-BR/app/reminders?view=pending");
+    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+  });
+
+  /**
+   * `2P-REMINDER-REVALIDATE-HANG`, the failure side — a refused write must read
+   * as a refusal.
+   *
+   * The test above proves the surface reflects a write that **succeeded**. The
+   * dangerous inverse is a surface that reflects one that did not: the owner's
+   * authorization names *"never turn a timeout into a success"* and *"show a
+   * true error when the response fails"*, and neither had a proof at the
+   * surface. The RPC's own refusal is proved further down this file, but a
+   * database that says no and a page that says nothing is exactly the shape
+   * this repository has paid for before.
+   *
+   * The race is made with **two pages in one browser context**, both driven
+   * through the product — no harness write, no injected state. Page B moves the
+   * reminder; page A is now holding a pre-state that no longer matches, and
+   * pressing its control is the same collision the hourly heartbeat produces.
+   */
+  test("a stale second view replays rather than duplicating, and is refused when it diverges", async ({
+    page,
+    context,
+  }) => {
+    await signIn(page);
+    const title = await createReminder(page);
+    await page.goto("/pt-BR/app/reminders");
+    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+
+    // A second view of the same list, holding the same pre-state. Both tabs
+    // therefore derive the SAME operation key, which is the whole point.
+    const stale = await context.newPage();
+    await stale.goto("/pt-BR/app/reminders");
+    await expect(row(stale, title).getByText("Agendado")).toBeVisible();
+
+    const preState = (target: Page) =>
+      row(target, title).locator("input[name='expectedState']").first().inputValue();
+    expect(await preState(stale)).toBe(await preState(page));
+
+    // ---- 1. the same action twice: a replay, not a second write ----
+    await row(page, title).getByLabel("Adiar").selectOption("60");
+    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
+    const applied = await preState(page);
+
+    await row(stale, title).getByLabel("Adiar").selectOption("60");
+    await row(stale, title).getByRole("button", { name: "Adiar" }).click();
+    await expect(outcome(stale)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
+
+    /*
+      The replay must report what the FIRST operation produced, and the row must
+      still carry exactly one snooze.
+
+      The pre-state input is what makes this decidable: it carries the instant
+      at microsecond precision, so two snoozes issued seconds apart are
+      distinguishable in a way the rendered minute is not. Equal here means one
+      write, which is `2P-REMINDER`'s "not duplicated" clause proved through the
+      surface rather than at the RPC.
+    */
+    await stale.reload();
+    expect(await preState(stale)).toBe(applied);
+
+    // ---- 2. a diverging action on a stale pre-state: a true refusal ----
+    // Back to the stale view by reloading nothing — this tab now holds the
+    // CURRENT state, so the stale one is `page`'s original. Re-establish it by
+    // acting from a view that has not seen the snooze.
+    const diverging = await context.newPage();
+    await diverging.goto("/pt-BR/app/reminders");
+    await expect(row(diverging, title).getByText("Agendado")).toBeVisible();
+
+    // Move it again from the first tab, so `diverging` is now behind.
+    await page.reload();
+    await row(page, title).getByLabel("Adiar").selectOption("180");
+    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
+
+    // `diverging` attempts a DIFFERENT action, so its operation key is not the
+    // replay of anything — the pre-state comparison is what answers.
+    await row(diverging, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    await diverging.getByRole("button", { name: "Sim, cancelar" }).click();
+
+    await expect(outcome(diverging)).toHaveText(
+      "O lembrete mudou enquanto esta página estava aberta. Recarregue e tente de novo.",
+      { timeout: 30_000 },
+    );
+    await expect(outcome(diverging)).toHaveClass(/error/);
+
+    // `pending` still ends on the failure path: a refused write must not leave
+    // the surface disabled with no way forward.
+    await expect(
+      row(diverging, title).getByRole("button", { name: "Cancelar lembrete" }),
+    ).toBeEnabled({ timeout: 30_000 });
+
+    // And the refusal really refused: it is still scheduled, not cancelled.
+    await page.reload();
+    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+
+    await stale.close();
+    await diverging.close();
+  });
+
   test("a cancelled reminder offers only reactivate, and a delivered one offers nothing", async ({
     page,
   }) => {

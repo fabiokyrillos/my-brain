@@ -10765,3 +10765,160 @@ twice and neither of which carries an owner signature of its own.**
 **Three things need the owner before 2P.8 can be finished:** the two remainders
 above, and `2P-ACCESS-003`'s wording. Two more — `2P-ACCESS-005` and the hardware
 half of `2P-MOBILE-001`/`-005` — cannot be discharged by any agent at all.
+
+## §103 — Slice 2P.8 ships: the defect the owner signed did not reproduce, and the record it rested on was false (2026-08-20)
+
+**Baseline `main` `f52755c`** — the 2P.7 handoff merge (§102). Clean, zero open
+PRs, **99 local = 99 hosted, parity `202608190099`**, read live before editing.
+**72 of 87.** Both allocations spent; a third a stop condition. Signup closed;
+rollout 25 pass · 3 fail · 2 owner-signature.
+
+**Zero migrations.** The phase reaches its owner checkpoint, and **does not
+close.**
+
+### The owner signed four decisions, and all four are recorded by amendment
+
+`2P-ACCESS-003` means the navigation the product actually uses — links,
+`aria-current="page"`, visible focus, keyboard, back and forward — and **not**
+ARIA tabs, **not** a roving tabindex, and **not** a reversal of five signed
+decisions. `2P-CALENDAR-MONTH-TELEMETRY` is **refused funding**: no third
+migration, no vocabulary widening, and refusal 9 must not fire on it because
+*the absence of an event is not a broken event*. `2P-REMINDER-REVALIDATE-HANG`
+is **authorized to repair**, without a migration, after reproducing first. The
+count is **72**, corrected forward, with **no eighty-eighth requirement**.
+
+Prior text is preserved everywhere; the amendments sit under ADR-122 and beside
+the requirements in the PRD.
+
+### The signed defect did not reproduce, and the reason it was recorded was false
+
+The authorization required reproducing before editing, and that is the whole
+value of it.
+
+| Recorded in §101 and the PRD | Re-measured on `f52755c` |
+|---|---|
+| *"no action on this page has ever actually re-rendered it"* | **false** — every lifecycle action re-renders the list in place |
+| the creation dialog freezes | **did not reproduce** — 12 of 12, ~14.5 s each |
+| the same on a phone | did not reproduce |
+
+**A passing test proves nothing on its own**, so the revalidation was deleted,
+the app rebuilt, the server stopped *and killed by PID* — it survived the task
+stop, and the old build would otherwise have served the run — and the journey
+re-run. It failed at the in-place assertion and nowhere else; restoring the line
+made it pass.
+
+**`revalidatePath` accepts a literal resolved segment.** Slice 2P.4 measured one
+doing nothing on `/app/settings` and generalised. The true statement is narrower:
+a resolved path revalidates **the URL it names**. `/pt-BR/app/reminders` *is* the
+rendered URL; `/pt-BR/app/settings` was not, because that surface lives under a
+second dynamic `[section]` segment. *The generalisation was wrong, not the
+measurement it came from.*
+
+**No repair was written.** Changing `createReminder` to match would put the
+re-render back inside the transition that governs the dialog, which is the one
+thing §101's ten-run measurement says not to do. **A defect that does not
+reproduce is not repaired by rewriting the code that avoids it.** What was
+written is proof the properties hold — reflected without reload, `pending` ends,
+a replay writes **once**, and a diverging stale write is **refused in words**.
+
+*That last pair started as a failing test with a wrong premise: two views
+pressing the same control derive the **same** content-derived operation key, so
+the second submit is an idempotent replay and success is correct. Refusing it
+would have been the duplicate-write bug.*
+
+### `2P-CLOSE-001` — the generator, and what Phase 2P actually wrote
+
+`scripts/generate-phase-2p-traceability.mjs` applies the contract's twelve
+refusals and writes the matrix or refuses entirely. **87 declared · 87
+classified · 0 unclassified** — 65 built, 13 baseline, 4 partial, 4
+not-built-by-rule, 1 undelivered.
+
+**Only three of the eight records preceding the closeout carry a machine-readable classification section**
+(2P.4, 2P.5, 2P.7 = 28 requirements). The other six state outcomes in prose.
+Refusing them would make the generator unusable and retrofitting sections would
+edit records the owner said to preserve — so the rule is inverted: a record
+without a section contributes nothing, and the closeout record carries the
+remaining **59**. It still fails closed: a misspelled heading here drops 59
+classifications and the run refuses.
+
+**The rows that look like classifications and are not:** slice 2P.3 §1 is a
+**re-audit** table stating the pre-state. Reading it would produce a matrix
+describing the tree that was replaced.
+
+**It found three real defects on its first run** — `2P-AUTONOMY-005`, `-006`,
+`-007` are `not-built-by-rule` citing no checkable authority. The guard was not
+weakened and 2P.4's record was not edited; the closeout re-states those three
+with ADR-123 named, which is agreement rather than conflict.
+
+### The iPhone lane is a real engine, and CI does not run it
+
+`devices["iPhone 15"]` carries `defaultBrowserType: "webkit"`, so
+`--project=iphone-emulated` is **Playwright's WebKit** at an iPhone viewport —
+genuinely different from the Pixel 7 project, which is Chromium too. **Two of
+the three probe defects appeared only there.**
+
+It proves nothing about a device, iOS Safari itself, the software keyboard, the
+PWA shell or VoiceOver. CI installs `chromium` only and was not changed; the
+lane has the standing every `online-*.spec.ts` lane has.
+
+### One real product defect, and six probe defects
+
+**The composer had no live region at all.** Every announcing element was
+conditional — the attachment result arrived *with* its `role="status"` already
+populated, and a region created in the same commit as its content is frequently
+never announced. `2P-ACCESS-001` was true of the visible text and false of the
+audible one. The fix is the shape the reminders banner already used: one
+persistent `sr-only` polite region, empty when idle; `role="alert"` left alone
+because an alert *is* announced on insertion; the visible echo desroled so
+nothing is read twice.
+
+**Six probes were wrong and each was verified in the sources first:** Next's own
+route announcer is `assertive` by design (`grep` in `src` returns nothing); the
+file input **is** named by a wrapping `<label aria-label>`; `/app/settings`
+renders Geral rather than redirecting, deliberately, so titles coincide; a
+`page.title()` read raced WebKit; `settings/ia` is `ai`; and demanding a
+correlation id from a gate refusal demanded a reference for an error that never
+occurred. **A partial accessible-name computation does not under-report — it
+accuses working code.**
+
+### `2P-CHAT-007-JOURNEY` — unspendable, not declined
+
+The owner authorized one real answered turn. **No AI credential exists in this
+environment** — `BYOK_TEST_USER_A_OPENAI_API_KEY` is absent and there is no
+platform key either, established by listing variable **names** only. The
+repository's existing answered-turn journey **skips itself** for the same
+reason. Proved instead, on desktop and Pixel 7: a new conversation, a **real**
+gate refusal that leaks nothing, recovery into Settings, and a round-trip that
+fabricates no subject.
+
+### Evidence
+
+`typecheck` 0. `lint` — the only findings outside gitignored `.worktrees/` are
+the pre-existing `costs/page.tsx` warning. `npm test` **8688 passed, 0 failed
+tests**, 3 failed *files* = the recorded Windows shebang baseline. `build`
+passes. The **exact CI foundation command** 383 passed, 5 skipped.
+`online-phase-2p-closeout.spec.ts` **12 × 3 lanes = 36**;
+`online-phase-2p-conversation.spec.ts` **4 × 2 = 8**; the two new reminder
+proofs green on both lanes. Every browser proof ran against a **rebuilt**
+`next start`, with the stop **verified by port**.
+
+Hosted at closeout: 99 = 99, `202608190099`, **zero fixture residue with a
+two-sided control and zero orphans across four tables**, rollout 25 · 3 · 2,
+signup closed, all six automation categories `suggest_only`.
+
+*The one new failing test was mine: the Home page now has two polite regions,
+and an unscoped `getByRole("status")` stopped being unique. The assertion was
+made precise rather than the region removed.*
+
+### Where this stops
+
+`CHECKPOINT DO DONO — IPHONE REAL E VOICEOVER NECESSÁRIOS`.
+`PHASE_2P_OWNER_DEVICE_CHECKLIST.md` carries twelve numbered blocking steps and
+a separate list of what does not block, with instructions for reporting a
+failure without personal content.
+
+**Phase 2P does not close here.** `2P-ACCESS-005` is `undelivered` and the
+hardware half of `2P-MOBILE-001`/`-005` and `2P-MOBILE-002`'s keyboard half are
+owner-run. Every other remainder is routed and unabsorbed. **This section
+deliberately does not name what comes after Phase 2P**, and nothing about it was
+started or planned.
