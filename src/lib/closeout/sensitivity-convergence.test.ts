@@ -30,9 +30,40 @@ describe("2J-PRIVACY-001: the surfaces that render classified content consume th
       .toMatch(/presentationFor\(\s*"attention"/);
   });
 
-  it("review summaries read the contract", () => {
-    expect(code("src/features/reviews/review-body.tsx"))
-      .toMatch(/resolveContent\(\s*\n?\s*"review_summary"/);
+  /*
+   * The review disclosure was **retired by owner amendment on 2026-08-20**, and
+   * this assertion is replaced rather than deleted.
+   *
+   * It used to require `review-body.tsx` to call
+   * `resolveContent("review_summary", ...)`. That component no longer exists: a
+   * person who has signed in and deliberately opened a review that belongs to
+   * their own account sees it, without a second click.
+   *
+   * The masking RULE is untouched -- `review_summary` still resolves
+   * `{ normal: SHOW, private: SHOW, highly_sensitive: MASK }`. The mask never
+   * came from the rule; it came from that component hard-coding
+   * `highly_sensitive` as the level of every summary, because `summaries`
+   * carries no classification to read. **Fabricating the most protective level
+   * for a row that has none is what was overruled**, so the new invariant is the
+   * one that keeps that from creeping back.
+   */
+  it("no reviews surface fabricates a sensitivity level for a row that has none", () => {
+    for (const file of [
+      "src/app/[locale]/app/reviews/[reviewId]/page.tsx",
+      "src/features/reviews/review-presentation.ts",
+      "src/features/reviews/review-list.ts",
+    ]) {
+      expect(code(file), file + " invents a classification for a summary")
+        .not.toMatch(/resolveContent\(|"highly_sensitive"/);
+    }
+  });
+
+  it("still has a classification to fabricate, so the check above is not vacuous", () => {
+    // The control: the level the retired component used is a real value of the
+    // real vocabulary, so a surface that started passing it would be caught.
+    const contracts = code("src/features/sensitivity/contracts.ts");
+    expect(contracts).toContain("highly_sensitive");
+    expect(contracts).toMatch(/review_summary:\s*\{/);
   });
 
   it("the conversation card reads the contract (2K-PRIVACY-001)", () => {
@@ -391,7 +422,6 @@ describe("2J-PRIVACY-001: the notification clause governs a surface that does no
 describe("2J-PRIVACY-002: the reveal is local everywhere it exists", () => {
   it("writes no preference, cookie or storage from any revealing surface", () => {
     for (const file of [
-      "src/features/reviews/review-body.tsx",
       "src/features/shell/home-view.tsx",
       "src/features/daily-cycle/needs-attention-list.tsx",
       "src/features/conversation-cards/card.tsx",

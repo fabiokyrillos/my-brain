@@ -12,7 +12,6 @@ import { getReviewDetailCopy } from "@/features/reviews/copy";
 import { parseReviewMarkdown } from "@/features/reviews/markdown";
 import { formatReviewPeriodRange } from "@/features/reviews/period-format";
 import { RenderedReviewContent } from "@/features/reviews/rendered-markdown";
-import { ReviewDisclosure } from "@/features/reviews/review-body";
 import { calendarOrientationFor } from "@/features/reviews/review-periods";
 import { toReviewDetailView } from "@/features/reviews/review-presentation";
 import { requireUser } from "@/lib/auth/require-user";
@@ -152,22 +151,37 @@ export default async function ReviewDetailPage({
       </header>
 
       {/*
-        The words, behind the disclosure OD-2J-1 signs.
+        The words, shown — **an owner amendment to OD-2J-1, signed 2026-08-20**.
 
-        `summaries` has no sensitivity column and a review covers a whole period,
-        so it can contain anything that period contained — the surface's posture
-        is `highly_sensitive` for every row, and the reveal is local, transient
-        and written nowhere. The content is parsed on the server and handed to the
-        disclosure as elements; the disclosure decides only whether they render.
+        This page used to open masked, behind a "Mostrar resumo" control. The
+        owner's reasoning for removing it is on the record and is about *this*
+        page specifically: a person who has already signed in and deliberately
+        opened a review **that belongs to their own account** should not have to
+        click again to see it.
+
+        ## What the amendment did NOT change
+
+        The masking rule itself is untouched: `review_summary` still resolves
+        `{ normal: SHOW, private: SHOW, highly_sensitive: MASK }` in
+        `sensitivity/contracts.ts`, exactly as `hoje`, `attention` and `chat` do.
+        **The mask never came from that rule.** It came from `review-body.tsx`
+        hard-coding `highly_sensitive` as the level of every summary, because
+        `summaries` carries no classification to read. Fabricating the most
+        protective level for a row that has none is what the owner overruled.
+
+        The listing still carries **no content at all** — `loadReviewListProjection`
+        does not select the column and `toReviewSummaryView` has no such field —
+        so "visible by default" reaches exactly one place: an authenticated
+        owner's own review, on its own page. Access control is unchanged: the
+        read is `eq("user_id", user.id)` under RLS, and a row that is not the
+        reader's simply does not come back.
       */}
       <section aria-labelledby="review-content" className="review-detail-content">
         <h2 id="review-content">{copy.contentHeading}</h2>
         {blocks.length === 0 ? (
           <UniversalStateLine description={copy.contentEmpty} locale={locale} state="empty" />
         ) : (
-          <ReviewDisclosure locale={locale} reviewId={review.id}>
-            <RenderedReviewContent blocks={blocks} />
-          </ReviewDisclosure>
+          <RenderedReviewContent blocks={blocks} />
         )}
       </section>
 

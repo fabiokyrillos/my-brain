@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -139,17 +139,28 @@ describe("a review that is not the reader's own is indistinguishable from one th
 });
 
 describe("the stored Markdown is rendered, never shown raw and never executed", () => {
-  it("hides the content until it is explicitly asked for", async () => {
-    // OD-2J-1: `summaries` has no sensitivity column, so every summary is masked.
+  it("shows the content without a second click, and offers no reveal control", async () => {
+    /*
+      **ADR-124 Decision 1**, an owner amendment to OD-2J-1. This test is the
+      inverse of the one it replaces, which asserted the page opened masked.
+
+      The mask never came from the sensitivity rule — `review_summary` resolves
+      `{ normal: SHOW, private: SHOW, highly_sensitive: MASK }` like every other
+      content surface. It came from a component hard-coding `highly_sensitive`
+      for every summary, because `summaries` carries no classification to read.
+      A person who has signed in and deliberately opened a review that belongs to
+      their own account now simply sees it.
+    */
     const { container } = await mount();
-    expect(screen.getByText("Resumo oculto por padrão.")).toBeInTheDocument();
-    expect(container.textContent).not.toContain("Contrato");
-    expect(container.querySelector('[data-masked="true"]')).not.toBeNull();
+    expect(container.querySelector(".review-content")).not.toBeNull();
+    expect(container.textContent).toContain("Contrato");
+    expect(screen.queryByRole("button", { name: "Mostrar resumo" })).toBeNull();
+    expect(screen.queryByText("Resumo oculto por padrão.")).toBeNull();
+    expect(container.querySelector("[data-masked]")).toBeNull();
   });
 
-  it("renders headings and lists instead of hashes and asterisks once revealed", async () => {
+  it("renders headings and lists instead of hashes and asterisks", async () => {
     const { container } = await mount();
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar resumo" }));
 
     const content = container.querySelector(".review-content")!;
     expect(content).not.toBeNull();
@@ -163,7 +174,6 @@ describe("the stored Markdown is rendered, never shown raw and never executed", 
   it("renders markup in the content as text, with no element and no script", async () => {
     const hostile = '<script>alert(1)</script> e <img src=x onerror=alert(1)> e <b>negrito</b>';
     const { container } = await mount({ ...ROW, content: hostile });
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar resumo" }));
 
     const content = container.querySelector(".review-content") as HTMLElement;
     expect(content.querySelector("script")).toBeNull();
@@ -177,7 +187,6 @@ describe("the stored Markdown is rendered, never shown raw and never executed", 
   it("renders a dangerous link as its own words, never as an anchor", async () => {
     const content = "veja [aqui](javascript:alert(1)) e [ali](https://evil.test/steal)";
     const { container } = await mount({ ...ROW, content });
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar resumo" }));
 
     const rendered = container.querySelector(".review-content") as HTMLElement;
     expect(rendered.querySelectorAll("a")).toHaveLength(0);
@@ -194,7 +203,6 @@ describe("the stored Markdown is rendered, never shown raw and never executed", 
      */
     const content = "abra [a tarefa](/pt-BR/app/work/0f8fad5b-d9cb-469f-a165-70867728950e)";
     const { container } = await mount({ ...ROW, content });
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar resumo" }));
 
     const rendered = container.querySelector(".review-content") as HTMLElement;
     expect(rendered.querySelectorAll("a")).toHaveLength(0);
@@ -210,7 +218,6 @@ describe("the stored Markdown is rendered, never shown raw and never executed", 
   it("renders a long review without truncating it", async () => {
     const long = Array.from({ length: 150 }, (_, index) => `- item ${index}`).join("\n");
     const { container } = await mount({ ...ROW, content: long });
-    fireEvent.click(screen.getByRole("button", { name: "Mostrar resumo" }));
     expect(container.querySelectorAll(".review-content li")).toHaveLength(150);
   });
 });

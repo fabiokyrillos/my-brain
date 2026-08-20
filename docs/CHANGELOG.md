@@ -2,6 +2,42 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-20 - The Revisões checkpoint: the tabs answer a tap, and a review's own page shows its words
+
+**Owner checkpoint answered. Items 2, 3, 4, 6 and 8 approved. Item 1 corrected, item 5 reversed by owner decision, item 7 carried to the roadmap successor. ADR-124 records the eight decisions. ZERO MIGRATIONS; parity `202608190099`, unchanged. Phase 2P closes on the owner's approval of a short two-item checkpoint; Phase 2Q is neither started nor planned.**
+
+### Measured, before and after
+
+Against the **production** build both times, because `link.md` states plainly that *"Prefetching is only enabled in production"* — a dev-server number would describe a build nobody ships.
+
+| | before | after |
+|---|---|---|
+| tap → the control looks pressed (desktop) | **1 476 ms** | **13–23 ms** |
+| tap → the control looks pressed (Pixel 7) | **1 427 ms** | **13–25 ms** |
+| tap → the control looks pressed (iPhone WebKit) | **1 643 ms** | **112–132 ms** |
+| tap → new content (desktop) | 1 882 ms | **33–62 ms** |
+| tap → new content (Pixel 7) | 1 865 ms | **48–341 ms** |
+| tap → new content (iPhone WebKit) | 2 021 ms | **181–356 ms** |
+| requests caused by the tap | 3 | **0–2** |
+| prefetch requests on load | 11 | **6–8** |
+| previous content replaced by a skeleton | no | **no** |
+
+### Fixed
+
+- **The tapped control was correct and mute.** `aria-current` is derived on the server from `searchParams` — the right design, since the URL is the source of truth — but it meant the selected state could not move until the new render landed. `useLinkStatus` now renders an **`aria-hidden`, purely presentational** pending indicator, and the anchor picks it up through `:has()` because the hook must be called from a descendant of `Link`. **`aria-current` still comes from the server**, nothing reads the pending state back, and no content is rendered optimistically, so no other period — and no other account — can appear mid-transition.
+- **One whole database wave removed.** The page ran **four** sequential waves where three were enough: the history `await`ed the entire projection just to learn the window's start date. `reviewPeriodWindow` is pure and takes `(tab, day, timezone)`, so the window is now computed once and handed to both reads, which run in parallel. It also makes the two **agree by construction** — a divergence there would put the running period in the history as well, the exact defect this page was redesigned to remove.
+- **A review's own page shows its content.** The disclosure is gone and `review-body.tsx` is deleted.
+
+### Discovered
+
+- **The mask never came from the sensitivity rule.** `review_summary` always resolved `{ normal: SHOW, private: SHOW, highly_sensitive: MASK }`, exactly like `hoje`, `attention` and `chat`. It came from `review-body.tsx` **hard-coding `highly_sensitive` as the level of every summary**, because `summaries` carries no classification column — OD-2J-1's own stated cost. The owner overruled the fabrication, not the rule: **the RULES table is untouched**, and `sensitivity-convergence.test.ts` now asserts the new invariant **positively** — no reviews surface may pass `resolveContent` or the literal `highly_sensitive` — with a non-vacuity control beside it.
+- **The prefetch guess was wrong, and the measurement reversed it.** The first reading of `link.md` said `prefetch` would be expensive: three links in the viewport, each a full dynamic render. Measured, it costs **fewer** requests — 11 on load with the default, 8 with `prefetch` — because the default was already issuing partial prefetches for every link on the page, and for a dynamic route those reach only *"the partial route down to the nearest segment with a `loading.js` boundary"*, which is a shell that buys nothing. With `prefetch`, a tap costs **zero** round trips. A prefetch here is an ordinary RSC render of the same route, under the same session, for the same owner.
+
+### Not delivered, and carried forward
+
+- **`2P-REVIEW-CITATIONS` — high priority for the roadmap successor.** A review must link to the real records it was written from. Re-confirmed against the code and the deployed schema: `openai-provider.ts:337` **already filters** `citedSourceIds` against the ids it was given, so they are real owner-scoped ids read under RLS in that same request; `generateReview` drops them at the `summaries` upsert; `summaries` has `Relationships: []` and no column that could hold one. The minimal model is **one `jsonb` column** in the shape `conversation_messages.citations` has shipped since Phase 2K, plus chat's own re-read-at-render rule for rows that are gone or no longer readable. Entries and tasks only. A link may be born **only** from a canonical, owner-scoped identifier — **never** from a name inferred out of the Markdown, which the renderer's empty allow-set already enforces structurally. Costs **one migration**, deliberately **not created here**. Specified in `docs/reports/phase-2p/PHASE_2P_REVIEW_CITATIONS_REQUIREMENT.md`. **A "Fontes" section is not delivery of this**, and this remainder does not block Phase 2P from closing.
+- **VoiceOver — NOT EXECUTED.** Dispensed by the owner; recorded as not executed, never as approved.
+
 ## 2026-08-20 - Revisões, redesenhada: Dia · Semana · Mês, uma página por revisão, e o Markdown que nunca tinha sido renderizado
 
 **The owner's decision, implemented: each tab shows the current period's review, its actions, and the history of that same kind below it. Every generated review now has its own page and stable URL. ZERO MIGRATIONS; 99 local = 99 hosted, parity `202608190099`. Phase 2P does NOT close, and Phase 2Q is neither started nor planned.**
