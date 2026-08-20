@@ -10922,3 +10922,121 @@ hardware half of `2P-MOBILE-001`/`-005` and `2P-MOBILE-002`'s keyboard half are
 owner-run. Every other remainder is routed and unabsorbed. **This section
 deliberately does not name what comes after Phase 2P**, and nothing about it was
 started or planned.
+
+## §104 — The owner runs the iPhone checkpoint, rejects step 7, and four defects turn out to have two causes (2026-08-20)
+
+**Baseline `main` `68e4edc`** — slice 2P.8's merge (§103). Clean, zero open PRs,
+**99 local = 99 hosted, parity `202608190099`**, read live before editing.
+**Zero migrations.** Phase 2P **does not close**; a second device pass does.
+
+### The result, unrounded in either direction
+
+Steps 1–6 **approved on a real iPhone**. Step 7 **rejected**. VoiceOver:
+**`NOT EXECUTED — owner waived hardware validation`**.
+
+That waiver is recorded as the owner framed it and rounded neither way. It is
+**not a pass** — no screen-reader evidence exists and none is claimed — and it is
+**no longer a blocker**, because the owner released their own ADR-122 Decision 6
+gate on the ground that a screen reader is not part of their use. `2P-ACCESS-005`
+moves `undelivered` → `not-built-by-rule`, **adjudicated visibly** in the matrix.
+*Only the owner could do that, and no automated run may ever be cited as having
+satisfied it.*
+
+### Two causes under four defects
+
+**The calendar had no page container at all.** `CalendarView` rendered
+`<section className="calendar">` straight into `<main>`; every other route wraps
+in `.content-page`. Measured: `paddingLeft` **`0px`**, title and description at
+**x = 0** on both viewports, and at 1280 px the month grid and the reminders
+button running **past the right edge**. That single omission is the whole of
+*"textos muito próximos das bordas"*, the overflow, and the content behind the
+bottom bar. **A whole page's chrome can be missing and every test still pass**,
+because no test asked whether the page had a container.
+
+Beside it: **`.calendar-header` had no CSS rule anywhere**, so the `<h1>`
+inherited body size and rendered *smaller than the range label*. And
+`stylesheet-class-coverage.test.ts` **had been counting it** as an element drawn
+only by the user-agent default. *A debt counter records that something is owed;
+it does not decide what is worth paying first, and nobody read that entry as the
+calendar defect it was.*
+
+**The control band** went from thirteen identical pills across five rows —
+286 px, over 40% of an iPhone viewport before any calendar — to a grid of two
+fixed rows showing the labels both families already carried as `aria-label`:
+**Formato** and **O que mostrar**. *The information a screen reader had was the
+information a sighted reader was missing.*
+
+**Lembretes and Revisões share one cause.** Slice 2P.5 retired `Mais` from the
+bar and replaced one **generic** path to every `more` destination with a set of
+**specific** ones. Two of those are reachable and **not discoverable**: Hoje's
+link to Revisões sits in the **last of seven sections**, ~14 screens down on a
+phone; Lembretes was three hops away, inside a control band.
+
+**Both census rows were true.** `mobile-reachability-guard` proves from **source
+text** that each link exists and is unconditional — and a source-text guard
+cannot see how far down a page an element sits, how many navigations precede it,
+or whether anything names it. **A link that exists is not a link that can be
+found.** The new lane measures the rendered page and counts only links with a
+non-zero box.
+
+Hoje now carries a labelled **Ir para** row — Calendário · Lembretes · Revisões
+— built from the navigation registry's own hrefs and labels. This **overrides a
+recorded principle in the open**: `capabilities.ts` refuses *"a permanent control
+on the cockpit to satisfy a census"*, and that refusal does not cover a person
+who could not find two destinations on their own device. *Arranging the product
+around its bookkeeping and arranging it around its owner are different things,
+and only the first was refused.* The bar is untouched.
+
+**The Home card was a stale selector list.** `operations.css` established
+`container-type` on `.list-stack,.dashboard-recent-list`, and
+**`.dashboard-recent-list` exists nowhere in `src/`** — the Hoje rewrite replaced
+it with `.home-list`. So the container query written to stop exactly this defect,
+whose own comment says *"the reason the owner saw one word per line"*, reached
+Registros and never reached Hoje — where `.today-columns` puts **both** columns
+under its 700 px breakpoint. At 1920×1080 the title got a **187 px** track and
+wrapped 94 characters over four lines.
+
+`layout-contracts.spec.ts` mirrored the same three dead classes, so its density
+assertions had been measuring a page the product stopped rendering. **The mirror
+going stale is what hid the defect the mirror existed to catch.**
+`home-mirror-guard.test.ts` now derives the list from the components and was
+proved to fail in both directions.
+
+### A defect in slice 2P.8's own tests
+
+`2P-MOBILE-001`/`-004` used `/app/calendar?o=month`. The page's parameter is
+**`orientation`**; `o` is the key inside the serialized return-position payload.
+They measured the **day** view while their names said month. Everything they
+asserted was true of what they measured — **the label was wrong, which is the
+more dangerous of the two**, because a green run then reads as coverage of a
+surface nobody exercised. Corrected, with the assertion that would have caught
+it: the requested orientation is the one marked current.
+
+### Two probe defects of mine, measured before blaming the product
+
+The calendar title read 0 px from the edge on `day` and `week` but not `month`:
+the subtree was still in **App Router's streaming placeholder** — an unclassed
+`<div>` under `<body>`, outside `.app-frame`, every ancestor measuring width 0 —
+and `month` simply finished streaming first. And the destination row was first
+placed **after** the seven-step onboarding guide, which is the same defect moved
+a few hundred pixels.
+
+### Evidence
+
+`typecheck` 0. `lint` clean outside gitignored `.worktrees/`. `npm test`
+**8692 passed, 0 failed tests** (3 failed *files* = the recorded Windows shebang
+baseline). `build` passes. The **exact CI foundation command** 383 passed,
+5 skipped. `online-phase-2p-device-findings.spec.ts` **21 passing** on desktop,
+Pixel 7 and WebKit iPhone. `online-phase-2p-closeout.spec.ts` **24 passing**
+after the parameter correction. `calendar.spec.ts` + `layout-contracts.spec.ts`
+**106 passing**. Every defect failed a test before it was fixed.
+
+Hosted: 99 = 99, `202608190099`, rollout 25 · 3 · 2, signup closed, all six
+automation categories `suggest_only`.
+
+### Where this stops
+
+`PHASE_2P_OWNER_DEVICE_CHECKLIST_ROUND_TWO.md` — seven numbered steps, ~10
+minutes, **no VoiceOver**. Phase 2P does not close until the owner runs it.
+**This section deliberately does not name what comes after Phase 2P**, and
+nothing about it was started or planned.

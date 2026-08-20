@@ -2,6 +2,41 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-20 - The owner's iPhone checkpoint: steps 1–6 approved, step 7 rejected, and its four defects fixed
+
+**Zero migrations; 99 local = 99 hosted, parity `202608190099`. 87 of 87 classified — 66 built, 12 baseline, 4 partial, 5 not-built-by-rule, 0 undelivered. Phase 2P does NOT close: a second device pass is required.**
+
+### Fixed
+
+- **The calendar had no page container.** `CalendarView` rendered `<section className="calendar">` straight into `<main>`, while every other route wraps in `.content-page`. Measured before the fix: `getComputedStyle(main).paddingLeft` was `0px`, the title and description sat at x = 0 on both viewports, and at 1280px the month grid and the reminders button ran **past the right edge**. One wrapper is the whole of "text against the edges", the horizontal overflow, and the content hidden behind the bottom bar.
+- **`.calendar-header` had no CSS rule in any stylesheet.** Its `<h1>` inherited body size and rendered *smaller than the range label beside the arrows*, so the page read as if it had no title. `stylesheet-class-coverage.test.ts` had been counting this element as unstyled the whole time — a debt counter records that something is owed and does not decide what is worth paying first. `RECORDED_UNSTYLED` 45 → 44.
+- **The control band was thirteen identical pills across five rows, 286px tall on a phone** — over 40% of the viewport before any calendar appeared. It is now a grid with two fixed rows, and both chip families show the label they already carried as `aria-label`: **Formato** and **O que mostrar**.
+- **The reminders link left the control band.** A link to another page had been sitting among *previous period*, *today* and *next period*, wearing the same pill; it is now below the band, in `.calendar-destinations`, and still unconditional.
+- **The month grid** gained the border, radius and surface fill every other block in the product has, and a stray vertical rule that outlived the row it separated was removed.
+- **The Home "Precisa de você" card compressed a title to one word per line.** `operations.css` established `container-type` on `.list-stack,.dashboard-recent-list`, and **`.dashboard-recent-list` exists nowhere in `src/`** — the Hoje rewrite replaced it with `.home-list`. So the container query written to stop exactly this defect never reached Hoje, where `.today-columns` puts **both** columns under its own 700px breakpoint: at 1920×1080 the title got a **187px** track and wrapped 94 characters over four lines.
+
+### Added
+
+- **A direct path to Lembretes and Revisões.** Hoje carries a labelled *Ir para* row — Calendário · Lembretes · Revisões — built from the navigation registry's own hrefs and labels rather than from literals. The mobile bar is untouched: five slots, odd, capture at the midpoint.
+- **`src/lib/closeout/home-mirror-guard.test.ts`** — derives the containment class list from the components and fails in both directions: a dead name with containment, or a live stack without it. Proved to fail by mutation control.
+- **`e2e/online-phase-2p-device-findings.spec.ts`** — 21 assertions across desktop, Pixel 7 and WebKit iPhone, measuring the **rendered** page: how far down a destination sits, counting only links a person can actually see.
+
+### Corrected
+
+- **Slice 2P.8's own mobile assertions used `/app/calendar?o=month`.** The page's query parameter is `orientation`; `o` is the key inside the serialized return-position payload. They measured the **day** view while their names said month — true assertions, wrong label, which is the more dangerous of the two. Corrected, with a new assertion that the requested orientation is the one marked current.
+- **`e2e/layout-contracts.spec.ts` mirrored `.panel` / `.attention-panel` / `.dashboard-recent-list`** — three classes the Hoje rewrite deleted. Its density assertions had been measuring a page the product stopped rendering, which is how the live defect hid. Repaired to mirror `.today-columns` / `.home-section` / `.home-list`.
+- **`e2e/calendar.spec.ts`'s three fixtures** now carry the page container and the control labels, so the lane measures the page the product renders.
+
+### Re-classified, with visible adjudication
+
+- **`2P-ACCESS-005`: `undelivered` → `not-built-by-rule`**, on the owner's waiver of 2026-08-20 — *"NOT EXECUTED — owner waived hardware validation"*. It is **not a pass**: no screen-reader evidence exists and none is claimed. Only the owner could release ADR-122 Decision 6's gate, and they did.
+- **`2P-CALENDAR-005`: `baseline, extended` → `built`.** Slice 2P.7 recorded the reflow lane as sufficient; the real-device run rejected it, and the clipped actions at 1280px were the requirement's own words.
+
+### Not re-classified, deliberately
+
+The Home card is a defect on a surface Phase 2J and 2O built, found during 2P's closeout; and the navigation discoverability has no `2P-NAV` requirement. Attaching either to a 2P requirement to tidy the bookkeeping would be the invention the owner forbade.
+
+
 ## 2026-08-20 - Slice 2P.8: the closeout, a defect that did not reproduce, and a record that was false
 
 **`2P-MOBILE-001` … `-005`, `2P-ACCESS-001` … `-005`, `2P-CLOSE-001` … `-005`. Zero migrations; 99 local = 99 hosted, parity `202608190099` unchanged and read live at closeout. 87 of 87 classified — 65 built, 13 baseline, 4 partial, 4 not-built-by-rule, 1 undelivered. The phase does NOT close: a real iPhone and a real VoiceOver session are ADR-122 Decision 6's gate.**

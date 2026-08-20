@@ -23,9 +23,35 @@
   gap: var(--space-4, 1rem);
 }
 
+/*
+ * The page header, which had no rule at all.
+ *
+ * `.calendar-header` was styled by nothing, so its `<h1>` inherited the body
+ * size and rendered **smaller than the range label beside the arrows** — the
+ * page's own title read as a caption while "agosto de 2026" read as the
+ * heading. Every other surface gets this from `.list-header h1`; the calendar
+ * never had a `.list-header`, so it got nothing.
+ *
+ * The scale is taken from `.list-header h1` deliberately rather than invented,
+ * so Calendário sits at the same level as Registros and Trabalho instead of at
+ * a third size only this page uses.
+ */
+.calendar-header {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+}
+
+.calendar-header h1 {
+  font: 500 clamp(38px, 5vw, 60px) / 1 var(--font-reading);
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+
 .calendar-description {
   color: var(--text-muted);
   margin: 0;
+  max-width: var(--width-reading);
 }
 
 /*
@@ -44,21 +70,127 @@
  * `column-gap` is generous and `row-gap` is not: when the band wraps at a narrow
  * width the rows must read as rows, not as three separate blocks.
  */
+/*
+ * The control band, re-laid as a grid on 2026-08-20.
+ *
+ * ## What was wrong, measured rather than felt
+ *
+ * As a wrapping flex row it produced **thirteen identically-shaped pills across
+ * five rows, 286 px tall** on an iPhone — more than 40% of the viewport before
+ * any calendar appeared — with `flex-wrap` deciding the grouping. Which chips
+ * chose a period and which filtered its contents was left to the reader to
+ * infer, and on a narrow screen the two families interleaved.
+ *
+ * ## What the grid buys
+ *
+ * Two rows with fixed meaning instead of whatever wrapping produces: the period
+ * controls and the range navigation share the first, the filter owns the
+ * second. Each keeps its own labelled `<nav>`, so the grouping a sighted reader
+ * now sees is the grouping a screen reader always had.
+ *
+ * The band still **wraps rather than scrolls**: `2M-MOBILE-001` forbids
+ * horizontal page scroll at 375 px, and a control row that scrolled would hide
+ * destinations behind a gesture the phase refused.
+ */
 .calendar-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  column-gap: var(--space-6);
-  row-gap: var(--space-3);
-  padding: var(--space-3) 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "orientation"
+    "navigation"
+    "lanes";
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
   border-block: 1px solid var(--border-default);
 }
 
-/* The range and its arrows go last and take the remaining width, so the label
-   sits at the far edge on a wide viewport and starts its own row on a narrow
-   one instead of squeezing between two chip rows. */
-.calendar-toolbar .calendar-navigation {
-  margin-inline-start: auto;
+.calendar-toolbar .calendar-orientation { grid-area: orientation; }
+.calendar-toolbar .calendar-navigation { grid-area: navigation; }
+.calendar-toolbar .calendar-lanes { grid-area: lanes; }
+
+/* The two chip families and the navigation each become a labelled block. */
+.calendar-orientation,
+.calendar-lanes {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/*
+ * The label that was only ever an `aria-label`.
+ *
+ * Quiet on purpose: it names the row, it does not compete with it. Same
+ * treatment as `.eyebrow`, taken from the token rather than restated, so a
+ * change to the eyebrow scale reaches here too.
+ */
+.calendar-control-label {
+  font: var(--type-eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/*
+ * The filter row reads as secondary, because it is.
+ *
+ * Orientation answers *which slice of time* and is a choice among four; lanes
+ * answer *which of it* and are five independent toggles. They looked identical,
+ * which is most of why the band read as a pile. The filter chips lose the
+ * surface fill and keep the outline, so the selected orientation stays the only
+ * strongly-filled control in the band.
+ */
+.calendar-lanes a {
+  background: transparent;
+}
+
+/*
+ * Lembretes, below the band.
+ *
+ * It is a link to another page, so it stops sitting among controls that change
+ * this one — and it stops wearing their pill.
+ */
+.calendar-destinations {
+  margin: var(--space-3) 0 0;
+}
+
+.calendar-destinations .calendar-reminders-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  /*
+   * The separator goes with the row it separated.
+   *
+   * The base rule gives this link a `border-inline-start`, which was correct
+   * while it sat at the end of the navigation row and divided it from the
+   * arrows. On its own line that border is a stray vertical bar floating to the
+   * left of a link, which is precisely the *"aparência de interface inacabada"*
+   * the owner reported — a rule outliving the arrangement that motivated it.
+   */
+  margin-inline-start: 0;
+  padding-inline-start: 0;
+  border-inline-start: 0;
+}
+
+/*
+ * Above the phone, the period controls and the range share one row.
+ *
+ * `auto` for the navigation rather than a fraction: the range label is a date
+ * whose width is content, and giving it a fraction of the row made it wrap
+ * mid-month at some widths while leaving the chips short of space at others.
+ */
+@media (min-width: 48rem) {
+  .calendar-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "orientation navigation"
+      "lanes lanes";
+    column-gap: var(--space-6);
+  }
+
+  .calendar-toolbar .calendar-navigation {
+    justify-self: end;
+    align-self: end;
+  }
 }
 
 /*
@@ -376,9 +508,25 @@
  * shipped once.
  */
 
+/*
+ * The month reads as a surface, like every other block in the product.
+ *
+ * It was a bare collapsed table with square corners running the full width — no
+ * border around the whole, no radius, no surface fill — while `.list-row`,
+ * `.home-section` and `.panel` are all rounded, bordered surfaces. That
+ * inconsistency is a large part of *"aparência de interface inacabada"*: the
+ * grid did not look like it belonged to the same product as the page around it.
+ *
+ * The radius goes on the scroller rather than the table because
+ * `border-collapse: collapse` does not clip to a radius; the scroller already
+ * establishes a clipping context for its own `overflow-x`.
+ */
 .calendar-month-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
 }
 
 .calendar-month {

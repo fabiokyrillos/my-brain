@@ -203,6 +203,26 @@ export function CalendarView({
   const emptyMessage = isNarrowed(query) ? copy.states.emptyNarrowed : copy.states.empty;
 
   return (
+    /*
+      `.content-page` — the page container every other route in the product has
+      had, and this one did not.
+
+      Measured on a real iPhone and on desktop before it was added:
+      `getComputedStyle(main).paddingLeft` was **`0px`**, so the title, the
+      description, the summary and the month grid all sat flush against the
+      viewport edge; the grid and the reminders link ran **past** the right edge
+      at 1280px; and the last row of content sat behind the bottom bar, because
+      nothing reserved the space the bar occupies.
+
+      None of that was a calendar bug. `CalendarView` rendered `<section>`
+      straight into `<main>`, and `main` has no padding — every other surface
+      wraps in `.content-page`, which supplies `max-width`,
+      `padding: 58px var(--gutter) 130px` and the mobile override beneath it. The
+      omission is the whole of "elementos e textos muito próximos das bordas",
+      "aparência de interface inacabada" and the horizontal overflow, and it is
+      one wrapper rather than a sweep of margins.
+    */
+    <div className="content-page calendar-page">
     <section aria-labelledby={headingId} className="calendar">
       <header className="calendar-header">
         <h1 id={headingId}>{copy.title}</h1>
@@ -239,6 +259,20 @@ export function CalendarView({
       <div className="calendar-toolbar">
       {/* Orientation. Links, so the URL is the state and the keyboard works. */}
       <nav aria-label={copy.orientation.label} className="calendar-orientation">
+        {/*
+          The label, made visible (`2P-CALENDAR-005`, owner report of 2026-08-20:
+          *"filtros estranhos e pouco claros"*).
+
+          It was already here as `aria-label`, so a screen reader has always been
+          told what this row is and a sighted reader never was: thirteen
+          identically-shaped pills in one band, with nothing saying which of them
+          choose a period and which of them filter its contents.
+
+          `aria-hidden` because the `<nav>` already carries the same string as
+          its accessible name — rendering it visibly must not make a screen
+          reader say it twice.
+        */}
+        <span aria-hidden="true" className="calendar-control-label">{copy.orientation.label}</span>
         <ul>
           {(Object.keys(copy.orientation.options) as CalendarOrientation[]).map((orientation) => {
             const active = query.orientation === orientation;
@@ -258,6 +292,7 @@ export function CalendarView({
 
       {/* Lane visibility. Same shape, same reasons. */}
       <nav aria-label={copy.lanes.label} className="calendar-lanes" id={lanesId}>
+        <span aria-hidden="true" className="calendar-control-label">{copy.lanes.label}</span>
         <ul>
           {CALENDAR_LANES.map((lane) => {
             const shown = query.lanes.includes(lane);
@@ -319,22 +354,34 @@ export function CalendarView({
         >
           {copy.navigation.next}
         </Link>
-        {/*
-          The one link in the product that reaches Lembretes unconditionally.
+      </nav>
+      </div>
 
-          `/app/reminders` was reachable **only** from a calendar item that *is*
-          a reminder, or from an entry outcome that produced one — so an account
-          with no reminder had no path to the surface at all, and a route
-          reachable only once it has content is not reachable. It sits here
-          because this is the surface that already draws reminders beside tasks,
-          which makes "see all of them" a truthful offer rather than a menu entry
-          smuggled into a control band.
-        */}
+      {/*
+        Lembretes — a **destination**, and no longer dressed as a control.
+
+        It used to be the last child of `.calendar-navigation`, inside the
+        control band, which put a link to another page in the same row as
+        *previous period*, *today* and *next period* and gave it the same pill.
+        The owner's report of 2026-08-20 names the consequence twice over: the
+        band reads as *"filtros estranhos"*, and Lembretes was so hard to find on
+        a phone that this three-hop path — Trabalho → Calendário → here — was the
+        only one they could locate.
+
+        **This is no longer the product's only path to Lembretes**, and that is
+        the other half of the fix: Hoje now offers it directly. What stays here
+        is the contextual offer, which is truthful on the one surface that
+        already draws reminders beside tasks — but it sits below the band, with
+        the statements about the result, rather than among the ways to change it.
+
+        `mobile-reachability-guard.test.ts` still requires this link to be
+        unconditional, and it still is: it is outside every ternary on this page.
+      */}
+      <p className="calendar-destinations">
         <Link className="calendar-reminders-link" href={`/${locale}/app/reminders`}>
           {copy.navigation.allReminders}
         </Link>
-      </nav>
-      </div>
+      </p>
 
       {/* `2M-CAL-006`: reaching the bound is a visible state, not an empty grid. */}
       {bound.atEarliest ? <p className="calendar-bound" role="status">{copy.navigation.atEarliest}</p> : null}
@@ -586,6 +633,7 @@ export function CalendarView({
         </ol>
       )}
     </section>
+    </div>
   );
 }
 

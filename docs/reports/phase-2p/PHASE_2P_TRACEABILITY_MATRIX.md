@@ -10,11 +10,11 @@ docs:phase-2p:traceability`; `--check` fails when this file and the sources disa
 
 | Classification | Count |
 |---|---:|
-| `built` | 65 |
-| `baseline` | 13 |
+| `built` | 66 |
+| `baseline` | 12 |
 | `partial` | 4 |
-| `not-built-by-rule` | 4 |
-| `undelivered` | 1 |
+| `not-built-by-rule` | 5 |
+| `undelivered` | 0 |
 | **total** | **87** |
 
 ## Where the classifications come from
@@ -29,6 +29,7 @@ written; the closeout record carries every requirement the earlier ones did not 
 | `PHASE_2P_SLICE_05_ACCEPTANCE.md` | 2P.5 | 8 |
 | `PHASE_2P_SLICE_07_ACCEPTANCE.md` | 2P.7 | 10 |
 | `PHASE_2P_SLICE_08_ACCEPTANCE.md` | 2P.8 | 62 |
+| `PHASE_2P_OWNER_DEVICE_FINDINGS.md` | device findings | 2 |
 
 ## Migration budget
 
@@ -109,7 +110,7 @@ written; the closeout record carries every requirement the earlier ones did not 
 | `2P-CALENDAR-002` | `baseline` | 2P.7 | `calendar-item.tsx` states lane and commitment in **visible** text; asserted in `calendar-view.test.tsx` |
 | `2P-CALENDAR-003` | `baseline` | 2P.7 | the return position travels in the link (`from=`), proved in `online-calendar.spec.ts`; reschedule applies in place. **The scroll half is not claimed** |
 | `2P-CALENDAR-004` | `baseline` | 2P.7 | `2M-CAL-011`'s empty / narrowed-empty / partial / failed states |
-| `2P-CALENDAR-005` | `baseline` | 2P.7 | the existing reflow lane, plus the month's own phone presentation and its no-horizontal-scroll assertion |
+| `2P-CALENDAR-005` | `built` | device findings (adjudicates 2P.7) | **Re-classified** from `baseline, extended`. Slice 2P.7 recorded the reflow lane as sufficient; the owner's real-device run **rejected step 7**, and the measurement behind it was wrong in a way no lane had checked — the page had no container, `paddingLeft` was `0px`, and at 1280 px the grid and the reminders button ran past the right edge, which is the requirement's own *"clipped actions"*. Now built: `.content-page` wrapper, labelled control band, contained month grid, proved on three browser lanes |
 | `2P-REMINDER-001` | `built` | 2P.7 | header offers one action; no creation field until it is asked for |
 | `2P-REMINDER-002` | `built` | 2P.7 | five groups in the declared order, asserted by DOM position; **no recurrence in any shape** |
 | `2P-REMINDER-003` | `built` | 2P.7 | one writer, and both flows run through the same declarations; every case compared across both parsers |
@@ -124,7 +125,7 @@ written; the closeout record carries every requirement the earlier ones did not 
 | `2P-ACCESS-002` | `baseline` | 2P.8 | `ConfirmDialog`'s contract with four consumers, unit proofs, and slice 2P.7's authenticated journey over initial focus, a twelve-press Tab cycle, Escape and focus restored to the launcher; re-proved on the iPhone lane here |
 | `2P-ACCESS-003` | `baseline` | 2P.8 | the owner's signed interpretation, proved on **all five** surfaces and on three lanes: named `<nav>`, exactly one `aria-current="page"`, real links, no ARIA tab role, no roving `tabindex`, painted focus, and Enter / back / forward moving `aria-current` |
 | `2P-ACCESS-004` | `built` | 2P.8 | no region this product renders is `aria-live="assertive"`; measured with the framework's own route announcer excluded by ancestry and a control proving the exclusion removed something rather than matching nothing |
-| `2P-ACCESS-005` | `undelivered` | 2P.8 | a real VoiceOver session over capture, review, settings and reminders. **Remainder: it cannot be discharged by any agent** — ADR-122 Decision 6 makes it the closeout gate. Destination: the owner's checkpoint below, and Phase 2P does not close until it is run |
+| `2P-ACCESS-005` | `not-built-by-rule` | device findings (adjudicates 2P.8) | **Re-classified** from `undelivered` by the owner's waiver of 2026-08-20: *"NOT EXECUTED — owner waived hardware validation"*, on the ground that a screen reader is not part of their use. ADR-122 Decision 6 made this the closeout gate and the owner has released their own gate. **No VoiceOver evidence exists and none is claimed** — the rule records a decision not to run it, never a run. Destination: the owner, if their use ever changes |
 | `2P-CLOSE-001` | `built` | 2P.8 | `scripts/generate-phase-2p-traceability.mjs` classifies all 87 exactly once, applies the twelve refusals, offers `--check`, and refuses a stale matrix byte for byte |
 | `2P-CLOSE-002` | `built` | 2P.8 | every `partial` and `undelivered` above names a concrete remainder and a destination, and the generator refuses one that does not — including a row that tries to satisfy the check by containing its own identifier |
 | `2P-CLOSE-003` | `built` | 2P.8 | §8 dispositions automatic writes, undo, audio lifetime, file handling and conversation diagnostics against the threat model |

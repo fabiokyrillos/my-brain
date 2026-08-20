@@ -278,10 +278,23 @@ export function declaredRequirements(prdSource = readFile(PRD)) {
   return { requirements, duplicates };
 }
 
-/** Every acceptance record, oldest first. The closeout's own record sorts last. */
+/**
+ * Every record that may classify, oldest first.
+ *
+ * The nine slice records, then the **owner device findings** — a correction
+ * record rather than a tenth slice, and deliberately not named as one. ADR-122
+ * authorized slices 2P.0 … 2P.8 and no more, so calling this work "2P.9" would
+ * claim an authorization that does not exist; it is a correction inside the
+ * phase, produced by the owner's real-device checkpoint.
+ *
+ * It sorts **last** so that where it disagrees with an earlier record it is the
+ * later one, and the ordinary adjudication rule applies: it must say it is
+ * adjudicating, or the run refuses with a conflict rather than laundering the
+ * change through.
+ */
 export function acceptanceRecords(root = REPOSITORY_ROOT) {
   const directory = join(root, REPORTS);
-  return readdirSync(directory)
+  const slices = readdirSync(directory)
     .filter((name) => /^PHASE_2P_SLICE_\d+_ACCEPTANCE\.md$/.test(name))
     .sort()
     .map((name) => {
@@ -289,6 +302,17 @@ export function acceptanceRecords(root = REPOSITORY_ROOT) {
       const slice = `2P.${/SLICE_0*(\d+)_/.exec(name)[1]}`;
       return { name, slice, source };
     });
+
+  const findings = "PHASE_2P_OWNER_DEVICE_FINDINGS.md";
+  if (!existsSync(join(directory, findings))) return slices;
+  return [
+    ...slices,
+    {
+      name: findings,
+      slice: "device findings",
+      source: readFileSync(join(directory, findings), "utf8"),
+    },
+  ];
 }
 
 /**

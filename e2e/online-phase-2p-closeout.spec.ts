@@ -315,7 +315,19 @@ test.describe("Phase 2P closeout — access and phone evidence", () => {
       { name: "composer", route: "/pt-BR/app/capture", marker: ".composer" },
       { name: "settings navigation", route: "/pt-BR/app/settings", marker: ".settings-nav" },
       { name: "graph alternative", route: "/pt-BR/app/relations?view=list", marker: ".relations-tabs" },
-      { name: "calendar", route: "/pt-BR/app/calendar?o=month", marker: ".calendar-view, .calendar-month, main" },
+      /*
+        `orientation`, not `o` — corrected on 2026-08-20 after the owner's
+        device findings.
+
+        `o` is the key inside the serialized **return-position** payload; this
+        page's own query parameter is `orientation`. So `?o=month` fell back to
+        the default and these assertions measured the **day** view while their
+        names said month. Everything they asserted was true of what they
+        measured, and the label was wrong — which is the more dangerous of the
+        two, because a green run then reads as coverage of a surface nobody
+        exercised.
+      */
+      { name: "calendar", route: "/pt-BR/app/calendar?orientation=month", marker: ".calendar-month, .calendar-month-list, main" },
       { name: "dialogs", route: "/pt-BR/app/reminders", marker: ".reminder-compose-open" },
     ];
 
@@ -389,7 +401,7 @@ test.describe("Phase 2P closeout — access and phone evidence", () => {
       { route: "/pt-BR/app/reminders", selector: ".reminder-compose-open, .reminder-button" },
       { route: "/pt-BR/app/settings", selector: ".settings-nav a" },
       { route: "/pt-BR/app/relations?view=list", selector: ".relations-tabs a" },
-      { route: "/pt-BR/app/calendar?o=month", selector: ".work-modes a" },
+      { route: "/pt-BR/app/calendar?orientation=month", selector: ".work-modes a" },
     ];
 
     for (const scope of scopes) {
@@ -418,7 +430,7 @@ test.describe("Phase 2P closeout — access and phone evidence", () => {
       "/pt-BR/app/capture",
       "/pt-BR/app/settings",
       "/pt-BR/app/relations?view=list",
-      "/pt-BR/app/calendar?o=month",
+      "/pt-BR/app/calendar?orientation=month",
       "/pt-BR/app/reminders",
     ]) {
       await page.goto(route);
