@@ -11496,6 +11496,18 @@ deliberately **not created here**. Specified in
 `docs/reports/phase-2p/PHASE_2P_REVIEW_CITATIONS_REQUIREMENT.md`, which opens by
 saying that **a "Fontes" section is not delivery of this**.
 
+### Merged
+
+**PR #274 merged as `2207ddf`**, from `d83af55`. CI **green 3/3 on the merge SHA**
+itself (`conclusion: success`), not only on the branch head. `main` is clean,
+zero open PRs, **99 local = 99 hosted, parity `202608190099`**, and **zero**
+fixture residue — 0 fixture accounts, 0 orphan summaries, tasks or entries.
+
+The journey ran **39 / 39 across desktop, Pixel 7 and iPhone WebKit on the
+first attempt**, which is the first time in this phase that has happened.
+Running the unit suite and the Playwright lanes one at a time — the lesson
+§106 paid for — is why.
+
 ### Next
 
 A short **two-item** checkpoint — tab speed, and content visible without a second
