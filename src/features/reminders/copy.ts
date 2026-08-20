@@ -66,6 +66,49 @@ type ReminderCopy = {
   readonly independent: string;
   readonly historyLink: string;
 
+  /**
+   * `2P-REMINDER-001`/`-002` — the creation dialog's words.
+   *
+   * The five groups appear in the order the requirement names them: content,
+   * date and time, importance, the optional link, then save and cancel. The keys
+   * below are grouped the same way so a reader can check the order without
+   * opening the component.
+   *
+   * There is no recurrence key, and its absence is load-bearing rather than an
+   * omission: `2P-REMINDER-RECURRENCE` forbids a control that does not work and
+   * a rule encoded in free text, and a placeholder reading *"every week"* would
+   * be the second of those.
+   */
+  readonly creation: {
+    readonly open: string;
+    readonly title: string;
+    readonly description: string;
+    readonly contentLabel: string;
+    readonly contentHint: string;
+    readonly whenLabel: string;
+    readonly whenHint: string;
+    readonly importantLabel: string;
+    readonly linkLabel: string;
+    readonly linkHint: string;
+    readonly linkNone: string;
+    /**
+     * A task whose title this reader may not see.
+     *
+     * Still choosable: masking withholds the words, not the ability to link. The
+     * short id is what distinguishes two withheld tasks from each other without
+     * making either of them readable.
+     */
+    readonly linkWithheld: (shortId: string) => string;
+    readonly save: string;
+    readonly saving: string;
+    readonly cancel: string;
+    readonly created: string;
+    readonly invalid: string;
+    readonly invalidDate: string;
+    readonly unknownTask: string;
+    readonly failed: string;
+  };
+
   readonly cancelConfirmTitle: string;
   readonly cancelConfirmBody: string;
   readonly cancelConfirmAccept: string;
@@ -139,6 +182,30 @@ const COPY = {
     linkedEntry: "Registro vinculado",
     independent: "Lembrete avulso",
     historyLink: "Ver no histórico",
+
+    creation: {
+      open: "Novo lembrete",
+      title: "Novo lembrete",
+      description:
+        "Um lembrete avisa você em um momento específico. Ele não vira tarefa e não muda nada sozinho.",
+      contentLabel: "O que lembrar",
+      contentHint: "Escreva como você quer ler isso na hora.",
+      whenLabel: "Quando avisar",
+      whenHint: "No seu fuso horário.",
+      importantLabel: "Marcar como importante",
+      linkLabel: "Vincular a uma tarefa (opcional)",
+      linkHint: "Só tarefas suas aparecem aqui.",
+      linkNone: "Sem vínculo",
+      linkWithheld: (shortId) => `Tarefa protegida · ${shortId}`,
+      save: "Criar lembrete",
+      saving: "Criando…",
+      cancel: "Cancelar",
+      created: "Lembrete criado.",
+      invalid: "Revise o texto e o horário do lembrete.",
+      invalidDate: "Escolha uma data e um horário válidos.",
+      unknownTask: "Essa tarefa não está disponível. Escolha outra ou deixe sem vínculo.",
+      failed: "Não foi possível criar agora. Tente novamente.",
+    },
 
     cancelConfirmTitle: "Cancelar este lembrete?",
     cancelConfirmBody:
@@ -228,6 +295,30 @@ const COPY = {
     linkedTask: "Linked task",
     linkedEntry: "Linked record",
     independent: "Standalone reminder",
+
+    creation: {
+      open: "New reminder",
+      title: "New reminder",
+      description:
+        "A reminder tells you something at a specific moment. It does not become a task and it changes nothing on its own.",
+      contentLabel: "What to remember",
+      contentHint: "Write it the way you want to read it at the time.",
+      whenLabel: "When to tell you",
+      whenHint: "In your time zone.",
+      importantLabel: "Mark as important",
+      linkLabel: "Link to a task (optional)",
+      linkHint: "Only your own tasks appear here.",
+      linkNone: "No link",
+      linkWithheld: (shortId) => `Protected task · ${shortId}`,
+      save: "Create reminder",
+      saving: "Creating…",
+      cancel: "Cancel",
+      created: "Reminder created.",
+      invalid: "Check the reminder's text and time.",
+      invalidDate: "Choose a valid date and time.",
+      unknownTask: "That task is not available. Pick another one or leave it unlinked.",
+      failed: "Could not create it right now. Try again.",
+    },
     historyLink: "See in history",
 
     cancelConfirmTitle: "Cancel this reminder?",

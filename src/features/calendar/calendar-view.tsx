@@ -45,10 +45,11 @@ import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
 import {
   CALENDAR_LANES,
-  DAYS_BY_ORIENTATION,
   boundState,
   calendarHref,
   isNarrowed,
+  rangeDayCount,
+  rangeStart,
   step,
   withLaneToggled,
   withOrientation,
@@ -79,6 +80,29 @@ function formatDayLabel(date: string, locale: Locale): string {
     weekday: "short", day: "2-digit", month: "short", timeZone: "UTC",
   }).format(instant);
 }
+
+/**
+ * The month's own name, from the anchor's parts.
+ *
+ * Same UTC-noon trick as `formatDayLabel` and for the same reason: the date is
+ * already fixed, so formatting it in any real zone risks a label that disagrees
+ * with the grid it sits above.
+ */
+function formatMonthLabel(anchor: LocalDate, locale: Locale): string {
+  const instant = new Date(Date.UTC(anchor.year, anchor.month - 1, 1, 12));
+  return new Intl.DateTimeFormat(locale, { month: "long", year: "numeric", timeZone: "UTC" })
+    .format(instant);
+}
+
+/**
+ * How many items a month cell shows before it says *and more*.
+ *
+ * `2P-CALENDAR-001` requires cells that do not grow without limit and an overflow
+ * that stays reachable. Three, declared here rather than written into the JSX,
+ * because it is a product decision about how tall a six-row grid may get and the
+ * test that asserts the overflow appears has to name the same number.
+ */
+export const MONTH_CELL_ITEM_LIMIT = 3;
 
 export function CalendarView({
   dateBounds,
@@ -141,10 +165,39 @@ export function CalendarView({
     };
   }, [rescheduleAction]);
 
-  const rangeLabel = projection.days.length === 1
-    ? formatDayLabel(projection.days[0].date, locale)
-    : `${formatDayLabel(projection.days[0].date, locale)} – `
-      + `${formatDayLabel(projection.days[projection.days.length - 1].date, locale)}`;
+  /**
+   * A month names itself; every other orientation names its edges.
+   *
+   * *"27 jul – 6 set"* is a truthful description of the grid and a useless
+   * description of the period — it names two months the user did not select and
+   * omits the one they did. The grid's leading and trailing days are context, so
+   * the label is the anchor's own month.
+   */
+  const rangeLabel = query.orientation === "month"
+    ? formatMonthLabel(query.anchor, locale)
+    : projection.days.length === 1
+      ? formatDayLabel(projection.days[0].date, locale)
+      : `${formatDayLabel(projection.days[0].date, locale)} – `
+        + `${formatDayLabel(projection.days[projection.days.length - 1].date, locale)}`;
+
+  /**
+   * The grid, as rows of seven.
+   *
+   * The projection guarantees a whole number of weeks beginning on a Monday
+   * (`rangeDayCount`), so this is a regrouping rather than a computation — no
+   * padding, no missing cell, and no second opinion about where a week starts.
+   */
+  const weeks = query.orientation === "month"
+    ? Array.from(
+      { length: Math.ceil(projection.days.length / 7) },
+      (_unused, index) => projection.days.slice(index * 7, index * 7 + 7),
+    )
+    : [];
+
+  /** The month's own days that have something in them — the phone's list. */
+  const monthDaysWithItems = query.orientation === "month"
+    ? projection.days.filter((day) => day.inPeriod && day.items.length > 0)
+    : [];
 
   const failed = projection.failedLanes.map((failure) => copy.lanes.names[failure.lane]).join(", ");
   const emptyMessage = isNarrowed(query) ? copy.states.emptyNarrowed : copy.states.empty;
@@ -301,7 +354,153 @@ export function CalendarView({
       */}
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
-      {query.orientation === "week" ? (
+      {query.orientation === "month" ? (
+        /*
+          `2P-CALENDAR-001` — a real month, drawn twice.
+
+          **Both representations are rendered, and CSS chooses.** The grid is a
+          `<table>` for the same reason the week is one: a month genuinely is a
+          two-dimensional relation between weekdays and weeks, and a real table
+          says so to assistive technology without a single `role`. The list below
+          it is the same days as prose.
+
+          Which one a viewport gets is decided in `calendar.css`, not here. A
+          JavaScript viewport test would make the server and the client disagree
+          on the first paint, and the requirement's *"a plain list must not be
+          declared a month view"* is honoured by the selected period staying
+          `month` in the URL either way — the phone gets a different presentation
+          of the month, never a different period.
+
+          The list is also the **text alternative** the requirement asks for. It
+          is not `sr-only`: hiding it from sighted users would make the accessible
+          route the worse one, which is the failure `2M-ACCESS-005` was written
+          against one control down.
+        */
+        <>
+          <div className="calendar-month-scroll">
+            <table className="calendar-month">
+              <caption className="visually-hidden">{copy.month.gridLabel(rangeLabel)}</caption>
+              <thead>
+                <tr>
+                  {copy.month.weekdays.map((weekday) => (
+                    <th key={weekday} scope="col">{weekday}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {weeks.map((week) => (
+                  <tr key={week[0].date}>
+                    {week.map((day) => {
+                      const parsed = parseLocalDate(day.date);
+                      const shown = day.items.slice(0, MONTH_CELL_ITEM_LIMIT);
+                      const overflow = day.items.length - shown.length;
+                      return (
+                        <td
+                          data-outside={day.inPeriod ? undefined : "true"}
+                          data-today={day.isToday ? "true" : undefined}
+                          key={day.date}
+                        >
+                          {/*
+                            The day number is a link into the day view, carrying
+                            the lanes: `2P-CALENDAR-001`'s "opens a day preserving
+                            context". It is `withOrientation` on the same query
+                            rather than a fresh one, so a narrowed calendar stays
+                            narrowed on arrival.
+                          */}
+                          <Link
+                            className="calendar-month-daynumber"
+                            href={calendarHref(locale, {
+                              ...withOrientation(query, "day"),
+                              anchor: parsed ?? query.anchor,
+                            })}
+                          >
+                            {parsed ? parsed.day : day.date}
+                            {day.inPeriod ? null : (
+                              <span className="sr-only"> ({copy.month.outside})</span>
+                            )}
+                          </Link>
+                          {/*
+                            Today, carried by a word rather than by a fill.
+                            `2P-CALENDAR-001` forbids colour as the only marker,
+                            and this is the same `calendar-today` chip the day,
+                            week and agenda views already use.
+                          */}
+                          {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                          {shown.length > 0 ? (
+                            <ul className="calendar-day-items">
+                              {shown.map((item) => (
+                                <CalendarItem
+                                  dateBounds={dateBounds}
+                                  item={item}
+                                  key={item.id}
+                                  locale={locale}
+                                  rescheduleAction={recordingAction}
+                                  timezone={projection.timezone}
+                                />
+                              ))}
+                            </ul>
+                          ) : null}
+                          {/*
+                            The overflow, reachable rather than merely counted.
+                            A cell that said "+4" and did nothing would be the
+                            bound made visible and the content made unreachable.
+                          */}
+                          {overflow > 0 ? (
+                            <Link
+                              className="calendar-month-more"
+                              href={calendarHref(locale, {
+                                ...withOrientation(query, "day"),
+                                anchor: parsed ?? query.anchor,
+                              })}
+                            >
+                              {copy.month.more(overflow)}
+                            </Link>
+                          ) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="calendar-month-list">
+            <h2>{copy.month.listHeading}</h2>
+            {monthDaysWithItems.length === 0 ? (
+              <UniversalStateLine
+                className="calendar-empty"
+                description={emptyMessage}
+                locale={locale}
+                state="empty"
+              />
+            ) : (
+              <ol className="calendar-days">
+                {monthDaysWithItems.map((day) => (
+                  <li className="calendar-day" data-today={day.isToday ? "true" : undefined} key={day.date}>
+                    <h3>
+                      {formatDayLabel(day.date, locale)}
+                      {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                    </h3>
+                    <ul className="calendar-day-items">
+                      {day.items.map((item) => (
+                        <CalendarItem
+                          dateBounds={dateBounds}
+                          item={item}
+                          key={item.id}
+                          locale={locale}
+                          rescheduleAction={recordingAction}
+                          timezone={projection.timezone}
+                        />
+                      ))}
+                    </ul>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </>
+      ) : query.orientation === "week" ? (
         /*
           The scroll container is the **table's parent**, not the table.
 
@@ -392,8 +591,9 @@ export function CalendarView({
 
 /** Exported for the route's metadata, so the title is written once. */
 export function calendarRangeDates(query: CalendarQuery): readonly LocalDate[] {
-  const span = DAYS_BY_ORIENTATION[query.orientation];
-  return Array.from({ length: span }, (_unused, index) => addLocalDays(query.anchor, index));
+  const span = rangeDayCount(query);
+  const first = rangeStart(query);
+  return Array.from({ length: span }, (_unused, index) => addLocalDays(first, index));
 }
 
 export { formatLocalDate };

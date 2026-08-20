@@ -539,3 +539,217 @@ test.describe("the week is a grid, not seven columns sized by their contents", (
     expect(box.background).toBe("rgba(0, 0, 0, 0)");
   });
 });
+
+/**
+ * The month grid, mirroring `src/features/calendar/calendar-view.tsx`.
+ *
+ * August 2026 starts on a Saturday, so the grid opens on Monday 27 July and
+ * closes on Sunday 6 September — six rows, eleven days from the neighbouring
+ * months. Those are the cells that carry `data-outside`, and they are the reason
+ * this fixture uses a real month rather than a tidy 35-day one.
+ */
+function monthPage(locale: Locale, busyCount = 0): string {
+  const copy = COPY[locale];
+  const weekdays = locale === "en"
+    ? ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    : ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const outsideNote = locale === "en" ? "outside this month" : "fora do mês";
+  const todayWord = locale === "en" ? "Today" : "Hoje";
+  const moreWord = (count: number) =>
+    locale === "en" ? `${count} more` : `mais ${count}`;
+
+  // 27 July … 6 September 2026, as [day-of-month, inThisMonth].
+  const cells: Array<{ day: number; inMonth: boolean; date: string }> = [];
+  for (let offset = 0; offset < 42; offset += 1) {
+    const day = new Date(Date.UTC(2026, 6, 27 + offset));
+    cells.push({
+      day: day.getUTCDate(),
+      inMonth: day.getUTCMonth() === 7,
+      date: day.toISOString().slice(0, 10),
+    });
+  }
+
+  const item = (index: number) =>
+    `<li class="calendar-item" data-lane="deadline" data-commitment="committed">`
+    + `<a class="calendar-item-link" href="/${locale}/app/work/t${index}">Compromisso ${index}</a></li>`;
+
+  const cell = (entry: { day: number; inMonth: boolean; date: string }) => {
+    const today = entry.inMonth && entry.day === 15;
+    const busy = today ? busyCount : 0;
+    const shown = Math.min(busy, 3);
+    const overflow = busy - shown;
+    return `<td${entry.inMonth ? "" : ' data-outside="true"'}${today ? ' data-today="true"' : ""}>`
+      + `<a class="calendar-month-daynumber" href="?date=${entry.date}">${entry.day}`
+      + (entry.inMonth ? "" : `<span class="sr-only"> (${outsideNote})</span>`)
+      + `</a>`
+      + (today ? `<span class="calendar-today">${todayWord}</span>` : "")
+      + (shown
+        ? `<ul class="calendar-day-items">${Array.from({ length: shown }, (_u, i) => item(i)).join("")}</ul>`
+        : "")
+      + (overflow > 0
+        ? `<a class="calendar-month-more" href="?date=${entry.date}">${moreWord(overflow)}</a>`
+        : "")
+      + `</td>`;
+  };
+
+  const rows = Array.from({ length: 6 }, (_unused, week) =>
+    `<tr>${cells.slice(week * 7, week * 7 + 7).map(cell).join("")}</tr>`).join("");
+
+  const listDays = busyCount
+    ? `<ol class="calendar-days"><li class="calendar-day" data-today="true">`
+      + `<h3>sáb., 15 ago.<span class="calendar-today">${todayWord}</span></h3>`
+      + `<ul class="calendar-day-items">${Array.from({ length: busyCount }, (_u, i) => item(i)).join("")}</ul>`
+      + `</li></ol>`
+    : `<p class="calendar-empty">${copy.empty}</p>`;
+
+  return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>${FONT_STUB}${css}</style></head><body><main>
+  <section aria-labelledby="cal" class="calendar">
+    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
+    <div class="calendar-toolbar">
+      <nav aria-label="Orientação" class="calendar-orientation"><ul>
+        <li><a href="?orientation=day">Dia</a></li>
+        <li><a href="?orientation=week">Semana</a></li>
+        <li><a href="?orientation=month" aria-current="true">${locale === "en" ? "Month" : "Mês"}</a></li>
+        <li><a href="?orientation=agenda">Agenda</a></li>
+      </ul></nav>
+      <nav aria-label="Anterior" class="calendar-navigation">
+        <a href="?date=2026-07-15" rel="prev">Anterior</a>
+        <p aria-live="polite" class="calendar-range">${locale === "en" ? "August 2026" : "agosto de 2026"}</p>
+        <a href="?date=2026-08-15">Hoje</a>
+        <a href="?date=2026-09-15" rel="next">Próximo</a>
+      </nav>
+    </div>
+    <div class="calendar-month-scroll"><table class="calendar-month">
+      <caption class="visually-hidden">${locale === "en" ? "Month grid for August 2026" : "Grade do mês de agosto de 2026"}</caption>
+      <thead><tr>${weekdays.map((day) => `<th scope="col">${day}</th>`).join("")}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>
+    <div class="calendar-month-list">
+      <h2>${locale === "en" ? "Days with items this month" : "Dias com itens neste mês"}</h2>
+      ${listDays}
+    </div>
+  </section></main></body></html>`;
+}
+
+/**
+ * `2P-CALENDAR-001` — the month in a real engine.
+ *
+ * The property that cannot be checked anywhere below this lane: the grid and the
+ * readable list are **both in the DOM**, and CSS decides which one exists at a
+ * given width. jsdom applies no stylesheet, so a unit test can only assert the
+ * two subtrees are separately targetable; whether exactly one of them is
+ * rendered — and therefore whether a screen reader hears one month or two — is a
+ * question only a browser answers.
+ */
+test.describe("2P-CALENDAR-001: the month is a real grid, and only one of its two forms is live", () => {
+  test("shows the grid and removes the list on a wide viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setContent(monthPage("pt-BR"), { waitUntil: "load" });
+
+    await expect(page.locator(".calendar-month-scroll")).toBeVisible();
+    await expect(page.locator(".calendar-month-list")).toBeHidden();
+
+    // `display:none` rather than a clip: the subtree is out of the
+    // accessibility tree, which is what stops a reader hearing the month twice.
+    const display = await page.locator(".calendar-month-list")
+      .evaluate((node) => getComputedStyle(node).display);
+    expect(display).toBe("none");
+  });
+
+  test("shows the readable list and removes the grid on a phone", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.setContent(monthPage("pt-BR", 5), { waitUntil: "load" });
+
+    await expect(page.locator(".calendar-month-list")).toBeVisible();
+    await expect(page.locator(".calendar-month-scroll")).toBeHidden();
+    expect(
+      await page.locator(".calendar-month-scroll").evaluate((node) => getComputedStyle(node).display),
+    ).toBe("none");
+
+    // And the page does not scroll sideways to achieve it (`2M-MOBILE-001`).
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("lays six weeks of seven days, with the neighbouring days marked", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setContent(monthPage("pt-BR"), { waitUntil: "load" });
+
+    await expect(page.locator(".calendar-month thead th")).toHaveCount(7);
+    await expect(page.locator(".calendar-month tbody tr")).toHaveCount(6);
+    await expect(page.locator(".calendar-month td")).toHaveCount(42);
+    // 27–31 July and 1–6 September.
+    await expect(page.locator('.calendar-month td[data-outside="true"]')).toHaveCount(11);
+  });
+
+  test("marks today with a word, so the mark survives without colour", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setContent(monthPage("pt-BR"), { waitUntil: "load" });
+    const today = page.locator('.calendar-month td[data-today="true"]');
+    await expect(today).toHaveCount(1);
+    await expect(today.locator(".calendar-today")).toHaveText("Hoje");
+  });
+
+  test("bounds a busy cell and keeps its overflow reachable", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setContent(monthPage("pt-BR", 7), { waitUntil: "load" });
+
+    const busy = page.locator('.calendar-month td[data-today="true"]');
+    await expect(busy.locator(".calendar-item")).toHaveCount(3);
+    const more = busy.locator(".calendar-month-more");
+    await expect(more).toHaveText("mais 4");
+    await expect(more).toHaveAttribute("href", /date=2026-08-15/);
+
+    /*
+     * *"Cells do not grow without limit"*, asserted as the property rather than
+     * as a pixel number.
+     *
+     * The first version of this asserted a height ceiling, and it failed —
+     * usefully. The CSS it was checking used `max-height` on a `<td>`, which has
+     * no effect: table cells treat height as a minimum. The rule claimed a cap it
+     * did not impose, and only a real engine could say so.
+     *
+     * What actually bounds the cell is `MONTH_CELL_ITEM_LIMIT`, so that is what
+     * is measured: a day with seven items is exactly as tall as a day with
+     * three, and adding more can never make it taller.
+     */
+    const heightAt = async (count: number) => {
+      await page.setContent(monthPage("pt-BR", count), { waitUntil: "load" });
+      return page.locator('.calendar-month td[data-today="true"]')
+        .evaluate((node) => node.getBoundingClientRect().height);
+    };
+
+    /*
+     * Compared among cells that all show the overflow link, because the link is
+     * itself a line: a cell of exactly three items has no link and is therefore
+     * legitimately shorter than one of four. The bound being asserted is that
+     * beyond the limit, MORE items add NOTHING.
+     */
+    const atLimit = await heightAt(7);
+    expect(await heightAt(40)).toBe(atLimit);
+    expect(await heightAt(400)).toBe(atLimit);
+    // Not trivially constant: the measurement does respond to content below the
+    // limit, so a cell that always measured the same would fail here.
+    expect(await heightAt(1)).toBeLessThan(atLimit);
+  });
+
+  test("gives the day number a real target", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.setContent(monthPage("pt-BR", 2), { waitUntil: "load" });
+    // Measured in the list, which is the form a phone actually gets.
+    const link = page.locator(".calendar-month-list .calendar-item-link").first();
+    const box = await link.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeGreaterThan(0);
+  });
+
+  test("renders the month in English too, with its own weekday row", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.setContent(monthPage("en"), { waitUntil: "load" });
+    await expect(page.locator(".calendar-month thead th").first()).toHaveText("Mon");
+    await expect(page.locator(".calendar-range")).toHaveText("August 2026");
+  });
+});

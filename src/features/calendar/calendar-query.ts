@@ -46,25 +46,46 @@
 
 import {
   addLocalDays,
+  addLocalMonths,
   compareLocalDates,
+  daysInLocalMonth,
   formatLocalDate,
+  localWeekdayIndex,
   parseLocalDate,
+  startOfLocalMonth,
   startOfLocalWeek,
   type LocalDate,
 } from "@/lib/time/local-day";
 
 /**
- * `2M-CAL-007`'s three orientations.
+ * `2M-CAL-007`'s orientations — three until slice 2P.7, four since.
  *
  * **This is the canonical declaration.** `calendarOrientations` in
- * `product-analytics/contracts.ts` restates it for the telemetry payload, and
- * `calendar-query.test.ts` holds the two to exact equality — the same drift gate
- * the Phase 2E command vocabularies get, and for the same reason: an analytics
- * module must not import a feature module, and two lists that agree by
- * inspection are one refactor from disagreeing.
+ * `product-analytics/contracts.ts` restates it for the telemetry payload,
+ * because an analytics module must not import a feature module.
+ *
+ * The two lists were held to **exact equality** until `month` arrived, and they
+ * no longer are — deliberately. The third copy of the vocabulary lives inside
+ * the *deployed* `private.validate_product_event_properties`, which admits
+ * `['day','week','agenda']` and nothing else; widening it is a third Phase 2P
+ * migration and therefore a stop condition. So `month` is a period the surface
+ * shows and the ledger does not hear about, and the drift gate became an
+ * asymmetry with its own controls — `2P-CALENDAR-MONTH-TELEMETRY` in
+ * `calendar-query.test.ts` reads the enum out of the migration so the telemetry
+ * list still cannot drift from what is actually deployed.
  */
-export const CALENDAR_ORIENTATIONS = ["day", "week", "agenda"] as const;
+export const CALENDAR_ORIENTATIONS = ["day", "week", "month", "agenda"] as const;
 export type CalendarOrientation = (typeof CALENDAR_ORIENTATIONS)[number];
+
+/**
+ * The orientations whose span is a constant.
+ *
+ * `month` is deliberately outside this type rather than given a nominal 30, and
+ * the exclusion is what makes the omission a compile error instead of a rounding
+ * error: a month is 28, 29, 30 or 31 days sitting in a 4-, 5- or 6-week grid, so
+ * anything that needs a length must ask `rangeDayCount` with the anchor in hand.
+ */
+export type FixedSpanOrientation = Exclude<CalendarOrientation, "month">;
 
 /**
  * The five lanes `2M-CAL-002` names, over the five sources that already exist.
@@ -99,12 +120,50 @@ export const COMMITMENT_BY_LANE: Record<CalendarLane, CalendarCommitment> = {
   suggestion: "suggested",
 };
 
-/** How many days each orientation spans. Agenda is a fortnight, forward-looking. */
-export const DAYS_BY_ORIENTATION: Record<CalendarOrientation, number> = {
+/** How many days each fixed orientation spans. Agenda is a fortnight, forward-looking. */
+export const DAYS_BY_ORIENTATION: Record<FixedSpanOrientation, number> = {
   day: 1,
   week: 7,
   agenda: 14,
 };
+
+/**
+ * How many days the given position actually shows.
+ *
+ * For the three fixed orientations this is the constant above. For `month` it is
+ * the **grid**, not the month: whole weeks from the Monday on or before the
+ * first to the Sunday on or after the last, which is 28, 35 or 42 days. Whole
+ * weeks because a month drawn as a ragged seven-column table would put the same
+ * weekday in two columns, and 28 is reachable — a February beginning on a Monday
+ * in a non-leap year is exactly four weeks, and an implementation that always
+ * padded to 35 would draw a phantom week.
+ */
+export function rangeDayCount(query: CalendarQuery): number {
+  if (query.orientation !== "month") return DAYS_BY_ORIENTATION[query.orientation];
+  /*
+   * The lead is the weekday index of the first of the month — Monday is 0 — and
+   * it is asked for rather than computed as a difference between two dates. The
+   * obvious way to write that difference divides a millisecond span by 86,400,000,
+   * which `phase-2m-fixed-offset-guard.test.ts` forbids; the guard caught exactly
+   * that here before this comment existed.
+   */
+  const lead = localWeekdayIndex(startOfLocalMonth(query.anchor));
+  return Math.ceil((lead + daysInLocalMonth(query.anchor)) / 7) * 7;
+}
+
+/**
+ * The anchor one period earlier or later, before the bound is applied.
+ *
+ * Split out because `month` moves by a month and the other three move by their
+ * span, and both `step` and `boundState` need the same answer — two call sites
+ * computing "the next position" independently is how a *next* control and the
+ * *this is the last one* message come to disagree.
+ */
+function shiftAnchor(query: CalendarQuery, direction: -1 | 1): LocalDate {
+  return query.orientation === "month"
+    ? addLocalMonths(query.anchor, direction)
+    : addLocalDays(query.anchor, direction * DAYS_BY_ORIENTATION[query.orientation]);
+}
 
 /**
  * The navigation bound, declared **once** (`2M-CAL-006`).
@@ -233,8 +292,7 @@ export function calendarHref(locale: string, query: CalendarQuery): string {
  * lets the surface say why it stopped (`2M-CAL-006`).
  */
 export function step(query: CalendarQuery, direction: -1 | 1, today: LocalDate): CalendarQuery {
-  const span = DAYS_BY_ORIENTATION[query.orientation];
-  const candidate = addLocalDays(query.anchor, direction * span);
+  const candidate = shiftAnchor(query, direction);
   return { ...query, anchor: isWithinBound(candidate, today) ? candidate : query.anchor };
 }
 
@@ -243,10 +301,9 @@ export function boundState(query: CalendarQuery, today: LocalDate): {
   readonly atEarliest: boolean;
   readonly atLatest: boolean;
 } {
-  const span = DAYS_BY_ORIENTATION[query.orientation];
   return {
-    atEarliest: !isWithinBound(addLocalDays(query.anchor, -span), today),
-    atLatest: !isWithinBound(addLocalDays(query.anchor, span), today),
+    atEarliest: !isWithinBound(shiftAnchor(query, -1), today),
+    atLatest: !isWithinBound(shiftAnchor(query, 1), today),
   };
 }
 
@@ -259,7 +316,11 @@ export function boundState(query: CalendarQuery, today: LocalDate): {
  * would move the user somewhere they did not ask to go.
  */
 export function rangeStart(query: CalendarQuery): LocalDate {
-  return query.orientation === "week" ? startOfLocalWeek(query.anchor) : query.anchor;
+  if (query.orientation === "week") return startOfLocalWeek(query.anchor);
+  // A month snaps twice: to its own first day, then back to that day's Monday,
+  // so the grid's columns are weekdays rather than offsets from the first.
+  if (query.orientation === "month") return startOfLocalWeek(startOfLocalMonth(query.anchor));
+  return query.anchor;
 }
 
 /**

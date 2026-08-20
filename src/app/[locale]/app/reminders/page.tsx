@@ -10,9 +10,10 @@ import {
 import { NotificationInvitation } from "@/features/notifications/notification-invitation";
 import { deriveThreeFacts, mayInviteAtMomentOfValue } from "@/features/notifications/three-facts";
 
-import { createReminder } from "@/features/agent/actions";
-import { ReminderForm } from "@/features/agent/forms";
 import { getAgentName } from "@/features/profile/agent-identity";
+import { createReminder } from "@/features/reminders/actions";
+import { ReminderComposer } from "@/features/reminders/reminder-composer";
+import { loadReminderTaskOptions } from "@/features/reminders/task-options";
 import { getReminderCopy } from "@/features/reminders/copy";
 import {
   ReminderFeedbackBanner,
@@ -118,6 +119,12 @@ export default async function RemindersPage({
     return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
   };
 
+  const taskOptions = await loadReminderTaskOptions(
+    supabase,
+    user.id,
+    copy.creation.linkWithheld,
+  );
+
   const { reminders, hasNext } = await loadReminderPage(supabase, {
     userId: user.id,
     locale,
@@ -159,7 +166,16 @@ export default async function RemindersPage({
           <h1>{copy.heading}</h1>
           <p>{copy.intro}</p>
         </div>
-        <ReminderForm action={createReminder} locale={locale} />
+        {/*
+          `2P-REMINDER-001`. A single action, not a form.
+
+          The header used to carry `ReminderForm` — three controls and a submit
+          button, permanently open above the list. The options are resolved on
+          the server because the picker renders task titles, which are governed
+          content; see `task-options.ts` for why that resolution cannot happen
+          inside an `<option>`.
+        */}
+        <ReminderComposer action={createReminder} locale={locale} taskOptions={taskOptions} />
       </header>
 
       <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />

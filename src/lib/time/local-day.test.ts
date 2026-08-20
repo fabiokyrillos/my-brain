@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   addLocalDays,
+  addLocalMonths,
   compareLocalDates,
+  daysInLocalMonth,
   formatLocalDate,
   isSupportedTimeZone,
   localDateOf,
@@ -11,8 +13,10 @@ import {
   localDayLengthHours,
   localRangeBounds,
   parseLocalDate,
+  startOfLocalMonth,
   startOfLocalWeek,
   startOfNextLocalDay,
+  type LocalDate,
 } from "./local-day";
 
 /**
@@ -349,5 +353,63 @@ describe("2M-CAL-004: a named local day, and a run of them", () => {
     expect(startOfLocalWeek({ year: 2026, month: 8, day: 17 })).toEqual({ year: 2026, month: 8, day: 17 });
     // And it crosses a month boundary without special-casing one.
     expect(startOfLocalWeek({ year: 2026, month: 9, day: 2 })).toEqual({ year: 2026, month: 8, day: 31 });
+  });
+});
+
+/**
+ * `2P-CALENDAR-001` — the month, added here rather than in the calendar.
+ *
+ * `phase-2m-local-day-guard.test.ts` fails the build on a module that derives a
+ * day boundary of its own, and a calendar that computed *"the first of the
+ * month"* from a `Date` in some zone would be exactly the fourth copy that guard
+ * exists to stop. So the month arithmetic lives beside the week arithmetic, in
+ * the one module that owns wall-clock dates, and the calendar consumes it.
+ */
+describe("2P-CALENDAR-001: the month a date belongs to", () => {
+  const date = (value: string): LocalDate => {
+    const parsed = parseLocalDate(value);
+    if (!parsed) throw new Error(`fixture is not a date: ${value}`);
+    return parsed;
+  };
+
+  it("starts a month on its first day, whatever the anchor was", () => {
+    expect(startOfLocalMonth(date("2026-08-19"))).toEqual({ year: 2026, month: 8, day: 1 });
+    expect(startOfLocalMonth(date("2026-08-01"))).toEqual({ year: 2026, month: 8, day: 1 });
+    expect(startOfLocalMonth(date("2026-08-31"))).toEqual({ year: 2026, month: 8, day: 1 });
+  });
+
+  it("counts the days a month actually has, including a leap February", () => {
+    expect(daysInLocalMonth(date("2026-02-10"))).toBe(28);
+    expect(daysInLocalMonth(date("2028-02-10"))).toBe(29);
+    expect(daysInLocalMonth(date("2026-04-10"))).toBe(30);
+    expect(daysInLocalMonth(date("2026-12-10"))).toBe(31);
+  });
+
+  it("steps whole months and crosses the year boundary in both directions", () => {
+    expect(addLocalMonths(date("2026-12-15"), 1)).toEqual({ year: 2027, month: 1, day: 15 });
+    expect(addLocalMonths(date("2026-01-15"), -1)).toEqual({ year: 2025, month: 12, day: 15 });
+    expect(addLocalMonths(date("2026-08-19"), 0)).toEqual({ year: 2026, month: 8, day: 19 });
+  });
+
+  /**
+   * The property a naive `setMonth` gets wrong: January 31 plus one month is
+   * February 28, never March 3. A calendar whose *next month* control skipped
+   * February would be unusable exactly once a year — the kind of defect that
+   * ships because nobody presses it on the thirty-first.
+   */
+  it("clamps a day the target month does not have, rather than overflowing", () => {
+    expect(addLocalMonths(date("2026-01-31"), 1)).toEqual({ year: 2026, month: 2, day: 28 });
+    expect(addLocalMonths(date("2028-01-31"), 1)).toEqual({ year: 2028, month: 2, day: 29 });
+    expect(addLocalMonths(date("2026-03-31"), -1)).toEqual({ year: 2026, month: 2, day: 28 });
+    expect(addLocalMonths(date("2026-05-31"), 1)).toEqual({ year: 2026, month: 6, day: 30 });
+  });
+
+  it("never produces a date its own parser would refuse", () => {
+    for (let step = -30; step <= 30; step += 1) {
+      for (const start of ["2026-01-31", "2026-03-31", "2028-02-29", "2026-08-15"]) {
+        const shifted = addLocalMonths(date(start), step);
+        expect(parseLocalDate(formatLocalDate(shifted))).toEqual(shifted);
+      }
+    }
   });
 });

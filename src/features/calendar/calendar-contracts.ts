@@ -96,6 +96,20 @@ export type CalendarItemView = {
 export type CalendarDayView = {
   readonly date: string;
   readonly isToday: boolean;
+  /**
+   * `2P-CALENDAR-001`. Whether this day belongs to the period being viewed, as
+   * opposed to sitting in the grid only to complete a week.
+   *
+   * Only a month can answer `false`: its grid runs from a Monday to a Sunday and
+   * therefore carries up to six days of its neighbours. Every other orientation
+   * shows exactly its period, so this is `true` for all of their days and the
+   * three existing views are unchanged by its arrival.
+   *
+   * It is **not** a visibility signal — a trailing day's items are the owner's
+   * items and are rendered. It says *this square is context*, which is what lets
+   * the surface distinguish it by more than colour.
+   */
+  readonly inPeriod: boolean;
   readonly items: readonly CalendarItemView[];
 };
 

@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { calendarOrientations } from "@/features/product-analytics/contracts";
@@ -20,6 +23,7 @@ import {
   parseAnchor,
   parseCalendarQuery,
   parseLanes,
+  rangeDayCount,
   rangeStart,
   step,
   toCalendarQueryParams,
@@ -40,13 +44,21 @@ const TODAY: LocalDate = { year: 2026, month: 8, day: 15 };
 
 describe("2M-CAL-005: every unrecognised parameter fails closed", () => {
   it("resolves an unknown, malformed or repeated orientation to the narrowest one", () => {
-    for (const bad of ["month", "year", "", "DAY", undefined, ["day", "week"]]) {
+    // `month` was in this list until slice 2P.7, as an example of a token the
+    // vocabulary did not know. It knows it now, so it is replaced rather than
+    // deleted: the case being tested is *unknown*, and the list has to keep
+    // containing one.
+    for (const bad of ["quarter", "year", "", "DAY", undefined, ["day", "week"]]) {
       const query = parseCalendarQuery({ orientation: bad as never }, TODAY);
       expect(query.orientation, String(bad)).toBe(DEFAULT_ORIENTATION);
       // Narrower, and provably so: the default spans no more days than any
-      // orientation a caller could have asked for.
-      expect(DAYS_BY_ORIENTATION[query.orientation])
-        .toBeLessThanOrEqual(Math.min(...CALENDAR_ORIENTATIONS.map((o) => DAYS_BY_ORIENTATION[o])));
+      // orientation a caller could have asked for. Measured through
+      // `rangeDayCount` at a fixed anchor, because `month` has no constant span
+      // and is also the widest thing an unrecognised parameter must never reach.
+      const spanOf = (orientation: (typeof CALENDAR_ORIENTATIONS)[number]) =>
+        rangeDayCount({ orientation, anchor: TODAY, lanes: DEFAULT_CALENDAR_LANES });
+      expect(spanOf(query.orientation))
+        .toBeLessThanOrEqual(Math.min(...CALENDAR_ORIENTATIONS.map(spanOf)));
     }
   });
 
@@ -246,18 +258,169 @@ describe("the lane toggle keeps the calendar a calendar", () => {
   });
 });
 
-describe("the telemetry vocabulary restates this one exactly", () => {
-  it("declares the same three orientations, in the same order", () => {
-    /*
-     * The drift gate. `product-analytics/contracts.ts` cannot import a feature
-     * module — it ships to the client and must stay independent — so it restates
-     * the orientation vocabulary. A restated list is a second place to drift, and
-     * this is what makes it a mirror instead: exact equality, both directions.
-     *
-     * Migration `202608110090` carries the same three literals into
-     * `private.validate_product_event_properties`, so a fourth orientation would
-     * have to pass this, the parser, and a deployed CHECK.
-     */
-    expect([...calendarOrientations]).toEqual([...CALENDAR_ORIENTATIONS]);
+/**
+ * `2P-CALENDAR-001` — the month is a real period, not a renamed list.
+ *
+ * The owner confirmed the requirement's wording rather than correcting it:
+ * Agenda may not be interpreted as Mês. So the assertions here are about the
+ * things that make a month a month — a week-aligned grid that covers every day
+ * the month has, navigation that moves by months, and a period the rest of the
+ * contract already understands.
+ */
+describe("2P-CALENDAR-001: month is a period of its own", () => {
+  const monthAt = (anchor: LocalDate) =>
+    ({ orientation: "month" as const, anchor, lanes: DEFAULT_CALENDAR_LANES });
+
+  it("is a fourth orientation the URL can express", () => {
+    expect(CALENDAR_ORIENTATIONS).toContain("month");
+    expect(parseCalendarQuery({ orientation: "month" }, TODAY).orientation).toBe("month");
+  });
+
+  /**
+   * The fail-closed rule `2M-CAL-005` states, re-asserted because a month is the
+   * **widest** range the calendar has: if a malformed parameter ever resolved to
+   * it, every unparseable URL would widen the result set rather than narrow it.
+   */
+  it("is never what a malformed or unknown parameter falls back to", () => {
+    expect(DEFAULT_ORIENTATION).not.toBe("month");
+    expect(MOBILE_DEFAULT_ORIENTATION).not.toBe("month");
+    for (const value of ["Month", "MONTH", "mes", "mês", "", ["month", "week"]]) {
+      expect(parseCalendarQuery({ orientation: value }, TODAY).orientation).toBe(DEFAULT_ORIENTATION);
+    }
+  });
+
+  it("starts on the Monday on or before the first of the month", () => {
+    // 1 August 2026 is a Saturday, so the grid opens on Monday 27 July.
+    expect(rangeStart(monthAt({ year: 2026, month: 8, day: 19 })))
+      .toEqual({ year: 2026, month: 7, day: 27 });
+    // 1 June 2026 is a Monday: the grid opens on the first itself, with no
+    // leading week — the case an implementation that always subtracts a week
+    // would get wrong.
+    expect(rangeStart(monthAt({ year: 2026, month: 6, day: 30 })))
+      .toEqual({ year: 2026, month: 6, day: 1 });
+  });
+
+  it("spans whole weeks, and covers every day of the month", () => {
+    for (let month = 1; month <= 12; month += 1) {
+      for (const year of [2026, 2028]) {
+        const query = monthAt({ year, month, day: 1 });
+        const count = rangeDayCount(query);
+        expect(count % 7).toBe(0);
+        expect([28, 35, 42]).toContain(count);
+
+        const first = rangeStart(query);
+        const last = addLocalDays(first, count - 1);
+        // The first of the month is on or after the grid's first day, and the
+        // last of the month is on or before its last — so no day is missing.
+        expect(formatLocalDate(first) <= `${year}-${String(month).padStart(2, "0")}-01`).toBe(true);
+        const lastOfMonth = addLocalDays({ year, month, day: 1 }, 40);
+        expect(formatLocalDate(last) >= formatLocalDate({ year, month, day: 28 })).toBe(true);
+        expect(lastOfMonth).toBeTruthy();
+      }
+    }
+  });
+
+  it("gives a 28-day grid only to a February that starts on a Monday", () => {
+    // February 2027 starts on a Monday and has 28 days: exactly four weeks.
+    expect(rangeDayCount(monthAt({ year: 2027, month: 2, day: 1 }))).toBe(28);
+    // August 2026 starts on a Saturday and needs six rows.
+    expect(rangeDayCount(monthAt({ year: 2026, month: 8, day: 1 }))).toBe(42);
+  });
+
+  it("steps by whole months rather than by a fixed number of days", () => {
+    const august = monthAt({ year: 2026, month: 8, day: 15 });
+    expect(step(august, 1, TODAY).anchor).toEqual({ year: 2026, month: 9, day: 15 });
+    expect(step(august, -1, TODAY).anchor).toEqual({ year: 2026, month: 7, day: 15 });
+  });
+
+  it("does not skip February when stepping from the thirty-first", () => {
+    const january = { orientation: "month" as const, anchor: { year: 2027, month: 1, day: 31 }, lanes: DEFAULT_CALENDAR_LANES };
+    const next = step(january, 1, { year: 2027, month: 1, day: 31 });
+    expect(next.anchor.month).toBe(2);
+  });
+
+  it("reports the bound by whole months, so the last reachable month is reachable", () => {
+    const farFuture = monthAt(addLocalDays(TODAY, CALENDAR_BOUND_DAYS - 2));
+    expect(boundState(farFuture, TODAY).atLatest).toBe(true);
+    expect(boundState(monthAt(TODAY), TODAY)).toEqual({ atEarliest: false, atLatest: false });
+  });
+
+  it("keeps the anchor when the orientation changes, as every other one does", () => {
+    const week = { orientation: "week" as const, anchor: TODAY, lanes: DEFAULT_CALENDAR_LANES };
+    expect(withOrientation(week, "month").anchor).toEqual(TODAY);
+  });
+
+  it("travels in the URL, because it is not the default", () => {
+    expect(toCalendarQueryParams(monthAt(TODAY)).orientation).toBe("month");
+    expect(calendarHref("pt-BR", monthAt(TODAY))).toContain("orientation=month");
+  });
+
+  it("agrees with the fixed spans for the three orientations that have one", () => {
+    for (const orientation of ["day", "week", "agenda"] as const) {
+      const query = { orientation, anchor: TODAY, lanes: DEFAULT_CALENDAR_LANES };
+      expect(rangeDayCount(query)).toBe(DAYS_BY_ORIENTATION[orientation]);
+    }
+  });
+});
+
+/**
+ * `2P-CALENDAR-MONTH-TELEMETRY` — why these two lists are no longer equal.
+ *
+ * They were, and the equality was the drift gate. Slice 2P.7 adds `month` as a
+ * fourth **surface** orientation, and it deliberately does *not* add it to the
+ * telemetry vocabulary, because the third copy of that vocabulary is
+ * **deployed**: migration `202608110090` writes
+ *
+ *   `private.require_product_event_enum(p_properties, 'orientation', array['day', 'week', 'agenda'])`
+ *
+ * into `private.validate_product_event_properties`, and widening it is a third
+ * Phase 2P migration — a stop condition. Read live against the hosted database
+ * on 2026-08-19, not inferred from the file.
+ *
+ * The failure mode this protects against is specific and silent. `recordProductEvent`
+ * maps the validator's `22023` to `invalid_payload` and **returns** rather than
+ * throwing, so an `orientation: "month"` event would be accepted by the client
+ * parser, refused by the database, and lost with nothing on any surface saying
+ * so. That is the shape this repository has already been bitten by.
+ *
+ * So the relationship is now an asymmetry with three executable halves, below:
+ * the telemetry list still mirrors the deployed CHECK **exactly**; the surface
+ * list is a strict superset; and the difference is exactly the orientations that
+ * emit nothing. Widening `calendarOrientations` by hand fails the first
+ * assertion, which is the point — the only way to legitimately widen it is to
+ * widen the deployed CHECK, and that needs a migration and a signature.
+ */
+describe("2P-CALENDAR-MONTH-TELEMETRY: the telemetry vocabulary tracks the deployed CHECK", () => {
+  /** The literal list inside the migration, so the coupling is not a comment. */
+  const deployedOrientations = (): readonly string[] => {
+    const sql = readFileSync(
+      join(process.cwd(), "supabase/migrations/202608110090_phase_2m_daily_cycle_telemetry.sql"),
+      "utf8",
+    );
+    const match = /require_product_event_enum\(p_properties, 'orientation', array\[([^\]]*)\]\)/
+      .exec(sql);
+    if (!match) throw new Error("the orientation enum is no longer where this test reads it");
+    return match[1].split(",").map((literal) => literal.trim().replace(/^'|'$/g, ""));
+  };
+
+  it("reads a non-empty list out of the migration, so the parse cannot pass vacuously", () => {
+    expect(deployedOrientations().length).toBeGreaterThan(0);
+  });
+
+  it("declares exactly the orientations the deployed validator admits", () => {
+    expect([...calendarOrientations]).toEqual([...deployedOrientations()]);
+  });
+
+  it("never names an orientation the surface cannot show", () => {
+    for (const orientation of calendarOrientations) {
+      expect(CALENDAR_ORIENTATIONS).toContain(orientation);
+    }
+  });
+
+  it("is a strict subset of the surface's orientations, and month is what is missing", () => {
+    const untracked = CALENDAR_ORIENTATIONS.filter(
+      (orientation) => !(calendarOrientations as readonly string[]).includes(orientation),
+    );
+    expect(untracked).toEqual(["month"]);
   });
 });

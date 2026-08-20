@@ -7,8 +7,10 @@ import {
   type TaskDetailCommandState,
 } from "@/features/task-commands/detail-action-state";
 
-import type { CalendarItemView, CalendarProjection } from "./calendar-contracts";
-import { CalendarView } from "./calendar-view";
+import { addLocalDays, formatLocalDate } from "@/lib/time/local-day";
+
+import type { CalendarDayView, CalendarItemView, CalendarProjection } from "./calendar-contracts";
+import { CalendarView, MONTH_CELL_ITEM_LIMIT } from "./calendar-view";
 import { DEFAULT_CALENDAR_LANES, type CalendarQuery } from "./calendar-query";
 import { schedulingControlsFor } from "./calendar-scheduling";
 import { getCalendarCopy } from "./copy";
@@ -47,16 +49,30 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
   };
 }
 
-function projection(overrides: Partial<CalendarProjection> = {}): CalendarProjection {
-  const days = overrides.days ?? [{ date: "2026-08-15", isToday: true, items: [item()] }];
+/**
+ * A day fixture, with `inPeriod` defaulted.
+ *
+ * Slice 2P.7 added `inPeriod` to `CalendarDayView`. Every fixture below predates
+ * it and describes a day, week or agenda, where the grid *is* the period and the
+ * flag is always true — so defaulting it here keeps fifteen call sites saying
+ * what they were written to say, and the month tests pass it explicitly because
+ * for them it is the thing under test.
+ */
+type DayFixture = Omit<CalendarDayView, "inPeriod"> & { inPeriod?: boolean };
+
+function projection(
+  overrides: Partial<Omit<CalendarProjection, "days">> & { days?: readonly DayFixture[] } = {},
+): CalendarProjection {
+  const source = overrides.days ?? [{ date: "2026-08-15", isToday: true, items: [item()] }];
+  const days: readonly CalendarDayView[] = source.map((day) => ({ inPeriod: true, ...day }));
   return {
-    days,
     timezone: "America/Sao_Paulo",
     rangeStart: TODAY,
     rangeEnd: TODAY,
     failedLanes: [],
-    itemCount: days.reduce((total, day) => total + day.items.length, 0),
     ...overrides,
+    days,
+    itemCount: days.reduce((total, day) => total + day.items.length, 0),
   };
 }
 
@@ -360,7 +376,7 @@ describe("2M-CAL-010: the outcome survives the task leaving the day", () => {
   const reschedulable = () =>
     item({ reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } });
 
-  function rescheduling(days: CalendarProjection["days"]) {
+  function rescheduling(days: readonly DayFixture[]) {
     const action = vi.fn(async () => applied);
     const result = render(
       <CalendarView
@@ -406,5 +422,201 @@ describe("2M-CAL-010: the outcome survives the task leaving the day", () => {
   it("says nothing before anything has been applied", () => {
     rescheduling([{ date: "2026-08-15", isToday: true, items: [reschedulable()] }]);
     expect(screen.queryByRole("region", { name: "Resultado da alteração" })).toBeNull();
+  });
+});
+
+
+/**
+ * `2P-CALENDAR-001` — the month, as the owner confirmed it.
+ *
+ * The requirement's text was **not** amended: Agenda may not be renamed as Mês,
+ * and a plain list may not be declared a month. So these assertions are about
+ * the properties that make the difference — a real grid, today marked by more
+ * than a colour, the neighbouring days distinguished, cells that stop growing,
+ * an overflow that is still reachable, and a textual route to the same days.
+ */
+describe("2P-CALENDAR-001: the month is a grid, not a renamed list", () => {
+  const AUGUST = { year: 2026, month: 8, day: 15 };
+
+  /**
+   * A 42-cell August 2026 grid: it starts on Saturday 1 August, so the grid
+   * opens on Monday 27 July and closes on Sunday 6 September.
+   */
+  function monthDays(items: Record<string, CalendarItemView[]> = {}): readonly DayFixture[] {
+    const first = { year: 2026, month: 7, day: 27 };
+    return Array.from({ length: 42 }, (_unused, index) => {
+      const date = addLocalDays(first, index);
+      const key = formatLocalDate(date);
+      return {
+        date: key,
+        isToday: key === "2026-08-15",
+        inPeriod: date.month === 8,
+        items: items[key] ?? [],
+      };
+    });
+  }
+
+  const monthView = (days: readonly DayFixture[] = monthDays()) =>
+    view({
+      projection: projection({ days }),
+      query: query({ orientation: "month", anchor: AUGUST }),
+    });
+
+  it("renders a real table with the seven weekdays as column headers", () => {
+    monthView();
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.map((header) => header.textContent))
+      .toEqual([...getCalendarCopy("pt-BR").month.weekdays]);
+  });
+
+  it("lays the month out in whole weeks of seven", () => {
+    monthView();
+    const grid = screen.getByRole("table", { name: /Grade do mês/ });
+    const bodyRows = within(grid).getAllByRole("row").slice(1);
+    expect(bodyRows).toHaveLength(6);
+    for (const row of bodyRows) expect(within(row).getAllByRole("cell")).toHaveLength(7);
+  });
+
+  /**
+   * `2P-CALENDAR-001` forbids marking today with colour alone. The word is the
+   * carrier; the `data-today` attribute is what CSS hangs a tint on, and the
+   * assertion below would still pass with every colour removed.
+   */
+  it("marks today with a word rather than with a fill", () => {
+    monthView();
+    const today = screen.getAllByText(getCalendarCopy("pt-BR").todayLabel);
+    expect(today.length).toBeGreaterThan(0);
+  });
+
+  it("distinguishes the days that are only there to finish a week", () => {
+    const { container } = monthView();
+    const outside = container.querySelectorAll("td[data-outside='true']");
+    // 27–31 July is five days, and 1–6 September is six.
+    expect(outside).toHaveLength(11);
+    expect(container.querySelectorAll(".calendar-month td")).toHaveLength(42);
+  });
+
+  it("says so to a screen reader as well, not only to the eye", () => {
+    monthView();
+    const outsideNotes = screen.getAllByText(`(${getCalendarCopy("pt-BR").month.outside})`);
+    expect(outsideNotes).toHaveLength(11);
+  });
+
+  it("opens a day from its number, carrying the lanes rather than resetting them", () => {
+    view({
+      projection: projection({ days: monthDays() }),
+      query: query({ orientation: "month", anchor: AUGUST, lanes: ["deadline", "reminder"] }),
+    });
+    const link = screen.getByRole("link", { name: "15" });
+    expect(link.getAttribute("href")).toContain("date=2026-08-15");
+    expect(link.getAttribute("href")).toContain("lanes=deadline%2Creminder");
+    // The day view is the default orientation, so it is omitted from the URL
+    // rather than spelled — the same rule every other calendar link follows.
+    expect(link.getAttribute("href")).not.toContain("orientation=");
+  });
+
+  it("bounds a busy cell and keeps the rest reachable rather than merely counted", () => {
+    const busy = Array.from({ length: MONTH_CELL_ITEM_LIMIT + 4 }, (_unused, index) =>
+      item({ id: `item-${index}`, title: `Compromisso ${index}` }));
+    const { container } = monthView(monthDays({ "2026-08-15": busy }));
+
+    /*
+      Scoped to the grid. Both representations are in the DOM — see the
+      mutual-exclusion test below — so an unscoped query would find the list's
+      copy and this assertion could never fail.
+    */
+    const grid = container.querySelector(".calendar-month") as HTMLElement;
+    for (let index = 0; index < MONTH_CELL_ITEM_LIMIT; index += 1) {
+      expect(within(grid).getByText(`Compromisso ${index}`)).toBeTruthy();
+    }
+    expect(within(grid).queryByText(`Compromisso ${MONTH_CELL_ITEM_LIMIT}`)).toBeNull();
+
+    const overflow = within(grid).getByRole("link", {
+      name: getCalendarCopy("pt-BR").month.more(4),
+    });
+    expect(overflow.getAttribute("href")).toContain("date=2026-08-15");
+
+    // The list is where the bound does not apply: the overflow is reachable
+    // through the day link above, and through every item here.
+    const list = container.querySelector(".calendar-month-list") as HTMLElement;
+    expect(within(list).getAllByText(/^Compromisso \d$/)).toHaveLength(busy.length);
+  });
+
+  it("shows no overflow link when everything fits", () => {
+    monthView(monthDays({ "2026-08-15": [item()] }));
+    expect(screen.queryByText(/^mais \d+$/)).toBeNull();
+  });
+
+  /**
+   * The requirement asks for a text alternative and forbids the drawing being
+   * the only way in. It is a real heading and a real list — not `sr-only`,
+   * because an accessible route that is worse than the visual one is the failure
+   * this repository has already shipped once.
+   */
+  it("carries a textual route to the same days, visible to everyone", () => {
+    const { container } = monthView(monthDays({ "2026-08-15": [item()] }));
+    const list = container.querySelector(".calendar-month-list");
+    expect(list).toBeTruthy();
+    expect(list?.className).not.toContain("sr-only");
+    expect(list?.className).not.toContain("visually-hidden");
+    expect(screen.getByText(getCalendarCopy("pt-BR").month.listHeading)).toBeTruthy();
+  });
+
+  it("lists only the days of the month itself, and only the ones with something in them", () => {
+    const { container } = monthView(monthDays({
+      "2026-08-15": [item({ id: "in", title: "Dentro do mês" })],
+      // 30 July is in the grid but not in August: it renders in the cell and
+      // must not appear in the month's own list.
+      "2026-07-30": [item({ id: "out", title: "Fora do mês" })],
+    }));
+    const list = container.querySelector(".calendar-month-list") as HTMLElement;
+    // One day heading, and the item inside it — `getAllByRole("listitem")` would
+    // also count the item rows, which are `<li>` too.
+    expect(within(list).getAllByRole("heading", { level: 3 })).toHaveLength(1);
+    expect(within(list).getByText("Dentro do mês")).toBeTruthy();
+    expect(within(list).queryByText("Fora do mês")).toBeNull();
+    // And the July item is still rendered in the grid, because it is the
+    // owner's item and the cell it belongs to is on screen.
+    const grid = container.querySelector(".calendar-month") as HTMLElement;
+    expect(within(grid).getByText("Fora do mês")).toBeTruthy();
+  });
+
+  /**
+   * The duplication is deliberate and must stay harmless.
+   *
+   * Both representations are in the DOM so the choice can be made by CSS rather
+   * than by a viewport test that the server cannot run. That is only correct if
+   * exactly one of them is `display:none` at any width — `display:none` removes
+   * a subtree from the accessibility tree, so a screen reader hears one month,
+   * not two. jsdom applies no stylesheet and therefore cannot check that; this
+   * asserts the structure the rule hangs on, and
+   * `online-phase-2p-planning.spec.ts` proves the exclusivity in a real browser
+   * at both widths.
+   */
+  it("renders the grid and the list as two separately targetable subtrees", () => {
+    const { container } = monthView(monthDays({ "2026-08-15": [item()] }));
+    expect(container.querySelectorAll(".calendar-month-scroll")).toHaveLength(1);
+    expect(container.querySelectorAll(".calendar-month-list")).toHaveLength(1);
+    // Neither contains the other: nesting them would make hiding one hide both.
+    const scroll = container.querySelector(".calendar-month-scroll") as HTMLElement;
+    expect(scroll.querySelector(".calendar-month-list")).toBeNull();
+  });
+
+  it("says the month is empty rather than rendering an empty list", () => {
+    const { container } = monthView();
+    const list = container.querySelector(".calendar-month-list");
+    expect(within(list as HTMLElement).queryAllByRole("listitem")).toHaveLength(0);
+    expect(within(list as HTMLElement).getByText(getCalendarCopy("pt-BR").states.empty)).toBeTruthy();
+  });
+
+  it("names the period as its month, not as the grid's two edges", () => {
+    monthView();
+    expect(screen.getByText("agosto de 2026")).toBeTruthy();
+  });
+
+  it("offers the month as a fourth orientation control", () => {
+    monthView();
+    const link = screen.getByRole("link", { name: getCalendarCopy("pt-BR").orientation.options.month });
+    expect(link.getAttribute("aria-current")).toBe("true");
   });
 });

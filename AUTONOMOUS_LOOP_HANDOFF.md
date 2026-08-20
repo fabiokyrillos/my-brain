@@ -10515,3 +10515,164 @@ authority moved.
 Push HTTP 403, signup, rollout and every inherited residual stay where §87 …
 §99 left them. **This section deliberately does not name what comes after Phase
 2P.**
+
+## §101 — Slice 2P.7 ships: the calendar gets a real month, and the first `revalidatePath` that ever worked on the reminders route froze it (2026-08-19)
+
+**Baseline `main` `d30177f`** — the owner-decisions merge (§100). Clean, zero
+open PRs, **99 local = 99 hosted, parity `202608190099`**, read live. **63 of
+87.** Both Phase 2P allocations spent; a third remains a stop condition. Signup
+closed; rollout 25 pass · 3 fail · 2 owner-signature.
+
+**A note on how this session started.** The resuming prompt asked for slice 2P.6
+against a baseline of `main` = `1cf5959`. That SHA exists — it is PR #264, the
+2P.5 handoff — and `main` was **eleven commits ahead of it**, carrying the whole
+of 2P.6, its record, and §100. The prompt also carried the owner's `2P-PERSON-001`
+decision, which was already recorded in ADR-121, ADR-122, the PRD, the plan, the
+acceptance record and an executable guard. So the slice it asked for had been
+delivered, the re-audit it asked for was still valid — measured, not assumed:
+**zero product files changed between `97cee34` and `d30177f`** — and the owner
+authorized continuing to 2P.7 instead. *A stale baseline is not a reason to redo
+work; it is a reason to prove where the tree actually is before touching it.*
+
+### The month, and the vocabulary that lives in a deployed function
+
+`CALENDAR_ORIENTATIONS` is now `["day","week","month","agenda"]`. Monday-aligned
+grid of 28, 35 or 42 days — **28 is reachable**, so nothing pads to a phantom
+fifth week; navigation by whole months; a label that names the month rather than
+the grid's edges; today marked by a **word**; days outside the month
+distinguished visually *and* to a screen reader; cells bounded by
+`MONTH_CELL_ITEM_LIMIT` with a reachable overflow; a readable list for phones.
+
+The arithmetic went into `local-day.ts`, not the calendar, because
+`phase-2m-local-day-guard.test.ts` fails the build on a fourth copy of
+boundary derivation. **`addLocalMonths` clamps** — 31 January plus one month is
+28 February, never 3 March — which is how a *next month* control comes to skip
+February from the thirty-first, invisibly for eleven months of the year.
+
+**`2P-CALENDAR-MONTH-TELEMETRY` is a new remainder rather than a third
+migration.** The orientation vocabulary has three copies, and the third is inside
+the **deployed** `private.validate_product_event_properties`:
+
+```
+perform private.require_product_event_enum(p_properties, 'orientation', array['day', 'week', 'agenda']);
+```
+
+Read live against the hosted database. Widening it is a stop condition. Emitting
+anyway is worse than not emitting: `recordProductEvent` maps the validator's
+`22023` to `invalid_payload` and **returns**, so the event would be accepted by
+the client, refused by the database and lost with nothing anywhere saying so —
+the exact failure this repository has recorded before. Relabelling a month as
+`agenda` to fit the enum would put a false statement in an append-only ledger.
+
+So the month emits nothing, and three things hold it there: the client list is
+pinned to the migration's literals by a test that **reads them out of the
+migration**; the surface's producer takes the telemetry vocabulary, so deleting
+the guard in the page stops the build rather than silently emitting; and the
+journey asserts the silence **with a control** — the same page in `week` still
+emits, so a run where telemetry was broken entirely fails rather than passing.
+
+### `2P-REMINDER-REVALIDATE-HANG` — the finding that cost the most, and was not ours
+
+The authenticated journey hung: dialog stuck on *Criando…*, row written, server
+answered **200**, nothing in the server log, the browser console, or as a page
+error. Ten consecutive creations against `next start`:
+
+| Shape | Result |
+|---|---|
+| no revalidation | 10/10, ~1.4 s |
+| `revalidatePath("/[locale]/app/reminders", "page")` | ~3.9 s, hangs after two to five, past 120 s |
+| refresh on the client, after the dialog closes | 10/10, ~1.88 s |
+
+Slice 2P.6's fix — derive openness from `pending` — is correct and protects
+against closing **too early**. Nothing protects against a transition that never
+ends.
+
+**Establishing whose defect it was took two measurements, and both were worth
+making.** It reproduces with 2P.7's own `loadReminderTaskOptions` stubbed out of
+the page entirely; and a **worktree built at `main` `d30177f`**, carrying the old
+inline form and nothing from this branch, fails the same journey **2 times in
+12** with the same symptom. *`git stash` is not a baseline; a worktree at the
+base SHA is.*
+
+**Why nobody had seen it:** `applyReminderCommand` still revalidates a
+**resolved** path, which matches nothing under a dynamic `[locale]` segment. **No
+action on that page has ever actually re-rendered it.** This was the first that
+did, and the page was not ready.
+
+The refresh moved to the client, after the dialog has closed. What makes it safe
+is **ordering, not luck**: it runs only once `pending` is already false, so
+nothing it does can hold the dialog open, and a slow refresh degrades to a late
+list rather than to a control that cannot be dismissed.
+
+**This is a standing caution for the remaining `revalidatePath` call sites:
+repairing one can turn a dead call into a live freeze.**
+
+### The writer moved because it was building the wrong instant
+
+`createReminder` converted its `datetime-local` value with a bare `new Date(...)`,
+which resolves a wall clock in the **host's** zone — UTC on the server. A
+reminder set for 14:00 in São Paulo was stored as 14:00Z and would have fired
+**three hours early**. The reschedule command beside it had been doing this
+correctly since DEC-6. `2P-REMINDER-003` asks the two flows to share validation;
+they now share the **declarations**, and `schema.test.ts` runs every case through
+both parsers and compares verdicts, so they cannot drift while still passing.
+
+`assertActiveAccount` was dropped in the first draft of the move and put back.
+*Removing a check while relocating a function is the silent loss a move is
+supposed to make impossible.*
+
+### Five guards found real defects, and none was weakened
+
+- a division by `86_400_000` in the month's day count — fixed by extracting
+  `localWeekdayIndex` so no subtraction is needed;
+- two blocklists in this slice's tests duplicating the recurrence enforcer —
+  replaced by **closed lists**, following §100's *one enforcer, one recorder*
+  rather than broadening a single-file exemption;
+- two class names no rule reached — and removing them exposed a **specificity
+  bug**, `.reminder-compose-check` at `0,1,0` losing to
+  `.task-command-dialog-form label` at `0,1,1`;
+- the writer's move, caught before the allowlist was updated;
+- the mirror, which is why the month has a browser lane at all.
+
+And the 2P guard's month fact assertion **flipped**, which §100 said would be the
+delivery. It stays a closed list, so a fifth orientation still fails it.
+
+**`max-height` on a `<td>` is inert.** The month cell rule claimed a ceiling it
+did not impose — a "capped" cell measured 240 px — and only a real engine could
+say so. The declaration was removed rather than left to be believed, and the test
+now asserts the property that is true: beyond the item limit, more items add
+nothing.
+
+### Evidence
+
+`npm test` **8672 passing** (3 files fail to parse on Windows — the recorded
+local baseline, 0 failing tests, green in CI). `tsc` clean. `lint` reports
+nothing in this slice's files; its six errors are all inside gitignored
+`.worktrees/`. `npm run build` passes. `e2e/calendar.spec.ts` 70 passing on
+desktop and Pixel 7. The **exact CI foundation command** 383 passing, 5 skipped.
+`e2e/online-phase-2p-planning.spec.ts` **24 passing on desktop and Pixel 7**,
+against a rebuilt `next start` whose **served stylesheet was checked for this
+slice's own rules before the run** — so no proof was made against a stale
+artefact.
+
+### Slice 2P.8, and what is open
+
+**Cumulative: 72 of 87.** The inherited 73 double-counted `2P-CHAT-004`'s remainder closing, which slice 2P.2 had already counted as one of the seven CHAT requirements. The families sum to 87 only at 72 + 15, and the earlier records are not rewritten. `2P-CALENDAR-001` … `-005` and `2P-REMINDER-001` …
+`-005` are classified in the acceptance record: five built, five baseline, with
+`2P-CALENDAR-003`'s **scroll half explicitly not claimed**.
+
+**Ten remainders open and unabsorbed:** `2P-ATTENTION-008`'s browser half;
+`2P-CHAT-007-JOURNEY` (2P.8, carrying the owner's one-turn BYOK authorization);
+`RG-DEP-3`, **not re-run** because this slice deploys nothing; the four missing
+review flows; `2P-APPEARANCE-HYDRATION`; the remaining `revalidatePath` call
+sites, now with a caution attached; the first-action warm-up;
+`2P-REMINDER-RECURRENCE`; and **the two new ones — `2P-CALENDAR-MONTH-TELEMETRY`
+and `2P-REMINDER-REVALIDATE-HANG` — which are this session's classification,
+applying the principle the owner signed twice in this phase, and carry no owner
+signature of their own.** Both are put forward for one.
+
+**Not claimed by 2P.7:** anything on real hardware — the mobile lane is a Pixel 7
+emulation, not a device; any screen-reader run; and any automation, all six
+categories still `suggest_only`. Push HTTP 403, signup, rollout and every
+inherited residual stay where §87 … §100 left them. **This section deliberately
+does not name what comes after Phase 2P.**
