@@ -330,6 +330,19 @@ test.describe("a reminder is created through a dialog", () => {
      */
     const schedule = await row.locator(".reminder-schedule").textContent();
     expect(schedule).toContain("09:30");
+
+    /*
+     * And it claims **no origin**, because it has none.
+     *
+     * A reminder written by hand carries no `entry_id` and, with the link left
+     * empty, no `task_id` either. The row must say *standalone* rather than
+     * invent a source — the same rule slice 2P.6 held the memory composer to
+     * when it refused to render a null `source_entry_id` as "informed by you".
+     * Asserted positively and negatively, because a row that rendered nothing at
+     * all would pass a check for the absence of a link.
+     */
+    await expect(row.locator(".reminder-subject-none")).toHaveText("Lembrete avulso");
+    await expect(row.locator(".reminder-subject-link")).toHaveCount(0);
   });
 
   test("shows the same month and dialog on a phone", async ({ page }) => {
