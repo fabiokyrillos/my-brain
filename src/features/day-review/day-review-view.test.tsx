@@ -250,15 +250,30 @@ describe("2M-REVIEW-008: a stored review renders through the contract's own fiel
     // already on — and the words were disclosed inside the list below.
     mount({ generated: [storedReview("r1")] });
     const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
-    const link = within(region).getByRole("link", { name: copy.openReview });
+    const link = within(region).getByRole("link", { name: new RegExp(copy.openReview) });
     expect(link.getAttribute("href")).toBe("/en/app/reviews/r1");
     expect(within(region).queryByRole("link", { name: /see every review/i })).toBeNull();
+    // The name says WHICH review, not just that there is one — several of
+    // these stand on a week's tab, and identical names make the list
+    // untraversable by a screen reader.
+    expect(link.getAttribute("aria-label")).toContain("Daily summary");
+    expect(link.getAttribute("aria-label")).toContain("11/08/2026 — 11/08/2026");
   });
 
   it("renders every snapshot of the period, not just the newest", () => {
-    mount({ generated: [storedReview("newer"), storedReview("older", { periodEnd: "2026-08-10" })] });
+    mount({
+      generated: [
+        storedReview("newer"),
+        storedReview("older", { periodEnd: "2026-08-10", periodLabelRange: "10/08/2026 — 10/08/2026" }),
+      ],
+    });
     const region = screen.getByRole("region", { name: copy.generatedHeading("day") });
-    expect(within(region).getAllByRole("link", { name: copy.openReview })).toHaveLength(2);
+    const links = within(region).getAllByRole("link", { name: new RegExp(copy.openReview) });
+    expect(links).toHaveLength(2);
+    // …and the two are distinguishable by name, which is the whole point of
+    // rendering both rather than only the newest.
+    const names = links.map((link) => link.getAttribute("aria-label"));
+    expect(new Set(names).size, `two links share one accessible name: ${names.join(" | ")}`).toBe(2);
   });
 
   it("mounts the generate controls inside the period's own section", () => {

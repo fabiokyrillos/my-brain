@@ -216,7 +216,15 @@ export default async function ReviewsPage({
                 <p className="review-card-range">{review.periodLabelRange}</p>
               </div>
               <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
-              <Link className="review-open" href={`/${locale}/app/reviews/${review.id}`}>
+              {/* Named by period, for the reason the card above is: a list of
+                  links all called "Abrir revisão" is one a screen reader
+                  cannot tell apart. Structural labels only — never the
+                  review's words. */}
+              <Link
+                aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
+                className="review-open"
+                href={`/${locale}/app/reviews/${review.id}`}
+              >
                 {copy.openReview}
               </Link>
             </li>

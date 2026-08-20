@@ -550,7 +550,27 @@ export function DayReviewView({
                   </div>
                   <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
                 </div>
-                <a className="review-open" href={`${reviewsHref}/${review.id}`}>{copy.openReview}</a>
+                {/*
+                  An accessible name that says WHICH review.
+
+                  Several of these can stand on one screen — a week holds a
+                  review and a plan, and a regenerated period holds a
+                  snapshot per day — and a list of links all named "Abrir
+                  revisão" is a list a screen reader cannot tell apart.
+
+                  The name is built from the **period label and range**,
+                  which are structural, and never from the review's words:
+                  those are what the OD-2J-1 disclosure withholds, and an
+                  `aria-label` carrying them would hand the withheld string
+                  straight to assistive technology.
+                */}
+                <a
+                  aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
+                  className="review-open"
+                  href={`${reviewsHref}/${review.id}`}
+                >
+                  {copy.openReview}
+                </a>
               </li>
             ))}
           </ul>

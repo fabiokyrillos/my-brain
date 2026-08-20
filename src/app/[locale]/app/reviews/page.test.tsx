@@ -168,8 +168,11 @@ describe("the current period and the history are separate, and never the same re
     expect(within(row).getByText("Revisão da semana")).toBeInTheDocument();
     expect(within(row).getByText("03/08/2026 — 09/08/2026")).toBeInTheDocument();
     expect(within(row).getByText("Concluída")).toBeInTheDocument();
-    expect(within(row).getByRole("link", { name: "Abrir revisão" }).getAttribute("href"))
-      .toBe("/pt-BR/app/reviews/h1");
+    const open = within(row).getByRole("link", { name: /Abrir revisão/ });
+    expect(open.getAttribute("href")).toBe("/pt-BR/app/reviews/h1");
+    // Named by its period, so a list of them is traversable.
+    expect(open.getAttribute("aria-label")).toContain("Revisão da semana");
+    expect(open.getAttribute("aria-label")).toContain("03/08/2026 — 09/08/2026");
 
     // The disclosure is gone from the listing entirely — no reveal control, no
     // preview. Under OD-2J-1 every summary is masked, so a preview here would be
