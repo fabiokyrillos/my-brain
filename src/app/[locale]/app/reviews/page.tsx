@@ -7,9 +7,11 @@ import { requireProfileTimeZone } from "@/features/calendar/calendar-projection"
 import { DayReviewView } from "@/features/day-review/day-review-view";
 import { getDayReviewCopy } from "@/features/day-review/copy";
 import { loadDayReviewProjection } from "@/features/day-review/day-review-projection";
+import { reviewPeriodWindow } from "@/features/day-review/period-window";
 import { DayReviewOpened } from "@/features/product-analytics/interaction-events";
 import { formatReviewPeriodRange } from "@/features/reviews/period-format";
 import { parseReviewTab, periodTypesFor, REVIEW_TABS } from "@/features/reviews/review-periods";
+import { ReviewTabs } from "@/features/reviews/review-tabs";
 import { loadReviewListProjection } from "@/features/reviews/review-list";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { undoWorkOperation } from "@/features/task-commands/actions";
@@ -99,33 +101,54 @@ export default async function ReviewsPage({
   const todayBounds = localDayBoundsForDate(today, timezone);
   const nowLocalMinutes = Math.max(0, Math.floor((now.getTime() - todayBounds.start) / 60_000));
 
-  const projection = await loadDayReviewProjection(supabase, {
-    userId: user.id,
-    locale,
-    timezone,
-    day,
-    today,
-    scope,
-    tab,
-    nowLocalMinutes,
-  });
-
   /*
-   * The history is read **after** the projection rather than beside it, because
-   * it needs the window the projection resolved: the current period is excluded
-   * from the list below by its own start date, which is how the same review
-   * stops appearing twice on one screen.
+   * Both reads at once, and the measurement is why.
+   *
+   * The history used to `await` the whole projection just to learn the window's
+   * start date — so the page ran **four** sequential waves against the database
+   * (`requireUser`, the timezone, the projection's six queries, then this one)
+   * where three were enough. Nothing about the exclusion needed the projection:
+   * `reviewPeriodWindow` is pure, takes `(tab, day, timezone)`, and the
+   * projection derives its own window from the same three values.
+   *
+   * Computing it here and passing it to both is what removes the wave. It also
+   * makes the two agree by construction rather than by both being right: if the
+   * window the history excludes ever differed from the window the projection
+   * read, the running period would appear twice — the exact defect this page was
+   * redesigned to remove.
    */
-  const { items, hasNext } = await loadReviewListProjection(supabase, {
-    userId: user.id,
-    locale,
-    page,
-    tab,
-    excludePeriodStart: projection.window.startKey,
-  });
+  const window = reviewPeriodWindow(tab, day, timezone);
+
+  const [projection, { items, hasNext }] = await Promise.all([
+    loadDayReviewProjection(supabase, {
+      userId: user.id,
+      locale,
+      timezone,
+      day,
+      today,
+      scope,
+      tab,
+      nowLocalMinutes,
+    }),
+    loadReviewListProjection(supabase, {
+      userId: user.id,
+      locale,
+      page,
+      tab,
+      excludePeriodStart: window.startKey,
+    }),
+  ]);
 
   const copy = getDayReviewCopy(locale);
-  const tabHref = (value: (typeof REVIEW_TABS)[number]) => `/${locale}/app/reviews?period=${value}`;
+  /*
+   * A plain record rather than a function: `ReviewTabs` is a client component,
+   * and a function prop cannot cross that boundary — React throws at render, and
+   * `client-boundary-serializability-guard.test.ts` fails the build. This branch
+   * has already paid for that lesson once.
+   */
+  const hrefFor = Object.fromEntries(
+    REVIEW_TABS.map((value) => [value, `/${locale}/app/reviews?period=${value}`]),
+  ) as Record<(typeof REVIEW_TABS)[number], string>;
 
   return <div className="content-page reviews-page">
     {/*
@@ -142,25 +165,23 @@ export default async function ReviewsPage({
 
     {/*
       The tab strip — the page's primary navigation, immediately under its own
-      name. Links rather than buttons, so the browser's back and forward move
-      between periods and a shared URL opens the period it names.
+      name. Still links, so the browser's back and forward move between periods
+      and a shared URL opens the period it names.
 
-      `aria-current="page"` marks the selection, which is what a screen reader
-      announces; the visual state is `[aria-current]` in CSS rather than a
-      second class, so the two cannot disagree.
+      `aria-current="page"` is still derived on the **server** from
+      `searchParams`, which is what a screen reader announces and what keeps the
+      URL the only source of truth. What moved into a client component is the
+      **pending** indicator: measured against the production build, the control
+      took 1 476ms (desktop), 1 427ms (Pixel 7) and 1 643ms (iPhone WebKit) to
+      look selected, because the selected state could not move until the server
+      render arrived. See `review-tabs.tsx`.
     */}
-    <nav aria-label={copy.tabsLabel} className="review-tabs">
-      {REVIEW_TABS.map((value) => (
-        <Link
-          aria-current={tab === value ? "page" : undefined}
-          className="review-tab"
-          href={tabHref(value)}
-          key={value}
-        >
-          {copy.tabs[value]}
-        </Link>
-      ))}
-    </nav>
+    <ReviewTabs
+      currentTab={tab}
+      hrefFor={hrefFor}
+      label={copy.tabsLabel}
+      labels={copy.tabs}
+    />
 
     <DayReviewView
       /*

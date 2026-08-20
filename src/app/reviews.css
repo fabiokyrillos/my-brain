@@ -54,6 +54,38 @@
   box-shadow: var(--elevation-1);
 }
 
+/* The tap's own answer, while the server render is on its way.
+
+   `useLinkStatus` renders `.review-tab-pending` inside the tapped link, and the
+   anchor picks the state up through `:has()` — the hook has to be called from a
+   DESCENDANT of `Link`, so the child is the only place the state can live and
+   the parent is the only place it can be seen.
+
+   Deliberately restrained. The owner's contract says not to hide the delay
+   behind a long animation, so this is the SELECTED treatment arriving early
+   rather than a spinner: the control looks pressed the instant it is pressed,
+   and the real work below it got faster in the same change. A 900ms breathing
+   opacity is the only motion, and it is disabled for reduced motion. */
+.review-tab:has(.review-tab-pending) {
+  background: var(--background-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.review-tab-pending {
+  width: 6px;
+  height: 6px;
+  margin-left: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--link);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .review-tab-pending { animation: review-tab-breathe 900ms ease-in-out infinite; }
+  @keyframes review-tab-breathe { 50% { opacity: .25; } }
+}
+
 .review-tab:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;

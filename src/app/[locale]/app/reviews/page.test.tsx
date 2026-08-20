@@ -13,6 +13,8 @@ vi.mock("server-only", () => ({}));
 import { loadDayReviewProjection } from "@/features/day-review/day-review-projection";
 import { loadReviewListProjection } from "@/features/reviews/review-list";
 import { requireUser } from "@/lib/auth/require-user";
+import { reviewPeriodWindow } from "@/features/day-review/period-window";
+import { localDateOf } from "@/lib/time/local-day";
 import ReviewsPage from "./page";
 
 vi.mock("@/features/reviews/review-list", () => ({ loadReviewListProjection: vi.fn() }));
@@ -153,11 +155,55 @@ describe("the URL is the source of truth for the selected period", () => {
 
 describe("the current period and the history are separate, and never the same review twice", () => {
   it("excludes the running period from the history query by its own start date", async () => {
+    /*
+      Derived, not hard-coded — and the difference is the point of the change it
+      is testing.
+
+      The history used to `await` the projection just to read its window, so a
+      mocked projection could dictate the expected value. The page now computes
+      the window itself with `reviewPeriodWindow`, which is pure and takes
+      `(tab, day, timezone)` — so the two reads can run in parallel, and they
+      agree by construction rather than by both being right. The expectation is
+      therefore the same computation the page makes, against the same clock.
+    */
     vi.mocked(loadDayReviewProjection).mockResolvedValue(dayReview("day", "week") as never);
     await mount({ period: "week" });
+    const expected = reviewPeriodWindow(
+      "week",
+      localDateOf(new Date(), "America/Sao_Paulo"),
+      "America/Sao_Paulo",
+    ).startKey;
     expect(vi.mocked(loadReviewListProjection).mock.calls[0]![1]).toMatchObject({
-      excludePeriodStart: "2026-08-10",
+      excludePeriodStart: expected,
     });
+    // …and the control: a Monday, so a regression to "today" would be caught on
+    // six days out of seven rather than silently agreeing.
+    expect(expected).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("computes the window without the projection, so the two reads can run at once", async () => {
+    /*
+      The measured reason this changed: the page ran four sequential database
+      waves where three were enough. If the history ever waited on the projection
+      again, this fails — the mock resolves only after a tick, and the history
+      call is asserted to have been made before that tick completes.
+    */
+    let projectionResolved = false;
+    vi.mocked(loadDayReviewProjection).mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      projectionResolved = true;
+      return dayReview("day", "week") as never;
+    });
+    vi.mocked(loadReviewListProjection).mockImplementation(async () => {
+      expect(projectionResolved, "the history waited for the projection again").toBe(false);
+      return { items: [], hasNext: false } as never;
+    });
+    vi.mocked(requireUser).mockResolvedValue({ supabase: {}, user: { id: "user-1" } } as never);
+    render(await ReviewsPage({
+      params: Promise.resolve({ locale: "pt-BR" }),
+      searchParams: Promise.resolve({ period: "week" }),
+    }) as React.ReactElement);
+    expect(vi.mocked(loadReviewListProjection)).toHaveBeenCalled();
   });
 
   it("gives each history row a type, a period, a state and a way in — and nothing else", async () => {

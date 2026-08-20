@@ -11391,3 +11391,113 @@ The owner's checklist is
 `docs/reports/phase-2p/PHASE_2P_OWNER_CHECKLIST_REVIEWS.md` — eight steps, about
 six minutes, iPhone plus a desktop glance. **Phase 2P does not close on it**, and
 **Phase 2Q is not to be started or planned.**
+
+## §107 — The Revisões checkpoint: five approvals, one measured fix, one owner reversal, one requirement carried forward (2026-08-20)
+
+**Baseline `main` `d83af55`** — §106's record. Clean, zero open PRs, **99 local =
+99 hosted, parity `202608190099`**, read live before anything was written.
+**ZERO MIGRATIONS.** **ADR-124** records the eight decisions. Phase 2P **closes
+on the owner's approval of a short two-item checkpoint**; **Phase 2Q is neither
+started nor planned**.
+
+### What the owner approved, recorded as approved
+
+Items **2** (current period), **3** (generation), **4** (history), **6**
+(Markdown) and **8** (desktop). Everything not explicitly rejected is approved
+and is not to be re-opened.
+
+### Item 1 — the tabs felt slow, and the measurement said exactly why
+
+Measured against the **production** build, both before and after, because
+`link.md` states plainly that *"Prefetching is only enabled in production"*. A
+dev-server number would describe a build nobody ships.
+
+| | before | after |
+|---|---|---|
+| tap → control looks pressed (desktop) | **1 476 ms** | **13–23 ms** |
+| tap → control looks pressed (Pixel 7) | **1 427 ms** | **13–25 ms** |
+| tap → control looks pressed (iPhone WebKit) | **1 643 ms** | **112–132 ms** |
+| tap → new content | 1 882 / 1 865 / 2 021 ms | **33–62 / 48–341 / 181–356 ms** |
+| requests per tap | 3 | **0–2** |
+| prefetch requests on load | 11 | **6–8** |
+| skeleton replaced the content | **no** | **no** |
+
+**The interesting number was the first one.** `aria-current` is derived on the
+server from `searchParams` — correct, because the URL is the source of truth —
+so the selected state could not move until the render landed. The control was
+**correct and mute**: nothing on screen changed for about a second and a half
+after the finger came off the glass, and the `loading.tsx` skeleton never
+appeared either (`skeletonShown: false` on every hop, before and after).
+
+Two fixes, and they are different in kind:
+
+1. **`useLinkStatus`** renders an `aria-hidden`, purely presentational pending
+   indicator. `aria-current` **stays server-derived**, nothing reads the pending
+   state back, and no content is rendered optimistically — so local state did not
+   become a second source of truth and no other period can flash on screen.
+   The hook must be called from a **descendant** of `Link`, so the anchor picks
+   the state up through `:has()`.
+2. **One whole database wave removed.** The page ran **four** sequential waves
+   where three sufficed: the history `await`ed the entire projection just to
+   learn the window's start date. `reviewPeriodWindow` is pure and takes
+   `(tab, day, timezone)`, so the window is computed once and handed to both,
+   which now run in parallel. It also makes them **agree by construction** — a
+   divergence would put the running period in the history too, the exact defect
+   this page was redesigned to remove.
+
+### The prefetch guess was wrong, and I said so
+
+The first reading of `link.md` said `prefetch` would be expensive: three links in
+the viewport, each a full dynamic render, "3× the DB work". **Measured, it costs
+fewer requests** — 11 on load with the default, **8** with `prefetch` — because
+the default was already issuing partial prefetches for every link on the page,
+and for a dynamic route those reach only *"the partial route down to the nearest
+segment with a `loading.js` boundary"*: a shell that buys nothing. With
+`prefetch`, a tap costs **zero** round trips.
+
+The table is written into `review-tabs.tsx` itself so nobody repeats the guess.
+
+### Item 5 — the mask never came from the rule
+
+`review_summary` always resolved `{ normal: SHOW, private: SHOW,
+highly_sensitive: MASK }`, exactly like `hoje`, `attention` and `chat`. The mask
+came from `review-body.tsx` **hard-coding `highly_sensitive` as the level of
+every summary**, because `summaries` carries no classification column — which is
+OD-2J-1's own stated cost, not a defect in the contract.
+
+So the owner overruled **the fabrication**, not the rule. `GOVERNED_SURFACES`,
+the `RULES` table and `review_summary`'s entry are **untouched**;
+`review-body.tsx` is deleted; and `sensitivity-convergence.test.ts` asserts the
+new invariant **positively** rather than losing an assertion: no reviews surface
+may pass `resolveContent` or the literal `highly_sensitive`, with a non-vacuity
+control beside it. The listing still carries **no content at all**, and the read
+is still `eq("user_id", user.id)` under RLS with one `notFound()` arm.
+
+### Item 7 — re-confirmed, and the minimal model already ships
+
+The earlier audit's conclusion held. What it did not say is that **the shape of
+the fix is already in this product**:
+
+- `openai-provider.ts:337` **already filters** `citedSourceIds` against the ids
+  it was given, so what reaches `generateReview` are real, owner-scoped ids of
+  rows read under RLS **in that same request**. They are not model inventions.
+- `generateReview` drops them at the `summaries` upsert. The value is alive in
+  memory and left on the floor.
+- `summaries` has `Relationships: []` and no column that could hold one.
+- **`conversation_messages.citations` is the model** — one `jsonb` column, the
+  `buildCitationsEnvelope` shape, plus chat's `resolve-sources.ts` rule of
+  re-reading each cited source at render time against its **current**
+  classification, which is also the answer for a row that was deleted or is no
+  longer readable.
+
+Entries and tasks only; people, projects and memories are never in the source
+set, and widening it is a separate decision. Costs **one migration**,
+deliberately **not created here**. Specified in
+`docs/reports/phase-2p/PHASE_2P_REVIEW_CITATIONS_REQUIREMENT.md`, which opens by
+saying that **a "Fontes" section is not delivery of this**.
+
+### Next
+
+A short **two-item** checkpoint — tab speed, and content visible without a second
+click. **Phase 2P closes on the owner's approval of it.** **Phase 2Q is not to be
+started or planned without new authorization.**

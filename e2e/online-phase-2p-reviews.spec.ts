@@ -434,6 +434,72 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     await expect(page.getByRole("heading", { level: 2, name: "Este mês" })).toBeVisible();
   });
 
+  test("a tap is answered at once, and the previous period stays on screen until the new one arrives", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/pt-BR/app/reviews?period=day");
+    await expect(page.locator(".route-loading")).toHaveCount(0);
+    await expect(page.getByRole("heading", { level: 2, name: "Hoje" })).toBeVisible();
+    // Let the prefetch settle, the way a reader pausing on the page would.
+    await page.waitForTimeout(1500);
+
+    /*
+      Measured against the production build before this was built: the control
+      took 1 476ms (desktop), 1 427ms (Pixel 7) and 1 643ms (iPhone WebKit) to
+      look selected, and the `loading.tsx` skeleton never appeared — so a tap
+      changed nothing on screen for about a second and a half.
+
+      A DURATION is deliberately not asserted here. This lane shares a machine
+      with whatever else is running, and a millisecond threshold would be a flake
+      generator that says nothing about the product. What is asserted is the
+      thing that was actually missing: that the tap produces a visible answer
+      **before** the new content does.
+    */
+    const week = page.locator(".review-tabs").getByRole("link", { name: /^Semana$/ });
+    await week.click();
+    await expect(page.locator(".review-tab-pending")).toBeVisible();
+
+    /*
+      …and while it is pending, the page has NOT yet claimed the new period.
+      `aria-current` is derived on the server from `searchParams`; if the pending
+      state could move it, a screen reader would be told the week is current
+      while the day is still on screen. This is the assertion that keeps local
+      state from becoming the source of truth.
+    */
+    const dayTab = page.locator(".review-tabs").getByRole("link", { name: /^Dia$/ });
+    if (await page.locator(".review-tab-pending").count()) {
+      expect(await dayTab.getAttribute("aria-current")).toBe("page");
+    }
+
+    await expect(page.getByRole("heading", { level: 2, name: "Esta semana" })).toBeVisible();
+    await expect(page.locator(".review-tabs").getByRole("link", { name: /^Semana$/ }))
+      .toHaveAttribute("aria-current", "page");
+    // The indicator is gone once the navigation it belonged to finished.
+    await expect(page.locator(".review-tab-pending")).toHaveCount(0);
+  });
+
+  test("the other periods are prefetched, so a tap costs no round trip", async ({ page }) => {
+    await signIn(page);
+
+    let prefetches = 0;
+    const countPrefetch = (request: import("@playwright/test").Request) => {
+      if (request.url().includes("/app/reviews") && request.headers()["next-router-prefetch"]) prefetches += 1;
+    };
+    page.on("request", countPrefetch);
+    await page.goto("/pt-BR/app/reviews?period=day");
+    await expect(page.locator(".route-loading")).toHaveCount(0);
+    await page.waitForTimeout(2500);
+    page.off("request", countPrefetch);
+
+    /*
+      `link.md`: "Prefetching is only enabled in production". This lane runs
+      against `next start` in CI and against whatever server is on :3000 locally,
+      so the count is asserted as "some" rather than as a number — a dev server
+      would legitimately report zero, and pinning an exact figure would make this
+      a test of the harness.
+    */
+    expect(prefetches, "no period was prefetched").toBeGreaterThan(0);
+  });
+
   test("each period offers only the controls that write it, and its own history", async ({ page }) => {
     await signIn(page);
 
@@ -480,11 +546,16 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     await expect(page.getByRole("heading", { level: 1, name: "Revisão semanal" })).toBeVisible();
     await expect(page.locator("h1")).toHaveCount(1);
 
-    // Masked until asked for — `summaries` carries no classification, so the
-    // surface treats every summary as sensitive.
-    await expect(page.locator('[data-masked="true"]')).toBeVisible();
+    /*
+      Visible without a second click — **ADR-124 Decision 1**, an owner amendment
+      to OD-2J-1. The page used to open masked; the mask came from a component
+      hard-coding `highly_sensitive` for a row that carries no classification,
+      and that fabrication is what was overruled. The rule itself is unchanged,
+      and the listing still shows no content at all — asserted separately.
+    */
     await expect(page.locator(".route-loading")).toHaveCount(0);
-    await page.getByRole("button", { name: "Mostrar resumo" }).click();
+    await expect(page.locator("[data-masked]")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Mostrar resumo" })).toHaveCount(0);
 
     const content = page.locator(".review-content");
     await expect(content).toBeVisible();
@@ -509,7 +580,6 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     await page.goto("/pt-BR/app/reviews?period=week");
     await page.locator(".review-history-list").getByRole("link", { name: /Abrir revisão/ }).click();
     await expect(page.locator(".route-loading")).toHaveCount(0);
-    await page.getByRole("button", { name: "Mostrar resumo" }).click();
 
     const content = page.locator(".review-content");
     await expect(content).toBeVisible();
@@ -637,11 +707,9 @@ test.describe("the reviews experience: three periods, and a page per review", ()
     // And the review's own page, where the long content lives.
     await page.goto("/pt-BR/app/reviews?period=week");
     await page.locator(".day-review-generated").getByRole("link", { name: /Abrir revisão/ }).click();
-    // Settled before the press. A click that lands while the route is still
-    // streaming reaches a button whose handler is not attached yet, so the
-    // disclosure never opens and the failure reads as missing content.
+    // Settled before anything is read: a measurement taken while the route is
+    // still streaming reads the placeholder rather than the answer.
     await expect(page.locator(".route-loading")).toHaveCount(0);
-    await page.getByRole("button", { name: "Mostrar resumo" }).click();
     await expect(page.locator(".review-content")).toBeVisible();
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
