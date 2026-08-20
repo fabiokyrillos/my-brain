@@ -52,7 +52,7 @@ const ROOT = join(__dirname, "..");
  * makes the 375px touch-target test below fail on the first option row, which
  * is how that was established rather than assumed.
  */
-const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css", "settings-extended.css"] as const;
+const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css", "reviews.css", "settings-extended.css"] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
   .join("\n")
@@ -86,11 +86,12 @@ const COPY = {
   "pt-BR": {
     plannerTitle: "Planejar o dia",
     plannedEmpty: "Nada planejado para este dia ainda.",
-    reviewTitle: "Revisão do dia",
+    reviewTitle: "Hoje",
+    reviewDescription: "O que este dia realmente conteve, montado a partir dos seus próprios registros.",
     reviewsPageTitle: "Revisões",
     reviewsPageLead: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
-    reviewsHistory: "Revisões geradas",
-    reviewsHistoryEmpty: "Nenhuma revisão ainda.",
+    reviewsHistory: "Dias anteriores",
+    reviewsHistoryEmpty: "Nenhum dia anterior",
     synthesisHeading: "Como o dia ficou",
     synthesisCompleted: "2 tarefas concluídas",
     synthesisOpen: "1 continua em aberto",
@@ -118,11 +119,12 @@ const COPY = {
   en: {
     plannerTitle: "Plan the day",
     plannedEmpty: "Nothing planned for this day yet.",
-    reviewTitle: "Day review",
+    reviewTitle: "Today",
+    reviewDescription: "What this day actually contained, composed from your own records.",
     reviewsPageTitle: "Reviews",
     reviewsPageLead: "Generate a review when you choose; nothing runs from a configured schedule.",
-    reviewsHistory: "Generated reviews",
-    reviewsHistoryEmpty: "No reviews yet.",
+    reviewsHistory: "Previous days",
+    reviewsHistoryEmpty: "No previous day",
     synthesisHeading: "How the day turned out",
     synthesisCompleted: "2 tasks completed",
     synthesisOpen: "1 still open",
@@ -265,7 +267,14 @@ function plannerPage(locale: Locale, rows: string[]): string {
   </div>`);
 }
 
-/** The day review, mirroring the page `DayReviewView` renders. */
+/**
+ * The day review, mirroring the page `DayReviewView` renders.
+ *
+ * The Dia tab, because the tab strip is the page's navigation and this fixture
+ * exercises one destination at a time. `calendar-mirror-guard.test.ts` fails the
+ * build if a `day-review-*` class appears in the component and not here — which
+ * is what keeps this markup honest as the component changes.
+ */
 function reviewPage(locale: Locale, rows: string[], options: { unreadable?: boolean } = {}): string {
   const copy = COPY[locale];
   return shell(locale, `<div class="content-page reviews-page">
@@ -274,34 +283,43 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
       <h1>${copy.reviewsPageTitle}</h1>
       <p class="reviews-lead">${copy.reviewsPageLead}</p>
     </header>
+    <nav aria-label="Período" class="review-tabs">
+      <a aria-current="page" class="review-tab" href="?period=day">Dia</a>
+      <a class="review-tab" href="?period=week">Semana</a>
+      <a class="review-tab" href="?period=month">Mês</a>
+    </nav>
     <section aria-labelledby="day-review-title" class="day-review-page">
-    <header class="list-header">
-      <div>
+    <header class="day-review-header">
+      <div class="day-review-heading">
         <p class="eyebrow">FECHAMENTO DO DIA</p>
         <h2 class="day-review-title" id="day-review-title">${copy.reviewTitle}</h2>
-        <p class="quiet-state">${copy.nothingScheduled}</p>
+        <p class="day-review-range">terça-feira, 11 de agosto de 2026</p>
+        <p class="day-review-description">${copy.reviewDescription}</p>
+        <p class="day-review-promise">${copy.nothingScheduled}</p>
       </div>
-      <nav aria-label="Período da revisão" class="day-review-scope-nav">
-        <a aria-current="page" href="?scope=day">Este dia</a>
-        <a href="?scope=next_day">Dia seguinte</a>
+      <nav aria-label="Dia da revisão" class="day-review-scope-nav">
+        <a aria-current="page" href="?period=day&amp;scope=day">Hoje</a>
+        <a href="?period=day&amp;scope=next_day">Amanhã</a>
       </nav>
     </header>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
     <section aria-label="${copy.synthesisHeading}" class="day-review-synthesis">
       <h3>${copy.synthesisHeading}</h3>
       <ul class="day-review-counts"><li>${copy.synthesisCompleted}</li><li>${copy.synthesisOpen}</li><li>${copy.synthesisCaptured}</li></ul>
-      ${options.unreadable ? `<p class="day-review-partial" role="status">${copy.synthesisPartial}</p>` : ""}
+      ${options.unreadable
+        ? `<p class="day-review-partial" role="status">${copy.synthesisPartial}</p>`
+        : '<p class="day-review-all-read">Todas as fontes desta revisão foram lidas.</p>'}
     </section>
     <section aria-label="Seu horário de revisão" class="day-review-schedule">
       <h3>Seu horário de revisão</h3>
       <p>Já passou das 22:00, o horário que você escolheu para revisar o dia.</p>
     </section>
-    <section aria-label="${copy.unreadableHeading}" class="day-review-unreadable">
+    ${options.unreadable
+      ? `<section aria-label="${copy.unreadableHeading}" class="day-review-unreadable">
       <h3>${copy.unreadableHeading}</h3>
-      ${options.unreadable
-        ? '<div role="status"><ul><li>Não foi possível ler: Concluído. Esta seção não está vazia — ela não pôde ser lida.</li></ul></div>'
-        : '<p class="quiet-state">Todas as fontes desta revisão foram lidas.</p>'}
-    </section>
+      <div role="status"><ul><li>Não foi possível ler: Concluído. Esta seção não está vazia — ela não pôde ser lida.</li></ul></div>
+    </section>`
+      : ""}
     <section aria-label="${copy.completed}" class="day-review-section" data-source="completed">
       <h3>${copy.completed}</h3>
       ${rows.length === 0 ? '<p class="quiet-state">Nada foi concluído neste dia.</p>' : `<ul>${rows.join("")}</ul>`}
@@ -315,10 +333,39 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
         </li>
       </ul>
     </section>
+    <section aria-label="Revisão deste dia" class="day-review-generated" data-source="generated">
+      <h3>Revisão deste dia</h3>
+      <p class="day-review-generate-lead">Cada botão pede ao Brain uma síntese escrita deste período.</p>
+      <div class="review-buttons"><div class="review-action"><form><button type="submit">Resumo do dia</button></form></div></div>
+      <ul class="review-list">
+        <li class="review-card">
+          <div class="review-card-head">
+            <div>
+              <span class="review-card-period">Resumo do dia</span>
+              <h4>Resumo diário</h4>
+              <p class="review-card-range">11/08/2026 — 11/08/2026</p>
+            </div>
+            <span class="status-badge" data-tone="positive">Concluída</span>
+          </div>
+          <a class="review-open" href="/pt-BR/app/reviews/r1">Abrir revisão</a>
+        </li>
+      </ul>
+    </section>
     </section>
     <section aria-labelledby="reviews-history" class="reviews-history">
       <h2 id="reviews-history">${copy.reviewsHistory}</h2>
-      <p class="quiet-state">${copy.reviewsHistoryEmpty}</p>
+      <p class="reviews-history-lead">Revisões diárias que você já gerou.</p>
+      <ul class="review-history-list">
+        <li class="review-history-item">
+          <div>
+            <span class="review-card-period">Resumo do dia</span>
+            <h3>Resumo diário</h3>
+            <p class="review-card-range">10/08/2026 — 10/08/2026</p>
+          </div>
+          <span class="status-badge" data-tone="positive">Concluída</span>
+          <a class="review-open" href="/pt-BR/app/reviews/r0">Abrir revisão</a>
+        </li>
+      </ul>
     </section>
   </div>`);
 }
@@ -473,7 +520,27 @@ for (const locale of ["pt-BR", "en"] as const) {
       await expect(page.getByRole("heading", { level: 2, name: COPY[locale].reviewTitle })).toBeVisible();
       // `2M-REVIEW-007`, in the browser rather than only in a source scan.
       await expect(page.getByText(COPY[locale].nothingScheduled)).toBeVisible();
-      await expect(page.getByRole("region", { name: COPY[locale].unreadableHeading })).toBeVisible();
+      /*
+        The failure section is **absent** when nothing failed, and that is the
+        assertion rather than an omission.
+
+        It used to render on every visit and fall back to a "nothing was
+        unreadable" empty state, so a page that succeeded opened with a heading
+        announcing what could not be read. The owner asked for it to go, and
+        `2M-REVIEW-001` reads the same way: stating plainly what could not be
+        read is not served by a permanent section saying everything could.
+      */
+      await expect(page.getByRole("region", { name: COPY[locale].unreadableHeading })).toHaveCount(0);
+      await noHorizontalScroll(page);
+    });
+
+    test("the day review names what it could not read, when something really failed", async ({ page }) => {
+      // The other half. Without it the check above passes just as well over a
+      // surface that lost the ability to report a failed read at all.
+      await open(page, reviewPage(locale, [reviewRow({ locale })], { unreadable: true }));
+      const region = page.getByRole("region", { name: COPY[locale].unreadableHeading });
+      await expect(region).toBeVisible();
+      await expect(region.getByRole("status")).toBeVisible();
       await noHorizontalScroll(page);
     });
   });
@@ -754,7 +821,16 @@ test.describe("2M-ACCESS-006: keyboard and focus", () => {
     // focus before it. What matters is that the disclosure is **in** the tab
     // order, not where.
     let opened = false;
-    for (let press = 0; press < 6 && !opened; press += 1) {
+    /*
+      Twelve presses, not six.
+
+      The bound only terminates the search; the assertion is that the
+      disclosure is IN the tab order, not that it is near the front. The tab
+      strip (Dia · Semana · Mês) added three focusable links ahead of the day
+      review on 2026-08-20, which is legitimate new navigation and pushes the
+      row further down — so the bound grew by more than the three it had to.
+    */
+    for (let press = 0; press < 12 && !opened; press += 1) {
       await page.keyboard.press("Tab");
       opened = await page.evaluate(
         () => (document.activeElement as HTMLElement | null)?.tagName.toLowerCase() === "summary",

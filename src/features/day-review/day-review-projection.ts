@@ -44,16 +44,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/supabase/database.types";
-import { toReviewListItemView, type ReviewListItemView } from "@/features/reviews/review-presentation";
+import { periodTypesFor, type ReviewTab } from "@/features/reviews/review-periods";
+import { toReviewSummaryView, type ReviewSummaryView } from "@/features/reviews/review-presentation";
 import { deriveTaskSensitivity, type TaskSensitivity } from "@/features/sensitivity/task-derivation";
 import type { DayReviewScope } from "@/features/product-analytics/contracts";
 import type { Locale } from "@/lib/preferences";
-import {
-  addLocalDays,
-  formatLocalDate,
-  localDayBoundsForDate,
-  type LocalDate,
-} from "@/lib/time/local-day";
+import { addLocalDays, formatLocalDate, type LocalDate } from "@/lib/time/local-day";
 
 import {
   DAY_REVIEW_SOURCES,
@@ -62,6 +58,7 @@ import {
   type DayReviewSourceState,
   type DayReviewVerb,
 } from "./contracts";
+import { reviewPeriodWindow, type ReviewPeriodWindow } from "./period-window";
 import { readReviewSchedule, type ReviewScheduleReading } from "./review-schedule";
 
 const OPEN_TASK_STATUSES = ["inbox", "todo", "in_progress", "waiting", "blocked", "deferred"];
@@ -110,6 +107,25 @@ export type DayReviewCapture = {
 
 export type DayReviewProjection = {
   readonly scope: DayReviewScope;
+  /** Which of Dia/Semana/Mês this projection covers. */
+  readonly tab: ReviewTab;
+  /** The span actually read, from the local-day contract. */
+  readonly window: ReviewPeriodWindow;
+  /**
+   * The scope to attribute an applied action to, or **`null` for "do not
+   * record"**.
+   *
+   * `dayReviewScopes` is `["day", "next_day"]` and the deployed `product_events`
+   * validator refuses anything else — silently, which this repository has
+   * already been caught by once. Widening it is a migration, and this unit
+   * spends none.
+   *
+   * So the week and month tabs record nothing rather than recording
+   * `scope: "day"` for an action taken on a month. Q3's funnel keeps measuring
+   * exactly the day review it was defined to measure, and the alternative would
+   * have been a false row in an append-only ledger.
+   */
+  readonly telemetryScope: DayReviewScope | null;
   /** `YYYY-MM-DD` — the day being reviewed, in the user's own zone. */
   readonly day: string;
   readonly isToday: boolean;
@@ -120,7 +136,22 @@ export type DayReviewProjection = {
   readonly planned: readonly DayReviewItem[];
   readonly due: readonly DayReviewItem[];
   readonly captured: readonly DayReviewCapture[];
-  readonly generated: ReviewListItemView | null;
+  /**
+   * The reviews **written about this exact period**, newest first.
+   *
+   * A list rather than one row, and scoped to the tab's own `period_type`
+   * values. Both changes fix real defects in what this replaced:
+   *
+   * - It read *"any review whose period covers this day"*, so the **Dia** tab
+   *   could render the **weekly** review as its own — the two tie on
+   *   `period_end` when the weekly one was generated today, and the order was
+   *   decided by nothing.
+   * - `generateReview` stores `period_end` as the day it ran, and upserts on all
+   *   four key columns, so regenerating on a later day of the same week inserts
+   *   a second row. Those are snapshots of one period and belong together here,
+   *   not scattered into a list headed "anteriores".
+   */
+  readonly generated: readonly ReviewSummaryView[];
   /** Per-source outcome. `2M-REVIEW-001`'s "states plainly what it could not read". */
   readonly sourceStates: Readonly<Record<DayReviewSource, DayReviewSourceState>>;
   readonly unreadable: readonly DayReviewSource[];
@@ -158,18 +189,25 @@ export async function loadDayReviewProjection(
     readonly userId: string;
     readonly locale: Locale;
     readonly timezone: string;
+    /**
+     * The day the review is anchored to — today for every tab, or tomorrow for
+     * the Dia tab's `next_day` scope. The **window** is derived from it and the
+     * tab; `carry_forward` still means the day after this one.
+     */
     readonly day: LocalDate;
     readonly today: LocalDate;
     readonly scope: DayReviewScope;
+    /** Dia, Semana or Mês. `day` reads exactly what it always read. */
+    readonly tab: ReviewTab;
     /** Minutes since local midnight in the user's zone, from the caller's clock. */
     readonly nowLocalMinutes: number;
   },
 ): Promise<DayReviewProjection> {
-  const { userId, locale, timezone, day, today, scope } = input;
+  const { userId, locale, timezone, day, today, scope, tab } = input;
 
-  const bounds = localDayBoundsForDate(day, timezone);
-  const startIso = new Date(bounds.start).toISOString();
-  const endIso = new Date(bounds.end).toISOString();
+  const window = reviewPeriodWindow(tab, day, timezone);
+  const startIso = window.startIso;
+  const endIso = window.endIso;
   const dayKey = formatLocalDate(day);
   const nextDayKey = formatLocalDate(addLocalDays(day, 1));
 
@@ -240,14 +278,29 @@ export async function loadDayReviewProjection(
        * now applied, which is what makes a wrong table name a build error
        * instead of a silent runtime failure.
        */
+      /*
+       * Scoped to **this tab's period types** and to the period's own start.
+       *
+       * The predicate it replaces was `period_start <= today <= period_end`,
+       * which is "any review that covers today" — so a weekly review generated
+       * today satisfied it just as a daily one did, both ended on the same date,
+       * and `order by period_end desc limit 1` chose between them by nothing at
+       * all. The Dia tab could show the week's review under its own heading.
+       *
+       * `period_start` alone identifies the period, because `period_end` records
+       * the day the review was *written* rather than the period's last day —
+       * see `period-window.ts`. `content` is not selected: the card shows the
+       * period, the state and a way in, and the words live on the review's own
+       * page behind the OD-2J-1 disclosure.
+       */
       supabase
         .from("summaries")
-        .select("id,title,content,period_type,period_start,period_end,status")
+        .select("id,title,period_type,period_start,period_end,status")
         .eq("user_id", userId)
-        .lte("period_start", dayKey)
-        .gte("period_end", dayKey)
+        .in("period_type", periodTypesFor(tab))
+        .eq("period_start", window.startKey)
         .order("period_end", { ascending: false })
-        .limit(1),
+        .limit(DAY_REVIEW_ITEM_LIMIT),
       supabase
         .from("agent_preferences")
         .select("daily_review_time,weekly_review_time,weekly_review_day")
@@ -297,21 +350,20 @@ export async function loadDayReviewProjection(
     verbs: dayReviewVerbsFor(row.status),
   });
 
-  const generatedRow = ((generatedResult.data ?? []) as Record<string, unknown>[])[0] ?? null;
-  const generated = generatedRow
-    ? toReviewListItemView(
-      {
-        id: generatedRow.id,
-        title: generatedRow.title,
-        content: generatedRow.content,
-        period_type: generatedRow.period_type,
-        period_start: generatedRow.period_start,
-        period_end: generatedRow.period_end,
-        status: generatedRow.status,
-      },
-      locale,
-    )
-    : null;
+  const generated = ((generatedResult.data ?? []) as Record<string, unknown>[])
+    .map((row) =>
+      toReviewSummaryView(
+        {
+          id: row.id,
+          title: row.title,
+          period_type: row.period_type,
+          period_start: row.period_start,
+          period_end: row.period_end,
+          status: row.status,
+        },
+        locale,
+      ))
+    .filter((view): view is ReviewSummaryView => view !== null);
 
   const preferences = (preferencesResult.data ?? null) as
     | { daily_review_time: unknown; weekly_review_time: unknown; weekly_review_day: unknown }
@@ -319,6 +371,11 @@ export async function loadDayReviewProjection(
 
   return Object.freeze({
     scope,
+    tab,
+    window,
+    // `null` for week and month — see the field's own note. The alternative was
+    // a row in an append-only ledger claiming a monthly action happened on a day.
+    telemetryScope: tab === "day" ? scope : null,
     day: dayKey,
     isToday: dayKey === formatLocalDate(today),
     timezone,

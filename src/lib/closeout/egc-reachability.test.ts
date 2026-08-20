@@ -339,6 +339,14 @@ const INVENTORY: readonly RouteEntry[] = [
   { route: "reminders", sections: [] },
   { route: "reviews", sections: [] },
   /*
+   * A generated review's own page. `sections: []` because it renders **no
+   * collection at all** — it reads one `summaries` row and formats it, and
+   * the only control that reaches a writer is `generateReview`, which is the
+   * same Server Action the list page above offers and which writes the
+   * review rather than a collection on the page.
+   */
+  { route: "reviews/[reviewId]", sections: [] },
+  /*
    * Phase 2I's global search. `sections: []` because it renders **no
    * collection of its own** — every result is a link into the surface that
    * owns that record, and search writes nothing. Enumerated here because

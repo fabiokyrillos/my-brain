@@ -17,6 +17,9 @@
 @import "./costs.css";
 @import "./task-commands.css";
 @import "./calendar.css";
+/* After calendar.css: `.reviews-header` and its lead live there, and the tab
+   strip below them must be able to sit on top of that block. */
+@import "./reviews.css";
 /* After task-commands.css: the composer hosts `TaskCommandResult`, and the two
    rules that reach into it there are extended by selector rather than overridden
    by order — but a later import keeps the composer's own box winning if that

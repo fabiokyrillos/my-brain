@@ -1,0 +1,408 @@
+/* The Revisões experience — the tab strip, the current period and the history.
+
+   The owner's report was that the page "parece uma página técnica e
+   excessivamente longa". The structural repair is in the components; what this
+   sheet does is give the three parts different visual weight, so the page reads
+   as one subject with a history under it rather than as a stack of identical
+   boxes.
+
+   Every colour is a token. Every measure is a token. The two media queries sit
+   AFTER the base rules they override, because a query with no added specificity
+   placed above them loses to a later base rule and the layout silently stops
+   adapting — a defect this repository has already paid for once. */
+
+/* ---------------------------------------------------------------------------
+   The tab strip: Dia · Semana · Mês
+
+   A segmented control, sized to its content on desktop so it does not read as a
+   filter band, and three equal columns on a phone so nothing is squeezed. The
+   selected state is `[aria-current="page"]` rather than a class, so what a
+   screen reader announces and what the eye sees are the same fact.
+   --------------------------------------------------------------------------- */
+.review-tabs {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(96px, auto);
+  gap: var(--space-1);
+  margin: var(--space-5) 0 var(--space-8);
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--background-subtle);
+}
+
+.review-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.review-tab:hover { color: var(--text-primary); }
+
+.review-tab[aria-current="page"] {
+  background: var(--background-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-weight: 700;
+  box-shadow: var(--elevation-1);
+}
+
+.review-tab:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Parte A — the current period
+   --------------------------------------------------------------------------- */
+.day-review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+
+.day-review-heading { min-width: 0; max-width: var(--width-reading); }
+
+/* The span sits directly under the period's name, in the muted voice metadata
+   uses everywhere else — so it identifies the period without competing with the
+   title for the first read. */
+.day-review-range {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.day-review-description {
+  margin: var(--space-3) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+/* `2M-REVIEW-007`'s promise. It used to render through the empty-state line,
+   which put a "nothing here" treatment on a sentence that is a guarantee rather
+   than an absence. */
+.day-review-promise {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.day-review-all-read {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* ---------------------------------------------------------------------------
+   The written reviews of this period, and the controls that write them
+   --------------------------------------------------------------------------- */
+.day-review-generated {
+  margin-top: var(--space-8);
+  padding: var(--space-6);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.day-review-generated > h3 {
+  margin: 0;
+  font: var(--type-title-2);
+  letter-spacing: -.01em;
+}
+
+.day-review-generate-lead {
+  margin: var(--space-2) 0 var(--space-5);
+  max-width: var(--width-reading);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+/* One, two or four controls depending on the tab, so the row is sized by its
+   content rather than by a fixed four-column grid that leaves gaps. */
+.review-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: 0;
+}
+
+.review-buttons > .review-action { flex: 1 1 220px; }
+
+.review-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+
+.review-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.review-card-head > div { min-width: 0; }
+
+.review-card h3,
+.review-card h4 {
+  margin: var(--space-1) 0 0;
+  font: var(--type-title-2);
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+
+.review-card-period {
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.review-card-range {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.review-open {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-label);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.review-open:hover { background: var(--background-subtle); }
+
+.review-open:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Parte B — the history
+
+   Deliberately quieter than Parte A: rows separated by dividers rather than
+   boxed as cards, because history is reference and the current period is the
+   subject. A page of identical bordered boxes is what "excessivamente longa"
+   looks like.
+   --------------------------------------------------------------------------- */
+.review-history-list {
+  display: grid;
+  margin: var(--space-4) 0 var(--space-6);
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--border-divider);
+}
+
+/* Three columns for the row's three children — the text, the state badge and
+   the way in. Two columns with an explicitly placed third child put the badge
+   and the link in the same cell, which is a collision the browser resolves by
+   overlapping them. */
+.review-history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.review-history-item > div { min-width: 0; }
+
+.review-history-item h3 {
+  margin: var(--space-1) 0 0;
+  font: var(--type-title-2);
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------------------
+   A review's own page
+   --------------------------------------------------------------------------- */
+.review-detail-range {
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-lead);
+}
+
+.review-detail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: var(--space-4) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.review-detail-content,
+.review-detail-sources,
+.review-detail-actions { margin-top: var(--space-8); }
+
+.review-detail-content > h2,
+.review-detail-sources > h2,
+.review-detail-actions > h2 {
+  margin: 0 0 var(--space-4);
+  font: var(--type-title-2);
+  letter-spacing: -.01em;
+}
+
+/* The rendered Markdown. Capped at the reading measure so an 8 000-character
+   monthly review is read rather than scanned, and `overflow-wrap: anywhere` so a
+   long unbroken token cannot push the page sideways on a phone. */
+.review-content {
+  max-width: var(--width-reading);
+  overflow-wrap: anywhere;
+}
+
+.review-content > h3,
+.review-content > h4,
+.review-content > h5 {
+  margin: var(--space-6) 0 var(--space-2);
+  color: var(--text-primary);
+  letter-spacing: -.01em;
+}
+
+.review-content > h3 { font: var(--type-title-2); }
+.review-content > h4 { font: var(--type-section); }
+.review-content > h5 { font: var(--type-label); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+
+.review-content > :first-child { margin-top: 0; }
+
+.review-content p {
+  margin: 0 0 var(--space-4);
+  color: var(--text-secondary);
+  font: var(--type-reading);
+}
+
+.review-content ul,
+.review-content ol {
+  margin: 0 0 var(--space-4);
+  padding-left: var(--space-6);
+  color: var(--text-secondary);
+  font: var(--type-reading);
+}
+
+.review-content li { margin-bottom: var(--space-2); }
+
+.review-content strong { color: var(--text-primary); font-weight: 700; }
+
+.review-content code {
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--background-subtle);
+  font: var(--type-mono);
+}
+
+.review-content-link { color: var(--link); }
+
+.review-facts {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0 0 var(--space-4);
+  max-width: var(--width-reading);
+}
+
+.review-facts dt {
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.review-facts dd { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
+
+.review-detail-unlinked,
+.review-detail-past {
+  max-width: var(--width-reading);
+  margin: var(--space-4) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.review-action-links {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+}
+
+.review-regenerate {
+  padding: var(--space-5);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-subtle);
+}
+
+.review-regenerate > p {
+  margin: 0 0 var(--space-4);
+  max-width: var(--width-reading);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+/* ---------------------------------------------------------------------------
+   Narrow viewports. Placed last, per the note at the top of this file.
+   --------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  /* Three equal columns rather than content-sized ones, so "Semana" cannot make
+     "Dia" and "Mês" narrower than a comfortable target. `display: grid` (not
+     inline-grid) makes the strip full width, which is what gives each tab room. */
+  .review-tabs {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .review-tab { padding: 0 var(--space-2); font-size: 15px; }
+
+  .day-review-header { flex-direction: column; gap: var(--space-4); }
+
+  .day-review-generated { padding: var(--space-5) var(--space-4); }
+
+  .review-buttons > .review-action { flex: 1 1 100%; }
+
+  /* The badge and the link move under the title instead of competing with it for
+     a row that is not wide enough for three things. */
+  .review-history-item {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    justify-items: start;
+  }
+
+  .review-card-head { flex-direction: column; gap: var(--space-2); }
+
+  .review-open { width: 100%; justify-content: center; }
+}
