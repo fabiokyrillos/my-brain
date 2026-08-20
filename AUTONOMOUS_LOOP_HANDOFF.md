@@ -10676,3 +10676,92 @@ emulation, not a device; any screen-reader run; and any automation, all six
 categories still `suggest_only`. Push HTTP 403, signup, rollout and every
 inherited residual stay where §87 … §100 left them. **This section deliberately
 does not name what comes after Phase 2P.**
+
+## §102 — Slice 2P.7 merges, and slice 2P.8 is re-audited against the `main` it produced (2026-08-20)
+
+**Merged.** PR #268, head `ff09684`, **merge SHA `03a978e`**. Green at the exact
+head and again at the exact merge SHA, both times on all three jobs. The
+`database and journey` step list was read at both points: **21 success · 2
+skipped · 0 cancelled**, the two skipped being the artifact collectors that run
+only on failure. Every substantive step executed — the whole migration chain
+applied to an empty database, the pgTAP suite, `db lint`, the three concurrency
+proofs, the deterministic foundation journey, and the re-grant rollback
+rehearsal.
+
+Two earlier runs on this branch show `cancelled`; both were superseded by a
+later push, and their step counts confirm they were interrupted rather than
+failed. **Neither was counted as green.**
+
+**Baseline now:** `main` `03a978e`, worktree clean, **zero open PRs**, **99 local
+= 99 hosted, parity `202608190099`**, read live after the merge. Both Phase 2P
+allocations spent; a third is still a stop condition. Signup closed; rollout 25
+pass · 3 fail · 2 owner-signature. No automation enabled.
+
+### The count is 72, and the off-by-one has a single source
+
+The fourteen families divide the phase exactly — FOUNDATION 7, ATTENTION 8,
+CHAT 7, CAPTURE 10, AUTONOMY 10, SETTINGS 8, PERSON 4, MEMORY 4, RELATION 4,
+CALENDAR 5, REMINDER 5, MOBILE 5, ACCESS 5, CLOSE 5 = **87**. The recorded chain
+is 7 → 14 → 24 → 32 → 42 → **51** → **63**, and it diverges at exactly one step:
+slice 2P.5 counted *"42 at the close of 2P.4, plus eight `2P-SETTINGS`
+requirements, plus the `2P-CHAT-004` remainder closing"* as 51. Closing that
+remainder was real work, but `2P-CHAT-004` is one of the seven CHAT requirements
+slice 2P.2 had already counted.
+
+So the honest chain is 50 → 62 → **72**, and 72 + 15 = 87. **The earlier records
+are not rewritten** — they record what was believed when they were written, and
+the arithmetic is corrected forward rather than backwards over a signature.
+
+This matters beyond bookkeeping: `2P-CLOSE-001` requires a matrix that
+classifies **every requirement exactly once**, and a generator fed 73 could not
+have produced one.
+
+### Slice 2P.8, re-audited against `03a978e`
+
+Fifteen requirements — MOBILE 5, ACCESS 5, CLOSE 5 — plus the
+`2P-CHAT-007-JOURNEY` remainder carrying the owner's one-turn BYOK
+authorization. **Zero migrations expected.** Each measured, not inherited:
+
+| Requirement | State on `03a978e` |
+|---|---|
+| `2P-MOBILE-001` iPhone-sized production browser | **gap, and buildable.** `playwright.config.ts` declares two projects: `Desktop Chrome` and `Pixel 7`. There is no iPhone profile anywhere. Note the requirement says *iPhone-sized production browser*, which is a viewport and user-agent emulation against a production build — distinct from `-005`, which reserves **hardware** claims for the owner. Adding the profile is real work, not a rename. |
+| `2P-MOBILE-002` keyboard, IME, safe areas, viewport resize | partial groundwork: `safe-area-inset` appears in five stylesheets. No spec exercises a software keyboard or IME. Re-measure before designing. |
+| `2P-MOBILE-003` every new target ≥ 44×44 | baseline mechanism exists and is asserted in several lanes; **four touch-target exceptions remain an inherited residual** and must not be quietly absorbed. |
+| `2P-MOBILE-004` zoom and 320 px reflow | baseline: `calendar.spec.ts` and `phase-2o-mobile-accessibility.spec.ts` both run 320 px and an emulated 200 % zoom. Re-prove over the surfaces 2P.6 and 2P.7 added. |
+| `2P-MOBILE-005` hardware claims NOT EXECUTED | **a discipline requirement, and it is currently being honoured** — every acceptance record from 2P.4 onward says so explicitly. Closing it means proving the discipline held, not running hardware. |
+| `2P-ACCESS-001` composer names and state announcements | `capture/voice-composer.tsx` carries live regions; `capture/composer.tsx` is the shared composer. Unmeasured in detail. |
+| `2P-ACCESS-002` dialogs trap focus only while open, restore it | **strongest of the fifteen.** `ConfirmDialog` has the contract, four consumers, unit proofs, and — as of 2P.7 — an authenticated journey asserting initial focus, a twelve-press Tab cycle that cannot escape, Escape, and focus restored to the launcher. |
+| `2P-ACCESS-003` tabs implement keyboard selection and expose the active panel | **this names a construct the product deliberately does not have.** Five surfaces — `work-modes`, `brain-lenses`, `relation-view-controls`, `settings-section-nav`, `data-ai-tabs` — each document that they use links with `aria-current="page"` and **never** `role="tablist"`, because each navigates to a separate document. There is no tab, no tabpanel and no roving focus to implement. Either the requirement means *"the navigation is keyboard-operable and the active one is exposed"*, which is already true and is `baseline`, or it wants ARIA tabs, which would **reverse five signed decisions**. **This is an owner decision of exactly the shape `2P-PERSON-001` and `2P-REMINDER-002` received, and it should be put before anything is designed.** |
+| `2P-ACCESS-004` automation and Needs You outcomes announced without interrupting | live regions exist across `daily-cycle` and `operations`. The *"without interrupting for background work"* half — politeness level versus assertive — is unmeasured. |
+| `2P-ACCESS-005` a real VoiceOver session | **owner-run, and cannot be discharged here.** ADR-122 Decision 6's closeout gate. |
+| `2P-CLOSE-001` generated matrix classifying every requirement exactly once | **gap.** Every prior phase has a `scripts/generate-phase-2X-traceability.mjs`; **there is no `generate-phase-2p-traceability.mjs`.** The contract and its vocabulary already exist in `docs/reports/phase-2p/PHASE_2P_TRACEABILITY_CONTRACT.md`. |
+| `2P-CLOSE-002` every partial or undelivered item names a remainder and destination | the remainders are named across the records; the *destination* half is uneven and needs a pass. |
+| `2P-CLOSE-003` security disposition | not started. Must cover automatic writes, undo, audio lifetime, file handling and conversation diagnostics. |
+| `2P-CLOSE-004` parity, residue, rollout and signup read live | the mechanism is exercised every slice; closeout must read it **at closeout**, not cite an earlier reading. |
+| `2P-CLOSE-005` successor re-audited but not started or planned | the A13 guard already pins this. Note that §101 and this section deliberately do not name what comes after Phase 2P. |
+
+### One thing the closeout must not misread
+
+The traceability contract's refusal 9 is *"a product event with no deployed
+vocabulary, producer or consumer"*. `2P-CALENDAR-MONTH-TELEMETRY` looks like it
+at a glance and **is not**: `calendar_viewed` still has a deployed vocabulary, a
+producer and a consumer for the three orientations that are in it. What does not
+exist is an event **for the month**, deliberately, because the deployed
+validator admits three literals and widening it is a stop condition. A generator
+that flagged this would be reading the absence of an event as a broken event.
+
+### Open, and carried forward
+
+**Ten remainders**, none closed by this record: `2P-ATTENTION-008`'s browser
+half; `2P-CHAT-007-JOURNEY` (2P.8); `RG-DEP-3`, still INCOMPLETE and **not
+re-run**, because 2P.7 deployed nothing; the four missing review flows;
+`2P-APPEARANCE-HYDRATION`; the remaining `revalidatePath` call sites, **now
+carrying the caution that repairing one can turn a dead call into a live
+freeze**; the first-action warm-up; `2P-REMINDER-RECURRENCE`; and the two this
+slice created — **`2P-CALENDAR-MONTH-TELEMETRY` and
+`2P-REMINDER-REVALIDATE-HANG`, both of which apply a principle the owner signed
+twice and neither of which carries an owner signature of its own.**
+
+**Three things need the owner before 2P.8 can be finished:** the two remainders
+above, and `2P-ACCESS-003`'s wording. Two more — `2P-ACCESS-005` and the hardware
+half of `2P-MOBILE-001`/`-005` — cannot be discharged by any agent at all.
