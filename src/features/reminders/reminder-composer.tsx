@@ -48,7 +48,8 @@
  */
 
 import { BellPlus, LoaderCircle } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/features/task-commands/confirm-dialog";
 import type { Locale } from "@/lib/preferences";
@@ -92,6 +93,36 @@ export function ReminderComposer({
   // Closed once the write has landed **and** the transition has settled. The
   // `!pending` half is the whole lesson of slice 2P.6.
   const open = round !== null && !dismissed && !(created && !pending);
+
+  /**
+   * The list refresh, **outside the transition that governs the dialog**.
+   *
+   * `createReminder` deliberately issues no `revalidatePath`; its docstring
+   * carries the measurements. The short version: a working revalidation on this
+   * route puts the page's re-render inside the action's own transition, and that
+   * transition intermittently never settles — server answered 200, nothing
+   * logged anywhere, `pending` stuck true, dialog frozen on *Criando…*. The hang
+   * is not this slice's (it reproduces with 2P.7's own loader stubbed out), but
+   * shipping into it would be.
+   *
+   * Refreshing here cannot reproduce it, and the reason is structural rather
+   * than lucky: this runs only once `pending` is already false and the dialog is
+   * already closed, so nothing the refresh does can hold either of them open. If
+   * the refresh itself is slow the worst case is a list that updates late, which
+   * is a degradation rather than a control that cannot be dismissed.
+   *
+   * Keyed on the created id and remembered in a ref, so a re-render caused by
+   * the refresh cannot trigger a second one.
+   */
+  const router = useRouter();
+  const refreshed = useRef<string | null>(null);
+  const createdId = created ? changed?.reminderId ?? null : null;
+  useEffect(() => {
+    if (createdId === null || pending) return;
+    if (refreshed.current === createdId) return;
+    refreshed.current = createdId;
+    router.refresh();
+  }, [createdId, pending, router]);
 
   return (
     <div className="reminder-compose">

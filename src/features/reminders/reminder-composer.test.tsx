@@ -2,6 +2,18 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
+/**
+ * The router, stubbed — and the stub is an assertion target rather than scenery.
+ *
+ * The composer refreshes the list itself, because `createReminder` deliberately
+ * issues no `revalidatePath`: a working one puts the page's re-render inside the
+ * action's transition, and that transition intermittently never settles. The
+ * test below checks the refresh happens exactly once and only after the write
+ * has settled, which is the property that keeps the dialog dismissible.
+ */
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => refresh() }) }));
+
 import { IDLE_REMINDER_CREATION_STATE, type ReminderCreationState } from "./action-state";
 import { getReminderCopy } from "./copy";
 import { ReminderComposer, type ReminderCreationHandler } from "./reminder-composer";
@@ -278,6 +290,61 @@ describe("2P-REMINDER-002: saving", () => {
    * the dialog is still there while the action is in flight, and it is the
    * settling — not the success — that closes it.
    */
+  /**
+   * `2P-REMINDER-REVALIDATE-HANG` — the refresh is outside the transition.
+   *
+   * `createReminder` issues no `revalidatePath`, because a working one puts the
+   * page's re-render inside the action's own transition and that transition
+   * intermittently never settles — server answered 200, nothing logged, `pending`
+   * stuck true, dialog frozen. Measured over ten consecutive creations against
+   * `next start`: with revalidation, two to five successes then a hang past 120
+   * seconds; without it and refreshing here instead, ten for ten.
+   *
+   * The property that makes the composer's refresh safe is **ordering**: it runs
+   * only once the write has settled, so nothing it does can hold the dialog
+   * open. That ordering is what this asserts, along with it happening once —
+   * the refresh re-renders this component, and a refresh that re-triggered
+   * itself would be a loop.
+   */
+  it("refreshes the list once, and only after the write has settled", async () => {
+    const user = userEvent.setup();
+    refresh.mockClear();
+    let release: (state: ReminderCreationState) => void = () => {};
+    const action = vi.fn(handler(() => new Promise<ReminderCreationState>((resolve) => {
+      release = resolve;
+    })));
+    mount(action);
+
+    await openDialog(user);
+    await fillRequired(user, "Algo");
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    // In flight: nothing has been refreshed, because nothing has settled.
+    expect(refresh).not.toHaveBeenCalled();
+
+    release({ status: "success", message: copy.creation.created, reminderId: "r1" });
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // Still once after everything has settled: not a loop.
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh when the write was refused", async () => {
+    const user = userEvent.setup();
+    refresh.mockClear();
+    const action = vi.fn(handler(async () =>
+      ({ status: "error", message: copy.creation.failed, reminderId: null })));
+    mount(action);
+
+    await openDialog(user);
+    await fillRequired(user, "Algo");
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    await screen.findByText(copy.creation.failed);
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
   it("stays open while the write is in flight, and closes only once it settles", async () => {
     const user = userEvent.setup();
     let release: (state: ReminderCreationState) => void = () => {};

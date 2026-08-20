@@ -406,14 +406,29 @@
 }
 
 .calendar-month tbody td {
-  /* Tall enough to read as a day, and capped so six rows still fit a screen.
-     `2P-CALENDAR-001`: cells do not grow without limit — the height ceiling and
-     `MONTH_CELL_ITEM_LIMIT` are the two halves of that, and the overflow link
-     is what keeps the rest reachable. */
+  /* Tall enough that an empty day reads as a day rather than as a seam. On a
+     table cell `height` is a **minimum**, which is what is wanted here. */
   height: 7rem;
-  max-height: 9rem;
-  overflow: hidden;
 }
+
+/*
+ * There is deliberately no `max-height` here, and no `overflow: hidden`.
+ *
+ * Both were written first and both were inert: on a table cell `max-height` has
+ * no effect, so the rule claimed a ceiling it did not impose — a declaration
+ * that does nothing is worse than none, because the next reader believes it.
+ * The browser lane caught it (a "capped" cell measured 240px).
+ *
+ * `2P-CALENDAR-001`'s *"cells do not grow without limit"* is therefore enforced
+ * where it actually can be: `MONTH_CELL_ITEM_LIMIT` bounds how many items a cell
+ * renders, and the overflow link keeps the rest reachable. Clipping with
+ * `overflow: hidden` would have been the wrong fix anyway — it hides content
+ * that is present, which is the opposite of offering access to it.
+ *
+ * The items are not compacted by hiding their lane and commitment words either:
+ * `2M-ACCESS-005` forbids carrying the lane by colour alone, and `display: none`
+ * takes text out of the accessibility tree as surely as it takes it off screen.
+ */
 
 .calendar-month-daynumber {
   display: inline-block;

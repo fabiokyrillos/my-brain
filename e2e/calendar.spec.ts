@@ -703,9 +703,37 @@ test.describe("2P-CALENDAR-001: the month is a real grid, and only one of its tw
     await expect(more).toHaveText("mais 4");
     await expect(more).toHaveAttribute("href", /date=2026-08-15/);
 
-    // The cell is capped, so six rows of them still fit a screen.
-    const height = await busy.evaluate((node) => node.getBoundingClientRect().height);
-    expect(height).toBeLessThanOrEqual(160);
+    /*
+     * *"Cells do not grow without limit"*, asserted as the property rather than
+     * as a pixel number.
+     *
+     * The first version of this asserted a height ceiling, and it failed —
+     * usefully. The CSS it was checking used `max-height` on a `<td>`, which has
+     * no effect: table cells treat height as a minimum. The rule claimed a cap it
+     * did not impose, and only a real engine could say so.
+     *
+     * What actually bounds the cell is `MONTH_CELL_ITEM_LIMIT`, so that is what
+     * is measured: a day with seven items is exactly as tall as a day with
+     * three, and adding more can never make it taller.
+     */
+    const heightAt = async (count: number) => {
+      await page.setContent(monthPage("pt-BR", count), { waitUntil: "load" });
+      return page.locator('.calendar-month td[data-today="true"]')
+        .evaluate((node) => node.getBoundingClientRect().height);
+    };
+
+    /*
+     * Compared among cells that all show the overflow link, because the link is
+     * itself a line: a cell of exactly three items has no link and is therefore
+     * legitimately shorter than one of four. The bound being asserted is that
+     * beyond the limit, MORE items add NOTHING.
+     */
+    const atLimit = await heightAt(7);
+    expect(await heightAt(40)).toBe(atLimit);
+    expect(await heightAt(400)).toBe(atLimit);
+    // Not trivially constant: the measurement does respond to content below the
+    // limit, so a cell that always measured the same would fail here.
+    expect(await heightAt(1)).toBeLessThan(atLimit);
   });
 
   test("gives the day number a real target", async ({ page }) => {

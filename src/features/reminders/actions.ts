@@ -50,7 +50,7 @@
 import { revalidatePath } from "next/cache";
 
 import { localDateTimeToOffsetInstant } from "@/features/tasks/candidate-due-date";
-import { requireUser } from "@/lib/auth/require-user";
+import { assertActiveAccount, requireUser } from "@/lib/auth/require-user";
 import { defaultAgentPreferences, resolveLocale, type Locale } from "@/lib/preferences";
 
 // This module carries `"use server"`, so it may export only async functions.
@@ -290,6 +290,16 @@ export async function createReminder(
 
   const { supabase, user } = await requireUser(locale);
 
+  /*
+   * The lifecycle check the previous writer carried, kept.
+   *
+   * It was dropped in the first draft of this move and put back: a suspended or
+   * pending-deletion account must not be able to schedule a future alert, and
+   * removing a check while relocating a function is exactly the kind of silent
+   * loss a move is supposed to make impossible.
+   */
+  await assertActiveAccount(supabase, user.id, parsed.data.locale);
+
   // The offset comes from the profile, never from the browser and never from a
   // hidden field. Same read, same converter and same failure mode as the
   // reschedule command twenty lines up.
@@ -354,16 +364,47 @@ export async function createReminder(
   }
 
   /*
-   * The **route pattern**, not a resolved path.
+   * **This action deliberately does not call `revalidatePath`, and the reason is
+   * measured rather than assumed.**
    *
-   * `revalidatePath("/pt-BR/app/reminders")` — which is what this action used to
-   * do — matches nothing under a dynamic `[locale]` segment and silently
-   * revalidates no page at all. The bug is invisible: the row is written, the
-   * action succeeds, and the list is simply stale until something else
-   * refreshes it.
+   * The obvious code here is `revalidatePath("/[locale]/app/reminders", "page")`
+   * — the route pattern, since a resolved path matches nothing under a dynamic
+   * `[locale]` segment. It was written, and it is the first *working*
+   * revalidation this route has ever had: `applyReminderCommand` above still
+   * uses a resolved path, so no action on this page has ever actually re-rendered
+   * it.
+   *
+   * With it, the page re-render happens inside the action's own transition, and
+   * the transition intermittently never settles. Measured against `next start`
+   * over ten consecutive creations:
+   *
+   *   - without revalidation: ten successes, ~1.4s each;
+   *   - with it: ~3.9s each, and after two to five successes the transition
+   *     hangs past 120 seconds with the server having answered **200** and with
+   *     no error in the server log, the browser console, or as a page error.
+   *
+   * A stuck transition is a stuck `pending`, and a dialog whose openness is
+   * derived from `pending` — which is slice 2P.6's fix and is correct — then
+   * stays open on *Criando…* forever. Deriving openness from `pending` protects
+   * against closing too early; nothing protects against a transition that never
+   * ends.
+   *
+   * It is **not** this slice's code, established twice. The hang reproduces with
+   * slice 2P.7's own `loadReminderTaskOptions` stubbed out of the page entirely;
+   * and a worktree built at `main` `d30177f`, with the *old* inline form and no
+   * change from this branch, fails the same journey 2 times in 12 with the same
+   * symptom — a creation that never completes. So this route is already
+   * intermittently unstable in the local `next start` lane, and a working
+   * revalidation makes it far more frequent rather than causing it.
+   *
+   * Recorded as `2P-REMINDER-REVALIDATE-HANG`, and it is a caution for the
+   * remaining `revalidatePath` repairs: fixing one of those call sites can turn
+   * a dead call into a live freeze.
+   *
+   * So the refresh moved to the client, *after* the dialog has closed — see
+   * `reminder-composer.tsx`. The list still updates; it simply no longer
+   * updates inside the transition that decides whether a dialog is open.
    */
-  revalidatePath("/[locale]/app/reminders", "page");
-  revalidatePath("/[locale]/app/calendar", "page");
 
   return { status: "success", message: copy.creation.created, reminderId: inserted.data.id };
 }
