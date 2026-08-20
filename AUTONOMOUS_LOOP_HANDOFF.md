@@ -11372,6 +11372,19 @@ The lesson generalises: on this machine, run the unit suite and the Playwright
 lanes **one at a time**. Every "transient" guard failure in this unit — A13,
 reports-taxonomy, heartbeat-disposition — was this, and each cost a diagnosis.
 
+### Merged
+
+**PR #273 merged as `ac56934`**, four commits from `d5eedc4`. CI **green 3/3 on
+the merge SHA itself** (`conclusion: success`), not only on the branch head.
+`main` is clean, zero open PRs.
+
+**Residue: zero.** Four `codex-2prev-…@example.com` accounts survived runs I
+killed before their `afterAll` could fire — deleted through a script that reads
+each id back and **refuses any email that is not a fixture**, so a typo cannot
+reach the owner's account. Re-counted after: 0 fixture accounts, 0 orphan
+summaries, 0 orphan tasks, 0 orphan entries, parity `202608190099` with 99
+hosted migrations. A killed run leaves its fixtures behind — check for them.
+
 ### Next
 
 The owner's checklist is
