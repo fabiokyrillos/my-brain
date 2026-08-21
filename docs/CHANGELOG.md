@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q slice 2Q.1 DEPLOYED: parity 202608190099 → 202608210100
+
+**The one allocated migration is applied. 100 local = 100 hosted, advanced by exactly one.** Applied from `main` at merge SHA `c7c8db0`, worktree clean. Budget **1 allocated · 1 spent**; a second of any kind remains a stop condition.
+
+**All thirteen gates passed with evidence, recorded in `PHASE_2Q_SLICE_01_DEPLOYMENT.md`.** Notably: local bytes proved equal to merged bytes by `sha256` **and** git object id; the dry run showed **exactly one** pending migration; CI green 3/3 on the merge SHA with executed steps **9 / 11 / 23**.
+
+**The deployed posture is unchanged, compared against a pre-state read live rather than against a memory.** Three policies with the same names, `authenticated` alone on all three, the grant string byte-identical and still without DELETE, RLS enabled and forced, one pre-existing foreign key, **zero constraints on `citations`**, one trigger, and **zero rows with `citations is null`** — the default reached every existing row.
+
+**The fourth parity proof ran, and the `summaries` block is byte-identical between the generated types and the committed file** — the hand-added entry is exactly what `supabase gen types typescript --linked` produces. That is what ADR-041's mechanism is for.
+
+**It surfaced a pre-existing divergence, reported rather than absorbed.** The two files also differ in ~305 unrelated lines: five entries in different positions, and six RPC entries rendered differently. **All six functions exist in the deployed database** — verified against `pg_proc`, where four are **overloaded** (a no-argument form and a `p_window interval` form) and the installed CLI renders overloads differently from whatever produced the committed entries. Neither file is wrong about the schema. **It predates this slice by construction**: the whole diff to `database.types.ts` was 3 insertions, and all four disputed entries were already present at `e3a3668`. **Not repaired here** — rewriting ~305 lines of RPC typing that no requirement names could break typed RPC calls. Destination: the owner.
+
+**Two-sided residue control, because a zero count over an empty table satisfies every marker.** A synthetic auth user and one summary row were planted; the probe saw 1 summary, 1 profile, `type: "task"` stored **as a task**, reach `["entry","task"]`, and **exactly four keys** on the reference — nowhere to put content. After deleting the auth user, all six markers read 0, while the probe remained able to see (1 real review readable, 15 columns present). **Zero residue.** These statements run as `postgres` and prove nothing about RLS; RLS is proved in pgTAP under `set local role authenticated`, which CI ran.
+
+**`2Q-CITE-008` observed hosted:** the one pre-existing review carries `'[]'`, not NULL — it parses to `unknown` ("nobody recorded whether the Brain found anything") rather than to `no_qualifying_evidence`, which would claim the Brain looked and found nothing.
+
+**One half of the hosted proof is UNSPENDABLE, and is not reported as a pass.** Proving the **real producer** end to end needs a `generateReview` call, which is a paid AI call against the owner's BYOK credential; ADR-128 Decision 5 forbids spending one without a further authorization. `OPENAI_API_KEY` is absent here and `public.user_ai_credentials` exists on the deployed project, so generating would spend the owner's. Recorded as **UNSPENDABLE**, the same treatment `2P-CHAT-007-JOURNEY` carries. It blocks nothing: slices 2Q.2/2Q.3 need a review row with an envelope, which a synthetic fixture supplies, and the real end-to-end proof is **item 1 of the owner's device checkpoint**.
+
+Signup closed, rollout 25 · 3 · 2, `RG-DEP-3` still not closable by writing a file, push HTTP 403 not resumed, `2P-ACCESS-005` **WAIVED, NOT PASSED**, `2P-REVIEW-CITATIONS` still **NOT DELIVERED** — a stored envelope is not a link the owner can click.
+
 ## 2026-08-21 - Phase 2Q slice 2Q.1: the references survive the write (one migration, SPENT)
 
 **`202608210100_phase_2q_slice_1_summary_citations.sql` — one statement, and it spends the phase's only allocated migration.** `OD-2Q-7` signed A; **a second of any kind is a stop condition**, and `OD-2Q-4` signed A means no pending decision could fund one. Budget: **1 allocated · 1 spent**.
