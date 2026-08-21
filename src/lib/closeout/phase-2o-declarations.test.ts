@@ -754,17 +754,18 @@ describe("Phase 2O: A13 has moved off this phase, in this same commit", () => {
     // ADR-115 moved the detector off 2O and onto this phase's then-unnamed
     // successor, and this test pinned that target literally. ADR-121 then
     // authorized that successor and moved the detector again, in its own
-    // commit, so the pin moves with it. The property this test holds forever
-    // is the negative half — the detector never points back at 2O — asserted
-    // explicitly below so the pin update can never satisfy this test by
-    // accident. The literal pin on the current target is kept deliberately:
-    // every future retarget must consciously pass through here, which is how
-    // this defect was caught when ADR-121's retarget missed it.
+    // commit, so the pin moves with it — and **ADR-126 does it a third time**.
+    // The property this test holds forever is the negative half — the detector
+    // never points back at 2O — asserted explicitly below so the pin update can
+    // never satisfy this test by accident. The literal pin on the current
+    // target is kept deliberately: every future retarget must consciously pass
+    // through here, which is how this defect was caught when ADR-121's retarget
+    // missed it.
     const guard = read("src/lib/closeout/phase-2f-documentation.test.ts");
     expect(guard).not.toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2O_/);
-    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2Q_/);
-    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2Q-/);
-    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2q\/i;/);
+    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2R_/);
+    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2R-/);
+    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2r\/i;/);
   });
 
   it("records Phase 2O's start as an authorization rather than an accident", () => {
