@@ -428,7 +428,7 @@ describe("Phase 2Q declarations", () => {
      */
     const reports = join(REPO, "docs/reports/phase-2q");
     const filed = existsSync(reports) ? readdirSync(reports) : [];
-    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
+    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i]) {
       expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before its slice ran`)
         .toEqual([]);
     }
@@ -441,10 +441,31 @@ describe("Phase 2Q declarations", () => {
       expect(name, `${name} is not a slice acceptance record`)
         .toMatch(/^PHASE_2Q_SLICE_\d{2}_ACCEPTANCE\.md$/);
     }
-    // Slice 2Q.0 is closed, so its record is required rather than merely
-    // permitted: a guard that only tolerates evidence never notices it vanish.
+    // Slices 2Q.0 and 2Q.1 are closed, so their records are required rather than
+    // merely permitted: a guard that only tolerates evidence never notices it
+    // vanish. Each closed slice adds its own line here.
     expect(accepted, "slice 2Q.0's acceptance record is missing")
       .toContain("PHASE_2Q_SLICE_00_ACCEPTANCE.md");
+    expect(accepted, "slice 2Q.1's acceptance record is missing")
+      .toContain("PHASE_2Q_SLICE_01_ACCEPTANCE.md");
+
+    /*
+     * **A deployment record became legitimate the moment the migration was
+     * applied**, so it moves out of the forbidden list and into a required one —
+     * the same inversion, one artifact later. It is required rather than merely
+     * allowed, and it is required to be **for the slice that spent the
+     * allocation**: a deployment record for a slice that deployed nothing would
+     * be a claim of hosted evidence the traceability contract's refusal 7
+     * rejects by name.
+     */
+    const deployments = filed.filter((name) => /DEPLOYMENT/i.test(name));
+    expect(deployments, "the deployment record must name the slice that spent the migration")
+      .toEqual(["PHASE_2Q_SLICE_01_DEPLOYMENT.md"]);
+    const deployment = read("docs/reports/phase-2q/PHASE_2Q_SLICE_01_DEPLOYMENT.md");
+    expect(deployment, "a deployment record must state the parity it produced")
+      .toContain("202608210100");
+    expect(deployment, "and it must not claim the AI half it could not spend")
+      .toMatch(/UNSPENDABLE/);
 
     /*
      * **The migration allocation, asserted as a ceiling rather than as a zero.**
