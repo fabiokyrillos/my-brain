@@ -559,7 +559,14 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
     const laterPhase2p = migrations.filter((name) => /phase[_-]?2p/i.test(name));
     expect(laterPhase2p, `Phase 2P must have exactly two migrations: ${laterPhase2p.join(", ")}`)
       .toHaveLength(2);
-    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length);
+    // Phase 2Q spent the ONE migration ADR-127 Decision 7 allocated, after this
+    // phase closed. Counted explicitly and pinned at exactly one, for the same
+    // reason as Phase 2P above: an unattributed migration must still fail the
+    // total, and a SECOND 2Q migration is a stop condition that fails here.
+    const laterPhase2q = migrations.filter((name) => /phase[_-]?2q/i.test(name));
+    expect(laterPhase2q, `Phase 2Q is allocated exactly one migration: ${laterPhase2q.join(", ")}`)
+      .toHaveLength(1);
+    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length);
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);
     // Non-vacuous: the filter really filters.

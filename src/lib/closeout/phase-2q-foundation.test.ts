@@ -89,39 +89,77 @@ describe("2Q-FOUNDATION-001: generateReview retrieves entries and tasks, and dis
     const tables = [...body.matchAll(/\.from\("([a-z_]+)"\)/g)].map((match) => match[1]);
     expect(tables.sort()).toEqual(["agent_preferences", "entries", "profiles", "summaries", "tasks"]);
 
-    // Recorded as locations, because a finding without one is an opinion.
-    expect(lineOf(AGENT_ACTIONS, /\.from\("entries"\)/)).toBe(932);
-    expect(lineOf(AGENT_ACTIONS, /\.from\("tasks"\)/)).toBe(939);
-  });
-
-  it("never mentions citedSourceIds anywhere in the action file", () => {
     /*
-     * The strongest available form of "it is discarded": the provider returns
-     * the field, `generateReview` holds the whole answer in `answer`, and the
-     * identifier does not occur in the file at all. There is no partial read to
-     * miss, and no code path that could be quietly carrying it.
+     * **The line pins moved to the acceptance record, and this is why.**
+     *
+     * Slice 2Q.0 pinned `:932` and `:939` because a finding without a location
+     * is an opinion. Slice 2Q.1 edits this very file, so a live line number now
+     * churns with every comment added above it — and a guard that must be
+     * re-numbered on each edit teaches the next reader to re-number it without
+     * looking, which is how a pin stops being a check.
+     *
+     * The provenance is kept where it cannot rot: the acceptance record states
+     * the lines **as measured on `a0295a2`**, and that stays true of `a0295a2`
+     * forever. What is asserted live is the property, above.
      */
-    expect(read(AGENT_ACTIONS)).not.toContain("citedSourceIds");
+    expect(read("docs/reports/phase-2q/PHASE_2Q_SLICE_00_ACCEPTANCE.md"))
+      .toContain("src/features/agent/actions.ts:932");
   });
 
-  it("writes a summaries row that carries no citation field", () => {
+  it("READS citedSourceIds, where it used to discard them — INVERTED by slice 2Q.1", () => {
+    /*
+     * **Inverted, not deleted.**
+     *
+     * As shipped through `a0295a2` this asserted that the identifier
+     * `citedSourceIds` did not occur **anywhere** in the file — the strongest
+     * available form of "it is discarded", and the finding `2Q-FOUNDATION-001`
+     * recorded. Slice 2Q.1 made the action read it (`2Q-CITE-004`), so the
+     * assertion now requires the occurrence it used to forbid.
+     *
+     * The property being protected never changed: **whether the provider's
+     * validated ids survive the write.** Only the answer did.
+     */
+    expect(read(AGENT_ACTIONS), "the action went back to discarding the cited ids")
+      .toContain("citedSourceIds");
+  });
+
+  it("labels a task AS A TASK — INVERTED by slice 2Q.1", () => {
+    /*
+     * **This assertion was the mislabel, and it is inverted rather than
+     * deleted** — the rule this file's header states.
+     *
+     * As shipped through `a0295a2` it required `id: \`memory:${item.id}\`` and
+     * `type: "memory" as const` on the branch built from the `tasks` query, and
+     * that is what `2Q-FOUNDATION-001` recorded. Slice 2Q.1 corrected it
+     * (`2Q-CITE-007`), so the same block now requires the opposite, **and
+     * forbids the old shape by name** so a revert cannot pass quietly.
+     */
     const body = generateReviewBody();
+    expect(body, "the task branch stopped calling itself a task")
+      .toMatch(/id: `task:\$\{item\.id\}`/);
+    expect(body, "the task branch stopped declaring the task type")
+      .toMatch(/type: "task" as const/);
+    expect(body, "the memory mislabel came back")
+      .not.toMatch(/id: `memory:\$\{item\.id\}`/);
+    // And it is the *task* query it is built from — the label, located.
+    expect(body.indexOf('.from("tasks")')).toBeLessThan(body.indexOf("id: `task:"));
+  });
+
+  it("persists the envelope in the same write as the review — ADDED by slice 2Q.1", () => {
+    /*
+     * The inverse of "never mentions citedSourceIds", which is the assertion
+     * above and stays inverted with it. The identifier is now read, filtered
+     * through the same `flatMap` chat uses, and written into the upsert — so a
+     * review cannot exist without the references it was written from.
+     */
+    const body = generateReviewBody();
+    expect(body, "the action stopped reading the provider's cited ids")
+      .toContain("answer.citedSourceIds.flatMap");
     const upsert = body.slice(body.indexOf('.from("summaries")'));
-    for (const forbidden of ["citations", "cited_source", "sources:"]) {
-      expect(upsert, `the write already carries ${forbidden}`).not.toContain(forbidden);
-    }
-    expect(lineOf(AGENT_ACTIONS, /\.from\("summaries"\)/)).toBe(1045);
-  });
-
-  it("labels a task with the memory prefix, which is the finding that matters", () => {
-    const body = generateReviewBody();
-    expect(body, "the task branch stopped calling itself a memory")
-      .toMatch(/id: `memory:\$\{item\.id\}`/);
-    expect(body, "the task branch stopped declaring the memory type")
-      .toMatch(/type: "memory" as const/);
-    // And it is the *task* query it is built from — the mislabel, located.
-    expect(body.indexOf('.from("tasks")')).toBeLessThan(body.indexOf("id: `memory:"));
-    expect(lineOf(AGENT_ACTIONS, /id: `memory:\$\{item\.id\}`/)).toBe(970);
+    expect(upsert, "the envelope is not in the write").toContain("citations: buildCitationsEnvelope(");
+    expect(upsert, "the review must declare ITS reach, never chat's").toContain("reach: REVIEW_REACH");
+    expect(upsert, "the conflict target moved, which would break 2Q-CITE-009")
+      .toContain('onConflict: "user_id,period_type,period_start,period_end"');
   });
 });
 
@@ -135,9 +173,18 @@ describe("2Q-FOUNDATION-002: summaries has no column able to hold a citation", (
     return row;
   }
 
-  it("carries exactly fourteen columns, none of which can hold a reference", () => {
+  it("carries fifteen columns — the fourteen it had, plus the allocated one — INVERTED by slice 2Q.1", () => {
+    /*
+     * **Inverted, not deleted.** Slice 2Q.0 recorded fourteen columns and no
+     * place to put a citation; that was the finding that justified the one
+     * migration `OD-2Q-7` allocates. Slice 2Q.1 spends it, so the count is now
+     * fifteen — and the list is spelled out in full so a **sixteenth** arriving
+     * unnoticed fails here. A second migration of any kind is a stop condition,
+     * and this is one of the three places that would catch one.
+     */
     const columns = [...summariesRow().matchAll(/^ {10}([a-z_]+):/gm)].map((match) => match[1]);
     expect(columns.sort()).toEqual([
+      "citations",
       "content",
       "generated_at",
       "id",
@@ -153,7 +200,7 @@ describe("2Q-FOUNDATION-002: summaries has no column able to hold a citation", (
       "updated_at",
       "user_id",
     ]);
-    expect(columns).toHaveLength(14);
+    expect(columns).toHaveLength(15);
   });
 
   it("declares no relationship, so there is no join table either", () => {
@@ -163,9 +210,17 @@ describe("2Q-FOUNDATION-002: summaries has no column able to hold a citation", (
     expect(block).toContain("Relationships: []");
   });
 
-  it("has no migration creating a citations column or a summary join table", () => {
-    // Read from the migration chain rather than from the types, because the
-    // types are a generated artifact and could in principle lag the schema.
+  it("has EXACTLY ONE migration creating that column — INVERTED by slice 2Q.1", () => {
+    /*
+     * **The ceiling, not the absence.** Slice 2Q.0 asserted zero, because
+     * nothing was authorized to be spent. `OD-2Q-7` allocates one and slice
+     * 2Q.1 spends it, so what is worth holding for the rest of the phase is
+     * that there is **never a second** — a stop condition rather than an
+     * overrun, `OD-2Q-4` being signed as option A.
+     *
+     * Read from the migration chain rather than from the generated types,
+     * because the types are an artifact and could in principle lag the schema.
+     */
     const migrations = join(REPO, "supabase", "migrations");
     const hits: string[] = [];
     for (const name of readdirSync(migrations)) {
@@ -174,24 +229,66 @@ describe("2Q-FOUNDATION-002: summaries has no column able to hold a citation", (
         hits.push(name);
       }
     }
-    expect(hits, "a citation store for summaries already exists").toEqual([]);
+    expect(hits, `the allocation is one; found ${hits.join(", ")}`)
+      .toEqual(["202608210100_phase_2q_slice_1_summary_citations.sql"]);
   });
 
   it("and the review page therefore vouches for nothing", () => {
     expect(read(REVIEW_PAGE)).toContain("allowedIds: new Set<string>()");
+    // Still the empty set at slice 2Q.1: the column now holds the references,
+    // and **slice 2Q.2 is what feeds them to the allow-set.** A migration whose
+    // consumer shipped early would have made this line a lie one slice sooner.
     expect(lineOf(REVIEW_PAGE, /allowedIds: new Set<string>\(\)/)).toBe(125);
   });
 });
 
-describe("2Q-FOUNDATION-003: a task uuid stored as a memory resolves to unavailable — EXECUTED", () => {
+describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTED by slice 2Q.1", () => {
   /*
-   * **This block asserts a defect.** It is the failure the phase exists to
-   * prevent: reuse the chat envelope verbatim, and every task citation degrades
-   * in silence while every entry citation passes.
+   * **Inverted, and not in the direction slice 2Q.0 predicted. Read this.**
    *
-   * Slice 2Q.1 widens the vocabulary to `entry | memory | task`. When it does,
-   * this block is **inverted** — the same fixture must then resolve to a task
-   * card — not removed.
+   * 2Q.0's header said: *"the same fixture must then resolve to a task card"*.
+   * It does not, and forcing it to would have broken a signed decision. What
+   * actually changed is better, and the difference is worth the paragraph.
+   *
+   * ## What the fix is
+   *
+   * The defect was never that `resolveSources` lacked a task branch. It was
+   * that **`generateReview` produced a reference that lied about its own
+   * type** — `memory:<task-uuid>` — and the resolver then dutifully looked a
+   * task up in `memories`, missed, and returned `unavailable` for every task
+   * citation. Slice 2Q.1 fixes it at the producer (`2Q-CITE-007`): the label is
+   * now `task:` and the type is `task`, asserted as a pair. **The mislabelled
+   * reference this block used to execute can no longer be written.**
+   *
+   * ## Why the resolver REFUSES a task instead of rendering one
+   *
+   * ADR-127 Decision 1 says `resolve-sources.ts` "gains a `task` branch". That
+   * sentence was written for the option that was **recommended** — option A,
+   * where the sources area showed a preview of each cited record. Decision 5 of
+   * the same ADR signed **option C** instead, and Decision 5.1 states the
+   * consequence in the owner's own terms: *"a source list carrying no governed
+   * content never calls `resolveContent` at all."*
+   *
+   * That is not a preference here, it is mechanical. `readOnlyPreviewCard` —
+   * the only thing this module builds a resolved source out of — **requires** a
+   * `snippet` and a `sensitivity`. For a task those are the task's **title**
+   * (content, forbidden on this surface by `2Q-LINK-008`) and a classification
+   * derived from `source_entry_id` (a second derivation, forbidden by
+   * `2Q-TRUST-007`). A task branch that rendered would have manufactured
+   * exactly the two things the signature removed, in a module chat owns and a
+   * review must not use.
+   *
+   * So: chat does not retrieve tasks (`OD-2Q-2`, option A), no chat envelope can
+   * contain one, and the branch **refuses** — returning the same `unavailable`
+   * shape a deleted record gets. The review page gets its own content-free
+   * resolver in slice 2Q.2. The vocabulary is shared, exactly as `OD-2Q-1`
+   * signed; only the renderer is not.
+   *
+   * ## What this block asserts now
+   *
+   * That the misroute is impossible in **both** directions: the producer cannot
+   * emit it, and if a hand-written row ever carried one the resolver refuses it
+   * explicitly rather than silently searching the wrong table.
    */
   const USER = "11111111-1111-4111-8111-111111111111";
   const TASK = "22222222-2222-4222-8222-222222222222";
@@ -224,23 +321,34 @@ describe("2Q-FOUNDATION-003: a task uuid stored as a memory resolves to unavaila
     legacy: false,
   });
 
-  it("resolves the mislabelled task to unavailable, silently", async () => {
+  it("no longer produces the mislabel at all — the defect is gone at its source", () => {
+    const actions = read(AGENT_ACTIONS);
+    expect(actions, "the review generator went back to labelling a task a memory")
+      .not.toContain("id: `memory:${item.id}`");
+    expect(actions, "the task branch must declare the task type").toContain('type: "task" as const');
+  });
+
+  it("refuses a hand-written task reference rather than searching memories for it", async () => {
     const { supabase, asked } = client({
-      // The task row exists and is the owner's. Nothing looks for it.
-      tasks: [{ id: TASK, title: "Fechar o contrato", status: "done" }],
+      tasks: [{ id: TASK, title: "Fechar o contrato", status: "completed" }],
       memories: [],
     });
     const [source] = await resolveSources(
       supabase as never,
       USER,
-      citations({ id: `memory:${TASK}`, type: "memory", sourceId: TASK, support: "product_state" }),
+      citations({ id: `task:${TASK}`, type: "task", sourceId: TASK, support: "product_state" }),
       "pt-BR",
       NOW,
     );
+    // Refused, in the shape a deleted record gets — never resolved into a card
+    // carrying the task's title.
     expect(source?.card.state).toBe("unavailable");
-    // The whole finding in one assertion: the resolver never asks `tasks`.
-    expect(asked, "the resolver already reads tasks").not.toContain("tasks");
-    expect(asked).toContain("memories");
+    expect(source?.card.snippet, "a task's title reached a chat card").toBeNull();
+    // And it does NOT go looking in the wrong table, which was the whole defect.
+    expect(asked, "a task reference is being looked up in memories again")
+      .not.toContain("memories");
+    expect(asked, "and it must not read tasks here either — that is 2Q.2's own resolver")
+      .not.toContain("tasks");
   });
 
   it("is not vacuous: an entry citation resolves in the same call", async () => {
@@ -258,7 +366,7 @@ describe("2Q-FOUNDATION-003: a task uuid stored as a memory resolves to unavaila
       USER,
       citations(
         { id: `entry:${ENTRY}`, type: "entry", sourceId: ENTRY, support: "direct_record" },
-        { id: `memory:${TASK}`, type: "memory", sourceId: TASK, support: "product_state" },
+        { id: `task:${TASK}`, type: "task", sourceId: TASK, support: "product_state" },
       ),
       "pt-BR",
       NOW,
@@ -267,12 +375,17 @@ describe("2Q-FOUNDATION-003: a task uuid stored as a memory resolves to unavaila
     expect(task?.card.state).toBe("unavailable");
   });
 
-  it("and the vocabulary that causes it is pinned in TypeScript, not in SQL", () => {
+  it("and the widened vocabulary is still pinned in TypeScript, not in SQL", () => {
     const contracts = read(CONTRACTS);
-    expect(contracts).toContain('export type CitedSourceType = "entry" | "memory";');
-    expect(contracts).toContain('export const ANSWER_REACH = ["entry", "memory"] as const;');
-    // Twice: the current `referenceSchema` and the legacy recogniser.
-    expect([...contracts.matchAll(/z\.enum\(\["entry", "memory"\]\)/g)]).toHaveLength(2);
+    // Inverted with the rest: the vocabulary is now three, and it lives in one
+    // constant so a fourth cannot be added in one place and missed in another.
+    expect(contracts).toContain('export const CITED_SOURCE_TYPES = ["entry", "memory", "task"] as const;');
+    expect(contracts).toContain("export type CitedSourceType = (typeof CITED_SOURCE_TYPES)[number];");
+    expect(contracts, "the schema must read the constant, not a second literal")
+      .toContain("type: z.enum(CITED_SOURCE_TYPES)");
+    // Once, and only for the legacy recogniser — a legacy row can never carry a
+    // task, because the path that wrote those rows never retrieved one.
+    expect([...contracts.matchAll(/z\.enum\(\["entry", "memory"\]\)/g)]).toHaveLength(1);
     // The deployed column carries no check constraint, so widening costs zero
     // migrations. Proved from the migration that created it, not from memory.
     const chat = read("supabase/migrations/202607160006_chat_memory.sql");

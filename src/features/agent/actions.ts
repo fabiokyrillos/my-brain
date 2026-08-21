@@ -5,6 +5,11 @@ import { formatInstant } from "@/lib/time/instant-format";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { after } from "next/server";
 import { z } from "zod";
+import {
+  buildCitationsEnvelope,
+  REVIEW_REACH,
+  supportKindForSource,
+} from "@/features/conversation-sources/contracts";
 import { createProductEventIdempotencyKey, recordProductEvent } from "@/features/product-analytics/server";
 import { getTaskCommandCopy } from "@/features/task-commands/copy";
 import { taskCommandUndoErrorDetailFor } from "@/features/task-commands/errors";
@@ -966,9 +971,24 @@ export async function generateReview(
       occurredAt: item.occurred_at,
       similarity: 1,
     })),
+    /*
+     * `2Q-CITE-007` — **a task stops being called a memory.**
+     *
+     * This label used to read `memory:`, and the Phase 2P specification that
+     * proposed persisting these references noted it in passing as "a misnomer"
+     * without following it through. Followed through: `resolve-sources.ts`
+     * resolves `memory` against the **`memories`** table, so persisting a task
+     * uuid under that type makes every task citation degrade to "unavailable"
+     * while every entry citation passes — the feature ships green and never
+     * answers the one question the owner asked it to.
+     *
+     * The id prefix and the declared type are asserted **as a pair** by
+     * `2Q-CITE-007`, because either one alone would satisfy the letter and lose
+     * the behaviour.
+     */
     ...(tasksResult.data ?? []).map((item) => ({
-      id: `memory:${item.id}`,
-      type: "memory" as const,
+      id: `task:${item.id}`,
+      type: "task" as const,
       content: `Tarefa: ${item.title}. Status: ${item.status}. Prazo: ${item.due_at ?? "sem prazo"}.`,
       occurredAt: item.updated_at,
       similarity: 1,
@@ -1041,6 +1061,44 @@ export async function generateReview(
     const titleMap = parsed.data.locale === "pt-BR"
       ? { daily: "Resumo diário", weekly_review: "Revisão semanal", weekly_plan: "Planejamento semanal", monthly: "Revisão mensal" }
       : { daily: "Daily summary", weekly_review: "Weekly review", weekly_plan: "Weekly plan", monthly: "Monthly review" };
+    /*
+     * `2Q-CITE-004` — the references survive the write.
+     *
+     * Until Phase 2Q this action held `answer.citedSourceIds` and dropped them
+     * here, so the review page had nothing to vouch for and passed an empty
+     * allow-set: every link the model wrote collapsed into plain text, and the
+     * page had to tell the owner it could not name the records.
+     *
+     * ## Three properties this shape carries, none of them incidental
+     *
+     * 1. **A fabricated id cannot get here.** `openai-provider.ts` filters the
+     *    model's returned ids against `availableIds` — the set built from the
+     *    rows *this request* read under RLS — before they reach this function.
+     *    The `flatMap` below is the second, independent gate: an id with no
+     *    matching source in `sources` produces no reference at all
+     *    (`2Q-CITE-005`).
+     * 2. **Nothing content-bearing is stored.** The reference is
+     *    `{id, type, sourceId, support}` and `referenceSchema` is `.strict()`,
+     *    so there is nowhere in the shape to put a title or an excerpt. That
+     *    absence is the control, not a convention (`2Q-CITE-006`) — and it is
+     *    why archiving or reclassifying a cited record cannot leave its text
+     *    behind, which is the residual the legacy chat shape had to delete.
+     * 3. **The write is the same write.** The envelope goes into the upsert
+     *    that stores the review, so a review can never exist without the
+     *    references it was written from, and regenerating **replaces** the
+     *    envelope rather than accumulating envelopes — the conflict target is
+     *    the same four columns as before (`2Q-CITE-009`).
+     *
+     * `REVIEW_REACH` rather than chat's: this action retrieves entries and
+     * tasks (`OD-2Q-2`, signed option A). Stamping chat's reach would tell the
+     * owner the Brain looked in their memories when it did not.
+     */
+    const references = answer.citedSourceIds.flatMap((id) => {
+      const source = sources.find((item) => item.id === id);
+      const sourceId = id.split(":")[1];
+      if (!source || !sourceId) return [];
+      return [{ id, type: source.type, sourceId, support: supportKindForSource(source.type) }];
+    });
     const { error } = await supabase
       .from("summaries")
       .upsert(
@@ -1057,6 +1115,17 @@ export async function generateReview(
           input_tokens: answer.inputTokens,
           output_tokens: answer.outputTokens,
           generated_at: new Date().toISOString(),
+          citations: buildCitationsEnvelope({
+            // `2K-SRC-005`'s rule, applied here: insufficiency is a fact about
+            // **retrieval**, never about how many sources the model chose to
+            // cite. `sources` is non-empty by the time this line runs — the
+            // action returns `messages.empty` above when neither query found
+            // anything — so a review with zero citations honestly means "the
+            // Brain had material and cited none of it".
+            retrievedAnyQualifyingSource: sources.length > 0,
+            sources: references,
+            reach: REVIEW_REACH,
+          }),
         },
         { onConflict: "user_id,period_type,period_start,period_end" },
       );

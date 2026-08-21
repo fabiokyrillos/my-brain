@@ -11,13 +11,16 @@ import { describe, expect, it } from "vitest";
 import {
   ANSWER_REACH,
   ANSWER_SUPPORT_KIND,
+  CHAT_REACH,
   CITATIONS_ENVELOPE_VERSION,
   NO_CITATIONS,
+  REVIEW_REACH,
   SUPPORT_KINDS,
   buildCitationsEnvelope,
   parseCitations,
   supportKindForSource,
 } from "./contracts";
+import { getConversationSourcesCopy } from "./copy";
 
 const SOURCE_ID = "44444444-4444-4444-8444-444444444444";
 
@@ -88,6 +91,7 @@ describe("2K-PRIVACY-003: the persisted payload has nowhere to put content", () 
     const envelope = buildCitationsEnvelope({
       retrievedAnyQualifyingSource: true,
       sources: [reference],
+      reach: CHAT_REACH,
     });
     expect(JSON.stringify(envelope)).not.toMatch(/excerpt|content|snippet/);
     expect(Object.keys(envelope.sources[0]!).sort()).toEqual(["id", "sourceId", "support", "type"]);
@@ -122,7 +126,7 @@ describe("2K-PRIVACY-004: a legacy row's excerpt is discarded, never read", () =
 
 describe("2K-SRC-005: insufficiency comes from retrieval, never from the count", () => {
   it("records `no_qualifying_evidence` when retrieval found nothing", () => {
-    const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: false, sources: [] });
+    const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: false, sources: [], reach: CHAT_REACH });
     expect(envelope.evidence).toBe("no_qualifying_evidence");
   });
 
@@ -133,26 +137,58 @@ describe("2K-SRC-005: insufficiency comes from retrieval, never from the count",
      * evidence" — deriving insufficiency from the count would report the
      * opposite of what happened.
      */
-    const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [] });
+    const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: CHAT_REACH });
     expect(envelope.evidence).toBe("evidenced");
     expect(envelope.sources).toEqual([]);
   });
 
   it("round-trips both states through the parser", () => {
     for (const retrieved of [true, false]) {
-      const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: retrieved, sources: [reference] });
+      const envelope = buildCitationsEnvelope({ retrievedAnyQualifyingSource: retrieved, sources: [reference], reach: CHAT_REACH });
       expect(parseCitations(envelope).evidence).toBe(retrieved ? "evidenced" : "no_qualifying_evidence");
     }
   });
 });
 
 describe("2K-SRC-006: the answer discloses its actual reach", () => {
-  it("names exactly the two source types retrieval covers", () => {
-    expect([...ANSWER_REACH].sort()).toEqual(["entry", "memory"]);
+  /*
+   * **THIS BLOCK IS THE CONTROL THAT `OD-2Q-1` DID NOT MOVE CHAT.**
+   *
+   * Phase 2Q widened the citation **type** vocabulary to `entry | memory | task`
+   * so a review could stop storing a task as a memory. It did **not** widen what
+   * chat retrieves, and `conversation-sources/copy.ts` still tells the owner
+   * *"I looked in your records and your memories — those two places only."*
+   *
+   * The assertion below used to read
+   * `expect([...ANSWER_REACH]).toEqual(["entry","memory"])`. It was **not
+   * weakened when the vocabulary widened — it was given the right name.**
+   * `ANSWER_REACH` is now what the envelope schema *admits*; `CHAT_REACH` is
+   * what chat *declares*. Those were always two different facts sharing one
+   * constant, and a review stamped with chat's reach would have told the owner
+   * the Brain read their memories when it read their tasks.
+   *
+   * The property this file protects is unchanged and now stated precisely, with
+   * the admissible set asserted alongside it so neither can drift unnoticed.
+   */
+  it("names exactly the two source types chat's retrieval covers", () => {
+    expect([...CHAT_REACH].sort()).toEqual(["entry", "memory"]);
+    // And the copy the owner actually reads still says two places, so the
+    // sentence and the stamped fact cannot disagree.
+    for (const locale of ["pt-BR", "en"] as const) {
+      expect(getConversationSourcesCopy(locale).reach.toLowerCase())
+        .toMatch(locale === "pt-BR" ? /só nesses dois lugares/ : /those two places only/);
+    }
+  });
+
+  it("keeps the admissible vocabulary separate from what chat declares", () => {
+    expect([...ANSWER_REACH]).toEqual(["entry", "memory", "task"]);
+    expect([...ANSWER_REACH]).not.toEqual([...CHAT_REACH]);
+    // The control that the separation is real: a review declares the other pair.
+    expect([...REVIEW_REACH]).toEqual(["entry", "task"]);
   });
 
   it("stamps the reach on every new envelope", () => {
-    expect(buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [] }).reach)
+    expect(buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: CHAT_REACH }).reach)
       .toEqual(["entry", "memory"]);
   });
 
