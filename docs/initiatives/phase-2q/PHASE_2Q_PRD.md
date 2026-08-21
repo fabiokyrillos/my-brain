@@ -232,6 +232,37 @@ there.**
 and links rather than titles. That is the deliberate trade: the review's text
 carries the meaning, and the list carries the proof.
 
+#### §2.6 — the eight `OD-2Q-5` requirements, each mapped to a declared requirement
+
+The owner attached eight requirements to the signature. **Coverage is asserted
+mechanically, not claimed here**: `phase-2q-declarations.test.ts` fails if any
+row of this table names a requirement that is not declared, or if the table
+loses a row.
+
+| # | The owner's words | Declared as |
+|---|---|---|
+| 1 | a review shows a **clear** sources area | `2Q-LINK-006` |
+| 2 | a cited task appears **as a task**, never as a memory | `2Q-LINK-009` at render, `2Q-CITE-007` at the write |
+| 3 | every source points at its **canonical** object | `2Q-LINK-006` |
+| 4 | no link is created by text matching | `2Q-LINK-004` |
+| 5 | no duplicated preview of the content | `2Q-LINK-008` |
+| 6 | removed, foreign or unreadable degrades **without revealing which** | `2Q-TRUST-002`, `2Q-TRUST-003`, `2Q-TRUST-004` |
+| 7 | a historical review with no citations **says so honestly** | `2Q-LINK-007` at render, `2Q-CITE-008` for the stored state |
+| 8 | a "Fontes" section with no working links **is not delivery** | traceability contract refusal 16, enforced at closeout by `2Q-CLOSE-002` |
+
+Two further instructions came with the same signature and are declared alongside
+them:
+
+| The owner's words | Declared as |
+|---|---|
+| **no reveal control** on this path | `2Q-TRUST-009` |
+| opening the link shows the object **under the destination page's rules** | not a requirement of this phase — it is the behaviour those pages already have, and this phase must not change it. Recorded as T-7's residual in the threat model |
+
+**Requirement 2 needs both halves and that is deliberate.** Persisting the
+correct type (`2Q-CITE-007`) without labelling it correctly would satisfy the
+letter and fail the owner; labelling correctly over a wrongly persisted type is
+impossible. They are declared separately so a slice cannot close on one of them.
+
 ### `OD-2Q-6` — does the WebKit dark-contrast defect belong to this phase?
 
 **SIGNED — option A**, as recommended. ADR-127 Decision 6.

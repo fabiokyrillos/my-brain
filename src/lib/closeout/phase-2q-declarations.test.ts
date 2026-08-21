@@ -265,6 +265,54 @@ describe("Phase 2Q declarations", () => {
       .toMatch(/No reveal control|no reveal control/);
   });
 
+  it("maps all eight of OD-2Q-5's requirements onto declared requirements", () => {
+    /*
+     * The owner attached eight numbered requirements to `OD-2Q-5`. Coverage is
+     * the kind of claim that is easy to assert in prose and easy to lose in an
+     * edit, so §2.6 states it as a table and this reads that table back:
+     *
+     *  - the table must still have all eight rows, so one cannot be dropped;
+     *  - every requirement id it names must actually be declared, so a row
+     *    cannot point at something that no longer exists;
+     *  - and the two extra instructions signed with them — no reveal control,
+     *    and the destination page's rules — must still be accounted for.
+     *
+     * Requirement 8 is the exception and says so in the table: it is enforced by
+     * the traceability contract's refusal 16 rather than by a `2Q-` requirement,
+     * because "this is not delivery" is a closeout rule, not a thing to build.
+     */
+    const prd = read(PRD);
+    const at = prd.indexOf("#### §2.6");
+    expect(at, "the OD-2Q-5 coverage table is missing").toBeGreaterThan(-1);
+    const section = prd.slice(at, prd.indexOf("### `OD-2Q-6`", at));
+
+    const numbered = [...section.matchAll(/^\| (\d) \| /gm)].map((m) => m[1]);
+    expect(numbered, "a row of the OD-2Q-5 coverage table was lost")
+      .toEqual(["1", "2", "3", "4", "5", "6", "7", "8"]);
+
+    // Every requirement the table names is really declared. This is the half
+    // that catches a rename: the prose would still read correctly and the
+    // mapping would be pointing at nothing.
+    const named = [...section.matchAll(/`(2Q-[A-Z]+-\d{3})`/g)].map((m) => m[1]);
+    expect(named.length, "the table names no requirements at all").toBeGreaterThanOrEqual(9);
+    for (const id of new Set(named)) {
+      expect(ids, `the OD-2Q-5 coverage table names ${id}, which is not declared`).toContain(id);
+    }
+
+    // Requirement 8 is discharged by a contract refusal rather than by a
+    // requirement, and the contract must still carry it.
+    expect(flat(section), "requirement 8 must name the refusal that carries it")
+      .toMatch(/refusal 16/);
+    expect(flat(read(CONTRACT)), "refusal 16 must still exist")
+      .toMatch(/16\. \*\*a "sources", "citations" or similarly named section/);
+
+    // The two instructions signed alongside the eight.
+    expect(flat(section), "the no-reveal instruction lost its requirement")
+      .toMatch(/\*\*no reveal control\*\* on this path \| `2Q-TRUST-009`/);
+    expect(flat(section), "the destination-rules instruction must be accounted for, not dropped")
+      .toMatch(/not a requirement of this phase/);
+  });
+
   it("records the signature ADR, and what it still does not authorize", () => {
     const decisions = read("docs/DECISIONS.md");
     const at = decisions.indexOf("## ADR-127");
