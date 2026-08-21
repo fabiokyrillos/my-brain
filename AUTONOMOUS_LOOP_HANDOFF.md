@@ -11932,3 +11932,119 @@ worktrees are deliberately left in place.
 
 **An implementation authorization, or nothing.** The phase's first slice is
 `2Q.0`, and it may not begin until the owner records that decision.
+
+## §112 — Phase 2Q is IMPLEMENTED and NOT CLOSED: all six slices merged, one migration applied, 42/42 classified, waiting on the owner's device (2026-08-21)
+
+**ADR-128** authorized implementation; **ADR-129** corrected a signed premise
+append-only. Six slices, six merge SHAs, **CI green 3/3 on every one**.
+
+| Slice | Merge SHA | What it did |
+|---|---|---|
+| 2Q.0 | `e3a3668` | re-proved the five findings, **two by executing the defect** |
+| 2Q.1 | `c7c8db0` | the one migration; the references survive the write |
+| — | `553b538` | the deployment record; **parity `202608210100`** |
+| 2Q.2 | `57e812a` | **the slice the owner asked for** — a review links to the task |
+| 2Q.3 | `a67a34c` | removed/unreadable/foreign/never-existed as **one equality** |
+| 2Q.4 | `198591c` | the lane defect, and CI widened to WebKit |
+| 2Q.5 | `e64e2c1` | 42/42 classified, generated or refused |
+
+**Migration budget 1 allocated · 1 SPENT AND APPLIED.** 100 local = 100 hosted,
+parity `202608210100`. **Zero residue**, two-sided. **No AI credential spent.**
+
+### The three findings that changed what the phase built
+
+**1. `OD-2Q-5` option C removed a consumer that a signed sentence assumed.**
+ADR-127 Decision 1 says `resolve-sources.ts` "gains a `task` branch". That was
+written for the *recommended* option A, with previews. Decision 5 of the **same
+ADR** signed option C, and 5.1 says a content-free source list never calls
+`resolveContent` at all. Mechanically decisive: `readOnlyPreviewCard` **requires**
+a snippet and a sensitivity — for a task, its **title** and a second derivation,
+both forbidden. So the branch **refuses**, and the review page got its own
+content-free resolver. **The vocabulary is shared exactly as signed; only the
+renderer is not.**
+
+**2. `2Q-TRUST-005` was satisfiable by nothing happening.** The resolver
+**selected** the memory lifecycle columns and never applied `isMemoryInForce`.
+Under `OD-2Q-2` no memory can reach that branch, so the requirement would have
+passed **vacuously** while its observable says the check *is applied*. One line,
+using the shared predicate.
+
+**3. `A11Y-WEBKIT-DARK-CONTRAST` was a defect of the TEST LANE, not the
+product** — and this is the big one. ADR-127 Decision 6 was signed on the premise
+that it was live. Reproduced as the decision required, it contradicted that
+premise. **The fixture strips Tailwind's preflight**, and preflight is what makes
+a form control inherit its colour; without it a `<select>` falls back to the UA's
+`FieldText` — white in Chromium, **black** in WebKit — 1.13:1 on the dark canvas,
+on exactly the two surfaces whose text sits on a select. **Chromium could never
+have caught it**, which is why CI was silent for a whole phase.
+
+The owner ruled (**ADR-129**): change no product colour, fix the lane by the
+product's own mechanism, prove convergence, then widen CI. Done, in that order.
+
+### What I got wrong, and how it was caught
+
+Recorded because these are the useful part.
+
+- **Three intermediate conclusions during 2Q.4, two of them wrong.** "It is a
+  fixture artifact" (right by accident, wrong in its reasoning); "black text on
+  selects is a live product defect" (wrong); "stale theme resolution" (an
+  artifact of **how I forced the theme**). Fourteen measurements; each conclusion
+  corrected by the next measurement rather than by argument. **I stopped and
+  asked the owner** rather than guess a fourth time.
+- **A fixture leaked onto the hosted project.** `afterAll` guarded on a variable
+  assigned at the **end** of `beforeAll`; the first run failed midway, so the
+  cleanup **returned early and deleted nothing**. Only the marker-based residue
+  probe saw it — the teardown reported nothing. Now the id is recorded the
+  instant it exists, and the teardown **asserts** the delete and re-reads.
+- **A control that was true of two blanks.** The bulk-bar comparison *skipped*
+  the select whenever the real page had none. **A missing control is not evidence
+  of agreement.**
+- **The generator corrected a number I typed.** `built` 37 · `baseline` 5 was
+  wrong; it is **36 · 6**. Left visible in the record: *"generated, never typed"*
+  is only worth something if the generator is allowed to win.
+- **An authority guard must forbid the act, not the word — four times**, each
+  time on the paragraph explaining why the act is forbidden. A shared
+  `executable()` stripper, documented once with all four named, every use
+  two-sided.
+- **An orphan server answered for the real one.** `TaskStop` stopped the npm
+  wrapper, not the Next child; the readiness loop reported READY while talking to
+  the orphan serving the **old build**. Already recorded in this repository, and
+  it happened anyway. The loop now **fails loudly on `EADDRINUSE`**.
+
+### Two things a control found that no plan predicted
+
+- **`markdown.test.ts` had encoded the defect as a passing test**: the same id
+  admitted on `work/` **and** `inbox/`. The inverted block now carries the
+  retired id-only gate in one line, proving every href it refuses used to pass.
+- **The traceability generator could not see a family with digits.** The fixture
+  `2Q-A11Y-001` produced **no** refusal, because `[A-Z]+` cannot match it —
+  exactly the failure Phase 2K paid for. It now scans a loose shape too.
+
+### The matrix
+
+**42 declared · 42 classified · 0 unclassified.** `built` 36 · `baseline` 6 ·
+**zero** `partial`, `not-built-by-rule`, `undelivered`. All twelve threats
+**CLOSED**, three residuals named. The seven inherited properties re-proved
+**unweakened** — `sensitivity-convergence.test.ts` byte-pinned and **not** widened
+to the new files, for two reasons that agree.
+
+### Next — and it is not code
+
+**`PHASE_2Q_OWNER_CHECKPOINT.md`: eight items, on the owner's own device.** A new
+review with sources, the task link, the entry link, a historical review, a
+removed source, the absence of any preview, mobile, and contrast in **real
+Safari**.
+
+**Item 1 spends AI credit** against the owner's BYOK credential — the one thing
+this phase never did. The real producer's end-to-end proof is **UNSPENDABLE,
+never a pass**.
+
+**`2P-REVIEW-CITATIONS` is still NOT DELIVERED.** It becomes delivered when the
+owner clicks a source link on their own device, and not before. **If any
+checkpoint item fails, the phase does not close** — a failing item is a defect to
+fix, not a remainder to record.
+
+The declaration guard **still forbids a closing report**, deliberately. Signup
+closed; rollout 25 · 3 · 2; `RG-DEP-3` still not closable by writing a file; push
+HTTP 403 not resumed; `2P-ACCESS-005` **WAIVED, NOT PASSED**; **successor not
+started or planned.**
