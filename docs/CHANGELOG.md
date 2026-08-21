@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q implementation authorized (ADR-128); slice 2Q.0 closed
+
+**ADR-128 authorizes implementation** of slices `2Q.0` … `2Q.5`: branches, code, tests, pull requests, the merge of each after fully green CI, **exactly one migration**, its hosted application after every gate, deployment where the hosted proof needs it, owner-scoped synthetic fixtures, and the technical closeout — **conditioned on a final owner checkpoint**. It reopens none of the eight decisions ADR-127 signed, and `OD-2Q-5` stays literal option C. Neither ADR-126 nor ADR-127 is edited.
+
+**Slice 2Q.0 re-proved the five findings the phase rests on, against `main` `a0295a2` rather than against the document.** `src/lib/closeout/phase-2q-foundation.test.ts` — 17 assertions.
+
+- **`2Q-FOUNDATION-001`** — `generateReview` reads entries (`agent/actions.ts:932`) and tasks (`:939`) into the model's source set, labels the task `memory:` (`:970`), and **the identifier `citedSourceIds` does not occur anywhere in the file**.
+- **`2Q-FOUNDATION-002`** — `summaries` carries fourteen columns and `Relationships: []`, asserted three ways: the checked-in types, the whole 99-migration chain, and the **deployed database read live**.
+- **`2Q-FOUNDATION-003` — asserted as a defect, by executing it.** A task uuid persisted as `{type:"memory"}` resolves to `unavailable` through the real `resolveSources`, which never asks the `tasks` table. An entry citation in the same call is the control.
+- **`2Q-FOUNDATION-004` — asserted as a defect, by executing it.** `authorizeHref` (`reviews/markdown.ts:135`) takes no type: one vouched-for uuid authorizes `inbox/`, `work/`, `people/`, `projects/` and `memories/`. An unvouched id refused on all five is the control. Inert today, live the moment slice 2Q.1 populates the allow-set.
+- **`2Q-FOUNDATION-005`** — `2P-ATTENTION-008`'s browser half re-audited: **refresh IS proved in a browser** (`editable-candidate-confirmation.spec.ts` reloads the `needs-you` queue inside an `expect.poll` against a hosted disposable fixture), and **back navigation is proved nowhere**. The remainder is narrower than Phase 2P recorded and **still open**; nothing here discharges it.
+
+**A correction to this slice's own first assertion, recorded rather than hidden.** It claimed `generateReview` reads exactly two tables; it reads five — `profiles` and `agent_preferences` too. The finding is about the source set, so the assertion now extracts the `ChatSource[]` literal.
+
+**The `summaries` pre-state is recorded** so `2Q-CITE-002` can assert "unchanged" against something: three policies (`insert_own`, `select_own`, `update_own`, each to `authenticated` alone), `authenticated` holding INSERT/REFERENCES/SELECT/TRIGGER/TRUNCATE/UPDATE and **no DELETE**, RLS enabled, FORCE RLS enabled, one foreign key, one non-internal trigger.
+
+**Guards moved with the ADR rather than after it.** `phase-2f-documentation.test.ts`'s active-milestone assertion now requires `ADR-128` and `IMPLEMENTATION AUTHORIZED`, and refuses the superseded `IMPLEMENTATION NOT AUTHORIZED` — the step nobody took at Phase 2P, which is why that line went on understating two owner authorizations. `phase-2q-declarations.test.ts`'s planning-only absences are **inverted, not deleted**: slice acceptance records are now required and name-checked, the matrix, closing report and deployment record stay forbidden, and the migration count is held as a **ceiling of one** rather than a flat zero, so the guard survives the allocation being legitimately spent.
+
+**Zero product behaviour changed. Zero migrations created — budget 1 allocated · 0 spent. Zero hosted writes:** both hosted reads are `select` statements, so there is no residue and no residue control is owed. **No AI credential was spent.** Signup stays closed, rollout stays 25 pass · 3 fail · 2 owner-signature, `RG-DEP-3` still cannot be closed by writing a file, push HTTP 403 is not resumed, `2P-ACCESS-005` stays WAIVED NOT PASSED, `2P-REVIEW-CITATIONS` stays NOT DELIVERED, and the roadmap successor is not started or planned.
+
 ## 2026-08-21 - Phase 2Q planning package integrated
 
 **Merged at `0dc9d1a` (PR #276). The owner authorized the merge of the planning package and nothing else: no slice is started, no migration exists, nothing was deployed, and no hosted data was written.**
