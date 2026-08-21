@@ -2,6 +2,26 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q slice 2Q.3: removed, unreadable, foreign and never-existed are ONE outcome, asserted as an equality
+
+**Zero migrations**; budget stays 1 allocated · 1 spent. **32 of 42 requirements classified.**
+
+**The property, stated the only way it can be true.** The traceability contract refuses an indistinguishability requirement proved by separate passing expectations — three tests can each pass while producing three **different** outputs, which is exactly what turns a page into a probe. So every case is `expect(a).toEqual(b)` over the **whole resolved output**, driven with the **same citation** under four different worlds: removed, unreadable (`{data:null,error}`), foreign (the row **exists**, owned by another account, with `.eq("user_id", …)` honoured — modelled the way the database models it, not faked) and never-existed. All four equal. The control that makes it mean something: **the same citation, owned and readable, resolves** — without it every equality holds trivially for a resolver that refuses everything. Proved for a **task and an entry**, because refusal 14 refuses single-type evidence. And one property a blanket "refuse everything on error" would have hidden: a failed read on `tasks` must **not** delete the review's `entries` evidence.
+
+**A finding from the re-audit: `2Q-TRUST-005` was satisfiable by nothing happening.** `resolveReviewSources` **selected** the memory lifecycle columns and **never applied `isMemoryInForce``**. Under `OD-2Q-2` no memory can reach that branch, so the requirement would have been satisfied vacuously — while its observable says the check *is applied*. It now is, using the **shared predicate** (the same one chat's resolver, the SQL retrieval bound and the owner's badge use), and an archived memory produces output asserted **equal** to a deleted one.
+
+**`2Q-TRUST-006` — the protection must not disclose what it protects.** Rows for a `normal` and a `highly_sensitive` record are asserted **equal after the identifier is masked out**, with the identifier confirmed as the one thing that differed. It holds structurally rather than carefully: the resolver **never reads a classification**, asserted **on the query**, because a column selected but unused still puts it one edit from a branch. The inherited `sensitivity-convergence.test.ts` is **untouched**, asserted as a byte property — exactly those three files, both tokens still forbidden. The new files are deliberately **not** added: the requirement says the list stays unchanged, and that guard does not strip comments, so it would fail on the paragraphs explaining why `resolveContent` is never called.
+
+**`2Q-TRUST-007` pins in full rather than by spot-check**: `review_summary`'s rule, **all thirteen** governed surfaces **in order** (a count passes on a swap; a spot-check passes on twelve disappearing), and all three presentation variants **with their bodies** — `MASK` carrying `revealable: true` is the exact fact that made option C the only way to honour "no reveal control" without editing `RULES`.
+
+**`2Q-TRUST-008` — refusal is total.** One corrupt reference among four refuses all four; a smuggled `excerpt` is refused rather than stripped, with its text absent from the whole output; the state reports **`unrecorded`** rather than "found nothing"; and the page still renders its words.
+
+**Hosted journey: 27 of 27** across desktop, Pixel 7 and **WebKit**, against the production build and the hosted database. The fixture's third citation names a task deleted **after** the envelope was written — genuinely stale — and in the browser it renders **words, not a link**, with no anchor anywhere reaching the deleted id. Rows are asserted **structurally uniform**: exactly `kind · date · (link | gone)`, three children, and the live and deleted task rows carry the **same kind word**. Residue **zero**, two-sided.
+
+**A recorded trap, walked into anyway.** An **orphan server answered for the real one**: `TaskStop` stopped the npm wrapper but not the Next child, the new `npm run start` failed `EADDRINUSE`, and the readiness loop reported **READY** while talking to the orphan serving the **old build**. The PID was found and killed, `.next` removed, the build re-run to a fresh `BUILD_ID`, and the readiness loop rewritten to **fail loudly on `EADDRINUSE`** instead of polling a stranger. The 2Q.3 assertions are test-side so a stale build could not have produced a false pass — but that is luck, not method, and the method is what was fixed.
+
+Signup closed, rollout 25 · 3 · 2, push HTTP 403 not resumed, `2P-ACCESS-005` **WAIVED, NOT PASSED**, `2P-REVIEW-CITATIONS` still **NOT DELIVERED**, successor not started or planned.
+
 ## 2026-08-21 - Phase 2Q slice 2Q.2: a review that cited a task now links to it, and the link lands
 
 **This is the slice the owner asked for.** The sources area on `/app/reviews/[reviewId]` lists every cited record as **a kind, a date and a canonical link** — and nothing else. `OD-2Q-5` is signed as option C and is implemented literally: no preview, no excerpt, no title, no reveal control, and no link born from matching a name. **Zero migrations**; budget stays 1 allocated · 1 spent.

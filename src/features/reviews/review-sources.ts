@@ -50,6 +50,8 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isMemoryInForce } from "@/features/memories/lifecycle";
+
 import {
   parseCitations,
   type CitedSourceType,
@@ -133,6 +135,8 @@ export async function resolveReviewSources(
   userId: string,
   rawCitations: unknown,
   locale: Locale,
+  /** Injected so the lifecycle check is testable against a fixed instant. */
+  now: Date = new Date(),
 ): Promise<ReviewSources> {
   const citations: ParsedCitations = parseCitations(rawCitations);
   /*
@@ -184,9 +188,12 @@ export async function resolveReviewSources(
     type: CitedSourceType,
     result: { data: unknown[] | null; error: unknown },
     dateOf: (row: Record<string, unknown>) => string | null,
+    /** A row that fails this is treated exactly as one that did not come back. */
+    inForce: (row: Record<string, unknown>) => boolean = () => true,
   ) => {
     if (result.error) return;
     for (const raw of (result.data ?? []) as Record<string, unknown>[]) {
+      if (!inForce(raw)) continue;
       const id = String(raw.id);
       seen.add(vouchedKey(type, id));
       dateById.set(vouchedKey(type, id), dateOf(raw));
@@ -194,7 +201,26 @@ export async function resolveReviewSources(
   };
 
   absorb("entry", entries, (row) => (row.occurred_at as string | null) ?? null);
-  absorb("memory", memories, (row) => ((row.valid_from ?? row.created_at) as string | null) ?? null);
+  /*
+   * `2Q-TRUST-005` — **lifecycle is part of readability, and this is where it
+   * is applied rather than assumed.**
+   *
+   * A memory the owner archived must stop being offered as a source, with the
+   * **same** shape a deleted one gets. `OD-2Q-2` means no memory can reach this
+   * branch today — `generateReview` retrieves entries and tasks only — but the
+   * columns were already being read, and a requirement whose check does not
+   * exist is satisfied vacuously rather than truly. One line makes it real, and
+   * a fixture with an expired `valid_until` is what proves it.
+   *
+   * The same predicate chat's resolver uses, and the same one the SQL retrieval
+   * predicate and the badge the owner reads use — so none of the four can
+   * disagree about what "in force" means.
+   */
+  absorb("memory", memories, (row) => ((row.valid_from ?? row.created_at) as string | null) ?? null, (row) =>
+    isMemoryInForce(
+      { valid_from: (row.valid_from as string | null) ?? null, valid_until: (row.valid_until as string | null) ?? null },
+      now,
+    ));
   absorb("task", tasks, (row) => (row.updated_at as string | null) ?? null);
 
   const rows = citations.sources.map((source): ReviewSourceRow => {
