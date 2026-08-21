@@ -297,6 +297,52 @@ test.describe("a review's cited items are reachable, and carry no content", () =
     await expect(page).toHaveURL(new RegExp(`/pt-BR/app/work/${fixture.taskId}$`));
   });
 
+  test("2Q-TRUST-002: a task deleted BETWEEN generation and render degrades in the browser", async ({ page }) => {
+    /*
+     * Slice 2Q.3's hosted arm. The fixture's third citation names a task that
+     * was deleted **after** the envelope was written, so the stored reference is
+     * genuinely stale — which is the state `2Q-TRUST-001` says the page must
+     * never treat as proof.
+     *
+     * The unit tests own the **equality** between removed, unreadable, foreign
+     * and never-existed. This owns the one thing they cannot: that the browser,
+     * against the deployed database, really renders words instead of a link.
+     */
+    await openReview(page);
+    const gone = page.locator("li.review-cited-row", { hasText: "Não está mais disponível" });
+    await expect(gone).toHaveCount(1);
+    await expect(gone.locator("a")).toHaveCount(0);
+    // No link anywhere on the page reaches the deleted id — not in the sources
+    // area, and not in the prose either.
+    await expect(page.locator(`a[href*="${fixture.goneTaskId}"]`)).toHaveCount(0);
+    // And the review still renders its words: a citation that cannot resolve
+    // must not delete the product's own report.
+    await expect(page.locator(".review-content")).toContainText("Voce concluiu");
+  });
+
+  test("2Q-TRUST-006: the unavailable row is shaped exactly like an available one", async ({ page }) => {
+    /*
+     * The rendered half of the equality. The two rows must differ in **nothing a
+     * reader could use to tell which state produced them**, beyond the presence
+     * of the link itself — no different kind word, no extra marker, no styling
+     * hook that a stylesheet could later branch on.
+     */
+    await openReview(page);
+    const kinds = await page.locator("li.review-cited-row .review-cited-kind").allTextContents();
+    // Two task citations — one live, one deleted — and they read identically.
+    expect(kinds.filter((kind) => kind === "Tarefa")).toHaveLength(2);
+
+    const classes = await page.locator("li.review-cited-row").evaluateAll((items) =>
+      items.map((item) => Array.from(item.children).map((child) => child.className)));
+    // Every row is kind + date + (link | gone). Nothing else, and nothing extra
+    // on the unavailable one.
+    for (const shape of classes) {
+      expect(shape.slice(0, 2)).toEqual(["review-cited-kind", "review-cited-when"]);
+      expect(["review-cited-link", "review-cited-gone"]).toContain(shape[2]);
+      expect(shape).toHaveLength(3);
+    }
+  });
+
   test("it reads the same way in English", async ({ page }) => {
     await openReview(page, "en");
     const taskRow = page.locator(`li.review-cited-row:has(a[href="/en/app/work/${fixture.taskId}"])`);
