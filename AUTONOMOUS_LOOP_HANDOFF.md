@@ -11858,3 +11858,77 @@ phase is an implementation authorization the owner has not given.
 decisions do not discharge it. `2P-ACCESS-005` stays **WAIVED, NOT PASSED**;
 signup closed; push HTTP 403 not resumed; `RG-DEP-3` still cannot be closed by
 writing a file. The residual worktrees are deliberately left in place.
+
+## §111 — The Phase 2Q planning package is INTEGRATED (2026-08-21)
+
+The owner authorized the merge of the planning package **and nothing else**.
+Merged at **`0dc9d1a`** (PR #276). **No slice is started, no migration exists, no
+deploy happened, and no hosted data was written.**
+
+### Verified before the merge, not carried over
+
+| Fact | Value |
+|---|---|
+| PR head at merge time | **`0720333`**, unchanged since the review |
+| `origin/main` before the merge | **`beef7fa`** — **zero commits since the planning baseline**, so no re-audit was owed |
+| CI on `0720333` | **4/4 success** |
+| Reviews / actionable comments | **zero** — the single comment is the Vercel bot's `Ready` status, live feedback 0/0/0 |
+| Mergeable state | `MERGEABLE` / `CLEAN` |
+
+### Verified after the merge
+
+| Fact | Value |
+|---|---|
+| Merge SHA | **`0dc9d1a`**, merged by the owner |
+| CI on **`0dc9d1a`** | **green 3/3**, run `32488777919`, executed steps **11 / 23 / 9** — checked, because a cancelled job reports an empty `steps[]` and still reads as a run |
+| `main` local = `origin/main` | `0dc9d1a`, divergence `0 0` |
+| Worktree | clean · Open PRs | **zero** |
+| Migrations | **99 local = 99 hosted, parity `202608190099`**, re-read live |
+| Product code on `main` since `beef7fa` | **none** — the changed-file set is `docs/`, `*.test.ts`, one `scripts/` file and this handoff |
+| Migrations added | **zero** |
+| Governance guards on merged `main` | **126 passed** |
+
+### The eleven pre-merge confirmations
+
+Nine were derived mechanically and passed. **Two required reading, and the
+automated check was wrong both times** — recorded because a probe that fails on
+correct documents is the more dangerous kind of failure.
+
+**Confirmation 9 — "no promise of a task title in the source row".** The first
+detector read line by line. Markdown wraps, so a sentence's negation routinely
+landed on the *next* line and every hit it produced was a prohibition it had cut
+in half. Rewritten to work on sentences, it still produced two hits: one where
+the negation is *"rather than titles"*, and one where the negation lives in a
+numbered list's **preamble** (*"The generator and closeout guard must refuse:"*)
+and is therefore structurally outside the item's own sentence.
+
+Rather than tune the regex until it agreed with me — which is how a check stops
+being a check — **all 18 sentences in the package that mention a title were
+enumerated and read**. Every one is a prohibition, a threat description, a test
+criterion, an asset listing, or the literal `summaries.title` column name.
+**Zero promises.** Confirmation 9 passes on evidence, not on a passing script.
+
+**Confirmation 9b** failed because the assertion string was wrong: it looked for
+*"never by its title"* while ADR-127 Decision 5.2 says *"not by its title or any
+excerpt"*. Both formulations exist in the package and were confirmed directly.
+
+### What is integrated, and what it still is not
+
+**Phase 2Q is planned and its eight decisions are signed. It is not authorized
+to be built.** ADR-126 authorizes planning; ADR-127 signs the decisions; neither
+authorizes implementation, and this merge authorizes only integration. The
+sequence a reader should not misread: *planned → signed → integrated → **not
+started***.
+
+**`2P-REVIEW-CITATIONS` is still NOT DELIVERED.** Planning it, signing its
+decisions and merging the plan are three things that are not delivering it.
+
+**`2P-ACCESS-005` is still WAIVED, NOT PASSED.** Signup stays closed; the
+rollout gate stays 25 pass · 3 fail · 2 owner-signature; push HTTP 403 is not
+resumed; `RG-DEP-3` still cannot be closed by writing a file; the residual
+worktrees are deliberately left in place.
+
+### Next
+
+**An implementation authorization, or nothing.** The phase's first slice is
+`2Q.0`, and it may not begin until the owner records that decision.
