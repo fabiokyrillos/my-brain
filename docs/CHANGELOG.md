@@ -2,6 +2,30 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q: all eight decisions signed, one against the recommendation
+
+**Still planning only. ADR-127 authorizes no implementation. ZERO product code, ZERO migrations, parity `202608190099` unchanged. PR #276 stays a draft, and the only remaining blocker on the phase is an implementation authorization.**
+
+**`OD-2Q-5` was recommended as option A and signed as option C.** The sources area on a review shows **identification and a canonical link** to the real object, **no preview of the content**, and **no reveal control**. Opening the link is what shows the object, under the destination page's own rules.
+
+**Why the divergence is an improvement, and a miss of mine.** `sensitivity-convergence.test.ts:50` already asserts, on `main` today, that **no reviews surface may contain `resolveContent(` or the literal `highly_sensitive`** — over three named files including `reviews/[reviewId]/page.tsx`, established by ADR-124 Decision 2. **Option A would have required weakening that shipped guard**, because rendering a cited record's preview means resolving its classification on a reviews surface. The recommendation was made without holding it up against that guard, which the audit had already read for a different purpose. Recorded in the audit §9.2.
+
+**It also dissolves a conflict.** The shared presentation constant is `MASK = { outcome: "mask", revealable: true }`, so under option A a `highly_sensitive` cited record would have been masked **with** a reveal affordance — and suppressing it would have meant a new presentation variant or an edit to the `RULES` table, both forbidden by ADR-124 Decision 2. Under option C nothing maskable is rendered.
+
+**And it creates a threat option A did not have — `T-7b`.** A list showing a title for an ordinary record and withholding it for a sensitive one would **disclose the classification by the row's shape**: a leak produced by the protection rather than the exposure. So the identification is **content-free and uniform** — kind and date, identical for every citation — and `2Q-TRUST-006` is asserted as an **equality between two rows**, not as two separately passing cases.
+
+**The other seven followed the recommendation:** one shared vocabulary `entry | memory | task`; entries and tasks only; no backfill; no telemetry event and therefore no second migration; the WebKit dark-contrast defect in scope as one small slice, fixed **before** the CI lane widens; exactly one migration; the four missing automation review flows to a separate initiative.
+
+**Changed:** 39 → **42 requirements**. `2Q-LINK-008` (no duplicated content), `2Q-LINK-009` (a cited task appears as a task, never as a memory) and `2Q-TRUST-009` (no reveal control anywhere on the path) were **appended to the ends of their families**; no identifier was renumbered, reused or removed. `2Q-TRUST-006` rewritten from *"obeys the rule"* to *"every row looks the same whatever the classification"*; `2Q-TRUST-007` now asserts the **absence** of a second sensitivity derivation rather than the correct use of one. The migration budget moves from **proposed** to **1 allocated · 0 spent**. The estimate falls to **5 / 9.5 / 15** working days with an eight-day critical path — three requirements added and the total still dropped, because option C deletes a preview renderer, a per-citation classification lookup and a reveal control from slice 2Q.3.
+
+**The traceability contract gained refusals 17, 18 and 19** for the failure shapes option C makes possible: content rendered in the sources area; a reveal control anywhere on the path; a source row whose shape varies with the classification. **Refusal 13 was inverted rather than retired** — what is now refused is a document describing a signed decision as open, or reporting a chosen option other than the one signed.
+
+**`phase-2q-declarations.test.ts` was inverted the same way**, not relaxed: it now asserts the option *actually signed* per decision, and refuses a document that reports one as still open. Its predecessor's failure is kept in the comment, because the lesson survives the inversion.
+
+**ADR-125 and ADR-126 are both intact** — 30 insertions and 0 deletions in `DECISIONS.md`. This series does not edit an accepted ADR into agreement with a later one.
+
+**Unchanged:** `2P-REVIEW-CITATIONS` stays **NOT DELIVERED** — planning it and signing its decisions do not discharge it; `2P-ACCESS-005` stays **WAIVED, NOT PASSED**; signup closed; rollout 25 pass · 3 fail · 2 owner-signature; push HTTP 403 not resumed; `RG-DEP-3` still cannot be closed by writing a file.
+
 ## 2026-08-21 - Phase 2Q is authorized for planning
 
 **Planning only. ADR-126. ZERO product code, ZERO migrations, ZERO hosted writes; parity `202608190099`, unchanged. Eight owner decisions are OPEN and the pull request stays in draft.**

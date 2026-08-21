@@ -1,5 +1,10 @@
 # Phase 2Q — Gaps and opportunities
 
+**Updated 2026-08-21 for ADR-127**, which signed all eight decisions. Seven as
+recommended; `OD-2Q-5` as **option C**, against the recommendation — which
+removes the cited-preview work from this phase entirely and preserves a shipped
+invariant option A would have had to weaken.
+
 **Every row below states which *kind* of work it is.** The owner asked
 explicitly that work already shipped not be described as new, so the kind is a
 column rather than a tone.
@@ -12,7 +17,7 @@ column rather than a tone.
 | **extension** | a shipped mechanism is applied to one more case |
 | **validation** | it is believed true and has never been executed |
 | **external debt** | blocked on something outside this repository |
-| **owner decision** | it cannot be started until the owner signs |
+| **owner decision** | it cannot be started until the owner signs — **all eight are now signed, ADR-127** |
 
 ---
 
@@ -24,8 +29,9 @@ column rather than a tone.
 | **P0** | trust that a link the product draws goes where it says | **correction** — the allow-set is keyed on the uuid alone | 2Q.2 |
 | P1 | read global search and the Work bulk bar in dark mode on WebKit | **correction** + **validation** (a CI lane that cannot see it) | 2Q.4 |
 | P1 | know the phase told the truth about itself | **construction** | 2Q.5 |
-| — | see what a review was written from **before** it is generated | **owner decision** (`OD-2Q-2`) | out unless signed |
-| — | let the Brain create projects, companies, memories or relations for them | **construction**, two phases' worth | out (`OD-2Q-8`) |
+| — | cite a person, project, company or memory from a review | **owner decision** — `OD-2Q-2` **signed as option A** | **out of this phase** |
+| — | read a cited record's text without leaving the review | **owner decision** — `OD-2Q-5` **signed as option C** | **deliberately not built**; the link is the way |
+| — | let the Brain create projects, companies, memories or relations for them | **construction**, two phases' worth | **out** — `OD-2Q-8` signed as option A |
 
 ---
 
@@ -81,6 +87,17 @@ Recorded because each of these reads like work and is not.
 - **A container is not a link.** A section headed "Fontes" with no canonical
   links in it is not delivery — ADR-125 Decision 4, inherited.
 - **The product may say what it cited. It may not say the sentence is true.**
+- **The list points; it does not repeat.** `OD-2Q-5`, signed as option C: a
+  source row carries identification and a canonical link and **no content**. The
+  review's own prose already says what it is about, and opening the link is what
+  shows the object — under the destination page's rules, not the review's.
+- **The row's shape must not vary with the classification.** A list that
+  identified ordinary records and withheld identification for sensitive ones
+  would disclose the classification by its shape — a leak created by the
+  protection rather than by the exposure.
+- **No reveal control.** Nothing maskable is rendered, so there is nothing to
+  reveal; and the shared `MASK` presentation carries `revealable: true`, so any
+  masked content on this path would have dragged a reveal affordance in with it.
 
 ---
 

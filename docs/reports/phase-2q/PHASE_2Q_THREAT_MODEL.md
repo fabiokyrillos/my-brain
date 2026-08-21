@@ -129,20 +129,61 @@ an empty read. Both produce `unavailable`… the surface must not distinguish
 the review page, because ADR-124 made "the review's own words" visible and
 somebody generalises that to the records it cites.
 
-**Why the generalisation is wrong.** ADR-124 Decision 2 is explicit that
-`GOVERNED_SURFACES`, the `RULES` table and `review_summary`'s entry were
-untouched. What ADR-124 retired was **fabricating a level for a row that has
-none** — `summaries` carries no classification column. A cited **entry** does
-carry one. The two situations are not the same, and treating them as the same
-would move a signed rule by inference.
+**Resolved by shape — `OD-2Q-5`, signed as option C (ADR-127 Decision 5).** The
+sources area renders **no content at all**: no preview, no excerpt, no title.
+There is no cited-record text on the surface, so there is nothing for the
+generalisation to reach.
 
-**Control.** `OD-2Q-5` — an **open owner decision**, not a recommendation
-executed quietly. Until it is signed, `2Q-TRUST-006` is not buildable.
+**Why this is stronger than the control that was recommended.**
+`sensitivity-convergence.test.ts:50` already asserts, on `main` today, that **no
+reviews surface may contain `resolveContent(` or the literal `highly_sensitive`**
+— over three named files including `reviews/[reviewId]/page.tsx`. The
+recommended option A would have required **weakening that shipped guard**,
+because rendering a cited record's preview means resolving its classification on
+a reviews surface. Option C keeps the guard unweakened, and `2Q-TRUST-006`
+requires it to still pass with its reviews file list unchanged.
 
-**Task-specific note.** `tasks` has **no `sensitivity` column**; the level is
-derived from `source_entry_id` by `deriveTaskSensitivity`, already used by seven
-surfaces. `2Q-TRUST-007` requires the existing derivation, and a guard that
-fails on a second implementation — because a second one would drift.
+**Task-specific note, now moot on this surface.** `tasks` has no `sensitivity`
+column; the level is derived from `source_entry_id` by `deriveTaskSensitivity`.
+Under option C the review page never needs that derivation, because it never
+renders task text. `2Q-TRUST-007` therefore asserts the *absence* of a second
+derivation rather than the correct use of one.
+
+**Residual.** The **destination** page still renders the record's content, under
+its own rules — which is exactly what the owner decided should happen. Opening a
+link is a deliberate act on a governed surface.
+
+### T-7b — The protection discloses what it protects
+
+**Mechanism.** A source list that showed a title for an ordinary record and
+withheld it for a sensitive one would let a reader infer the classification from
+the row's **shape**. The protection would leak the fact it exists.
+
+**Why this is a new threat.** It does not exist under option A, where every row
+carries a preview and the mask is uniform machinery. It is created by any partial
+application of option C — showing identification "when it is safe to" — and it is
+the reason ADR-127 Decision 5.2 makes the identification **content-free and
+uniform**: kind and date, the same for every citation.
+
+**Control (TO BUILD).** `2Q-TRUST-006`, asserted as an **equality** between a
+row for a `normal` record and a row for a `highly_sensitive` one — equal except
+for the identifier inside the href. Three separately passing tests would not be
+this property.
+
+### T-7c — A reveal control reappears
+
+**Mechanism.** Somebody adds "show anyway" to a row, because that is what `MASK`
+does everywhere else in the product.
+
+**Why it would be wrong here.** The owner forbade it, and the shared presentation
+`MASK` is `{ outcome: "mask", revealable: true }` — so honouring "no reveal"
+through the rules table would mean either a new presentation variant or an edit
+to `RULES`, both forbidden by ADR-124 Decision 2. Option C avoids the conflict
+entirely: nothing maskable is rendered, so there is nothing to reveal.
+
+**Control (TO BUILD).** `2Q-TRUST-009` — no interactive element exists in a
+source row beyond the link itself, with a planted reveal button as the control
+that makes the assertion capable of failing.
 
 ### T-8 — Deleting a record rewrites history
 
@@ -193,7 +234,8 @@ a pair.
 |---|---|---|
 | removed / foreign / never-existed are one `notFound()` arm on the review page | ADR-124 Decision 4 | do not add a discriminator |
 | the review listing carries **no** review content | ADR-124 Decision 3 | citations are a **detail-page** feature only |
-| the sensitivity `RULES` table and `GOVERNED_SURFACES` | ADR-124 Decision 2 | untouched unless `OD-2Q-5` says otherwise |
+| **no reviews surface calls `resolveContent` or names `highly_sensitive`** | `sensitivity-convergence.test.ts:50`, ADR-124 Decision 2 | must still pass **unweakened**, with its reviews file list unchanged — `2Q-TRUST-006` |
+| the sensitivity `RULES` table and `GOVERNED_SURFACES` | ADR-124 Decision 2 | **untouched.** `OD-2Q-5` is signed as option C, which needs no change to them; a change proving necessary is a stop condition |
 | all six automation categories fail-closed | ADR-123 Decision 3 | no automatic writer is created |
 | append-only ledgers are written only through their RPCs | `ENGINEERING_STANDARDS.md` | no direct writes; and see `OD-2Q-4` on why no new event is proposed |
 | signup closed, rollout 25 · 3 · 2 | `signup-rollout-gate.test.ts` | untouched |

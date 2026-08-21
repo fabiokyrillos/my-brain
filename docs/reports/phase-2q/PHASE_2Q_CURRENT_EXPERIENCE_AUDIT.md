@@ -387,3 +387,70 @@ Recorded rather than silently corrected, per the owner's instruction.
 | Push HTTP 403 | not resumed |
 | BYOK credit | none spent; no credential present |
 | Hosted data | **not touched by this audit.** The only hosted read was the migration list |
+
+---
+
+## 9. The signature, and what it changed in this audit — 2026-08-21
+
+**ADR-127 signed all eight decisions.** Seven followed this audit's
+recommendation. **`OD-2Q-5` did not**, and the divergence changes two findings
+above rather than merely selecting a branch.
+
+### 9.1 §3.9 is superseded in its conclusion, not in its evidence
+
+§3.9 measured that `tasks` has no `sensitivity` column and that the level is
+derived from `source_entry_id`, and concluded that the open question was *which
+rule governs the cited record's preview*. **The measurement stands. The question
+is gone**, because option C renders no preview: there is no cited-record content
+on the review page for a rule to govern.
+
+### 9.2 A finding this audit should have made before recommending option A
+
+`sensitivity-convergence.test.ts:50` asserts — today, on `main` — that **no
+reviews surface may contain `resolveContent(` or the literal `highly_sensitive`**,
+over three named files including `reviews/[reviewId]/page.tsx`. It was
+established by ADR-124 Decision 2 and left standing.
+
+**Option A would have required weakening it.** Rendering a cited record's preview
+means resolving that record's classification on a reviews surface, which is
+exactly what those three files are forbidden to do. This audit recommended option
+A **without noticing that its own recommendation collided with a shipped guard**
+— the guard was read in §3.7 for its degradation behaviour and not checked
+against the recommendation being made.
+
+Recorded rather than corrected in place, because the correction is the owner's
+decision and the miss is the audit's.
+
+### 9.3 A conflict option C also dissolves
+
+The owner forbade a reveal control on the citation path. The shared presentation
+constant is `MASK = { outcome: "mask", revealable: true }`
+(`sensitivity/contracts.ts:196`), so under option A a `highly_sensitive` cited
+record would have been masked **with** a reveal affordance — and suppressing it
+would have meant a new presentation variant or an edit to the `RULES` table, both
+forbidden by ADR-124 Decision 2. **Under option C nothing maskable is rendered,
+so the conflict never arises.**
+
+### 9.4 A threat option C creates, which option A did not have
+
+A source list that showed a title for an ordinary record and withheld it for a
+sensitive one would **disclose the classification by the row's shape**. That is a
+leak produced by the protection rather than by the exposure, and it does not
+exist under option A, where every row carries a preview and the mask is uniform
+machinery.
+
+It is why ADR-127 Decision 5.2 makes the identification **content-free and
+uniform** — kind and date, identical for every citation — and why
+`2Q-TRUST-006` is asserted as an **equality between two rows** rather than as
+two separately passing cases. Recorded as `T-7b` in the threat model.
+
+### 9.5 What the signature did not change
+
+Every measurement in §§1–8 stands unaltered: the seven-surface provenance census,
+the two-source retrieval set, the discard at the upsert, the fourteen columns and
+`Relationships: []`, the type-confusion finding, the `authorizeHref` gap, the
+`product_events` closed vocabulary, the calibration producer reachable only with
+`'task'` and `'person'`, and the three documentary divergences in §7.
+
+**`2P-REVIEW-CITATIONS` remains NOT DELIVERED.** Signing the decisions that would
+deliver it is not delivering it, and ADR-127 Decision 9 says so.

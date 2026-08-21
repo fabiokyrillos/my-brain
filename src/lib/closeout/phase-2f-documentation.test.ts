@@ -236,10 +236,14 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * quietly repaired, because the next person to skip the step will read this.
      */
     expect(line).toContain("ADR-126");
+    expect(line, "Phase 2Q has received a second decision and the line must cite it")
+      .toContain("ADR-127");
     expect(line, "ADR-126 authorizes planning only, and the line must say so")
       .toMatch(/PLANNING AUTHORIZED/i);
     expect(line, "implementation is not authorized, so the line must not imply it is")
       .toMatch(/IMPLEMENTATION NOT AUTHORIZED/i);
+    expect(line, "ADR-127 signed the decisions, and the line must not overstate that as implementation")
+      .toMatch(/SIGNED/i);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2R/);
   });

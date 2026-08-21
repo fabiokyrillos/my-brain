@@ -11747,3 +11747,114 @@ verified by listing every remaining `2Q` in the file.
 one until the owner answers the eight decisions. `2P-ACCESS-005` remains
 **WAIVED, NOT PASSED**; signup stays closed; push HTTP 403 is not resumed;
 `RG-DEP-3` still cannot be closed by writing a file.
+
+## §110 — All eight Phase 2Q decisions signed, and the one that went against the recommendation is the better choice (2026-08-21)
+
+**ADR-127.** Still **planning only** — it authorizes no implementation, no
+deployment and no hosted change. PR #276 stays a **draft**. **Zero product code,
+zero migrations, parity `202608190099` unchanged.**
+
+### The seven that followed the recommendation
+
+`OD-2Q-1` one shared vocabulary `entry | memory | task` · `OD-2Q-2` entries and
+tasks only · `OD-2Q-3` no backfill · `OD-2Q-4` no telemetry event and therefore
+no second migration · `OD-2Q-6` the WebKit dark-contrast defect in scope, fixed
+**before** the CI lane widens · `OD-2Q-7` exactly one migration · `OD-2Q-8` the
+four missing automation review flows to a separate initiative.
+
+### `OD-2Q-5`: recommended A, signed C — and I was wrong
+
+The sources area shows **identification and a canonical link**, **no preview of
+the content**, and **no reveal control**. Opening the link is what shows the
+object, under the destination page's own rules.
+
+**The finding I should have made before recommending option A.**
+`sensitivity-convergence.test.ts:50` asserts — on `main`, today — that **no
+reviews surface may contain `resolveContent(` or the literal
+`highly_sensitive`**, over three named files including
+`reviews/[reviewId]/page.tsx`. ADR-124 Decision 2 established it and left it
+standing. **Option A would have required weakening that shipped guard**, because
+rendering a cited record's preview means resolving its classification on a
+reviews surface.
+
+I had *read* that guard during the audit — §3.7 cites it for its degradation
+behaviour — and never held it up against the recommendation I was making. **The
+lesson is not "check the guards"; it is "check the guards against your own
+proposal", which is a different act.**
+
+**A conflict option C also dissolves.** The shared presentation constant is
+`MASK = { outcome: "mask", revealable: true }`
+(`sensitivity/contracts.ts:196`). Under option A a `highly_sensitive` cited
+record would have been masked **with** a reveal affordance, and suppressing it
+would have meant a new presentation variant or an edit to the `RULES` table —
+both forbidden by ADR-124 Decision 2. Under option C nothing maskable is
+rendered, so there is nothing to reveal.
+
+**A threat option C creates that option A did not have — `T-7b`.** A list showing
+a title for an ordinary record and withholding it for a sensitive one would
+**disclose the classification by the row's shape**: a leak produced by the
+protection rather than by the exposure. So the identification is **content-free
+and uniform** — kind and date, identical for every citation — and `2Q-TRUST-006`
+is asserted as an **equality between two rows**, never as two separately passing
+cases.
+
+**And the words are already on the page.** The review's prose names what it is
+about; the list points, it does not repeat. That is what *"não duplicar uma
+prévia do conteúdo"* asks for.
+
+### What moved in the package
+
+**39 → 42 requirements.** `2Q-LINK-008` (no duplicated content), `2Q-LINK-009`
+(a cited task appears as a task, never as a memory) and `2Q-TRUST-009` (no reveal
+control anywhere on the path) were **appended to the ends of their families**.
+**No identifier renumbered, reused or removed** — the same shape ADR-121's
+amendment used for `2P-SETTINGS-008`.
+
+`2Q-TRUST-006` was rewritten from *"obeys the rule"* to *"every row looks the
+same whatever the classification"*. `2Q-TRUST-007` now asserts the **absence** of
+a second sensitivity derivation rather than the correct use of one.
+
+**Budget: proposed → `1 allocated · 0 spent`.** `OD-2Q-4` is signed as option A,
+so **no second is reachable**: a second of any kind is a stop condition, not an
+overrun.
+
+**Estimate 10.5 → 9.5 likely days**, eight-day critical path. Three requirements
+were added and the total **fell**, because option C deletes three concrete pieces
+of slice 2Q.3 — a preview renderer, a per-citation classification lookup and a
+reveal control — and adds one equality assertion. Stated as arithmetic rather
+than rounded away.
+
+### Guards, inverted rather than relaxed
+
+**Traceability contract:** refusals **17, 18 and 19** added for the three failure
+shapes option C makes possible — content in the sources area, a reveal control on
+the path, and a row whose shape varies with the classification. **Refusal 13 was
+inverted, not retired**: what is now refused is a document describing a signed
+decision as open, or reporting a chosen option other than the one signed.
+
+**`phase-2q-declarations.test.ts`** now asserts the option **actually signed** per
+decision — `OD-2Q-5` must read `option C` — and refuses a document reporting one
+as still open. Its own pre-signature failure is kept in the comment: the first
+version forbade the *word* "signed" near a decision id and fell over on *"until
+`OD-2Q-1` … are signed"*, a sentence asserting the opposite. **A conditional is
+not a claim**, and the replacement carries a two-sided control proving it can
+tell them apart.
+
+**`phase-2f-documentation.test.ts`'s `Active milestone:` assertion** now requires
+**ADR-127** as well as ADR-126, under its own standing rule that the line cites
+every authorization the phase has received and overstates none.
+
+### Nothing rewritten
+
+`DECISIONS.md`: **30 insertions, 0 deletions.** ADR-125 and ADR-126 are both
+intact, including ADR-126's own *"Decision 4 — the eight open decisions are
+OPEN"*, which the guard now asserts must survive.
+
+### Next
+
+**Nothing is authorized to be built.** The only remaining blocker on the whole
+phase is an implementation authorization the owner has not given.
+**`2P-REVIEW-CITATIONS` stays NOT DELIVERED** — planning it and signing its
+decisions do not discharge it. `2P-ACCESS-005` stays **WAIVED, NOT PASSED**;
+signup closed; push HTTP 403 not resumed; `RG-DEP-3` still cannot be closed by
+writing a file. The residual worktrees are deliberately left in place.

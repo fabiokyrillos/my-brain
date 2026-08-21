@@ -4,16 +4,17 @@
  * ## What this file is, and what it is not
  *
  * It is a **documentary** guard. It reads `docs/` and asserts properties of
- * documents. It ships no route, no component, no Server Action and no SQL, and
+ * documents. It ships no route, no component, no Server Action and no SQL.
  * ADR-126 authorizes exactly this: the planning package, plus the guards that
  * keep it fail-closed.
  *
  * ## The posture it holds
  *
- * ADR-126 authorizes **planning only**. So the assertions come in two
+ * ADR-126 authorizes **planning only**, and **ADR-127 signs the eight decisions
+ * without authorizing implementation either**. So the assertions come in two
  * directions, and both matter:
  *
- *  - the package is **present and coherent** — six documents, 39 declarations,
+ *  - the package is **present and coherent** — six documents, 42 declarations,
  *    six families with locked counts and no gaps;
  *  - everything that only exists *after* implementation is **absent** — no
  *    acceptance record, no matrix, no closing report, no deployment record, and
@@ -21,23 +22,31 @@
  *
  * Phase 2N's equivalent was inverted at closeout rather than deleted, and Phase
  * 2P's was flipped rather than relaxed, for the reason both files state: an
- * absence nobody asserts is an absence nobody notices disappearing. This file
- * is written to be flipped the same way when the owner authorizes
- * implementation, not thrown away.
+ * absence nobody asserts is an absence nobody notices disappearing. **This file
+ * has now been inverted once itself** — see the decision block — and it is
+ * written to be inverted again when implementation is authorized, not thrown
+ * away.
  *
- * ## Three pins this file carries that its predecessors did not
+ * ## Four pins this file carries
  *
- * 1. **Eight decisions are OPEN**, and a document that reports one as signed —
- *    or that quietly drops a decision — fails. A recommendation is not a
- *    signature, and this repository has already recorded a phase where a
- *    package's own recommendation was read back as an outcome.
+ * 1. **All eight decisions are SIGNED (ADR-127), and one diverges.**
+ *    `OD-2Q-5` was recommended as option A and signed as **option C**. The guard
+ *    asserts the *option actually signed*, per decision, because a package that
+ *    reported "signed" without saying which branch would be describing a
+ *    decision nobody made. Before ADR-127 this block held the opposite property;
+ *    it was inverted, not deleted.
  * 2. **No family name may contain a digit.** `2K-A11Y` did, which made Phase
- *    2K's seven accessibility requirements invisible to every prose count *and*
- *    to the A13 detector's declaration signal. The family here is `ACCESS`, and
- *    the property is asserted rather than remembered.
- * 3. **The supersession is narrow and named.** ADR-126 supersedes ADR-125
- *    Decision 6 alone. A future edit that widened it — or that edited ADR-125
- *    itself — would be the failure this series has refused since ADR-108.
+ *    2K's seven accessibility requirements invisible to every prose count, to
+ *    the traceability generator's attribution check, *and* to the A13 detector's
+ *    declaration signal — all three at once, silently. The family here is
+ *    `ACCESS`, and the property is asserted with the unmatchable shape as its
+ *    control.
+ * 3. **The supersession chain is narrow and named.** ADR-126 supersedes ADR-125
+ *    Decision 6 alone; ADR-127 signs what ADR-126 left open and revises nothing.
+ *    Neither earlier ADR is edited — the rule since ADR-108.
+ * 4. **The budget is ALLOCATED at one, and no second is reachable.** `OD-2Q-4`
+ *    is signed as option A, so there is no pending decision that could fund a
+ *    second: it is a stop condition, not an overrun.
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -59,26 +68,37 @@ const REQUIRED = [PRD, PLAN, AUDIT, GAPS, THREATS, CONTRACT] as const;
 const DECLARATION = /^- \*\*(2Q-[A-Z]+-\d{3}):\*\*/gm;
 const ids = [...read(PRD).matchAll(DECLARATION)].map((match) => match[1]);
 
-const TOTAL = 39;
+// 39 at ADR-126; 42 since ADR-127 Decision 5 appended `2Q-LINK-008`,
+// `2Q-LINK-009` and `2Q-TRUST-009` to the ends of their families to carry the
+// eight requirements the owner attached to `OD-2Q-5`. No identifier was
+// renumbered, reused or removed.
+const TOTAL = 42;
 const FAMILY_COUNTS: Readonly<Record<string, number>> = {
   FOUNDATION: 5,
   CITE: 9,
-  LINK: 7,
-  TRUST: 8,
+  LINK: 9,
+  TRUST: 9,
   ACCESS: 5,
   CLOSE: 5,
 };
 
-const OPEN_DECISIONS = [
-  "OD-2Q-1",
-  "OD-2Q-2",
-  "OD-2Q-3",
-  "OD-2Q-4",
-  "OD-2Q-5",
-  "OD-2Q-6",
-  "OD-2Q-7",
-  "OD-2Q-8",
-] as const;
+/** The option the owner actually signed, per decision. `OD-2Q-5` is the divergence. */
+const SIGNED_OPTION: Readonly<Record<string, string>> = {
+  "OD-2Q-1": "A",
+  "OD-2Q-2": "A",
+  "OD-2Q-3": "A",
+  "OD-2Q-4": "A",
+  "OD-2Q-5": "C",
+  "OD-2Q-6": "A",
+  "OD-2Q-7": "A",
+  "OD-2Q-8": "A",
+};
+
+/** Markdown wraps; a property of the text is not a property of its line breaks. */
+const flat = (text: string): string => text.replace(/\s+/g, " ");
+
+/** An assertion that a decision is still open. A history sentence is not one. */
+const OPEN_CLAIM = /(OD-2Q-\d)[^.\n]{0,60}?\b(?:is|are|remains?|stays?) (?:still )?(?:open|unsigned|undecided)\b/gi;
 
 const familyOf = (id: string): string => id.split("-")[1];
 const indexOf = (id: string): number => Number.parseInt(id.split("-")[2], 10);
@@ -88,7 +108,7 @@ describe("Phase 2Q declarations", () => {
     for (const path of REQUIRED) expect(exists(path), `${path} is missing`).toBe(true);
   });
 
-  it("declares 39 unique requirements across six families", () => {
+  it("declares 42 unique requirements across six families", () => {
     expect(ids.length).toBe(TOTAL);
     expect(new Set(ids).size, "a requirement is declared twice").toBe(TOTAL);
     expect([...new Set(ids.map(familyOf))].sort()).toEqual(Object.keys(FAMILY_COUNTS).sort());
@@ -138,67 +158,136 @@ describe("Phase 2Q declarations", () => {
     }
   });
 
-  it("declares all eight owner decisions as OPEN, each with options and a recommendation", () => {
+  it("records all eight decisions as SIGNED, and keeps the declined branches visible", () => {
+    /*
+     * **Inverted by ADR-127, and kept rather than deleted.**
+     *
+     * Under ADR-126 this block refused a document that read its own
+     * recommendation as an outcome. The decisions are now signed, so it refuses
+     * the mirror error: a document that re-opens one, softens it, or describes
+     * it as still open. The failure being prevented is unchanged — a document
+     * disagreeing with the owner's actual signature. Only the direction moved,
+     * exactly as Phase 2O's guard was inverted at ADR-116 rather than dropped.
+     */
     const prd = read(PRD);
-    expect(prd, "the decisions section must say nothing is signed")
-      .toMatch(/NOTHING HERE IS SIGNED/);
-    for (const decision of OPEN_DECISIONS) {
+    expect(prd, "the package must record that all eight are signed")
+      .toMatch(/ALL EIGHT DECISIONS SIGNED by ADR-127/);
+    expect(prd, "the pre-signature banner must be gone, not merely contradicted")
+      .not.toMatch(/NOTHING HERE IS SIGNED/);
+    for (const decision of Object.keys(SIGNED_OPTION)) {
       expect(prd, `${decision} is not declared`).toContain(`### \`${decision}\``);
     }
-    // Every decision carries exactly one recommendation. Counted, so a decision
-    // that loses its recommendation — or grows a second — fails.
+    // The declined branches stay readable: they are the context the signature
+    // was given in. Counted, so a decision that quietly loses its recommendation
+    // — or grows a second — fails.
     const recommended = [...prd.matchAll(/\(recommended\)/g)].length;
     expect(recommended, "a decision lost or duplicated its recommendation")
-      .toBe(OPEN_DECISIONS.length);
+      .toBe(Object.keys(SIGNED_OPTION).length);
   });
 
-  it("never reports an open decision as signed", () => {
+  it("records the option actually signed for each decision, including the divergence", () => {
+    // Seven followed the recommendation and one did not. A package that reported
+    // "signed" without saying *which* branch would be describing a decision
+    // nobody made — and `OD-2Q-5` is precisely the one where that would matter.
+    const prd = read(PRD);
+    for (const [decision, option] of Object.entries(SIGNED_OPTION)) {
+      const at = prd.indexOf(`### \`${decision}\``);
+      expect(at, `${decision} is not declared`).toBeGreaterThan(-1);
+      const block = prd.slice(at, at + 400);
+      expect(block, `${decision} carries no signature`).toMatch(/\*\*SIGNED — option [A-C]/);
+      expect(block, `${decision} records the wrong signed option`)
+        .toMatch(new RegExp(`\\*\\*SIGNED — option ${option}`));
+    }
+    expect(prd, "the one divergence must be stated, not smoothed over")
+      .toMatch(/The recommendation was option A, and the owner chose against it/);
+  });
+
+  it("never reports a signed decision as still open", () => {
     /*
-     * The mirror error of Phase 2O's guard, which after ADR-116 had to refuse a
-     * document that *re-opened* a signed decision. Here nothing is signed, so
-     * what is forbidden is the opposite claim.
+     * The inverse of what this block held before ADR-127, and the reason it was
+     * inverted rather than deleted: an absence nobody asserts is an absence
+     * nobody notices disappearing.
      *
-     * **The first version of this assertion was wrong and is worth recording.**
-     * It forbade any "signed" within 40 characters of a decision id, and so it
-     * failed on *"blocked at slice 2Q.1 until `OD-2Q-1`, `OD-2Q-3` and
-     * `OD-2Q-7` are signed"* — a sentence that says the opposite of the thing
-     * being forbidden. A conditional is not a claim, and a guard that cannot
-     * tell them apart forces the document to be written around the guard.
-     *
-     * So the rule is narrowed to the affirmative forms, and a conditional lead
-     * disarms them.
+     * **A recorded failure of the pre-signature version, kept because the lesson
+     * survives the inversion.** It forbade any "signed" within 40 characters of
+     * a decision id, and failed on *"blocked at slice 2Q.1 until `OD-2Q-1` …
+     * are signed"* — a sentence asserting the opposite of what was forbidden. A
+     * conditional is not a claim. The same care is applied here: what is
+     * forbidden is an assertion that a decision *is open*, not the word "open".
      */
-    const CONDITIONAL = /\b(until|unless|if|before|once|when|after|require[sd]?|must be|needs? to be|awaiting)\b/i;
-    const CLAIM = /(OD-2Q-\d)([^.\n]{0,60}?)\b(is|are|was|were|has been|have been) signed\b/gi;
     for (const path of REQUIRED) {
-      const text = read(path);
-      for (const line of text.split("\n")) {
-        for (const match of line.matchAll(CLAIM)) {
-          const lead = line.slice(0, match.index ?? 0) + match[2];
-          expect(CONDITIONAL.test(lead), `${path} claims ${match[1]} is signed: ${line.trim()}`).toBe(true);
-        }
+      for (const line of read(path).split("\n")) {
+        const hit = [...line.matchAll(OPEN_CLAIM)][0];
+        if (hit) expect.fail(`${path} reports ${hit[1]} as open: ${line.trim()}`);
       }
-      expect(text, `${path} uses the "all N signed" shape a signed phase uses`)
-        .not.toMatch(/ALL (EIGHT|8) (OF THE )?DECISIONS? SIGNED/i);
     }
   });
 
-  it("that signed-claim rule is two-sided: it admits a conditional and refuses a claim", () => {
-    // Without this, the assertion above passes on a document that simply never
-    // mentions a decision — and would keep passing if it started claiming one
-    // was signed in a shape the regex missed.
-    const CONDITIONAL = /\b(until|unless|if|before|once|when|after|require[sd]?|must be|needs? to be|awaiting)\b/i;
-    const CLAIM = /(OD-2Q-\d)([^.\n]{0,60}?)\b(is|are|was|were|has been|have been) signed\b/gi;
-    const verdict = (line: string): "claim" | "conditional" | "none" => {
-      const matches = [...line.matchAll(CLAIM)];
-      if (matches.length === 0) return "none";
-      const first = matches[0];
-      const lead = line.slice(0, first.index ?? 0) + first[2];
-      return CONDITIONAL.test(lead) ? "conditional" : "claim";
-    };
-    expect(verdict("blocked until `OD-2Q-1` and `OD-2Q-7` are signed.")).toBe("conditional");
-    expect(verdict("`OD-2Q-1` is signed and the vocabulary widens.")).toBe("claim");
-    expect(verdict("`OD-2Q-1` remains open.")).toBe("none");
+  it("that open-claim rule is two-sided: it refuses a claim and admits the history", () => {
+    // Without this the assertion above passes on a document that simply never
+    // mentions a decision, and would keep passing if the regex stopped matching.
+    const hits = (line: string): number => [...line.matchAll(OPEN_CLAIM)].length;
+    expect(hits("`OD-2Q-5` remains open."), "a real claim must be caught").toBe(1);
+    expect(hits("`OD-2Q-5` is signed as option C."), "a signature must not be caught").toBe(0);
+    expect(
+      hits("Under ADR-126 this section declared eight open decisions."),
+      "the historical narration must survive",
+    ).toBe(0);
+  });
+
+  it("holds the migration budget as ALLOCATED, one, with no second reachable", () => {
+    const plan = read(PLAN);
+    expect(plan).toMatch(/## 1\. Migration budget — ALLOCATED/);
+    expect(plan, "the allocation must be stated as made, not proposed")
+      .toMatch(/1 allocated · 0 spent/);
+    expect(flat(plan), "`OD-2Q-4` closes the only route to a second")
+      .toMatch(/`OD-2Q-4` is signed as option A/);
+    expect(flat(read(CONTRACT)), "a second migration must be a stop condition, not an overrun")
+      .toMatch(/a second is a \*\*stop condition\*\*, not an overrun/);
+  });
+
+  it("carries the three requirements ADR-127 appended, and renumbers nothing", () => {
+    const prd = read(PRD);
+    for (const id of ["2Q-LINK-008", "2Q-LINK-009", "2Q-TRUST-009"]) {
+      expect(ids, `${id} was not appended`).toContain(id);
+    }
+    expect(flat(prd), "the append must be recorded rather than silent")
+      .toMatch(/No identifier was renumbered, reused or removed/);
+    // The three carry `OD-2Q-5`'s substance: no duplicated content, a task shown
+    // as a task, and no reveal control. Asserted by property, not by id alone.
+    const forId = (id: string): string =>
+      prd.split("\n").find((line) => line.startsWith(`- **${id}:**`)) ?? "";
+    expect(forId("2Q-LINK-008"), "the no-content property is missing")
+      .toMatch(/no\*\* preview, excerpt, snippet or title/);
+    expect(forId("2Q-LINK-009"), "the task-not-memory property is missing")
+      .toMatch(/never labelled or routed as a memory/);
+    expect(forId("2Q-TRUST-009"), "the no-reveal property is missing")
+      .toMatch(/No reveal control|no reveal control/);
+  });
+
+  it("records the signature ADR, and what it still does not authorize", () => {
+    const decisions = read("docs/DECISIONS.md");
+    const at = decisions.indexOf("## ADR-127");
+    expect(at, "ADR-127 is missing").toBeGreaterThan(-1);
+    const body = decisions.slice(at);
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "signing decisions must not authorize implementation")
+      .toMatch(/authorizes no implementation/i);
+    expect(body, "the divergence must be on the record")
+      .toMatch(/chooses the content-free source list over the recommendation/);
+    expect(body, "the priority pendency is not discharged by signing either")
+      .toMatch(/`2P-REVIEW-CITATIONS` stays NOT DELIVERED/);
+    expect(body, "an ADR in this series must not name the successor")
+      .not.toMatch(/2R/i);
+  });
+
+  it("keeps ADR-126 intact rather than rewritten", () => {
+    // The rule since ADR-108: an accepted ADR is not edited into agreement with
+    // a later one. ADR-127 signs what ADR-126 left open; it does not revise it.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-126 — The owner authorizes Phase 2Q planning/);
+    expect(decisions, "ADR-126's own words about the open decisions must survive")
+      .toMatch(/Decision 4 — the eight open decisions are OPEN/);
   });
 
   it("names a slice, and a dependency where one exists, for every requirement", () => {
@@ -211,20 +300,11 @@ describe("Phase 2Q declarations", () => {
       expect(heading, `family ${family} has no section heading`).toBeDefined();
       expect(heading, `family ${family} names no slice`).toMatch(/slice 2Q\.\d/);
     }
-    // Every requirement that names a decision names one that exists.
+    // Every requirement that names a decision names one that exists. The
+    // pattern admits a trailing "(signed X)" note, which ADR-127 added.
     for (const match of read(PRD).matchAll(/\*\*Decision:\*\* `(OD-2Q-\d)`/g)) {
-      expect(OPEN_DECISIONS as readonly string[]).toContain(match[1]);
+      expect(Object.keys(SIGNED_OPTION)).toContain(match[1]);
     }
-  });
-
-  it("proposes exactly one migration, allocates none, and makes a second a stop condition", () => {
-    const plan = read(PLAN);
-    expect(plan).toMatch(/\*\*Proposed: exactly one\.\*\*/);
-    expect(plan, "the migration must name its exclusive destination").toMatch(/2Q-CITE-001/);
-    expect(plan, "a second migration must be a stop condition").toMatch(/stop condition/i);
-    const decisions = read("docs/DECISIONS.md");
-    expect(decisions, "ADR-126 must allocate no migration")
-      .toMatch(/the migration budget is PROPOSED, not signed/);
   });
 
   it("records the authorization, its narrow supersession, and what it refuses", () => {
@@ -238,6 +318,10 @@ describe("Phase 2Q declarations", () => {
       .toMatch(/supersedes ADR-125 Decision 6 alone/);
     expect(body, "and it must be narrow in the decision that carries it")
       .toMatch(/ADR-125 Decision 6 is superseded, and nothing else in ADR-125 is/);
+    expect(body, "ADR-126 itself allocated no migration; ADR-127 is what allocated one")
+      .toMatch(/the migration budget is PROPOSED, not signed/);
+    expect(body, "the exclusive destination must be named in the plan")
+      .toMatch(/summaries\.citations/);
     expect(body, "the priority pendency must not be discharged by being planned")
       .toMatch(/`2P-REVIEW-CITATIONS` is not discharged by being planned/);
     expect(body, "an ADR in this series must not name the successor")
