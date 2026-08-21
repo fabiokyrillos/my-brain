@@ -86,21 +86,35 @@ fails the build on an addition to it.
 | [`initiatives/phase-2k/`](./initiatives/phase-2k/) | `PHASE_2K_PRD.md`, `PHASE_2K_IMPLEMENTATION_PLAN.md` — Conversar as the primary interface, authorized for planning by ADR-097 (2026-08-08) and for implementation through closeout by ADR-101 (2026-08-09). Scope was the parent mobile-first PRD's Etapa 3. **Concluded 2026-08-09**, after an extraordinary post-phase correction charged to no phase. |
 | [`initiatives/phase-2l/`](./initiatives/phase-2l/) | `PHASE_2L_PRD.md`, `PHASE_2L_IMPLEMENTATION_PLAN.md` — Work and execution, authorized for planning by ADR-102 and for **implementation through closeout by ADR-103** (both 2026-08-09), which also signed all five owner decisions. Scope is the parent mobile-first PRD's Etapa 4, slices 4.1–4.3. **Complete 2026-08-09**, closeout corrected the same day. |
 | [`initiatives/phase-2m/`](./initiatives/phase-2m/) | `PHASE_2M_PRD.md`, `PHASE_2M_IMPLEMENTATION_PLAN.md` — Calendar, daily planning and notifications, authorized for planning by ADR-104 (2026-08-09) and for **implementation through closeout by ADR-105** (2026-08-11), which signed all seven owner decisions. Scope is the parent mobile-first PRD's Etapa 4, slices 4.4–4.7. Migration budget **2 allocated · 0 spent, non-transferable**; push is authorized **opt-in and content-free**; real-device proof is owner-run and **blocks closeout**. |
+| [`initiatives/phase-2n/`](./initiatives/phase-2n/) | `PHASE_2N_PRD.md`, `PHASE_2N_IMPLEMENTATION_PLAN.md` — People, projects, memory and files, authorized for planning by ADR-108 and for implementation by ADR-112. **Complete**, 127 of 127 classified. |
+| [`initiatives/phase-2o/`](./initiatives/phase-2o/) | `PHASE_2O_PRD.md`, `PHASE_2O_IMPLEMENTATION_PLAN.md` — Activation, preferences and control, authorized for planning by ADR-115, decisions signed by ADR-116/117, implementation by ADR-118. **Complete**, 116 of 116 classified, zero migrations. |
+| [`initiatives/phase-2p/`](./initiatives/phase-2p/) | `PHASE_2P_PRD.md`, `PHASE_2P_IMPLEMENTATION_PLAN.md` — Trustworthy capture and everyday UX, authorized for planning by ADR-121 and for implementation by ADR-122, with a second migration by ADR-123. **CLOSED 2026-08-20 by ADR-125**: 87 of 87 classified — 66 built, 12 baseline, 5 not-built-by-rule, 4 partial, 0 undelivered. VoiceOver is **waived, not passed**, and `2P-REVIEW-CITATIONS` is **not delivered**. |
+| [`initiatives/phase-2q/`](./initiatives/phase-2q/) | `PHASE_2Q_PRD.md`, `PHASE_2Q_IMPLEMENTATION_PLAN.md` — Evidence: the record behind the claim. **PLANNING AUTHORIZED ONLY**, by ADR-126 (2026-08-21), which supersedes ADR-125 Decision 6 alone. 39 requirements, six families, six slices, **none implemented and none classified**; **eight owner decisions are OPEN**; **one migration is proposed and none is allocated**. |
+
+*(The rows for phases 2N, 2O and 2P were missing from this table until
+2026-08-21 and are added here with the Phase 2Q row, because this index is one
+of the two places the repository has already recorded drifting behind the ADRs.)*
 
 **The roadmap successor has no governing artifact and must not acquire one
-without owner authorization.** The A13 guard in
+without owner authorization.** Phase 2Q now has one — ADR-126 — and the guard
+has moved past it, so "the successor" below means the phase **after** 2Q. The
+A13 guard in
 `src/lib/closeout/phase-2f-documentation.test.ts` fails the build the moment a
 successor `*_PRD.md` or `*_IMPLEMENTATION_PLAN.md` appears anywhere under
 `docs/`, or any file declares a successor requirement, or an accepted ADR names
 the successor in its heading, or a migration or source file is named for its
 implementation.
 
-**The retarget precedent, now applied eight times.** Phase 2G was started the
+**The retarget precedent, now applied eleven times.** Phase 2G was started the
 sanctioned way — ADR-083 and the guard's retarget in one commit — then Phase 2H
 by ADR-085, Phase 2I by ADR-092, Phase 2J by ADR-094, Phase 2K by ADR-097,
-Phase 2L by ADR-102, and Phase 2M by **ADR-104** (2026-08-09), each moving the
-guard to the next
+Phase 2L by ADR-102, Phase 2M by ADR-104, Phase 2N by ADR-108, Phase 2O by
+ADR-115, Phase 2P by ADR-121, and Phase 2Q by **ADR-126** (2026-08-21), each
+moving the guard to the next
 unauthorized lettered phase in the same change that recorded the authorization.
+*(This sentence said "eight times" and stopped listing at ADR-104 until
+2026-08-21; the count and the list are corrected here rather than left to be
+noticed, which is the same failure mode the paragraph below describes.)*
 The invariant is never unenforced in between, and **no ADR names the successor's
 scope**: inventing one would be the error the guard exists to prevent — which is
 why ADR-104's heading says *"retargets to the roadmap successor"* rather than

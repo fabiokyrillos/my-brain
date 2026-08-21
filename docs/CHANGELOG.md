@@ -2,6 +2,29 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q is authorized for planning
+
+**Planning only. ADR-126. ZERO product code, ZERO migrations, ZERO hosted writes; parity `202608190099`, unchanged. Eight owner decisions are OPEN and the pull request stays in draft.**
+
+**ADR-126 supersedes ADR-125 Decision 6 alone**, which had authorized no planning for the roadmap successor. ADR-125 is not edited: the closure, the VoiceOver waiver, the spent migration ceiling and the list of unabsorbed remainders all stand, and **`2P-REVIEW-CITATIONS` stays NOT DELIVERED** — planning a requirement does not discharge it.
+
+**The phase's subject was measured, not inherited.** `PHASE_2K_2O_ROADMAP_DESIGN.md` ends at Phase 2O and `MY_BRAIN_UX_ROADMAP.md` names no lettered phase, so there was no roadmap definition to adopt. An executable census over `src/` found the product answers *"where did this come from"* on **seven** surfaces and refuses on **one**: `/app/reviews/[reviewId]` passes an empty link allow-set, so every link a generated review contains degrades to plain text. That refusal is currently correct — the page has nothing it can vouch for, because `generateReview` drops the provider's already-validated `citedSourceIds` at the `summaries` upsert and `summaries` carries `Relationships: []`.
+
+**Two findings that change the plan, neither of them in Phase 2P's records.**
+
+1. **The 2P specification's minimal model is incomplete.** `generateReview` labels **tasks** with the `memory:` prefix; the chat citation contract pins `type: z.enum(["entry","memory"])` and `resolve-sources.ts:109` resolves `memory` against the **`memories`** table. Reusing that envelope verbatim would persist a task uuid as a memory, the resolver would find nothing, and **every task citation would silently degrade to "unavailable"** while entry-only tests passed. The smallest correct model is one `jsonb` column **plus** one vocabulary correction — and because the vocabulary is pinned in TypeScript rather than SQL (`citations jsonb not null default '[]'`, no check constraint, no trigger, no deployed validator), the correction costs **zero migrations**.
+2. **`authorizeHref` binds an id to no surface.** Its allow-set is keyed on the uuid alone and `INTERNAL_ROUTE`'s path segment is `[a-z-]+`, so an envelope vouching for entry `X` would also authorize `/pt-BR/app/work/X`. Inert today because the set is empty; live the moment it is populated. It does not leak — the task page scopes by `user_id` and calls `notFound()` — it hands the owner a broken link.
+
+**A documentary divergence, found and resolved by evidence.** `docs/TODO.md`'s `Active milestone:` line still described Phase 2P as *"PLANNING AUTHORIZED, IMPLEMENTATION NOT AUTHORIZED … none implemented"* after ADR-122 authorized implementation and ADR-125 closed the phase — and the guard that reads that line stayed pinned to ADR-121, so **it passed while the document understated two owner authorizations**. The line moves to Phase 2Q and ADR-126, and the failure is written into the guard's own comment rather than quietly repaired.
+
+**Added:** `docs/initiatives/phase-2q/PHASE_2Q_PRD.md` and `PHASE_2Q_IMPLEMENTATION_PLAN.md`; `docs/reports/phase-2q/` with the current-experience audit, the gaps report, the threat model and the traceability contract; ADR-126; `src/lib/closeout/phase-2q-declarations.test.ts`, a documentary guard that fails the build if the package loses a requirement, hides an open decision as a recommendation, or acquires an implementation artifact.
+
+**Changed:** the A13 phase-start detector retargets to the roadmap successor in this same commit, so the invariant is never unenforced in between; `phase-2o-declarations.test.ts`'s literal pin on the detector's target moves with it, deliberately, so every future retarget must consciously pass through that guard.
+
+**39 requirements across six families and six slices, none implemented and none classified.** `2Q-FOUNDATION` (5) · `2Q-CITE` (9) · `2Q-LINK` (7) · `2Q-TRUST` (8) · `2Q-ACCESS` (5) · `2Q-CLOSE` (5). **One migration is PROPOSED and none is allocated**; a second is a stop condition. Estimate **5.5 / 10.5 / 16.5** working days, nine-day critical path, blocked at slice 2Q.1 until `OD-2Q-1`, `OD-2Q-3` and `OD-2Q-7` are signed.
+
+**Unchanged:** signup closed; rollout 25 pass · 3 fail · 2 owner-signature; all six automation categories `suggest_only`; push HTTP 403 not resumed; no BYOK credit spent; no audio persisted; `2P-ACCESS-005` **WAIVED, NOT PASSED**; `RG-DEP-3` still cannot be closed by writing a file.
+
 ## 2026-08-20 - Phase 2P is closed
 
 **Closed by the owner after approving the final two-item checkpoint. ADR-125. No successor phase is started or planned.**

@@ -11588,3 +11588,162 @@ fail-closed by ADR-123 Decision 3, `A11Y-WEBKIT-DARK-CONTRAST`, and `RG-DEP-3`.
 plan and no requirement enumeration for the roadmap successor. **A start signal
 appearing in this repository is a defect until the owner authorizes one**, and
 `phase-2f-documentation.test.ts` is what says so.
+
+## §109 — Phase 2Q is authorized for PLANNING, and the 2P specification it inherits was incomplete (2026-08-21)
+
+**ADR-126.** Planning only: a PRD, an implementation plan, an audit, a gaps
+report, a threat model, a traceability contract and one documentary guard.
+**Zero product code, zero migrations, zero hosted writes.**
+
+### Preflight, proved before anything was written
+
+| Fact | Value |
+|---|---|
+| `main` / `origin/main` | **`beef7fa`**, identical, `0 0` |
+| Worktree | clean |
+| Open PRs | **zero** |
+| CI on **`beef7fa`** | **green 3/3**, run `32440530986`, jobs with **11 / 23 / 9 executed steps** — checked, because a cancelled job reports an empty `steps[]` and still reads as a run |
+| Migrations | **99 local = 99 hosted, parity `202608190099`** |
+| Signup | closed — `[auth].enable_signup = false` |
+| A13's target before this commit | **Phase 2Q** |
+| Phase 2Q artifacts before this commit | **none** — zero files, zero declared requirements |
+
+Two stale git worktrees exist (`.worktrees/suggest-new-people`,
+`my-brain-navigation-performance`), both clean.
+`codex/suggest-new-people` is **not** an ancestor of `main`, which looks alarming
+and is not: its content landed by **squash merge at `080a867`** (PR #244), which
+is. Housekeeping, not lost work.
+
+### The authorization had to be an ADR, not an edit
+
+**ADR-125 Decision 6 authorized no planning at all.** The owner has now
+authorized it. ADR-125 is **not edited** — this series has never rewritten an
+accepted ADR into agreement with a later one — so ADR-126 supersedes
+**Decision 6 alone**, by name, and every other decision in ADR-125 stands. In
+particular **`2P-REVIEW-CITATIONS` is still NOT DELIVERED. Planning a
+requirement does not discharge it.**
+
+### The subject was measured, because there was nothing to inherit
+
+`PHASE_2K_2O_ROADMAP_DESIGN.md` **ends at Phase 2O**, and
+`MY_BRAIN_UX_ROADMAP.md` is item-based and names no lettered phase. So no
+roadmap definition of the successor exists, and the objective comes from an
+executable census instead.
+
+**The census result, which is the whole phase:** the product answers *"where did
+this come from"* on **seven** surfaces — `task-detail-view.tsx:279`, memories
+list and detail, a person, a project, the two entity panels, an entry's return
+link, and chat's source cards — and refuses on **one**:
+`/app/reviews/[reviewId]` passes `new Set<string>()` as its link allow-set. That
+refusal is currently **correct**: `generateReview` drops the provider's already
+validated `citedSourceIds` at the `summaries` upsert, and `summaries` carries
+`Relationships: []`, so the page has nothing to vouch for.
+
+### THE FINDING THAT MATTERS MOST: the 2P specification would have shipped a feature that silently did nothing
+
+`PHASE_2P_REVIEW_CITATIONS_REQUIREMENT.md` §3 recommends reusing
+`conversation_messages.citations` **verbatim**. It also notes, in passing, that
+`generateReview`'s `memory:` prefix is "a misnomer" for a task — and does not
+follow that through.
+
+Follow it through: `referenceSchema` pins `type: z.enum(["entry","memory"])`, and
+`resolve-sources.ts:109` resolves `memory` against the **`memories`** table.
+Reusing the envelope verbatim stores a **task uuid** as a memory. At render the
+resolver looks that id up in `memories`, finds nothing, and returns
+`unavailableCard`. **Every task citation degrades in silence**, the feature ships
+green, and any test written over entries alone passes.
+
+That is the exact opposite of what the owner asked for — *"se a revisão disser
+que eu concluí a tarefa X, deve existir um link para a tarefa X real"*.
+
+**So the minimal model is one `jsonb` column PLUS one vocabulary correction.**
+And the correction costs **zero migrations**, because the pinning is TypeScript:
+the deployed column is `citations jsonb not null default '[]'::jsonb`
+(`202607160006_chat_memory.sql:58`) with **no check constraint, no trigger and no
+deployed validator**. Verified, not assumed.
+
+### A second defect, recorded nowhere in Phase 2P
+
+`authorizeHref` (`reviews/markdown.ts:135`) keys its allow-set on the **uuid
+alone**, and `INTERNAL_ROUTE`'s path segment is `[a-z-]+` — any surface. An
+envelope vouching for entry `X` therefore also authorizes `/pt-BR/app/work/X`.
+**Inert today** because the set is empty; **live the moment it is populated.**
+It does not leak — the task page scopes by `user_id` and calls `notFound()` — it
+hands the owner a broken link, which is the failure class the phase exists to
+remove. `2Q-FOUNDATION-004` executes it before `2Q-LINK-002` inverts it.
+
+### A DOCUMENTARY DIVERGENCE THE GUARD WAS BUILT TO CATCH AND DID NOT
+
+`docs/TODO.md`'s `Active milestone:` line still read *"Phase 2P … PLANNING
+AUTHORIZED, IMPLEMENTATION NOT AUTHORIZED (2026-08-18), by ADR-121 … 87
+requirements … none implemented"* — after ADR-122 authorized implementation and
+ADR-125 closed the phase. `phase-2f-documentation.test.ts` reads that line and
+**stayed pinned to ADR-121**, so it passed the whole time while the document
+understated two owner authorizations.
+
+The guard's own comment says *"Move it with the ADR, every time."* Nobody did.
+The line is moved to Phase 2Q and ADR-126, and **the failure is written into the
+guard's comment** rather than quietly repaired.
+
+`docs/README.md` had the same shape of drift twice over: no rows for phases 2N,
+2O or 2P, and a retarget paragraph saying *"applied eight times"* that stopped
+listing at ADR-104. Both corrected, and both named.
+
+### A correction to my own first pass, kept rather than hidden
+
+The census initially reported that Work had **no** provenance affordance,
+because it grepped `app/[locale]/app/work/[taskId]/page.tsx` — a **38-line file
+that delegates** to `TaskDetailSurface`. The affordance is there
+(`task-detail-view.tsx:279`). **A grep of the route file is not a census of the
+route**, and had it not been caught, a fabricated requirement would have entered
+the PRD.
+
+### The package
+
+`docs/initiatives/phase-2q/` — PRD, implementation plan.
+`docs/reports/phase-2q/` — current-experience audit, gaps and opportunities,
+threat model, traceability contract.
+`src/lib/closeout/phase-2q-declarations.test.ts` — 16 assertions.
+
+**39 requirements, six families, six slices, none classified.**
+`2Q-FOUNDATION` (5) · `2Q-CITE` (9) · `2Q-LINK` (7) · `2Q-TRUST` (8) ·
+`2Q-ACCESS` (5) · `2Q-CLOSE` (5).
+
+**The family is `ACCESS`, not `A11Y`, deliberately.** `A11Y` contains digits, so
+`[A-Z]+-\d{3}` cannot match it — which is why Phase 2K's seven accessibility
+requirements were invisible to every prose count *and* to the A13 detector at
+once. The guard asserts the property with the unmatchable shape as its control.
+
+**Budget: one migration PROPOSED, none allocated.** A second is a stop
+condition. **Estimate 5.5 / 10.5 / 16.5** working days, nine-day critical path.
+**Blocked at slice 2Q.1** until `OD-2Q-1`, `OD-2Q-3` and `OD-2Q-7` are answered.
+
+### The four automation review flows are not one group
+
+ADR-123's amendment routed `project`, `organization`, `memory` and `relation`
+here together. Proved from the deployed migration `202608190099`:
+`private.record_automation_calibration_observation` is called from three sites
+whose category arguments are the literals `'task'` and `'person'`, so **nothing
+can ever write an observation for the other four** — waiting accumulates
+nothing, still true. But they are four different problems: `project` and
+`organization` are medium (the extraction schema already emits both), `memory` is
+**not in `entryExtractionSchema` at all** so it changes the AI contract and the
+Deno worker with it, and `relation` is blocked by `2N-RELATION-TRIGGER`.
+`OD-2Q-8` recommends a separate initiative.
+
+### The A13 retarget
+
+Moved off Phase 2Q — which ADR-126 authorizes — and onto the next unauthorized
+lettered phase, **in this same commit**, so the invariant is never unenforced.
+`phase-2o-declarations.test.ts`'s literal pin moved with it. A new series entry
+was **added**, not substituted, and `["ADR-121", /2Q/i]` was deliberately left
+in place: a global find-and-replace would have destroyed that historical
+assertion, which is why the retarget was done as explicit edits and then
+verified by listing every remaining `2Q` in the file.
+
+### Next
+
+**Nothing is authorized to be built.** The pull request is a **draft** and stays
+one until the owner answers the eight decisions. `2P-ACCESS-005` remains
+**WAIVED, NOT PASSED**; signup stays closed; push HTTP 403 is not resumed;
+`RG-DEP-3` still cannot be closed by writing a file.

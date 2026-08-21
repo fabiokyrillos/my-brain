@@ -669,12 +669,24 @@ export function audit(root = REPOSITORY_ROOT) {
   }
 
   // --- refusal 12: no successor before authorization -----------------------
-  const successorArtifacts = existsSync(join(root, "docs/initiatives/phase-2q"))
-    || existsSync(join(root, "docs/reports/phase-2q"));
+  //
+  // **Retargeted 2026-08-21 by ADR-126**, which authorized Phase 2Q for
+  // planning. This is the third place in the repository that pins the
+  // successor's letter — after `phase-2f-documentation.test.ts`'s A13 detector
+  // and `phase-2o-declarations.test.ts`'s literal pin on it — and it is the one
+  // that had to be discovered by running the suite rather than by reading the
+  // governance documents, because nothing points at it from them.
+  //
+  // The pin is kept literal rather than derived. A derived version would move
+  // itself and no author would ever have to think about it, which is the
+  // opposite of what these pins are for: every retarget must consciously pass
+  // through each one.
+  const successorArtifacts = existsSync(join(root, "docs/initiatives/phase-2r"))
+    || existsSync(join(root, "docs/reports/phase-2r"));
   if (successorArtifacts) {
-    refusals.push("a Phase 2Q governing artifact exists before any authorization (refusal 12)");
+    refusals.push("a Phase 2R governing artifact exists before any authorization (refusal 12)");
   }
-  if (/^- \*\*2Q-[A-Z]+-\d{3}:\*\*/m.test(readFile(PRD, root))) {
+  if (/^- \*\*2R-[A-Z]+-\d{3}:\*\*/m.test(readFile(PRD, root))) {
     refusals.push("a successor requirement is declared before authorization (refusal 12)");
   }
 
