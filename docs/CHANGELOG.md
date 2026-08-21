@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q slice 2Q.4: the defect the lane could not see was a defect OF the lane (ADR-129)
+
+**Zero migrations; zero product code.** Every change is in `e2e/`, `.github/` and `playwright.config.ts`. **37 of 42 requirements classified.**
+
+**The order was the requirement, and it is what found this.** ADR-127 Decision 6 said reproduce first, fix second, widen CI third. `2Q-ACCESS-001` reproduced it — and **the reproduction contradicted the premise the decision was signed on**. Nothing was changed until the owner ruled (ADR-129, append-only; **ADR-127 is not edited**).
+
+**The cause.** `accessibility.spec.ts` inlines the product's CSS with `@import "tailwindcss"` stripped, and **Tailwind's preflight is what makes a form control inherit its colour** (`button,input,optgroup,select,textarea{font:inherit;color:inherit}`). Without it a `<select>` falls back to the UA's `FieldText`: white under Chromium's dark `color-scheme`, **black** under WebKit's — **1.13:1** on `#141311`, on exactly the two surfaces whose text sits on a select. **Chromium could never have caught it**, which is why CI was silent for a whole phase; that is now a test. A second, independent artifact was found alongside it: a `setContent` document carrying a viewport meta with no real origin makes WebKit resolve **no custom properties at all**, which produced the bogus `#ffffff` backgrounds the first measurements reported.
+
+**The product was always correct**, measured on the real running app in the same engine with the theme applied the product's way: `rgb(240,237,231)` on `rgb(28,27,24)`, identical to Chromium, and the select **inherits** it through eight ancestors.
+
+**Fourteen measurements are preserved as history, including three intermediate conclusions of which two were wrong** — each had a plausible artifact behind it and each was corrected by the next measurement rather than by argument. ADR-129 Decision 9 requires that; a report showing only the final answer would teach nothing about how a lane invents a defect.
+
+**The fix, all of it in `e2e/`:** the theme now arrives by the product's own mechanism (`localStorage` seeded, and `APPEARANCE_SCRIPT` **imported** from `src/features/appearance/contracts.ts` rather than copied); a real document loads on the app origin before the fixture replaces it, fulfilled in-process so the lane stays hermetic; and Tailwind's preflight rule is **restored verbatim** — writing `select{color:var(--text-primary)}` instead would have made the lane green while still measuring something the product does not do.
+
+**The five controls the owner required all pass.** Without the real mechanism the lane still reproduces the false positive **and does not on Chromium**, which is asserted. Fixture and real page converge on **eight properties**, in dark and light, on both engines, with the real page asserted to really be in dark and to really have a select. axe still reports a **really planted** grey-on-grey failure and reports nothing for a passing pair. The axe config, threshold, surface list and skip-freedom are byte-pinned. `.search-filters select`, both `.work-bulk-*` rules and the dark `--background-canvas`/`--text-primary` are byte-pinned. **A correction inside the controls themselves:** the bulk-bar comparison first skipped the select whenever the real page had none, which made "they agree" true of two blanks — the account is now seeded and a row is actually ticked.
+
+**CI widened, after and scoped.** `ci.yml` installs `webkit` and runs `accessibility.spec.ts` on `iphone-emulated`; the other journeys stay Chromium-only. `playwright.config.ts`'s "CI does not select this project" paragraph is **replaced rather than deleted**, and says why.
+
+**Classifications follow the measurement.** `2Q-ACCESS-001` **built** (an executed investigation). `2Q-ACCESS-002` and `-003` **baseline** — the surfaces were already correct and **no product fix was made**; `built` would claim a change that did not happen. `2Q-ACCESS-004` **built**. `2Q-ACCESS-005` records honestly that **none of this is screen-reader evidence**; `2P-ACCESS-005` stays **WAIVED, NOT PASSED**.
+
+Lane results: `iphone-emulated` 65 passed, `desktop` 65 passed, `mobile` 70 passed, 0 failed; fidelity proof 4 passed on each engine; lane guard 11 passed. Parity `202608210100`, 100 = 100. Signup closed, rollout 25 · 3 · 2, push HTTP 403 not resumed, `2P-REVIEW-CITATIONS` still **NOT DELIVERED**, successor not started or planned.
+
 ## 2026-08-21 - Phase 2Q slice 2Q.3: removed, unreadable, foreign and never-existed are ONE outcome, asserted as an equality
 
 **Zero migrations**; budget stays 1 allocated · 1 spent. **32 of 42 requirements classified.**

@@ -86,12 +86,24 @@ export default defineConfig({
      * chrome) and it carries the safe-area insets the composer and the bottom
      * navigation are built around.
      *
-     * **CI does not select this project**, and that is deliberate rather than an
-     * oversight: `.github/workflows/ci.yml` installs `chromium` only, and adding
-     * a WebKit install plus a third journey lane to the gate is a change to the
-     * CI contract that this slice was not authorized to make. The lane is run
-     * locally and its results are recorded per slice, which is the same standing
-     * every `online-*.spec.ts` lane already has.
+     * **CI now selects this project — for `accessibility.spec.ts` only** (Phase
+     * 2Q slice 2Q.4, ADR-129). It did not before, and that paragraph used to say
+     * so; the sentence is replaced rather than deleted, because *why* it changed
+     * is the finding.
+     *
+     * `A11Y-WEBKIT-DARK-CONTRAST` sat open for a whole phase precisely because
+     * the failure existed only on the engine CI could not run: every green
+     * pipeline was silent about it. Measured, it turned out to be a **lane**
+     * defect and not a product one — the fixture strips Tailwind's preflight, so
+     * a `<select>` stops inheriting its colour and falls back to the UA's
+     * `FieldText`, which under WebKit's dark `color-scheme` is black. The real
+     * app was always correct, proved against it in
+     * `online-phase-2q-accessibility-fidelity.spec.ts`.
+     *
+     * **The widening is scoped to the lane whose blind spot was measured.** The
+     * other CI journeys stay on the two Chromium projects: covering an engine is
+     * worth its minutes where a blind spot was demonstrated, not everywhere at
+     * once.
      */
     { name: "iphone-emulated", use: { ...devices["iPhone 15"] } },
   ],

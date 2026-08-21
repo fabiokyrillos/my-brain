@@ -241,9 +241,22 @@ jobs:
       - name: Build the application under test
         run: npm run build
 
-      - name: Install the browser
-        # Both Playwright projects (Desktop Chrome, Pixel 7) are Chromium.
-        run: npx playwright install --with-deps chromium
+      - name: Install the browsers
+        # Two of the three projects (Desktop Chrome, Pixel 7) are Chromium.
+        #
+        # `webkit` joins them in Phase 2Q slice 2Q.4 (ADR-129), and it is the
+        # reason `A11Y-WEBKIT-DARK-CONTRAST` could sit open for a whole phase:
+        # the defect existed only on the engine CI could not run, so every green
+        # pipeline was silent about it. It turned out to be a **lane** defect
+        # rather than a product one — the fixture stripped Tailwind's preflight,
+        # so a <select> stopped inheriting its colour and fell back to the UA's
+        # `FieldText`, black under WebKit's dark `color-scheme`. The fix is in
+        # `e2e/`; no product colour moved.
+        #
+        # The order was the requirement (ADR-127 Decision 6): the lane was made
+        # faithful and green FIRST, and only then does CI widen to it. Widening
+        # first would have landed a red pipeline on a defect that was not real.
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run the deterministic foundation journey
         # foundation.spec.ts needs no OpenAI key and no seeded user: it proves
@@ -273,7 +286,15 @@ jobs:
         # markup and pass — which is what §85 found had been happening. This lane
         # has no array to go stale: it loads the production build's own pages, so
         # a stylesheet dropped from `globals.css` fails it.
-        run: npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/accessibility.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts e2e/phase-2o-mobile-accessibility.spec.ts --project=desktop --project=mobile
+        #
+        # `2Q-ACCESS-004`: `accessibility.spec.ts` now runs on the WebKit
+        # project too, so the engine family Safari renders with is covered on
+        # every pull request rather than on a developer's machine. The other
+        # specs stay on the two Chromium projects: this widening is scoped to the
+        # lane whose blind spot was measured, not applied speculatively.
+        run: |
+          npx playwright test e2e/foundation.spec.ts e2e/task-command.spec.ts e2e/calendar.spec.ts e2e/daily-surfaces.spec.ts e2e/phase-2o-mobile-accessibility.spec.ts --project=desktop --project=mobile
+          npx playwright test e2e/accessibility.spec.ts --project=desktop --project=mobile --project=iphone-emulated
 
       # 2F-REVOKE-003 — the re-grant rollback rehearsal.
       #

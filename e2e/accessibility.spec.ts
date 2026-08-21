@@ -45,6 +45,8 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
+import { APPEARANCE_SCRIPT, APPEARANCE_STORAGE_KEY } from "../src/features/appearance/contracts";
+
 const ROOT = join(__dirname, "..");
 const require_ = createRequire(__filename);
 
@@ -117,6 +119,15 @@ const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file
   .replace(/@import\s+"tailwindcss";?/g, "")
   .replace(/@import\s+"\.\/[a-z-]+\.css";?/g, "");
 
+/**
+ * A URL on the app's own origin, served by Playwright rather than by the server.
+ *
+ * The lane needs a **real origin** for two independent reasons, both measured —
+ * see `render`. Fulfilling the request in-process keeps the lane hermetic: it
+ * still needs no session and no route, exactly as before.
+ */
+const FIXTURE_URL = "http://localhost:3000/__accessibility-fixture__";
+
 async function render(
   page: Page,
   body: string,
@@ -124,16 +135,68 @@ async function render(
 ) {
   if (reducedMotion) await page.emulateMedia({ reducedMotion: "reduce" });
   /*
-   * `theme` stamps `data-theme` on the root, which is how a stored preference
-   * reaches the page (ADR-114). It matters that this is a parameter rather than
-   * an `emulateMedia({ colorScheme })` call: the explicit choice and the system
-   * default are two different code paths in `tokens.css`, and the one a user
-   * actually picks is the one a media emulation would never exercise.
+   * ## The theme arrives the way the PRODUCT delivers it — `2Q-ACCESS-004`
+   *
+   * This lane used to stamp `data-theme` straight into the HTML string. That is
+   * **not** how a reader gets a theme: the product stores a choice in
+   * `localStorage` and an inline, pre-paint script reads it and sets the
+   * attribute (`src/features/appearance/contracts.ts`). So the choice is seeded
+   * into storage and **the product's own `APPEARANCE_SCRIPT` is run**, verbatim
+   * and imported rather than copied — the lane exercises the real mechanism
+   * instead of a lookalike, and `theme: undefined` means `system`, which is the
+   * state a reader actually arrives in.
+   *
+   * ## Why the navigation before `setContent`, which looks redundant and is not
+   *
+   * **Measured, on the WebKit lane.** A `setContent` document on `about:blank`
+   * that carries `<meta name="viewport">` makes WebKit resolve **no custom
+   * properties at all** on `body` and on form controls: `--text-primary` comes
+   * back as the empty string, so `color: var(--text-primary)` is invalid at
+   * computed-value time and falls back to initial **black**. axe then measured
+   * black-on-dark and reported six and seven `color-contrast` violations on
+   * global search and the Work bulk bar — `A11Y-WEBKIT-DARK-CONTRAST`.
+   *
+   * **The product never had that defect.** The same page, in the same engine,
+   * measured on the real running app, resolves `#f0ede7` on `#1c1b18`. The lane
+   * was inventing the failure.
+   *
+   * It was isolated by elimination: not the CSS (all fifteen sheets resolve),
+   * not `@theme`, not the markup, not staleness (waiting never resolves it) —
+   * **the viewport meta on a first document that has no real origin.** Loading a
+   * real document first, then replacing it, is the shape a real navigation has,
+   * and it is also what makes `localStorage` reachable for the step above. One
+   * change, both reasons.
    */
-  const themeAttribute = theme ? ` data-theme="${theme}"` : "";
+  await page.route(FIXTURE_URL, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      /*
+        The viewport meta is on the FIRST document deliberately. WebKit loses
+        custom-property resolution when the viewport is established by a
+        `setContent` document rather than by a real navigation — establishing it
+        here, on the navigation, is what a real page does and is what makes the
+        replacement below resolve. Measured; an empty first document does not
+        work.
+      */
+      body: `<!doctype html><html><head><meta charset="utf-8">`
+        + `<meta name="viewport" content="width=device-width, initial-scale=1">`
+        + `</head><body></body></html>`,
+    }));
+  await page.addInitScript(([key, choice]) => {
+    try {
+      if (choice) window.localStorage.setItem(key as string, choice as string);
+      else window.localStorage.removeItem(key as string);
+    } catch {
+      // A document with no storage origin. The script below then finds nothing
+      // and leaves the attribute off, which is `system` — the honest default.
+    }
+  }, [APPEARANCE_STORAGE_KEY, theme ?? null]);
+  await page.goto(FIXTURE_URL, { waitUntil: "load" });
   await page.setContent(
-    `<!doctype html><html lang="pt-BR"${themeAttribute}><head><meta charset="utf-8">`
+    `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">`
       + `<meta name="viewport" content="width=device-width, initial-scale=1">`
+      + `<script>${APPEARANCE_SCRIPT}</script>`
       /*
         The three `next/font` variables, stubbed — the same three
         `layout-contracts.spec.ts` has always stubbed, and absent here until
@@ -149,6 +212,25 @@ async function render(
       */
       + `<title>Acessibilidade</title><style>`
       + `:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}`
+      /*
+        The one Tailwind preflight rule this lane depends on, restored by hand.
+
+        `css` above strips `@import "tailwindcss"`, so the preflight the product
+        actually ships never reaches this fixture — and preflight is what makes a
+        form control inherit its colour:
+        `button,input,optgroup,select,textarea{font:inherit;color:inherit}`.
+
+        **Without it a <select> falls back to the UA's `FieldText`**, which under
+        `color-scheme: dark` is white in Chromium and BLACK in WebKit. That is
+        the whole of `A11Y-WEBKIT-DARK-CONTRAST`: black on the dark canvas, 1.13:1,
+        on exactly the two surfaces whose text sits on a select. The product was
+        never affected — measured on the real app, the same select inherits
+        `#f0ede7` through eight ancestors.
+
+        Restored rather than worked around, and asserted against the real page by
+        `online-phase-2q-accessibility-fidelity.spec.ts`.
+      */
+      + `button,input,optgroup,select,textarea{font:inherit;color:inherit}`
       + `${css}</style></head>`
       + `<body><div class="app-shell">${body}</div></body></html>`,
     { waitUntil: "load" },
@@ -812,6 +894,151 @@ test("ADR-114: the dark fixture really is dark, so the scan above is not vacuous
   );
   expect(light).toBe("#f7f6f3");
   expect(light).not.toBe(canvas);
+});
+
+
+/* ------------------------------------------------------------------ *
+ * `2Q-ACCESS-001`/`-004` — the controls that make the corrected lane
+ * mean something.
+ *
+ * Phase 2Q found that this lane reported `A11Y-WEBKIT-DARK-CONTRAST`:
+ * six and seven `color-contrast` violations on global search and the Work
+ * bulk bar, in dark, on the WebKit project only. **The product never had
+ * that defect** — the same surfaces, measured on the real running app in
+ * the same engine, resolve `#f0ede7` on `#1c1b18`.
+ *
+ * The lane was inventing it, and `render` above now says exactly why and
+ * how it was fixed. What follows is the part that keeps the fix honest:
+ * a control proving the OLD mechanism really did produce the false
+ * positive, and a control proving axe can still see a real one.
+ *
+ * Neither disables a rule, weakens a threshold, or changes a colour.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The retired mechanism: the theme stamped into the HTML string, on a
+ * `setContent` document with no real origin.
+ *
+ * Kept as a **control**, not as an option. Nothing else may call it.
+ */
+async function renderWithRetiredThemeMechanism(page: Page, body: string, theme: "light" | "dark") {
+  await page.setContent(
+    `<!doctype html><html lang="pt-BR" data-theme="${theme}"><head><meta charset="utf-8">`
+      + `<meta name="viewport" content="width=device-width, initial-scale=1">`
+      + `<title>Acessibilidade</title><style>`
+      + `:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}`
+      + `${css}</style></head>`
+      + `<body><div class="app-shell">${body}</div></body></html>`,
+    { waitUntil: "load" },
+  );
+}
+
+/** What a surface actually computes, for the properties the defect touched. */
+async function measureSurface(page: Page) {
+  return page.evaluate(() => {
+    const cs = getComputedStyle;
+    const select = document.querySelector("select") as HTMLElement | null;
+    return {
+      theme: document.documentElement.getAttribute("data-theme"),
+      rootToken: cs(document.documentElement).getPropertyValue("--text-primary").trim(),
+      bodyToken: cs(document.body).getPropertyValue("--text-primary").trim(),
+      bodyBg: cs(document.body).backgroundColor,
+      bodyColor: cs(document.body).color,
+      selectToken: select ? cs(select).getPropertyValue("--text-primary").trim() : null,
+      selectColor: select ? cs(select).color : null,
+      selectBg: select ? cs(select).backgroundColor : null,
+    };
+  });
+}
+
+test("2Q-ACCESS-001 control 1: the RETIRED mechanism reproduces the false positive on WebKit", async ({ page }, testInfo) => {
+  /*
+   * Without this, "the lane is fixed" would be a claim about a green run
+   * rather than about a defect that was real and is gone. It drives the
+   * old code path on purpose and asserts what it produced.
+   *
+   * It is engine-aware because the finding is: **Chromium could never have
+   * caught this**, which is exactly why `ci.yml` running only Chromium
+   * projects saw nothing. Asserting that here makes the reason for
+   * `2Q-ACCESS-004` part of the suite instead of part of a report.
+   */
+  await renderWithRetiredThemeMechanism(page, searchSurface(), "dark");
+  const retired = await measureSurface(page);
+  const isWebKit = testInfo.project.name === "iphone-emulated";
+
+  if (isWebKit) {
+    expect(retired.bodyToken, "the retired mechanism no longer reproduces the defect").toBe("");
+    expect(retired.selectColor).toBe("rgb(0, 0, 0)");
+  } else {
+    expect(retired.bodyToken, "a Chromium project saw the defect — the premise moved").toBe("#f0ede7");
+  }
+
+  await render(page, searchSurface(), { theme: "dark" });
+  const corrected = await measureSurface(page);
+  expect(corrected.bodyToken, "the corrected lane must resolve in every engine").toBe("#f0ede7");
+  expect(corrected.selectColor).toBe("rgb(240, 237, 231)");
+  expect(corrected.selectBg).toBe("rgb(28, 27, 24)");
+});
+
+test("2Q-ACCESS-001 control 2: the corrected lane agrees with itself across both themes", async ({ page }) => {
+  // The convergence with the REAL app is proved in
+  // `e2e/online-phase-2q-accessibility-fidelity.spec.ts`, which needs a
+  // session and therefore cannot run here. This is the half that can: the
+  // product's own mechanism produces the product's own palettes.
+  await render(page, searchSurface(), { theme: "dark" });
+  const dark = await measureSurface(page);
+  expect(dark).toMatchObject({
+    theme: "dark",
+    bodyToken: "#f0ede7",
+    bodyBg: "rgb(20, 19, 17)",
+    selectColor: "rgb(240, 237, 231)",
+    selectBg: "rgb(28, 27, 24)",
+  });
+
+  await render(page, searchSurface(), { theme: "light" });
+  const light = await measureSurface(page);
+  expect(light).toMatchObject({
+    theme: "light",
+    bodyToken: "#1a1917",
+    bodyBg: "rgb(247, 246, 243)",
+    selectColor: "rgb(26, 25, 23)",
+    selectBg: "rgb(255, 255, 255)",
+  });
+
+  // And `system`, which is the state a reader arrives in: no attribute, and
+  // the palette follows the machine rather than an explicit choice.
+  await render(page, searchSurface());
+  expect((await measureSurface(page)).theme).toBeNull();
+});
+
+test("2Q-ACCESS-001 control 3: axe still finds a contrast violation that is really there", async ({ page }) => {
+  /*
+   * The control that matters most. A lane made green by breaking its own
+   * scanner would pass every assertion above. So a genuine failure is
+   * planted — grey on grey, well under 4.5:1 — and axe must still report
+   * it at `serious`.
+   *
+   * The plant is inline on the fixture, not a change to any product
+   * colour: `2Q-ACCESS-002/-003` are `baseline` precisely because no
+   * product colour was touched.
+   */
+  await render(
+    page,
+    `<p style="color:#8a8a8a;background:#7d7d7d">Um texto plantado com contraste insuficiente</p>`,
+    { theme: "dark" },
+  );
+  const violations = await axeViolations(page);
+  expect(violations.map((violation) => violation.id)).toContain("color-contrast");
+
+  // Two-sided: the same scan on the same surface, with a passing colour
+  // pair, reports nothing — so the scanner is discriminating rather than
+  // simply always complaining.
+  await render(
+    page,
+    `<p style="color:#ffffff;background:#111111">Um texto plantado com contraste suficiente</p>`,
+    { theme: "dark" },
+  );
+  expect(await axeViolations(page)).toEqual([]);
 });
 
 /* ------------------------------------------------------------------ *
