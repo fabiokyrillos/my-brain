@@ -238,11 +238,28 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line).toContain("ADR-126");
     expect(line, "Phase 2Q has received a second decision and the line must cite it")
       .toContain("ADR-127");
-    expect(line, "ADR-126 authorizes planning only, and the line must say so")
+    /*
+     * **Moved with ADR-128, in the commit that recorded it** — which is the step
+     * the paragraph above records nobody taking at Phase 2P, and the reason that
+     * line went on saying "IMPLEMENTATION NOT AUTHORIZED" about a phase that had
+     * shipped and closed.
+     *
+     * ADR-128 authorizes implementation of Phase 2Q from slice 2Q.0 through
+     * closeout. So "IMPLEMENTATION NOT AUTHORIZED" is now the **understatement**
+     * — the mirror-image error the comment above names — and the line must
+     * instead cite the third ADR and say what it gave. "PLANNING AUTHORIZED" and
+     * "SIGNED" both stay: the rule is that the line cites **every**
+     * authorization the phase has received, not only the newest.
+     */
+    expect(line, "Phase 2Q has received a third decision and the line must cite it")
+      .toContain("ADR-128");
+    expect(line, "ADR-126 authorized planning, and the line must keep saying so")
       .toMatch(/PLANNING AUTHORIZED/i);
-    expect(line, "implementation is not authorized, so the line must not imply it is")
-      .toMatch(/IMPLEMENTATION NOT AUTHORIZED/i);
-    expect(line, "ADR-127 signed the decisions, and the line must not overstate that as implementation")
+    expect(line, "ADR-128 authorizes implementation, so the line must not understate it")
+      .toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    expect(line, "and it must not carry the superseded refusal alongside the authorization")
+      .not.toMatch(/IMPLEMENTATION NOT AUTHORIZED/i);
+    expect(line, "ADR-127 signed the decisions, and the line must still record that")
       .toMatch(/SIGNED/i);
     expect(line, "no successor is authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2R/);
