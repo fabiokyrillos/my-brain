@@ -428,10 +428,29 @@ describe("Phase 2Q declarations", () => {
      */
     const reports = join(REPO, "docs/reports/phase-2q");
     const filed = existsSync(reports) ? readdirSync(reports) : [];
-    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i]) {
-      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before its slice ran`)
+    /*
+     * **The last inversion, and the list is now down to one.**
+     *
+     * The matrix became legitimate the moment slice 2Q.5 generated it, so it
+     * moves out of the forbidden list and into a required one — required to
+     * exist, and required to say 42/42 with nothing unclassified, because a
+     * matrix that quietly dropped a row would read as complete.
+     *
+     * **The closing report stays forbidden**, and that is the whole point of
+     * this line surviving: Phase 2Q is not closed by an agent. The owner's
+     * device checkpoint is the gate, and until they have run it there is no
+     * closing report to write.
+     */
+    for (const forbidden of [/CLOSING_REPORT/i]) {
+      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before the owner closed the phase`)
         .toEqual([]);
     }
+    expect(filed, "the generated matrix is missing").toContain("PHASE_2Q_TRACEABILITY_MATRIX.md");
+    const matrix = read("docs/reports/phase-2q/PHASE_2Q_TRACEABILITY_MATRIX.md");
+    expect(matrix, "the matrix no longer classifies every requirement")
+      .toContain("**42 declared · 42 classified · 0 unclassified.**");
+    expect(matrix, "a requirement slipped through unclassified").not.toContain("UNCLASSIFIED");
+    expect(filed, "the threat disposition is missing").toContain("PHASE_2Q_THREAT_DISPOSITION.md");
 
     // The acceptance records that DO exist must be for slices that closed, and
     // named in the repository's shape — so a stray file cannot enter the folder
@@ -454,6 +473,8 @@ describe("Phase 2Q declarations", () => {
       .toContain("PHASE_2Q_SLICE_03_ACCEPTANCE.md");
     expect(accepted, "slice 2Q.4's acceptance record is missing")
       .toContain("PHASE_2Q_SLICE_04_ACCEPTANCE.md");
+    expect(accepted, "slice 2Q.5's acceptance record is missing")
+      .toContain("PHASE_2Q_SLICE_05_ACCEPTANCE.md");
 
     /*
      * **A deployment record became legitimate the moment the migration was

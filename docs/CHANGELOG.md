@@ -2,6 +2,28 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q slice 2Q.5: 42 of 42 classified, generated or refused — awaiting the owner's checkpoint
+
+**Zero migrations; budget stays 1 allocated · 1 spent.** **42 declared · 42 classified · 0 unclassified.** The phase is **not** closed: the owner's device checkpoint is the gate.
+
+**`2Q-CLOSE-001` — generated, never typed, and it refused before it produced.** `scripts/generate-phase-2q-traceability.mjs` reads the PRD and the six slice acceptance records and either writes the matrix or **writes nothing at all**, because a matrix that is 41/42 correct reads as complete. Run against the tree before slice 2Q.5's record existed, it named the five `2Q-CLOSE` requirements as unclassified and exited non-zero. It refused a **second** time with that record already on disk — because the file was not yet in `RECORDS`. **Listed rather than globbed** is the point: a record nobody declared contributes nothing, and a glob would absorb a stray file just as silently.
+
+**The generator caught a wrong number I had typed.** The slice record said `built` 37 · `baseline` 5; the truth is **36 · 6** — I had forgotten `2Q-TRUST-005`, which slice 2Q.3 classified `baseline` after making its check non-vacuous. The correction is left visible in the record rather than silently overwritten: *"generated, never typed"* is only worth something if the generator is allowed to win.
+
+**A control found a real gap in the generator.** The digit-family fixture `2Q-A11Y-001` produced **no** refusal — because the strict declaration shape `[A-Z]+` cannot match a family containing digits, which is **exactly the failure Phase 2K paid for**: seven accessibility requirements invisible to every prose count, to the generator and to the A13 detector at once. The generator now scans a **loose** shape too and refuses by name anything the strict one cannot see. A generator that only used the strict shape would answer "nothing is wrong" about a family it cannot see.
+
+**`2Q-CLOSE-002`** requires a remainder **and** a destination, with the row's own identifier **stripped first** — the recorded trap is a row that satisfies the check by repeating its own id. Phase 2Q produced no `partial`, which would make the refusal vacuous, so it is driven over planted fixtures with **both sides**: refused when self-referential, refused when it names no destination, **admitted** when it names both.
+
+**`2Q-CLOSE-003` — hosted, two-sided.** Parity `202608210100` read live, 100 = 100. The residue probe was **planted** (4 markers at 1), **removed** (all 0, plus every marker any Phase 2Q fixture ever used), and the probes proved **still able to see** — 2 users, 1 summary, 9 tasks, 3 entries, 15 columns, **0 orphan profiles**.
+
+**`2Q-CLOSE-004`** names six remainders an agent cannot discharge, each with the human act that would. **`2Q-CLOSE-005`**: the phase-start guard sits where ADR-126 put it, no ADR in this phase names a successor, and no successor artifact exists.
+
+**Threat disposition:** all twelve threats **CLOSED**, three residuals named rather than absorbed, and the seven inherited properties each re-proved unweakened.
+
+**Online suite, three lanes:** citations **9 passed** on desktop, Pixel 7 and WebKit; fidelity **4 passed** on both engines; accessibility lane **65 / 70 / 65**.
+
+**The closing report stays forbidden by the declaration guard**, deliberately: Phase 2Q is not closed by an agent. `PHASE_2Q_OWNER_CHECKPOINT.md` is the eight-item script, and **item 1 spends AI credit** — the one thing this phase never did.
+
 ## 2026-08-21 - Phase 2Q slice 2Q.4: the defect the lane could not see was a defect OF the lane (ADR-129)
 
 **Zero migrations; zero product code.** Every change is in `e2e/`, `.github/` and `playwright.config.ts`. **37 of 42 requirements classified.**
