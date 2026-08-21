@@ -407,16 +407,81 @@ describe("Phase 2Q declarations", () => {
       .toMatch(/WAIVED, NOT PASSED/);
   });
 
-  it("holds the planning-only absences", () => {
+  it("holds the absences implementation has not yet earned", () => {
+    /*
+     * **Inverted by ADR-128, and kept rather than deleted** — the third time
+     * this file has been moved rather than thrown away, and for the reason
+     * stated at the top: an absence nobody asserts is an absence nobody notices
+     * disappearing.
+     *
+     * Under ADR-126/127 this block forbade **four** artifacts, because the phase
+     * was planning-only and any one of them would have been a result the package
+     * could not have. ADR-128 authorizes implementation, so an acceptance record
+     * per closed slice is now legitimate — and forbidding it would make the
+     * guard fail on correct work, which this repository has already recorded as
+     * the more dangerous kind of failure.
+     *
+     * **The other three stay forbidden, and they are not the same three.** The
+     * matrix, the closing report and a deployment record are outcomes of slices
+     * that have not run. The list shrinks as the phase earns each one; it is
+     * never emptied.
+     */
     const reports = join(REPO, "docs/reports/phase-2q");
     const filed = existsSync(reports) ? readdirSync(reports) : [];
-    for (const forbidden of [/ACCEPTANCE/i, /TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
-      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before implementation`)
+    for (const forbidden of [/TRACEABILITY_MATRIX/i, /CLOSING_REPORT/i, /DEPLOYMENT/i]) {
+      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before its slice ran`)
         .toEqual([]);
     }
-    // No Phase 2Q migration, and no product-code file named for it.
-    const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /2q/i.test(name)), "a Phase 2Q migration exists").toEqual([]);
+
+    // The acceptance records that DO exist must be for slices that closed, and
+    // named in the repository's shape — so a stray file cannot enter the folder
+    // by looking vaguely like one.
+    const accepted = filed.filter((name) => /ACCEPTANCE/i.test(name));
+    for (const name of accepted) {
+      expect(name, `${name} is not a slice acceptance record`)
+        .toMatch(/^PHASE_2Q_SLICE_\d{2}_ACCEPTANCE\.md$/);
+    }
+    // Slice 2Q.0 is closed, so its record is required rather than merely
+    // permitted: a guard that only tolerates evidence never notices it vanish.
+    expect(accepted, "slice 2Q.0's acceptance record is missing")
+      .toContain("PHASE_2Q_SLICE_00_ACCEPTANCE.md");
+
+    /*
+     * **The migration allocation, asserted as a ceiling rather than as a zero.**
+     *
+     * `OD-2Q-7` allocates exactly one, spent in slice 2Q.1. Before that slice
+     * runs the count is zero; after it, it is one. **Two is a stop condition**,
+     * and that is the property worth holding across the whole phase — a flat
+     * "none" would have to be deleted the moment the allocation is legitimately
+     * spent, which is how a guard stops guarding.
+     */
+    const migrations = readdirSync(join(REPO, "supabase/migrations"))
+      .filter((name) => /2q|citation/i.test(name));
+    expect(migrations.length, `the allocation is one; found ${migrations.join(", ")}`)
+      .toBeLessThanOrEqual(1);
+  });
+
+  it("records the implementation authorization, and what it still refuses", () => {
+    const decisions = read("docs/DECISIONS.md");
+    const at = decisions.indexOf("## ADR-128");
+    expect(at, "ADR-128 is missing").toBeGreaterThan(-1);
+    const body = decisions.slice(at);
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "the authorization must name what it authorizes")
+      .toMatch(/authorizes \*\*implementation\*\*/);
+    expect(body, "a second migration must stay a stop condition")
+      .toMatch(/A second migration of any kind halts the phase/);
+    expect(body, "no paid AI call may be spent silently")
+      .toMatch(/No paid AI call is authorized/i);
+    expect(body, "the priority pendency is not discharged by being authorized")
+      .toMatch(/stays \*\*NOT DELIVERED\*\*/);
+    expect(body, "the closeout must stay conditioned on the owner")
+      .toMatch(/owner device checkpoint/);
+    expect(body, "an ADR in this series must not name the successor")
+      .not.toMatch(/2R/i);
+    // ADR-126 and ADR-127 stay intact rather than rewritten into agreement.
+    expect(body, "neither earlier ADR may be edited")
+      .toMatch(/Neither earlier ADR is edited/);
   });
 
   it("is not vacuous: every extractor above answers differently on a fixture", () => {
