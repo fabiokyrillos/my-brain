@@ -2440,6 +2440,7 @@ export type Database = {
       }
       summaries: {
         Row: {
+          citations: Json
           content: string
           generated_at: string
           id: string
@@ -2456,6 +2457,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          citations?: Json
           content: string
           generated_at?: string
           id?: string
@@ -2472,6 +2474,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          citations?: Json
           content?: string
           generated_at?: string
           id?: string

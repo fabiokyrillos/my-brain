@@ -63,21 +63,75 @@ export type SupportKind = (typeof SUPPORT_KINDS)[number];
 /** The answer itself is composed, never retrieved. */
 export const ANSWER_SUPPORT_KIND: SupportKind = "inference";
 
-export type CitedSourceType = "entry" | "memory";
+/**
+ * `OD-2Q-1`, signed as option A — **one vocabulary, one resolver, one set of
+ * degradation rules.**
+ *
+ * `task` joined in Phase 2Q because `generateReview` retrieves tasks and
+ * labelled them `memory:`. Persisting that verbatim stores a task uuid as a
+ * memory, and the resolver looks it up in `memories` — so every task citation
+ * degrades to "unavailable" in silence while every entry citation passes.
+ * `2Q-FOUNDATION-003` executes that failure before this line fixed it.
+ *
+ * **This costs no migration.** The deployed columns —
+ * `conversation_messages.citations` and, since `202608210100`,
+ * `summaries.citations` — are both `jsonb not null default '[]'::jsonb` with no
+ * check constraint, no trigger and no deployed validator. The pinning is here,
+ * in TypeScript, and this constant is the single place it lives.
+ */
+export const CITED_SOURCE_TYPES = ["entry", "memory", "task"] as const;
+export type CitedSourceType = (typeof CITED_SOURCE_TYPES)[number];
+
+/**
+ * How a source of each kind supports an answer.
+ *
+ * Written as an exhaustive record rather than as a ternary, deliberately: a
+ * ternary's `else` arm silently absorbs every type added after it was written,
+ * which is the exact shape of the defect this phase exists to remove. Adding a
+ * member to `CITED_SOURCE_TYPES` without deciding its support kind is now a
+ * type error rather than a wrong answer.
+ *
+ * A **task** is `product_state`: something the product currently holds as true
+ * on the owner's behalf, derived from something they wrote. It is not a
+ * `direct_record`, because the owner did not type the task — they typed the
+ * entry it came from.
+ */
+const SUPPORT_BY_TYPE: Readonly<Record<CitedSourceType, SupportKind>> = {
+  entry: "direct_record",
+  memory: "product_state",
+  task: "product_state",
+};
 
 export function supportKindForSource(type: CitedSourceType): SupportKind {
-  return type === "entry" ? "direct_record" : "product_state";
+  return SUPPORT_BY_TYPE[type];
 }
 
 /**
- * `2K-SRC-006` — what the retrieval actually covers.
+ * `2K-SRC-006` — what a retrieval *may* cover, and what each caller *did*.
  *
- * Two source types, and the product should say so. Today it implies it looked
- * everywhere; ADR-055 and OD-2K-A mean it looks at entries and memories. Making
- * the limit legible costs nothing and teaches the user the shape of the system.
+ * **These are two different facts, and Phase 2Q separated them.** Until then
+ * one constant served as both, because there was one caller. There are now two,
+ * and they reach different places: chat retrieves entries and memories
+ * (ADR-055, OD-2K-A), while a review retrieves entries and tasks (`OD-2Q-2`,
+ * signed as option A).
+ *
+ * Collapsing them again would make the product lie in one direction or the
+ * other — either chat would claim it reads tasks, or a review's envelope would
+ * be unparseable for naming one. So `ANSWER_REACH` is the **admissible
+ * vocabulary** the envelope schema validates against, and each caller declares
+ * its own reach below.
+ *
+ * `CHAT_REACH` is byte-identical to what the single constant used to be, which
+ * is what makes chat's own tests the control that its behaviour did not move.
  */
-export const ANSWER_REACH = ["entry", "memory"] as const;
+export const ANSWER_REACH = CITED_SOURCE_TYPES;
 export type AnswerReach = (typeof ANSWER_REACH)[number];
+
+/** What `sendChatMessage` retrieves. Unchanged, and its copy still says so. */
+export const CHAT_REACH: readonly AnswerReach[] = ["entry", "memory"];
+
+/** What `generateReview` retrieves — `OD-2Q-2`, signed as option A. */
+export const REVIEW_REACH: readonly AnswerReach[] = ["entry", "task"];
 
 /** The version stamped on every envelope this module writes. */
 export const CITATIONS_ENVELOPE_VERSION = "2026-08-09.1";
@@ -92,7 +146,7 @@ export const CITATIONS_ENVELOPE_VERSION = "2026-08-09.1";
 const referenceSchema = z
   .object({
     id: z.string().min(1).max(100),
-    type: z.enum(["entry", "memory"]),
+    type: z.enum(CITED_SOURCE_TYPES),
     sourceId: z.string().uuid(),
     support: z.enum(SUPPORT_KINDS),
   })
@@ -144,6 +198,13 @@ export type CitationsEnvelope = z.infer<typeof envelopeSchema>;
  */
 const legacyEntrySchema = z.object({
   id: z.string().min(1),
+  /**
+   * **Deliberately NOT widened with the vocabulary above.** The legacy shape was
+   * written by a code path that retrieved entries and memories and nothing else,
+   * so a legacy row can never contain a task. Admitting one here would let a
+   * corrupt or hand-edited row claim a type its writer could not have produced,
+   * and would describe history that did not happen.
+   */
   type: z.enum(["entry", "memory"]),
   sourceId: z.string().uuid(),
 });
@@ -227,11 +288,20 @@ export function buildCitationsEnvelope(input: {
   readonly retrievedAnyQualifyingSource: boolean;
   readonly sources: readonly PersistedSourceReference[];
   readonly explanation?: AnswerExplanation;
+  /**
+   * What **this** caller retrieved — `CHAT_REACH` or `REVIEW_REACH`.
+   *
+   * Required rather than defaulted. A default would silently give a new caller
+   * chat's reach, and a review stamped with chat's reach would tell the owner
+   * the Brain looked in their memories when it looked at their tasks. The
+   * caller knows; the constant cannot.
+   */
+  readonly reach: readonly AnswerReach[];
 }): CitationsEnvelope {
   return {
     v: CITATIONS_ENVELOPE_VERSION,
     evidence: input.retrievedAnyQualifyingSource ? "evidenced" : "no_qualifying_evidence",
-    reach: [...ANSWER_REACH],
+    reach: [...input.reach],
     sources: [...input.sources],
     ...(input.explanation === undefined ? {} : { explanation: input.explanation }),
   };

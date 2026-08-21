@@ -167,6 +167,35 @@ function resolveOne(
     };
   }
 
+  /*
+   * `OD-2Q-1` widened the vocabulary to `entry | memory | task`, and this branch
+   * is what stops that widening from breaking this resolver **silently**.
+   *
+   * Before Phase 2Q the code below was reached by anything that was not an
+   * entry, so a `task` reference would have been looked up in `memories`,
+   * missed, and returned as `unavailable` — the exact defect
+   * `2Q-FOUNDATION-003` records, moved one level up rather than fixed.
+   *
+   * **A task is refused here rather than resolved, and that is the correct
+   * outcome, not a gap.** This module is chat's, and chat does not retrieve
+   * tasks (`OD-2Q-2`, signed option A), so no chat envelope can contain one.
+   * A review's envelope can — and a review must **not** be resolved through
+   * this path: `readOnlyPreviewCard` requires a `snippet` and a `sensitivity`,
+   * which for a task would mean putting its title on the surface and deriving
+   * its classification from `source_entry_id`. `OD-2Q-5` is signed as **option
+   * C**: the sources area shows no content at all, and ADR-127 Decision 5.1
+   * records that a source list carrying no governed content never resolves a
+   * classification in the first place. The review page therefore has its own
+   * content-free resolver.
+   *
+   * So this returns the same `unavailable` shape a deleted or foreign record
+   * gets — refusing, never inventing — and the type system makes the branch
+   * unmissable rather than implicit.
+   */
+  if (reference.type === "task") {
+    return { ...base, card: unavailableCard("task"), occurredAt: null };
+  }
+
   const row = memoryById.get(reference.sourceId);
   if (!row) return { ...base, card: unavailableCard("memory"), occurredAt: null };
   // An archived memory is unreadable *as a source*, and says so with the same

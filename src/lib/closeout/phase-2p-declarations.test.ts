@@ -187,7 +187,20 @@ describe("Phase 2P declarations", () => {
     ]);
     // The rejected candidate is not copied forward under any name. Unchanged.
     expect(migrations.filter((name) => name.startsWith("202608170098"))).toEqual([]);
-    expect(migrations).toHaveLength(99);
+    /*
+     * Phase 2P's own list above is UNCHANGED and stays pinned at exactly two by
+     * name — a third Phase 2P migration is still a stop condition, and still
+     * fails here.
+     *
+     * Only the whole-tree total moves, because Phase 2Q spent the ONE migration
+     * ADR-127 Decision 7 allocated (`summaries.citations`, `202608210100`). It
+     * is counted explicitly rather than absorbed into a bumped number, so an
+     * unattributed migration arriving beside it still fails this line.
+     */
+    const laterPhase2q = migrations.filter((name) => /phase[_-]?2q/i.test(name));
+    expect(laterPhase2q, `Phase 2Q is allocated exactly one migration: ${laterPhase2q.join(", ")}`)
+      .toEqual(["202608210100_phase_2q_slice_1_summary_citations.sql"]);
+    expect(migrations).toHaveLength(99 + laterPhase2q.length);
   });
 
   it("records the second authorization, and what it still refuses", () => {

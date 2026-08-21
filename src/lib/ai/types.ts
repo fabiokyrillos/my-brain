@@ -23,7 +23,21 @@ export type EmbeddingResult = AIUsageDetails & {
 
 export type ChatSource = {
   id: string;
-  type: "entry" | "memory";
+  /**
+   * `OD-2Q-1`, signed as option A — **one vocabulary, not two.**
+   *
+   * `task` is here because `generateReview` retrieves tasks and used to label
+   * them `memory:`. That is not cosmetic: `resolve-sources.ts` looks a `memory`
+   * up in the `memories` table, so a task uuid stored under that type resolves
+   * to "unavailable" for **every** task citation while every entry citation
+   * passes — a feature that ships green and silently answers none of the
+   * owner's actual questions. `2Q-FOUNDATION-003` executes that failure.
+   *
+   * The provider is generic in this field: it interpolates it into the source
+   * envelope and filters returned ids against the set it was given. Widening it
+   * therefore costs no prompt change and no migration.
+   */
+  type: "entry" | "memory" | "task";
   content: string;
   occurredAt: string;
   similarity: number;

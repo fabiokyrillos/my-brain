@@ -96,7 +96,8 @@ describe("2N-RELATION-003: this slice persists nothing and infers nothing", () =
     // The phase's ceiling, restated where a slice could break it.
     // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
     // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning.
-    expect(migrations).toHaveLength(99);
+    // Chain head moved to 100 by Phase 2Q slice 2Q.1's ONE authorized migration (ADR-127 Decision 7 / ADR-128 Decision 3: summaries.citations). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched. A SECOND 2Q migration is a stop condition and fails here.
+    expect(migrations).toHaveLength(100);
   });
 
   it("mutation control: the narrowed migration scan still refuses this slice's own", () => {

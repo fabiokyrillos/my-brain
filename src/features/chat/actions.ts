@@ -16,6 +16,7 @@ import { recordErrorEvent, type ErrorOperation } from "@/lib/observability/error
 import { chatFailureMessage, classifyChatFailure, withChatFailureReference } from "./diagnostics";
 import {
   buildCitationsEnvelope,
+  CHAT_REACH,
   supportKindForSource,
 } from "@/features/conversation-sources/contracts";
 import { buildAnswerExplanation } from "@/features/conversation-sources/explanation";
@@ -350,6 +351,16 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       retrievedAnyQualifyingSource: sources.length > 0,
       sources: references,
       explanation,
+      /*
+       * Chat's own reach, unchanged. `OD-2Q-1` widened the citation **type**
+       * vocabulary to admit `task`; it did not widen what chat retrieves, and
+       * `conversation-sources/copy.ts` still tells the owner *"those two places
+       * only"*. Passing the caller's reach rather than spreading a shared
+       * constant is what keeps those two facts from drifting: a review declares
+       * `REVIEW_REACH`, and neither surface can silently inherit the other's
+       * sentence.
+       */
+      reach: CHAT_REACH,
     });
 
     const { error: answerError } = await supabase.from("conversation_messages").insert({

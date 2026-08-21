@@ -140,7 +140,11 @@ const REPO = resolve(__dirname, "../../..");
 // change.
 // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
 // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning: this pin moves in the commit that adds the migration, and this guard's claim about THIS initiative is untouched.
-const AUTHORIZED_MIGRATION_HEAD = "202608190099";
+// Chain head moved to 202608210100 by Phase 2Q slice 2Q.1's ONE authorized
+// migration (ADR-127 Decision 7 / ADR-128 Decision 3: summaries.citations). Same
+// reasoning: this pin moves in the commit that adds the migration, and this
+// guard's claim about THIS initiative is untouched.
+const AUTHORIZED_MIGRATION_HEAD = "202608210100";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

@@ -194,6 +194,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // table's existing 24-hour default and is reaped by the sweep
       // `202607250052` already ships: a reused signed value, not a minted one.
       "202608190099_phase_2p_slice_4_automation_policy_and_calibration.sql",
+      // Phase 2Q slice 2Q.1. Relevant to THIS guard because it is a schema
+      // change that arrived after the correction, and irrelevant to its
+      // subject for the clearest possible reason: it adds ONE column with a
+      // default and does nothing else. It schedules no sweep, mints no
+      // retention value, registers no window, creates no table and writes no
+      // row. The citations it stores are identifiers on a row that is already
+      // deleted by the `auth.users` cascade with its review.
+      "202608210100_phase_2q_slice_1_summary_citations.sql",
     ]);
   });
 });
