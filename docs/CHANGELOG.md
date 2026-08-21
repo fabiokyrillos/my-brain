@@ -2,6 +2,20 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - Phase 2Q planning package integrated
+
+**Merged at `0dc9d1a` (PR #276). The owner authorized the merge of the planning package and nothing else: no slice is started, no migration exists, nothing was deployed, and no hosted data was written.**
+
+**Verified before the merge:** the PR head was still `0720333`; `origin/main` was still `beef7fa`, so the branch had **zero commits to re-audit against**; CI was 4/4 on that head; zero reviews and zero actionable comments — the single comment is the Vercel bot's `Ready` status with live feedback 0/0/0; state `MERGEABLE` / `CLEAN`.
+
+**Verified after it:** CI **green 3/3 on the merge SHA** (run `32488777919`, executed steps 11 / 23 / 9 — checked, because a cancelled job reports an empty `steps[]` and still reads as a run); `main` local = `origin/main` = `0dc9d1a`, divergence `0 0`; worktree clean; **zero open PRs**; **99 local = 99 hosted, parity `202608190099`** re-read live; **zero product code and zero migrations on `main` since `beef7fa`**; governance guards **126 passed** on merged `main`.
+
+**The sequence, stated so it cannot be misread: planned → signed → integrated → NOT STARTED.** ADR-126 authorizes planning, ADR-127 signs the eight decisions, and this merge authorizes only integration. None of the three authorizes implementation.
+
+**Two of the eleven pre-merge confirmations needed reading, and the automated check was wrong both times.** Confirmation 9 — *no promise of a task title in the source row* — first read line by line; Markdown wraps, so a sentence's negation kept landing on the next line and **every hit it produced was a prohibition it had cut in half**. Rewritten to work on sentences it still produced two: one where the negation is *"rather than titles"*, and one where the negation lives in a numbered list's **preamble** and is structurally outside the item's own sentence. Rather than tune the regex until it agreed — which is how a check stops being a check — **all 18 sentences in the package mentioning a title were enumerated and read**. Every one is a prohibition, a threat description, a test criterion, an asset listing, or the literal `summaries.title` column name. **Zero promises.** Confirmation 9b failed on a wrong assertion string, looking for *"never by its title"* while ADR-127 Decision 5.2 says *"not by its title or any excerpt"*.
+
+**Unchanged:** `2P-REVIEW-CITATIONS` stays **NOT DELIVERED** — planning it, signing its decisions and merging the plan are three things that are not delivering it; `2P-ACCESS-005` stays **WAIVED, NOT PASSED**; signup closed; rollout 25 pass · 3 fail · 2 owner-signature; push HTTP 403 not resumed; `RG-DEP-3` still cannot be closed by writing a file; the residual worktrees are deliberately left in place.
+
 ## 2026-08-21 - Phase 2Q: all eight decisions signed, one against the recommendation
 
 **Still planning only. ADR-127 authorizes no implementation. ZERO product code, ZERO migrations, parity `202608190099` unchanged. PR #276 stays a draft, and the only remaining blocker on the phase is an implementation authorization.**
