@@ -41,8 +41,9 @@ const ROW = {
  * agreed with the bug. So the assertions check the **arguments**, and the
  * `from` spy is what proves the table.
  */
-function supabaseStub(row: unknown, error: unknown = null) {
+function supabaseStub(row: unknown, error: unknown = null, cited: Record<string, unknown[]> = {}) {
   const calls: Record<string, unknown[][]> = {};
+  let table = "";
   const query: Record<string, unknown> = {};
   for (const method of ["select", "eq"]) {
     query[method] = vi.fn((...args: unknown[]) => {
@@ -51,15 +52,43 @@ function supabaseStub(row: unknown, error: unknown = null) {
     });
   }
   query.maybeSingle = vi.fn(async () => ({ data: row, error }));
-  const from = vi.fn((table: string) => {
-    (calls.from ??= []).push([table]);
+  /*
+   * The citation re-read (`2Q-TRUST-001`). `in` resolves rather than chaining,
+   * and it answers **per table** — so a resolver that looked a task up in
+   * `memories` would get nothing back here, which is exactly the defect
+   * `2Q-FOUNDATION-003` recorded. The fake must not agree with that bug.
+   */
+  query.in = vi.fn((...args: unknown[]) => {
+    (calls.in ??= []).push([table, ...args]);
+    return Promise.resolve({ data: cited[table] ?? [], error: null });
+  });
+  const from = vi.fn((requested: string) => {
+    table = requested;
+    (calls.from ??= []).push([requested]);
     return query;
   });
   return { calls, client: { from } };
 }
 
-async function mount(row: unknown = ROW, reviewId = "r1", error: unknown = null) {
-  const stub = supabaseStub(row, error);
+/**
+ * A stored citations envelope naming the ids given, in the shape
+ * `buildCitationsEnvelope` writes. Written out rather than imported so this
+ * file exercises the parser on a literal, exactly as a stored row would.
+ */
+function envelope(entryId: string | null, taskId: string | null) {
+  const sources = [];
+  if (entryId) sources.push({ id: `entry:${entryId}`, type: "entry", sourceId: entryId, support: "direct_record" });
+  if (taskId) sources.push({ id: `task:${taskId}`, type: "task", sourceId: taskId, support: "product_state" });
+  return { v: "2026-08-09.1", evidence: "evidenced", reach: ["entry", "task"], sources };
+}
+
+async function mount(
+  row: unknown = ROW,
+  reviewId = "r1",
+  error: unknown = null,
+  cited: Record<string, unknown[]> = {},
+) {
+  const stub = supabaseStub(row, error, cited);
   vi.mocked(requireUser).mockResolvedValue({ supabase: stub.client, user: { id: "user-1" } } as never);
   const element = await ReviewDetailPage({
     params: Promise.resolve({ locale: "pt-BR", reviewId }),
@@ -236,12 +265,105 @@ describe("sources are stated only as far as the row can prove them", () => {
       .toBeInTheDocument();
   });
 
-  it("states the limit instead of showing an empty list of sources", async () => {
-    // The honest pendência: the citations exist at generation time and are
-    // discarded at write time, so the page cannot list them.
-    await mount();
-    expect(screen.getByText(/não pode apontar com certeza quais itens entraram nela/))
-      .toBeInTheDocument();
+  it("2Q-LINK-007: a review with no recorded references says so, and shows no empty container", async () => {
+    /*
+     * **Updated by slice 2Q.2, and the sentence changed with the fact.** It used
+     * to say the text is stored *without* its references — true of every review
+     * before `202608210100`, and false of every one written after. It now says
+     * the references *were not recorded*, which stays true of the historical
+     * rows forever and claims nothing about new ones.
+     *
+     * ADR-125 Decision 4: a "Fontes" section without canonical links in it is
+     * not delivery. So the honest statement appears **instead of** a list, never
+     * beside an empty one.
+     */
+    const { container } = await mount();
+    expect(screen.getByText(/não foram registradas quando ela foi escrita/)).toBeInTheDocument();
+    expect(container.querySelectorAll("ul.review-cited-list")).toHaveLength(0);
+    expect(screen.queryByText("Itens citados")).toBeNull();
+  });
+
+  it("2Q-LINK-006: a review that cited records lists them, each reachable by a canonical link", async () => {
+    const ENTRY = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    const TASK = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+    const { container } = await mount(
+      { ...ROW, citations: envelope(ENTRY, TASK) },
+      "r1",
+      null,
+      {
+        entries: [{ id: ENTRY, occurred_at: "2026-08-11T10:00:00Z" }],
+        tasks: [{ id: TASK, updated_at: "2026-08-12T10:00:00Z" }],
+      },
+    );
+
+    const list = container.querySelector("ul.review-cited-list") as HTMLElement;
+    expect(list).not.toBeNull();
+    expect([...list.querySelectorAll("li")].map((item) => [
+      item.querySelector(".review-cited-kind")?.textContent,
+      item.querySelector("a")?.getAttribute("href"),
+    ])).toEqual([
+      ["Registro", `/pt-BR/app/inbox/${ENTRY}`],
+      ["Tarefa", `/pt-BR/app/work/${TASK}`],
+    ]);
+    expect(screen.queryByText(/não foram registradas quando ela foi escrita/)).toBeNull();
+  });
+
+  it("2Q-TRUST-001: it re-reads every cited record under the reader's own session", async () => {
+    const ENTRY = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    const TASK = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+    const { stub } = await mount({ ...ROW, citations: envelope(ENTRY, TASK) }, "r1", null, {
+      entries: [{ id: ENTRY, occurred_at: null }],
+      tasks: [{ id: TASK, updated_at: null }],
+    });
+    expect(stub.calls.from).toEqual([["summaries"], ["entries"], ["tasks"]]);
+    expect(stub.calls.from).not.toContainEqual(["memories"]);
+    expect(stub.calls.eq).toContainEqual(["user_id", "user-1"]);
+  });
+
+  it("2Q-LINK-004: naming a real task by title creates no link, because no id vouched for it", async () => {
+    /*
+     * The requirement the owner stated by name: **no link is ever born from
+     * matching a name in the Markdown against a record.** The task below is real
+     * and its record resolves — it is simply not named by the prose as a link,
+     * so the prose that mentions it stays prose.
+     */
+    const TASK = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
+    const { container } = await mount(
+      { ...ROW, content: "Você concluiu **Fechar o contrato** nesta semana.", citations: envelope(null, TASK) },
+      "r1",
+      null,
+      { tasks: [{ id: TASK, updated_at: "2026-08-12T10:00:00Z" }] },
+    );
+    const rendered = container.querySelector(".review-content") as HTMLElement;
+    expect(rendered.querySelectorAll("a")).toHaveLength(0);
+    expect(rendered.textContent).toContain("Fechar o contrato");
+    // Two-sided: the citation IS resolved, so the area below does link it — the
+    // absence above is about the prose, not about a resolver that did nothing.
+    expect(container.querySelectorAll("ul.review-cited-list a")).toHaveLength(1);
+  });
+
+  it("2Q-LINK-002: an entry-vouched id does not authorize a task route in the prose", async () => {
+    const ENTRY = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    const { container } = await mount(
+      { ...ROW, content: `abra [a tarefa](/pt-BR/app/work/${ENTRY})`, citations: envelope(ENTRY, null) },
+      "r1",
+      null,
+      { entries: [{ id: ENTRY, occurred_at: "2026-08-11T10:00:00Z" }] },
+    );
+    const rendered = container.querySelector(".review-content") as HTMLElement;
+    expect(rendered.querySelectorAll("a")).toHaveLength(0);
+    expect(rendered.textContent).toContain("a tarefa");
+
+    // Two-sided: the SAME id on its own surface IS admitted, so the refusal is
+    // about the pair rather than about an allow-set that admits nothing.
+    cleanup();
+    const { container: right } = await mount(
+      { ...ROW, content: `abra [o registro](/pt-BR/app/inbox/${ENTRY})`, citations: envelope(ENTRY, null) },
+      "r1",
+      null,
+      { entries: [{ id: ENTRY, occurred_at: "2026-08-11T10:00:00Z" }] },
+    );
+    expect((right.querySelector(".review-content") as HTMLElement).querySelectorAll("a")).toHaveLength(1);
   });
 });
 

@@ -448,6 +448,8 @@ describe("Phase 2Q declarations", () => {
       .toContain("PHASE_2Q_SLICE_00_ACCEPTANCE.md");
     expect(accepted, "slice 2Q.1's acceptance record is missing")
       .toContain("PHASE_2Q_SLICE_01_ACCEPTANCE.md");
+    expect(accepted, "slice 2Q.2's acceptance record is missing")
+      .toContain("PHASE_2Q_SLICE_02_ACCEPTANCE.md");
 
     /*
      * **A deployment record became legitimate the moment the migration was

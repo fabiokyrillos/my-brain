@@ -14,15 +14,20 @@
  *
  * ## Two of the five are asserted as DEFECTS, deliberately
  *
- * `2Q-FOUNDATION-003` and `-004` assert behaviour that is **wrong**, by
- * executing it. That is the point: the phase begins from a demonstrated defect
- * rather than from an argument, and slices 2Q.1 and 2Q.2 invert these blocks
- * rather than deleting them. A test that only ever described the fixed state
- * could never show that the defect was real.
+ * `2Q-FOUNDATION-003` and `-004` asserted behaviour that was **wrong**, by
+ * executing it. That was the point: the phase began from a demonstrated defect
+ * rather than from an argument.
  *
- * **When you come here to invert one, invert it — do not delete it.** An absence
- * nobody asserts is an absence nobody notices disappearing, which is the rule
- * this repository has held since Phase 2N.
+ * **Both are now INVERTED — by slices 2Q.1 and 2Q.2 — and neither was deleted.**
+ * Every inverted block says so in its own body, names the slice that turned it,
+ * and forbids the old shape **by name**, so a revert cannot pass quietly. An
+ * absence nobody asserts is an absence nobody notices disappearing, which is the
+ * rule this repository has held since Phase 2N.
+ *
+ * **`-003` did not invert in the direction slice 2Q.0 predicted**, and its body
+ * explains why at length: `OD-2Q-5` was signed as option C, which removed the
+ * consumer that prediction assumed. The divergence is recorded there rather than
+ * smoothed over here.
  *
  * ## What this file is not
  *
@@ -48,13 +53,52 @@ const REVIEW_PAGE = "src/app/[locale]/app/reviews/[reviewId]/page.tsx";
 const CONTRACTS = "src/features/conversation-sources/contracts.ts";
 const CANDIDATE_SPEC = "e2e/editable-candidate-confirmation.spec.ts";
 
-/** The line a pattern is on, 1-indexed, so a finding is recorded as a location. */
-function lineOf(relative: string, pattern: RegExp): number {
-  const lines = read(relative).split("\n");
-  const index = lines.findIndex((line) => pattern.test(line));
-  expect(index, `${relative} no longer contains ${pattern}`).toBeGreaterThan(-1);
-  return index + 1;
+/**
+ * A source file with its comments removed — **code, not prose.**
+ *
+ * ## Why this exists, and why it is written down rather than inlined
+ *
+ * This is the **fourth** time in Phase 2Q that a guard scanning for a forbidden
+ * construct failed on the paragraph explaining why the construct is forbidden:
+ *
+ *   1. the migration-refusal scan, on `on delete set null` inside a `--` comment;
+ *   2. the same scan again, on `foreign key` inside `comment on column`, which
+ *      is prose living inside a **statement**;
+ *   3. `review-sources.test.ts`, on `resolveContent` inside the paragraph saying
+ *      the module never calls it;
+ *   4. here, on `new Set<string>()` inside the sentence saying the page no
+ *      longer passes one.
+ *
+ * The rule under all four: **an authority guard must forbid the act, not the
+ * word.** The tempting repair each time is to reword the explanation until the
+ * scanner agrees — which is fixing the evidence to fit the test, and leaves the
+ * next reader with a comment that says less than it should.
+ *
+ * Callers that use this must pair it with a **two-sided** control proving it
+ * removes prose and keeps statements; a stripper that removed everything would
+ * make every refusal pass on an empty string.
+ */
+function executable(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("//"))
+    .join("\n");
 }
+
+/*
+ * `lineOf` lived here and is **gone, deliberately, with its last caller.**
+ *
+ * Slice 2Q.0 pinned findings to line numbers, because a finding without a
+ * location is an opinion. Slices 2Q.1 and 2Q.2 then edited every file it pointed
+ * at, and a pin that has to be re-typed on each edit teaches the next reader to
+ * re-type it without looking — which is how a pin stops being a check.
+ *
+ * The provenance did not disappear: `PHASE_2Q_SLICE_00_ACCEPTANCE.md` states the
+ * lines **as measured on `a0295a2`**, which stays true of `a0295a2` forever, and
+ * one assertion above reads that record back. What is asserted live is the
+ * property.
+ */
 
 /** `generateReview`'s body, isolated from the rest of a 1000-line action file. */
 function generateReviewBody(): string {
@@ -233,12 +277,40 @@ describe("2Q-FOUNDATION-002: summaries has no column able to hold a citation", (
       .toEqual(["202608210100_phase_2q_slice_1_summary_citations.sql"]);
   });
 
-  it("and the review page therefore vouches for nothing", () => {
-    expect(read(REVIEW_PAGE)).toContain("allowedIds: new Set<string>()");
-    // Still the empty set at slice 2Q.1: the column now holds the references,
-    // and **slice 2Q.2 is what feeds them to the allow-set.** A migration whose
-    // consumer shipped early would have made this line a lie one slice sooner.
-    expect(lineOf(REVIEW_PAGE, /allowedIds: new Set<string>\(\)/)).toBe(125);
+  it("and the review page now vouches FROM the stored envelope — INVERTED by slice 2Q.2", () => {
+    /*
+     * **Inverted, not deleted.**
+     *
+     * Slice 2Q.0 recorded `allowedIds: new Set<string>()` — the page had nothing
+     * to vouch for, so every link a model wrote collapsed into text. Slice 2Q.1
+     * filled the column and deliberately **left this line alone**, because a
+     * migration whose consumer shipped early would have made it a lie one slice
+     * sooner. Slice 2Q.2 is what feeds it, so the assertion now requires the
+     * opposite and **forbids the empty set by name**.
+     */
+    const page = read(REVIEW_PAGE);
+    // Comments stripped — see `executable`. The page's own comment says what the
+    // allow-set *used to be*, and a guard that tripped on that sentence would be
+    // forbidding the word rather than the act.
+    expect(executable(page), "the page went back to vouching for nothing")
+      .not.toContain("new Set<string>()");
+    expect(page, "the allow-set must come from the resolved sources and nothing else")
+      .toContain("vouchedFor: vouchedFrom(sources)");
+    expect(page, "and those sources must be RE-READ, never taken from the envelope alone")
+      .toContain("await resolveReviewSources(supabase, user.id, row.citations, locale)");
+    expect(page, "the citations column must actually be selected")
+      .toMatch(/\.select\("[^"]*citations[^"]*"\)/);
+  });
+
+  it("that stripper is two-sided: it removes prose and keeps statements", () => {
+    // Without this the assertion above would pass on an empty string, which is
+    // the failure mode of fixing a scanner instead of a finding.
+    const page = read(REVIEW_PAGE);
+    expect(page, "the page must still explain what the allow-set used to be")
+      .toContain("new Set<string>()");
+    expect(executable(page)).not.toContain("new Set<string>()");
+    expect(executable(page), "the stripper ate the page itself")
+      .toContain("export default async function ReviewDetailPage");
   });
 });
 
@@ -395,24 +467,39 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
   });
 });
 
-describe("2Q-FOUNDATION-004: an entry-vouched id authorizes a task route — EXECUTED", () => {
+describe("2Q-FOUNDATION-004: the link gate binds the PAIR — INVERTED by slice 2Q.2", () => {
   /*
-   * **This block asserts a defect too.** `authorizeHref`'s allow-set is keyed on
-   * the uuid alone and `INTERNAL_ROUTE`'s surface segment is `[a-z-]+`, so an
-   * envelope vouching for entry `X` also authorizes `/pt-BR/app/work/X`.
+   * **This block asserted a defect, and the defect is gone.**
    *
-   * **Inert today** — the review page passes an empty set — and **live the
-   * moment slice 2Q.1 populates it. Slice 2Q.2 inverts this block.**
+   * As recorded: `authorizeHref`'s allow-set was keyed on the uuid alone and
+   * `INTERNAL_ROUTE`'s surface segment was `[a-z-]+` and never read, so an
+   * envelope vouching for entry `X` also authorized `/pt-BR/app/work/X`. It was
+   * **inert** while the review page passed an empty set, and it went **live the
+   * moment slice 2Q.1 filled the column** — which is why slice 2Q.2 closed it in
+   * the very next unit rather than at closeout.
+   *
+   * The set below now holds a `type:id` **pair**, as `vouchedKey` builds it.
    */
   const ID = "44444444-4444-4444-8444-444444444444";
-  const vouched = new Set([ID]);
+  const vouched = new Set([`task:${ID}`]);
 
-  it("admits the same id on every surface, which is the gap", () => {
-    for (const surface of ["inbox", "work", "people", "projects", "memories"]) {
+  it("admits ONLY the surface the id was vouched for — INVERTED by slice 2Q.2", () => {
+    /*
+     * **The inversion this block was written for.** As shipped through
+     * `c7c8db0` it asserted the defect: one vouched-for uuid opened `inbox/`,
+     * `work/`, `people/`, `projects/` **and** `memories/`, because the allow-set
+     * was keyed on the uuid alone and the surface segment was never read.
+     *
+     * Slice 2Q.2 binds the pair. The id is vouched for **as a task**, so exactly
+     * one of those five is admitted and the other four — every one of which used
+     * to pass — is refused **by name**, so a regression says which it re-opened.
+     */
+    expect(authorizeHref(`/pt-BR/app/work/${ID}`, vouched)).toBe(`/pt-BR/app/work/${ID}`);
+    for (const surface of ["inbox", "memories", "people", "projects"]) {
       expect(
         authorizeHref(`/pt-BR/app/${surface}/${ID}`, vouched),
-        `${surface} is already refused — the gate now binds more than the uuid`,
-      ).toBe(`/pt-BR/app/${surface}/${ID}`);
+        `a task-vouched id still opens ${surface}/ — the gap is back`,
+      ).toBeNull();
     }
   });
 
@@ -423,10 +510,29 @@ describe("2Q-FOUNDATION-004: an entry-vouched id authorizes a task route — EXE
     }
   });
 
-  it("takes no type at all, which is why it cannot bind one", () => {
-    expect(read("src/features/reviews/markdown.ts"))
-      .toContain("export function authorizeHref(href: string, allowedIds: ReadonlySet<string>): string | null {");
-    expect(lineOf("src/features/reviews/markdown.ts", /^export function authorizeHref\(/)).toBe(135);
+  it("reads the surface back to a type, which is what lets it bind one — INVERTED by slice 2Q.2", () => {
+    /*
+     * The mechanism, not just the outcome. Slice 2Q.0 recorded that
+     * `authorizeHref` took **no type at all**, which is why it could not bind
+     * one. It now maps the surface segment through `citation-routes.ts` — **one
+     * map, shared with the code that BUILDS the hrefs**, so the gate and the
+     * renderer cannot drift into disagreeing about a route.
+     */
+    const markdown = read("src/features/reviews/markdown.ts");
+    expect(markdown)
+      .toContain("export function authorizeHref(href: string, vouchedFor: ReadonlySet<string>): string | null {");
+    expect(markdown, "the surface segment must be captured, not skipped")
+      .toContain("const type = citedTypeForSegment(match[1]);");
+    expect(markdown, "a segment naming no citable type must be refused outright")
+      .toContain("if (!type) return null;");
+    expect(markdown, "and the pair must be the key")
+      .toContain("vouchedFor.has(vouchedKey(type, match[2]))");
+    // One map, two consumers — asserted so a second, private copy of the route
+    // table cannot appear beside it.
+    const routes = read("src/features/reviews/citation-routes.ts");
+    expect(routes).toContain('entry: "inbox"');
+    expect(routes).toContain('memory: "memories"');
+    expect(routes).toContain('task: "work"');
   });
 });
 

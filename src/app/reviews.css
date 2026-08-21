@@ -521,3 +521,96 @@
 
   .review-open { width: 100%; justify-content: center; }
 }
+
+/* Cited items — `OD-2Q-5`, signed as option C.
+
+   THE SHAPE IS THE PRIVACY CONTROL. A row holds a kind word, a date and a link,
+   and it holds them the same way for every citation whatever the cited record's
+   classification. There is no title column, no excerpt line and no reveal
+   control, because `ReviewSourceRow` has no field for any of them — this sheet
+   could not draw one if it wanted to.
+
+   `.review-cited-*`, NOT `.review-source-*`. That prefix is taken: this sheet
+   already draws `.review-source-facts`, and reusing it would have made the two
+   lists inherit each other's rules. A class name is an interface, and this
+   repository has already paid once for taking one that had an owner. */
+.review-cited-heading {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.review-cited-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  max-width: var(--width-reading);
+  list-style: none;
+}
+
+/* `auto auto 1fr` rather than three equal columns: the kind and the date are
+   short and fixed, and the link takes the remaining measure so its target stays
+   comfortably above the 44px minimum on a phone. */
+.review-cited-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+/* The kind is styled by ONE rule for every value of `data-kind`. Deliberately:
+   a per-type rule would let a future edit give one kind a different look, and a
+   list whose rows differed by kind — or by classification — would disclose
+   something the row itself refuses to say. */
+.review-cited-kind {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  padding: 2px var(--space-3);
+  color: var(--text-secondary);
+  font: var(--type-eyebrow);
+  white-space: nowrap;
+}
+
+.review-cited-when {
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  white-space: nowrap;
+}
+
+.review-cited-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--link);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+.review-cited-link:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+/* Removed, unreadable and foreign all render this, identically. It is text and
+   never an anchor: a link to a record that is gone is the broken link this
+   phase exists to remove. */
+.review-cited-gone {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* One column on a phone, so the kind, the date and the link stack rather than
+   squeezing the link's target below the touch minimum. Placed AFTER the base
+   rules it overrides — a media query above them adds no specificity and is
+   silently dead, which this repository has already recorded once. */
+@media (max-width: 600px) {
+  .review-cited-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-1);
+    align-items: start;
+  }
+  .review-cited-kind { justify-self: start; }
+}
