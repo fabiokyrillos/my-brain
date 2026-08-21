@@ -12,6 +12,8 @@ import { getReviewDetailCopy } from "@/features/reviews/copy";
 import { parseReviewMarkdown } from "@/features/reviews/markdown";
 import { formatReviewPeriodRange } from "@/features/reviews/period-format";
 import { RenderedReviewContent } from "@/features/reviews/rendered-markdown";
+import { resolveReviewSources, vouchedFrom } from "@/features/reviews/review-sources";
+import { ReviewSourcesList } from "@/features/reviews/review-sources-list";
 import { calendarOrientationFor } from "@/features/reviews/review-periods";
 import { toReviewDetailView } from "@/features/reviews/review-presentation";
 import { requireUser } from "@/lib/auth/require-user";
@@ -66,7 +68,7 @@ export default async function ReviewDetailPage({
 
   const result = await supabase
     .from("summaries")
-    .select("id,title,content,period_type,period_start,period_end,status,generated_at,model")
+    .select("id,title,content,period_type,period_start,period_end,status,generated_at,model,citations")
     .eq("user_id", user.id)
     .eq("id", reviewId)
     .maybeSingle();
@@ -110,19 +112,27 @@ export default async function ReviewDetailPage({
   const isCurrent = belongsToCurrentPeriod(currentWindow, review.periodStart);
 
   /*
-   * `2N-KNOWS-003`'s posture, applied to a surface with no foreign keys at all.
+   * `2N-KNOWS-003`'s posture, finally satisfiable — `2Q-LINK-001`.
    *
-   * `summaries` carries `Relationships: []`. The provider returns
-   * `citedSourceIds` and `generateReview` **discards them**, so a stored review
-   * names no record that can be proved to exist and to belong to the reader.
-   * The allow-set is therefore empty, every link inside the content degrades to
-   * its own text, and the page offers only links it can derive from canonical
-   * columns: the period, in the calendar, at the orientation that shows it.
+   * The allow-set used to be `new Set<string>()` because `summaries` carried
+   * nothing to vouch for. Since `202608210100` it carries `citations`, so the
+   * page derives its allow-set **from the stored envelope and from nothing
+   * else** — and only after **re-reading every cited record now**, under this
+   * reader's own session (`2Q-TRUST-001`). A stored reference is a claim about
+   * what was cited; it is never evidence the row still exists.
    *
-   * That is recorded as a pendência rather than repaired, because repairing it
-   * means persisting the citations — a migration, which this unit does not spend.
+   * Three properties follow, and none of them is incidental:
+   *
+   *   - a link exists only where a canonical, owner-scoped identifier was
+   *     recorded at generation time — **never** because a name in the Markdown
+   *     looked like a record (`2Q-LINK-004`);
+   *   - the gate binds the **pair** `(type, id)`, so an entry id cannot
+   *     authorize a task route (`2Q-LINK-002`);
+   *   - a refused link becomes **text**, never nothing, so the model's sentence
+   *     survives intact (`2Q-LINK-003`).
    */
-  const blocks = parseReviewMarkdown(review.content, { allowedIds: new Set<string>() });
+  const sources = await resolveReviewSources(supabase, user.id, row.citations, locale);
+  const blocks = parseReviewMarkdown(review.content, { vouchedFor: vouchedFrom(sources) });
   const periodHref = calendarHref(locale, {
     orientation: calendarOrientationFor(review.tab),
     anchor: window.startDate,
@@ -186,17 +196,29 @@ export default async function ReviewDetailPage({
       </section>
 
       {/*
-        Where this came from, stated **only as far as the row can prove it**.
+        Where this came from — and since `202608210100`, **which records**.
 
-        The generator reads the owner's entries and tasks inside the period; that
-        is a fact about the code, and it is said as such. Which entries and which
-        tasks is a fact the row does not carry, and inventing a list would be the
-        fabrication the whole product refuses. So the section names the kinds of
-        record, the model, the span, and stops.
+        `OD-2Q-5` is signed as **option C**: every cited record is reachable by a
+        canonical link, identified by its kind and its date, and **no content of
+        it appears here**. No preview, no excerpt, no title. The review's own
+        prose above already says what it is about; this area exists to point at
+        the object, and opening the link is what shows it — under the destination
+        page's own rules, not this page's.
+
+        A review whose references were never recorded says so **honestly**
+        (`2Q-LINK-007`) rather than showing an empty container: ADR-125
+        Decision 4 already ruled that a "Fontes" section without canonical links
+        in it is not delivery, and that ruling is inherited.
       */}
       <section aria-labelledby="review-sources" className="review-detail-sources">
         <h2 id="review-sources">{copy.sourcesHeading}</h2>
         <p className="section-explainer">{copy.sourcesExplainer}</p>
+        {sources.rows.length > 0 ? (
+          <>
+            <h3 className="review-cited-heading">{copy.sourcesListHeading}</h3>
+            <ReviewSourcesList copy={copy} locale={locale} rows={sources.rows} timezone={timezone} />
+          </>
+        ) : null}
         <dl className="review-source-facts">
           <div>
             <dt>{copy.periodLabel}</dt>
@@ -211,7 +233,9 @@ export default async function ReviewDetailPage({
             <dd>{review.periodLabel}</dd>
           </div>
         </dl>
-        <p className="review-detail-unlinked">{copy.sourcesNotLinked}</p>
+        {sources.rows.length === 0 ? (
+          <p className="review-detail-unlinked">{copy.sourcesNotLinked}</p>
+        ) : null}
       </section>
 
       {/*

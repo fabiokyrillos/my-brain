@@ -140,7 +140,7 @@ describe("no markup and no script can survive the parse", () => {
   ];
 
   it.each(HOSTILE)("keeps %s as literal text with no link node", (source) => {
-    const blocks = parseReviewMarkdown(source, { allowedIds: new Set([ID]) });
+    const blocks = parseReviewMarkdown(source, { vouchedFor: new Set([`task:${ID}`]) });
     const nodes = blocks.flatMap((block) => (block.kind === "list" ? block.items.flat() : block.inline));
 
     // Nothing became a link…
@@ -155,7 +155,7 @@ describe("no markup and no script can survive the parse", () => {
     // a value object that gained an `html` kind would fail here.
     const blocks = parseReviewMarkdown(
       `${STORED}\n\n${HOSTILE.join("\n\n")}\n\n> citação\n\n| a | b |\n\n![img](http://evil.test/x.png)`,
-      { allowedIds: new Set([ID]) },
+      { vouchedFor: new Set([`task:${ID}`]) },
     );
     for (const block of blocks) {
       expect(["heading", "paragraph", "list"]).toContain(block.kind);
@@ -167,8 +167,23 @@ describe("no markup and no script can survive the parse", () => {
   });
 });
 
-describe("a link exists only where the caller vouched for the id", () => {
-  const ALLOWED = new Set([ID]);
+describe("a link exists only where the caller vouched for the (type, id) PAIR", () => {
+  /*
+   * **Inverted by slice 2Q.2 — `2Q-LINK-002` — and the old behaviour is kept
+   * below as the planted control.**
+   *
+   * This suite used to hold `new Set([ID])`: a bare id, and the gate keyed on
+   * the uuid alone. `2Q-FOUNDATION-004` executed what that admitted — one
+   * vouched-for uuid opened `inbox/`, `work/`, `people/`, `projects/` AND
+   * `memories/`. Inert at the time, because the reviews page passed an empty
+   * set; live the moment slice 2Q.1 filled it.
+   *
+   * The set now holds `type:id` pairs, and the surface segment is read back to
+   * a type. `ID` below is vouched for **as a task**, so a `work/` href is
+   * admitted and an `inbox/` href for the same id is refused — which is the
+   * exact case that used to pass.
+   */
+  const ALLOWED = new Set([`task:${ID}`]);
 
   const REFUSED = [
     "javascript:alert(1)",
@@ -191,17 +206,57 @@ describe("a link exists only where the caller vouched for the id", () => {
     expect(authorizeHref(href, ALLOWED)).toBeNull();
   });
 
-  it("admits an internal route whose id is in the allow-set", () => {
+  it("admits an internal route whose (type, id) pair is vouched for", () => {
     // The positive half. Without it every check above could pass by returning
     // null unconditionally, forever — including after ids become available.
     expect(authorizeHref(`/pt-BR/app/work/${ID}`, ALLOWED)).toBe(`/pt-BR/app/work/${ID}`);
-    expect(authorizeHref(`/en/app/inbox/${ID}`, ALLOWED)).toBe(`/en/app/inbox/${ID}`);
+    expect(authorizeHref(`/en/app/work/${ID}`, ALLOWED)).toBe(`/en/app/work/${ID}`);
     expect(authorizeHref(`/pt-BR/app/work/${ID.toUpperCase()}`, ALLOWED)).not.toBeNull();
+    // And an entry-vouched id admits an entry route, so the gate is not simply
+    // hard-coded to one surface.
+    const asEntry = new Set([`entry:${ID}`]);
+    expect(authorizeHref(`/en/app/inbox/${ID}`, asEntry)).toBe(`/en/app/inbox/${ID}`);
+  });
+
+  it("REFUSES the same id on a surface it was not vouched for — the planted control", () => {
+    /*
+     * **This is the assertion `2Q-FOUNDATION-004` predicted, inverted.** Every
+     * href below was admitted before this slice, by this exact allow-set. Each
+     * one is now refused, and the list is written out rather than summarised so
+     * a regression names the surface it re-opened.
+     */
+    for (const surface of ["inbox", "memories"]) {
+      expect(
+        authorizeHref(`/pt-BR/app/${surface}/${ID}`, ALLOWED),
+        `a task-vouched id still opens ${surface}/`,
+      ).toBeNull();
+    }
+    // A surface that maps to no citable type is refused outright — stricter
+    // than a mismatch, and it needs no second rule.
+    for (const surface of ["people", "projects", "organizations", "files"]) {
+      expect(
+        authorizeHref(`/pt-BR/app/${surface}/${ID}`, ALLOWED),
+        `${surface}/ is admissible, and nothing vouches for that type`,
+      ).toBeNull();
+      expect(authorizeHref(`/pt-BR/app/${surface}/${ID}`, new Set([`entry:${ID}`]))).toBeNull();
+    }
+  });
+
+  it("is not vacuous: the OLD, id-only rule would have admitted every one of those", () => {
+    // The control that the block above tests a real change rather than a set
+    // that simply never matches. This is the retired gate, in one line.
+    const oldGate = (href: string, ids: ReadonlySet<string>) => {
+      const match = /^\/(?:pt-BR|en)\/app\/[a-z-]+\/([0-9a-fA-F-]{36})$/.exec(href);
+      return match && ids.has(match[1].toLowerCase()) ? href : null;
+    };
+    for (const surface of ["inbox", "memories", "people", "projects"]) {
+      expect(oldGate(`/pt-BR/app/${surface}/${ID}`, new Set([ID]))).not.toBeNull();
+    }
   });
 
   it("renders a refused link as its own words, losing the navigation and nothing else", () => {
     const blocks = parseReviewMarkdown("veja [o relatório](https://evil.test/steal) agora", {
-      allowedIds: ALLOWED,
+      vouchedFor: ALLOWED,
     });
     const inline = blocks[0].kind === "paragraph" ? blocks[0].inline : [];
     expect(inline.every((node) => node.kind !== "link")).toBe(true);
@@ -210,14 +265,14 @@ describe("a link exists only where the caller vouched for the id", () => {
 
   it("renders an allowed link as an anchor carrying that exact href", () => {
     const blocks = parseReviewMarkdown(`veja [a tarefa](/pt-BR/app/work/${ID}) agora`, {
-      allowedIds: ALLOWED,
+      vouchedFor: ALLOWED,
     });
     const inline = blocks[0].kind === "paragraph" ? blocks[0].inline : [];
     const link = inline.find((node) => node.kind === "link");
     expect(link).toEqual({ kind: "link", value: "a tarefa", href: `/pt-BR/app/work/${ID}` });
   });
 
-  it("vouches for nothing when the allow-set is empty, which is today's reviews surface", () => {
+  it("vouches for nothing when the allow-set is empty, which is a review with no stored references", () => {
     const blocks = parseReviewMarkdown(`[a tarefa](/pt-BR/app/work/${ID})`);
     const inline = blocks[0].kind === "paragraph" ? blocks[0].inline : [];
     expect(inline.every((node) => node.kind !== "link")).toBe(true);

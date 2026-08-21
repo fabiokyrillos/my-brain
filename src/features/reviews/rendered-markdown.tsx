@@ -78,16 +78,20 @@ export function RenderedReviewContent({ blocks }: { blocks: readonly ReviewBlock
 /**
  * The one call site's convenience: parse and render together.
  *
- * `allowedIds` is required rather than optional, so a caller has to state what
+ * `vouchedFor` is required rather than optional, so a caller has to state what
  * it can vouch for — an omitted option that defaults to "nothing" reads the same
  * as a caller that forgot, and only one of those is a decision.
+ *
+ * It carries `(type, id)` **pairs** since Phase 2Q, not bare ids: the gate binds
+ * both halves, so an entry id can no longer authorize a task route
+ * (`2Q-LINK-002`).
  */
 export function ReviewContent({
-  allowedIds,
   content,
+  vouchedFor,
 }: {
-  allowedIds: ReadonlySet<string>;
   content: string;
+  vouchedFor: ReadonlySet<string>;
 }) {
-  return <RenderedReviewContent blocks={parseReviewMarkdown(content, { allowedIds })} />;
+  return <RenderedReviewContent blocks={parseReviewMarkdown(content, { vouchedFor })} />;
 }

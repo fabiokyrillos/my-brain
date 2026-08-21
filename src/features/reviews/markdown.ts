@@ -37,6 +37,8 @@
  * loses content is worse than one that shows a stray bracket.
  */
 
+import { citedTypeForSegment, vouchedKey } from "./citation-routes";
+
 /** One run of inline content. `link` is the only node that can carry an href. */
 export type ReviewInline =
   | { readonly kind: "text"; readonly value: string }
@@ -65,15 +67,15 @@ export type ReviewBlock =
 
 export type ReviewMarkdownOptions = {
   /**
-   * The record ids this caller can **vouch for**, lowercased.
+   * The **`(type, id)` pairs** this caller can vouch for, as `vouchedKey`
+   * builds them — never bare ids.
    *
-   * Empty means no link in the content may become an anchor, which is the
-   * reviews surface's situation today: `summaries` carries no foreign key and
-   * `generateReview` discards the provider's `citedSourceIds`, so nothing in a
-   * stored review names a record that has been proved to exist and to belong to
-   * the reader.
+   * `2Q-LINK-001/002`. Until Phase 2Q this was a set of ids, and the gate keyed
+   * on the uuid alone: an envelope vouching for entry `X` also authorized
+   * `/pt-BR/app/work/X`. Empty still means no link in the content may become an
+   * anchor, which is what a review with no stored references gets.
    */
-  readonly allowedIds?: ReadonlySet<string>;
+  readonly vouchedFor?: ReadonlySet<string>;
 };
 
 /**
@@ -117,26 +119,44 @@ export function stripUnsafeCharacters(text: string): string {
  * sentence — an anchor exists only where a caller vouched for the id.
  */
 const INTERNAL_ROUTE =
-  /^\/(?:pt-BR|en)\/app\/[a-z-]+\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
+  /^\/(?:pt-BR|en)\/app\/([a-z-]+)\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$/;
 
 /**
  * The href to render, or `null` for "this is not a link".
  *
  * `null` does not mean "drop it" — the caller turns the node into **text**, so
  * the words survive and only the navigation is refused. Everything that is not
- * an internal route to a vouched-for id returns `null`: `javascript:`, `data:`,
- * `http(s):`, `mailto:`, protocol-relative `//host`, a path with a fabricated
- * id, and a well-formed path whose id nobody supplied.
+ * an internal route to a **vouched-for `(type, id)` pair** returns `null`:
+ * `javascript:`, `data:`, `http(s):`, `mailto:`, protocol-relative `//host`, a
+ * path with a fabricated id, a well-formed path whose id nobody supplied — and,
+ * since Phase 2Q, **a well-formed path whose id was vouched for as a different
+ * kind of record.**
+ *
+ * ## The pair, and why the id alone was not enough
+ *
+ * `2Q-LINK-002`. The surface segment used to be `[a-z-]+` and was never read,
+ * so one vouched-for uuid authorized `inbox/`, `work/`, `people/`, `projects/`
+ * and `memories/` alike — `2Q-FOUNDATION-004` executed exactly that. It never
+ * leaked (`work/[taskId]` scopes by `user_id` and calls `notFound()`); it handed
+ * the owner **a broken link they would click**, which is the failure class this
+ * phase exists to remove. The segment is now read back to a type through
+ * `citation-routes.ts`, and the pair must match.
+ *
+ * A segment that maps to **no** citable type is refused outright rather than
+ * compared — so `people/` and `projects/` can never be admitted by any envelope,
+ * which is stricter than refusing a mismatch and needs no second rule.
  *
  * Exported so the test can call the real function rather than re-implement its
  * regex — a control that carries its own private copy of the mechanism is not a
  * control.
  */
-export function authorizeHref(href: string, allowedIds: ReadonlySet<string>): string | null {
+export function authorizeHref(href: string, vouchedFor: ReadonlySet<string>): string | null {
   const trimmed = stripUnsafeCharacters(href).trim();
   const match = INTERNAL_ROUTE.exec(trimmed);
   if (!match) return null;
-  return allowedIds.has(match[1].toLowerCase()) ? trimmed : null;
+  const type = citedTypeForSegment(match[1]);
+  if (!type) return null;
+  return vouchedFor.has(vouchedKey(type, match[2])) ? trimmed : null;
 }
 
 /**
@@ -150,7 +170,7 @@ export function authorizeHref(href: string, allowedIds: ReadonlySet<string>): st
 const INLINE =
   /`([^`\n]+)`|\[([^\]\n]*)\]\(([^)\s]*)\)|\*\*([^*\n]+)\*\*|__([^_\n]+)__|\*([^*\n]+)\*|_([^_\n]+)_/g;
 
-function parseInline(source: string, allowedIds: ReadonlySet<string>): readonly ReviewInline[] {
+function parseInline(source: string, vouchedFor: ReadonlySet<string>): readonly ReviewInline[] {
   const nodes: ReviewInline[] = [];
   let cursor = 0;
 
@@ -174,7 +194,7 @@ function parseInline(source: string, allowedIds: ReadonlySet<string>): readonly 
     if (match[1] !== undefined) {
       nodes.push({ kind: "code", value: match[1] });
     } else if (match[2] !== undefined && match[3] !== undefined) {
-      const href = authorizeHref(match[3], allowedIds);
+      const href = authorizeHref(match[3], vouchedFor);
       // The label, always. A refused link loses its navigation, never its words.
       if (href) nodes.push({ kind: "link", value: match[2], href });
       else pushText(match[2] || match[3]);
@@ -211,7 +231,7 @@ export function parseReviewMarkdown(
   options: ReviewMarkdownOptions = {},
 ): readonly ReviewBlock[] {
   if (typeof source !== "string") return [];
-  const allowedIds = options.allowedIds ?? new Set<string>();
+  const vouchedFor = options.vouchedFor ?? new Set<string>();
   // Line endings first, then the strip: a lone `\r` is a line break, and
   // removing it as a control character would silently join two lines.
   const text = stripUnsafeCharacters(source.replace(/\r\n?/g, "\n"));
@@ -231,13 +251,13 @@ export function parseReviewMarkdown(
     if (!paragraph.length) return;
     const joined = paragraph.join(" ").trim();
     paragraph = [];
-    if (joined) blocks.push({ kind: "paragraph", inline: parseInline(joined, allowedIds) });
+    if (joined) blocks.push({ kind: "paragraph", inline: parseInline(joined, vouchedFor) });
   };
   const flushList = () => {
     if (!list) return;
     const { ordered, items } = list;
     list = null;
-    blocks.push({ kind: "list", ordered, items: items.map((item) => parseInline(item, allowedIds)) });
+    blocks.push({ kind: "list", ordered, items: items.map((item) => parseInline(item, vouchedFor)) });
   };
   const flush = () => {
     flushParagraph();
@@ -254,7 +274,7 @@ export function parseReviewMarkdown(
     if (heading) {
       flush();
       const level = Math.min(5, Math.max(3, 3 + (heading[1].length - shallowest))) as ReviewHeadingLevel;
-      const inline = parseInline(heading[2].trim(), allowedIds);
+      const inline = parseInline(heading[2].trim(), vouchedFor);
       // A heading with no text is not a heading; it is a stray run of hashes,
       // and printing it as an empty <h3> would put a silent gap in the outline.
       if (inline.length) blocks.push({ kind: "heading", level, inline });
