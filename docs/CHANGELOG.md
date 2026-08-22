@@ -2,6 +2,49 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-22 - INCIDENT: the unattended entry-dispatch drain had been answering 401 since 2026-08-12, and the dead-man switch could not see it
+
+**No migration, no product code, no schema change.** The repair is a rotation of one shared secret in the two stores that hold it, plus a redeploy.
+
+**The symptom.** Every per-minute tick of `cron.job` 3 (`my-brain-entry-dispatch`) recorded `succeeded` — because `net.http_post` is asynchronous and the cron only reports that the request was *queued*. The **responses** told the real story: every retained row in `net._http_response` was `401 {"error":"Unauthorized"}`.
+
+**The cause, from metadata alone — no secret was read.** The cron sends `x-dispatch-secret` read from `vault.decrypted_secrets['entry_dispatch_secret']`; `process-jobs` compares it with its own `WORKER_DISPATCH_SECRET` and answers exactly that 401 — **with no `code` field**, which is what distinguishes this branch from `missing_bearer`. The two stores' timestamps place the divergence precisely:
+
+| Store | Name | Last write before the repair |
+| --- | --- | --- |
+| Supabase Vault | `entry_dispatch_secret` | `2026-07-17T20:45:21Z` — `created_at` == `updated_at`, never changed |
+| Edge Function | `WORKER_DISPATCH_SECRET` | `2026-08-12T14:40:40Z` |
+
+The function's value was rewritten on 2026-08-12 and the vault's was not. **Why it was rewritten is not established** and this record does not guess; the neighbouring `VAPID_*` secrets carry timestamps from the same afternoon, which is suggestive and not proof.
+
+**What can and cannot be proved about the window.** `net._http_response` retains roughly six hours, so the 401 is **directly proved only from 2026-08-22T16:32Z**. The 2026-08-12T14:40:40Z start comes from the two `updated_at` values, and is corroborated arithmetically by the dead-man switch's own counter: `scheduled_job_health` for this job stood at **7140 successes with `useful_count` 1 and `failure_count` 0**, and 7140 minutes back from the repair lands on 2026-08-07, when slice 2H.4 deployed the reporting RPC. Between those two dates the counter did not move.
+
+**Why nothing alerted.** A gateway 401 is answered **before the function body runs**, so `reportDispatchRun` never fires — neither `record_scheduled_job_run` nor `record_scheduled_job_failure`. The dead-man switch therefore reported `failure_count: 0` throughout a ten-day outage: it was **frozen, not red**. This is a real monitoring gap and it is recorded in `TODO.md` rather than closed here.
+
+**What the outage actually cost, measured.** Nothing was stuck. The whole `jobs` table held **two** rows, both `completed`. The application's nudge does **not** use this secret — `kickEntryInterpretationWorker` invokes the function with the end user's own access token (`src/lib/jobs/entry-worker.ts`) — so interactive capture never depended on the drain. The risk was latent, not realised. **`env-contract.ts` and `PHASE_2H_EDGE_DEPLOYMENT_EVIDENCE.md` both state that the application's nudge authenticates with `WORKER_DISPATCH_SECRET`; the code says otherwise, and that is a documentation defect, now named.**
+
+**The repair.** One new 256-bit value from `randomBytes(32)`, written to both stores back to back and to nowhere else: `supabase secrets set --env-file` for the Edge Function, `vault.update_secret` through the Management API for the vault. The value was never printed, never placed on a command line, never written inside the repository, and both scratch files were overwritten and deleted immediately. `process-jobs` redeployed **v28 → v29**; `byok:verify-runtime` **5 pass · 0 fail · IN PARITY**; `verify:edge-parity` **`ok`**. The first tick after the rotation, `2026-08-22T22:52:00Z`, returned **`200 {"ok":true,"mode":"dispatch","processed":1,"succeeded":1,"failed":0}`**.
+
+## 2026-08-22 - The extraction fix is EFFECTIVE in production, proved on the record that exposed it
+
+`process-jobs` **v27 → v28** carrying prompt `2026-08-22.1`; Vercel Production deployed `7e84728`; `verify:edge-parity` `ok`. The reported entry was reprocessed through `enqueue_entry_reprocessing` and drained by the restored cron.
+
+**Version 2 (`origin: ai_reprocessed`, `prompt_version: 2026-08-22.1`) against version 1 (`ai_generated`, `2026-07-25.1`), on the same entry and the same model `gpt-5.6-luna`:**
+
+| Field | v1 | v2 |
+| --- | --- | --- |
+| `people` | *(empty)* | **`["Garo"]`** |
+| `organizations` | `["Royal Caribbean"]` | `["Royal Caribbean"]` |
+| `projects` | **`["Relatório de Sweepstakes para Garo"]`** | *(empty)* |
+| `contexts` | *(empty)* | `["Trabalho"]` |
+| `taskCandidates` | 1 | 1, unchanged |
+
+**Version 1 is untouched** — same row, same `created_at` `2026-08-22T15:22:11Z`, same `prompt_version`, same `raw_output`. The immutable history gained a row and lost none.
+
+**Nothing was created automatically.** No `people` row exists for this owner; no entity link; no candidate resolution; no materialised task. Garo is offered as a pending candidate and the decision to create the person is the owner's, unmade.
+
+The `Histórico imutável` layout was measured against the **CSS production serves**, with the entry's real two-version content: at 1440px the summary occupies the full 188px column at 3.56 words per line and the date stacks beneath; at 440px, 308px and 6.40 words per line. The defect wrapped it one word per line.
+
 ## 2026-08-22 - Two defects on one entry: a named person never became a person, and the immutable history wrapped one word per line
 
 **Zero migrations. No product copy changed. Nothing outside the two defects.** No phase, no roadmap and no priority is touched by this entry.
