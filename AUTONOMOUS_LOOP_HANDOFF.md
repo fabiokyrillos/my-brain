@@ -12141,3 +12141,183 @@ The most useful thing this phase leaves behind is not the feature. It is the
 habit that produced it: **reproduce before fixing** — which is the only reason a
 signed premise was caught being false before a product colour was changed to
 satisfy a broken fixture.
+
+## §114 — Phase 2R is authorized for PLANNING, the theme was derived from a census rather than chosen, and three ADRs turned out to be wrong about automation (2026-08-22)
+
+**ADR-131.** Planning only: a PRD, an implementation plan, a theme comparison, an
+audit, a gaps report, a threat model, a traceability contract, and the guards
+that keep them fail-closed. **No implementation, no migration, no deploy, no
+hosted write, no AI call, no BYOK credit, no signup or rollout change, no push
+resumption, no restore.**
+
+### The baseline was re-proved, not inherited
+
+The task was given a baseline and told not to trust it. Every line was
+re-derived: `main` = `origin/main` = **`43c8be17`** (`0 0`); worktree clean;
+**zero** open PRs; **CI green 3/3 on the exact SHA**; **100 local = 100 hosted,
+parity `202608210100`** read live; signup closed; no successor artifact anywhere.
+
+Local gates at that SHA: lint **zero errors in the product**, typecheck **zero**,
+`npm test` **8 957 passing / zero failing**.
+
+Two corrections to what the baseline implied:
+
+- **The residual worktrees are sanctioned**, not a divergence — ADR-128 Decision
+  9 says so in as many words. I reported them as a divergence first and withdrew
+  it.
+- **All six local lint errors come from `.worktrees/suggest-new-people/`**, a
+  residual worktree nested *inside* the repository that ESLint walks into and CI
+  never sees. The product has none.
+
+### The theme was derived, and one measurement decided it
+
+The published roadmap ends at Phase 2O. Nothing defines a theme for the letter
+after 2Q, so four were costed in `PHASE_2R_THEME_OPTIONS.md` — and the ranking
+came from a read-only count rather than from preference:
+
+| table | rows |
+|---|---|
+| `automation_calibration_observations` | **0** |
+| `reminders` | **2** |
+| `summaries` | **2** |
+
+**This is a pre-MVP with one user and almost no data**, so *any theme whose
+completion depends on accumulated usage is not buildable now.* That disqualifies
+**autonomy** — the most valuable option — because `task` alone needs 50 reviewed
+subjects at 0.90 precision, and a phase choosing it would build **the product's
+first unattended writer with no evidence to validate it against.**
+
+What survives is **Rotina: o que se repete.** `public.reminders` has twelve
+columns and **no recurrence column of any kind**, and **no `jsonb` column to
+repurpose** — so unlike Phase 2Q's `summaries.citations` there is not even an
+unused column to reach for. **73 requirements, ten families, six slices.**
+
+**The theme itself is `OD-2R-1` and is OPEN.** A recommendation is not a
+signature, and choosing another option replaces the requirement set.
+
+### The finding I was not looking for
+
+**Three consecutive ADRs are wrong about automation.** ADR-128 Decision 9,
+ADR-129 Decision 10 and ADR-130 Decision 8 each state *"All six automation
+categories stay `suggest_only` with no automatic writer."*
+
+Read live:
+
+| category | stored state | created (UTC) | decision | eligible | observations |
+|---|---|---|---|---|---|
+| `task` | **`automatic_when_eligible`** | 2026-08-20 12:14:34 | `insufficient_calibration` | false | 0 |
+| `person` | **`automatic_when_eligible`** | 2026-08-20 12:14:48 | `insufficient_calibration` | false | 0 |
+| `project` | `suggest_only` | 12:14:54 | `suggest_only_by_owner` | false | 0 |
+| `organization` | `suggest_only` | 12:15:04 | `suggest_only_by_owner` | false | 0 |
+| `memory` · `relation` | *(no row)* | — | computed `suggest_only` | false | 0 |
+
+**Attribution first, because the alternative is a false accusation.** Four rows
+written within **thirty seconds**, in ascending order, through the settings
+surface, on the day Phase 2P closed. The only writer is
+`set_automation_category_policy` — `authenticated` and audited. **This is the
+owner's own action.**
+
+**The product is safe, by a mechanism the record does not name.** Two independent
+facts hold it: `private.automation_category_decision` is consumed only by
+`automation_category_status()`, consumed only by a **display** path, and
+**nothing anywhere writes as a consequence of `eligible`**; and calibration is
+empty. The *"no automatic writer"* half is true and is the real protection. The
+other half is false.
+
+**Why it matters for whoever builds automation:** the owner has **already
+consented** for two categories. Start from the rows, never from the ADRs.
+
+**No policy row was changed to make the sentence true.** Altering the thing a
+record describes in order to make the record true is the inversion this
+repository exists to prevent. The correction is ADR-131 Decision 6, appended.
+
+### Two defects proved, and routed out rather than absorbed
+
+1. **A search cannot be linked, shared, bookmarked or returned to.**
+   `/app/search` reads **no** `searchParams`; query, filters *and results* live
+   in `useState`. **Ten of the twelve** comparable list routes do read
+   `searchParams`. Search and `library` are the only two that do not.
+2. **`2P-ATTENTION-008`, with a mechanism at last.** `activeFilter` in
+   `needs-attention-list.tsx` is component-local `useState` with no URL backing,
+   so back navigation resets the filter and discards every paged result.
+
+Both go to **`OD-2R-9`**, recommended as a small separate initiative, on the
+owner's standing instruction that the successor must not become a debt
+container. **Understanding a remainder more precisely is not discharging it.**
+
+### Four inherited descriptions were narrower or staler than recorded
+
+- **Accessibility on real routes** is *one spec file's mechanism*, not a coverage
+  hole: `phase-2o-mobile-accessibility.spec.ts` and its `online-` twin already
+  run against real routes. Only the **dark scan** in `accessibility.spec.ts` uses
+  `setContent`.
+- **Search already ships** — `src/features/search/`, `/app/search`, and a command
+  palette. Any note that findability is the product's gap is stale.
+- **Push already has a governing artifact** and needs none from a product phase.
+- **The four automation flows** were re-measured independently and the Phase 2Q
+  finding **stands**: `automation_category_has_producer` returns true only for
+  `'task'` and `'person'`.
+
+### The retarget: five pins, not one
+
+`STATE.md` and ADR-130 both recorded the successor's letter as appearing *"only
+inside the A13 detector"*. **That was wrong.** The pins are:
+
+1. `phase-2f-documentation.test.ts` — three constants and the fixtures;
+2. `phase-2o-declarations.test.ts` — the literal pin on the target;
+3. `generate-phase-2p-traceability.mjs` — refusal 12;
+4. `generate-phase-2q-traceability.mjs` — the successor check;
+5. `phase-2q-declarations.test.ts` — the ADR-125…128 series assertions.
+
+**Three are findable only by running the suite.** All five moved in the same
+commit as ADR-131, none by a global replace, and `phase-2r-declarations.test.ts`
+now asserts every one of them — with a mutation control run before commit:
+reverting a single pin makes the guard fail.
+
+### One guard repaired, and not by weakening it
+
+`phase-2q-declarations.test.ts` took an ADR's body as `decisions.slice(at)` —
+**unbounded, to end of file.** With an append-only `DECISIONS.md`, **any** later
+ADR naming the successor would have failed an assertion about an *earlier* one.
+It was found by static reading before writing anything, not by the suite going
+red.
+
+The slice is bounded to its own ADR block. **No regex loosened, no assertion
+removed** — the resolution to a guard firing on correct work is a corrected
+subject, never a weaker pattern. A two-sided control proves the bounded form
+still fires inside its own ADR, and that the unbounded form really had the
+defect.
+
+### Two counts corrected rather than propagated
+
+- The PRD's prose said **"fifty-two requirements across nine families"** while
+  its tables held **73 across ten**. Caught by counting the rows with a script
+  instead of re-reading the sentence. The guard now asserts the sentence
+  **against the derived count**, in both directions.
+- The A13 comment said **"eleventh application"** while describing the **tenth**
+  by `README.md`'s own enumeration. Corrected to **twelfth**, with the
+  off-by-one written down.
+
+### Two indexes had drifted, one of them again
+
+`docs/reports/README.md` still said **"The active initiative is Phase 2N"** —
+three phases stale — and its table had **no rows for 2O, 2P or 2Q**. That file
+already records catching this exact drift once, when it named Phase 2H after 2I
+and 2J had closed. Corrected, with the repeat noted rather than tidied away.
+`docs/README.md` had no row for `push-hardware-validation`, missing since
+ADR-107.
+
+### For whoever picks this up next
+
+**Nothing is signed.** Nine decisions are open and three of them —
+`OD-2R-1`, `OD-2R-7`, `OD-2R-8` — block slice 2R.1 absolutely.
+
+**`OD-2R-8` is the one to read first.** `2P-REMINDER-RECURRENCE` was refused
+**by name** by the owner. A refusal recorded by the owner is lifted by the owner
+and by nobody else, least of all by a later phase quietly planning the refused
+thing. **If it is not lifted, Phase 2R as written has no subject.**
+
+**And the habit that produced everything above:** the two most valuable findings
+in this session — the automation record and the unbounded ADR slice — came from
+**reading the deployed rows and the guard's own source instead of the documents
+describing them.** The documents were confident and wrong in both cases.
