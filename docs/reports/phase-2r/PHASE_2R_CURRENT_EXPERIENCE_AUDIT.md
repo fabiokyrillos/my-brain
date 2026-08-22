@@ -64,7 +64,7 @@ surface — plus the route `/app/search` and a command palette at
 gap is search"* is **stale** and is corrected here.
 
 **The capability register is honest.** `src/features/shell/capabilities.ts`
-marks twelve preferences `state: "future"` with `visible: false` and **no**
+marks ten preferences `state: "future"` with `visible: false` and **no**
 consumer evidence — stored columns that are deliberately not presented as
 behaviour. That is the contract working, not a defect.
 
@@ -474,7 +474,7 @@ widen a phase out of an abstract preference for tidiness. Two qualify.
 | 2 | **The *Precisa de você* filter and pagination are lost on back navigation** (§3.1). | **medium** | component read in full; no URL, router or history call exists |
 
 **Deliberately not raised as defects**, having been checked and found sound: the
-twelve `state: "future"` capability rows (correctly invisible, correctly without
+ten `state: "future"` capability rows (correctly invisible, correctly without
 consumers); the three Vitest file-transform failures (Windows-only, zero failing
 tests); the six lint errors (residual worktree only).
 
