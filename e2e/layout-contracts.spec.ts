@@ -552,3 +552,327 @@ test.describe("the task detail composes into two columns without reordering them
     }
   });
 });
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `Histórico imutável` — the revision timeline.
+ *
+ * The owner reported the interpretation summary rendering "praticamente uma
+ * palavra por linha" inside `Ver detalhes técnicos`. The cause is invisible to
+ * every jsdom test in the repository, because it is a grid-placement fact:
+ * `.revision-timeline li` declared three columns whose first was reserved for
+ * the `History` icon, but that icon is `position:absolute` — so it is not a grid
+ * item, does not consume a track, and the summary block auto-placed into the
+ * 24px column meant for it.
+ *
+ * The second half of the finding is width, and it is why these tests measure the
+ * **real ancestry** rather than the timeline alone: from 1080px up the block
+ * lives in `.record-explanation`, a `minmax(320px,.65fr)` aside, so a desktop row
+ * has ~240px of content — less than a 375px phone gives it. The viewport says
+ * nothing useful about this container, which is why the layout switches on the
+ * container and why the assertions below never hardcode "desktop means two
+ * columns".
+ */
+
+/** Mirrors the `History` icon `technical-details.tsx` renders per row. */
+const TIMELINE_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"></svg>';
+
+/** A real interpretation summary, long enough that any starved column wraps it. */
+const REVISION_SUMMARY =
+  "Preciso desenvolver um relatório de Sweepstakes para Garo, que faz parte da Royal Caribbean, com o prazo jogado para a sexta-feira seguinte.";
+const REVISION_SUMMARY_EN =
+  "Develop the Sweepstakes report for Garo at Royal Caribbean, with the deadline moved to the following Friday.";
+const CORRECTION_REASON = "Corrigi o prazo porque a sexta-feira seguinte cai depois dos quinze dias.";
+
+/** `formatInstant(…, "dayAndTime", …)` — `dateStyle:"medium"`, `timeStyle:"short"`. */
+const MEDIUM_DATE = "22 de ago. de 2026, 14:32";
+/**
+ * The longest timestamp this surface can be asked to render. `dayAndTime` is
+ * medium today, so this is a deliberate over-statement of the input: a date
+ * column that survives this cannot starve the summary with the real one.
+ */
+const LONG_DATE = "sábado, 22 de agosto de 2026 às 14:32:07 BRT";
+
+function revisionRow(options: {
+  version: number;
+  origin: string;
+  summary: string;
+  date: string;
+  current?: boolean;
+  reason?: string;
+}) {
+  const reason = options.reason ? `<small>${options.reason}</small>` : "";
+  return `<li${options.current ? ' class="revision-current"' : ""}>${TIMELINE_ICON}<div class="revision-entry"><strong>v${options.version} · ${options.origin}</strong><p>${options.summary}</p>${reason}</div><time datetime="2026-08-22T17:32:00.000Z">${options.date}</time></li>`;
+}
+
+/**
+ * The disclosure is `open` here and closed in the product. That is the one
+ * concession this fixture makes: a `<details>` that is shut has no layout to
+ * measure, and the defect is in the layout it has when the owner opens it.
+ */
+function historyBody(options: { date?: string; revisions?: number } = {}) {
+  const date = options.date ?? MEDIUM_DATE;
+  const rows = [
+    revisionRow({ version: 3, origin: "Reinterpretação por IA", summary: REVISION_SUMMARY, date, current: true }),
+    revisionRow({ version: 2, origin: "Correção do usuário", summary: REVISION_SUMMARY_EN, date, reason: CORRECTION_REASON }),
+    revisionRow({ version: 1, origin: "Interpretação inicial", summary: REVISION_SUMMARY, date }),
+  ].slice(0, options.revisions ?? 3);
+  return `<div class="content-page entry-detail-page"><div class="entry-review record-detail">
+    <div class="record-detail-columns">
+      <div class="record-decision"><section class="review-understanding"><p class="review-understanding-body">${REVISION_SUMMARY}</p></section></div>
+      <aside class="record-explanation" aria-label="Como este registro foi lido">
+        <details class="technical-details" open>
+          <summary>Ver detalhes técnicos</summary>
+          <div class="technical-details-body">
+            <section class="interpretation-history">
+              <div class="section-heading"><span aria-hidden="true">${ICON}</span><div><h2>Histórico imutável</h2><p>Cada correção, undo e reinterpretação acrescenta uma versão.</p></div></div>
+              <ol class="revision-timeline">${rows.join("")}</ol>
+            </section>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </div></div>`;
+}
+
+type RevisionGeometry = {
+  lines: number;
+  words: number;
+  wordsPerLine: number;
+  timeOverflows: boolean;
+  entryColumn: string;
+  timeColumn: string;
+  entryLeft: number;
+  entryWidth: number;
+  timeLeft: number;
+  timeWidth: number;
+  rowWidth: number;
+  sideBySide: boolean;
+  iconIsGridItem: boolean;
+};
+
+/** `border-left:2px` plus `padding-left:18px` on `.revision-timeline li`. */
+const ROW_CHROME = 20;
+/** The `column-gap` on `.revision-timeline li`. */
+const ROW_GAP = 11;
+
+async function revisionGeometry(page: Page): Promise<RevisionGeometry[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".revision-timeline li")].map((row) => {
+      const entry = row.querySelector(".revision-entry") as HTMLElement | null;
+      if (!entry) throw new Error("the revision row rendered no .revision-entry block");
+      const paragraph = entry.querySelector("p") as HTMLElement;
+      const time = row.querySelector("time") as HTMLElement;
+      const icon = row.querySelector(":scope > svg") as HTMLElement;
+      const style = getComputedStyle(paragraph);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+      const height = paragraph.getBoundingClientRect().height;
+      const lines = Math.max(1, Math.round(height / lineHeight));
+      const words = (paragraph.textContent ?? "").trim().split(/\s+/u).filter(Boolean).length;
+      const entryBox = entry.getBoundingClientRect();
+      const timeBox = time.getBoundingClientRect();
+      return {
+        lines,
+        words,
+        wordsPerLine: words / lines,
+        // A `nowrap` timestamp wider than its column is truncated by the card's
+        // `overflow:hidden` with no ellipsis, which the page-level overflow
+        // check cannot see.
+        timeOverflows: time.scrollWidth > time.clientWidth + 1,
+        entryColumn: getComputedStyle(entry).gridColumnStart,
+        timeColumn: getComputedStyle(time).gridColumnStart,
+        entryLeft: Math.round(entryBox.left),
+        entryWidth: Math.round(entryBox.width),
+        timeLeft: Math.round(timeBox.left),
+        timeWidth: Math.round(timeBox.width),
+        rowWidth: Math.round(row.getBoundingClientRect().width),
+        sideBySide: Math.abs(entryBox.top - timeBox.top) < 4,
+        iconIsGridItem: getComputedStyle(icon).position !== "absolute",
+      };
+    }),
+  );
+}
+
+/**
+ * Every width the owner asked to see, plus the two the repository already
+ * measures. 1440 and 1280 are above the 1080px split, so they exercise the
+ * narrow aside; 900 and 700 are below it, so they exercise the wide row.
+ */
+/**
+ * **Words** per line, not characters, and the metric change is deliberate.
+ *
+ * The row-title floor above is 24 characters, chosen for 13px UI titles in a
+ * panel. This surface is a 17px reading serif inside a column the stylesheet
+ * deliberately narrows: at 1440x900 the timeline is nested three cards deep —
+ * `.record-explanation` is 320px, and `.technical-details-body` and
+ * `.interpretation-history` each add 25px of padding on both sides — so the
+ * summary has **188px**, and a character floor calibrated for a wide list is
+ * measuring the aside's width rather than the defect.
+ *
+ * Words per line measures the reported symptom itself: *"praticamente uma
+ * palavra por linha"*. The broken layout put the summary in a 24px track, about
+ * one word per line; the fixed layout measures 2.8 (English, whose words are
+ * longer) to 3.7 (Portuguese) in that same 188px column, and more everywhere
+ * else. A floor of 2 separates those two populations and cannot be satisfied by
+ * the defect returning in any form.
+ */
+const TIMELINE_MIN_WORDS_PER_LINE = 2;
+
+const TIMELINE_VIEWPORTS = [
+  { name: "1440x900", width: 1440, height: 900 },
+  { name: "1280x800", width: 1280, height: 800 },
+  { name: "900x900", width: 900, height: 900 },
+  { name: "700x900", width: 700, height: 900 },
+  { name: "600x900", width: 600, height: 900 },
+  { name: "440x900", width: 440, height: 900 },
+  { name: "375x667", width: 375, height: 667 },
+] as const;
+
+test.describe("the immutable history timeline never starves the revision summary", () => {
+  test("the summary block owns the main column at every width, and the icon owns none", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      const rows = await revisionGeometry(page);
+      expect(rows, `no revision rows rendered at ${viewport.name}`).toHaveLength(3);
+      for (const [index, row] of rows.entries()) {
+        expect(row.iconIsGridItem, `${viewport.name} row ${index}: the icon became a grid item`).toBe(false);
+        expect(row.entryColumn, `${viewport.name} row ${index}: the summary is not in the first column`).toBe("1");
+        /*
+          The font-independent half of the guard, and the one that would have
+          caught the original defect on its own: the summary claims every pixel
+          the date does not. A track reserved for something that is not there —
+          the `24px` the absolutely-positioned icon never occupied — shows up
+          here as missing width, whatever the type is doing.
+        */
+        const claimed = row.entryWidth + (row.sideBySide ? row.timeWidth + ROW_GAP : 0);
+        expect(
+          claimed,
+          `${viewport.name} row ${index}: ${row.rowWidth - ROW_CHROME - claimed}px of the row is reserved for nothing`,
+        ).toBeGreaterThanOrEqual(row.rowWidth - ROW_CHROME - 1);
+      }
+    }
+  });
+
+  for (const viewport of TIMELINE_VIEWPORTS) {
+    test(`keeps the summary readable at ${viewport.name}`, async ({ page }) => {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      for (const [index, row] of (await revisionGeometry(page)).entries()) {
+        expect(
+          row.wordsPerLine,
+          `row ${index} at ${viewport.name}: ${row.words} words on ${row.lines} lines in a ${row.entryWidth}px column (row ${row.rowWidth}px)`,
+        ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+      }
+    });
+  }
+
+  test("a long timestamp cannot compress the summary", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody({ date: LONG_DATE }), viewport.width, viewport.height);
+      for (const [index, row] of (await revisionGeometry(page)).entries()) {
+        expect(
+          row.wordsPerLine,
+          `row ${index} at ${viewport.name} with a long date: ${row.words} words on ${row.lines} lines in ${row.entryWidth}px`,
+        ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+        expect(
+          row.timeOverflows,
+          `row ${index} at ${viewport.name}: the long timestamp overflowed its column and was truncated`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  /*
+   * The placement invariant, stated without naming a viewport: where the date
+   * shares the row it is the *final* column and sits to the right of the
+   * summary; where it does not, it is stacked underneath in the same column.
+   * The two counters below make this a real control — a build where the date
+   * never shared a row, or never stacked, would satisfy the invariant vacuously.
+   */
+  test("the date is either the final column or stacked under the summary, never beside it in column one", async ({ page }) => {
+    let sideBySideSeen = 0;
+    let stackedSeen = 0;
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      for (const date of [MEDIUM_DATE, LONG_DATE]) {
+        await render(page, historyBody({ date }), viewport.width, viewport.height);
+        for (const [index, row] of (await revisionGeometry(page)).entries()) {
+          const where = `row ${index} at ${viewport.name}`;
+          if (row.sideBySide) {
+            sideBySideSeen += 1;
+            expect(row.timeColumn, `${where}: a shared row put the date outside the final column`).toBe("2");
+            expect(row.timeLeft, `${where}: the date is not to the right of the summary`).toBeGreaterThan(row.entryLeft);
+          } else {
+            stackedSeen += 1;
+            expect(row.timeColumn, `${where}: a stacked date left the main column`).toBe("1");
+          }
+        }
+      }
+    }
+    expect(sideBySideSeen, "no width put the date in the final column").toBeGreaterThan(0);
+    expect(stackedSeen, "no width stacked the date under the summary").toBeGreaterThan(0);
+  });
+
+  test("multiple revisions and their correction reasons each keep their own row", async ({ page }) => {
+    for (const viewport of [TIMELINE_VIEWPORTS[0], TIMELINE_VIEWPORTS[5]]) {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      const reasons = await page.locator(".revision-timeline small").count();
+      expect(reasons, `the correction reason disappeared at ${viewport.name}`).toBe(1);
+      const tops = await page.evaluate(() =>
+        [...document.querySelectorAll(".revision-timeline li")].map((row) =>
+          Math.round(row.getBoundingClientRect().top),
+        ),
+      );
+      // Three rows, none overlapping: a collapsed row would repeat a top.
+      expect(new Set(tops).size, `revision rows overlapped at ${viewport.name}`).toBe(3);
+    }
+  });
+
+  test("survives print emulation, which is the export path", async ({ page }) => {
+    // There is no `@media print` block in the repository, so printing renders
+    // the screen layout — which is exactly why it has to be measured rather than
+    // assumed: a rule that only held under a `screen`-scoped query would not.
+    await page.emulateMedia({ media: "print" });
+    try {
+      for (const viewport of [TIMELINE_VIEWPORTS[0], TIMELINE_VIEWPORTS[5]]) {
+        await render(page, historyBody(), viewport.width, viewport.height);
+        for (const [index, row] of (await revisionGeometry(page)).entries()) {
+          expect(
+            row.wordsPerLine,
+            `row ${index} at ${viewport.name} in print: ${row.words} words on ${row.lines} lines in ${row.entryWidth}px`,
+          ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+        }
+      }
+    } finally {
+      await page.emulateMedia({ media: "screen" });
+    }
+  });
+
+  test("the timeline never scrolls its page sideways", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody({ date: LONG_DATE }), viewport.width, viewport.height);
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(overflow.scrollWidth, `horizontal overflow at ${viewport.name}`).toBeLessThanOrEqual(
+        overflow.clientWidth + 1,
+      );
+    }
+  });
+
+  /*
+   * The mirror guard this file's own header warns about: every fixture here is a
+   * copy of markup that lives somewhere else, and a copy that drifts keeps
+   * measuring a layout the product no longer renders. `PRIMARY` and `MOBILE_BAR`
+   * were stale for six destinations before anybody noticed.
+   */
+  test("the fixture still mirrors the markup the component emits", () => {
+    const component = readFileSync(
+      join(ROOT, "src", "features", "daily-cycle", "technical-details.tsx"),
+      "utf8",
+    );
+    expect(component, "the timeline list lost its class").toContain('className="revision-timeline"');
+    expect(component, "the summary block lost the class these assertions place")
+      .toContain('className="revision-entry"');
+    expect(component, "the row no longer renders a <time>").toMatch(/<time dateTime=\{revision\.createdAt\}>/);
+  });
+});
