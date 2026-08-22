@@ -361,6 +361,43 @@ a.home-agenda-link:hover{background:var(--background-subtle)}
 }
 .status-badge.needs_attention{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}.status-badge.could_not_organize{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.status-badge.saved,.status-badge.organizing{background:var(--tone-information-bg);color:var(--link)}.status-badge.ready{background:var(--tone-success-bg);color:var(--tone-success-fg)}.list-attention-hint{color:var(--text-secondary)}
 
+/* `Pessoas mencionadas` — the person-candidate card, which had no rules of its
+   own and was borrowing the task form's.
+
+   `.candidate-item` describes a `<label>` holding a visually hidden checkbox, a
+   24px check indicator and a copy block: `grid-template-columns:24px 1fr auto`
+   plus `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}`.
+   `PersonCandidateForm` renders a `<fieldset>` instead — legend, evidence, two
+   radio options, a name label and a text input — so auto-placement put the
+   evidence and the name label in the indicator's 24px gutter (measured at a
+   440px viewport: 5 words on 5 lines, a 24px column) and the input rule made
+   the name field invisible and `pointer-events:none`. The two shapes now have
+   two classes, and nothing here touches the task form's rules.
+
+   The card is its own query container: this section renders inside the decision
+   column, which is wide on desktop and full width on a phone, but the component
+   is not promised either — so the options split into two only where the card
+   itself has the room, and stack everywhere else. */
+.person-candidate-section{margin-top:18px}
+.candidate-list>.field-hint{margin:0 0 4px;color:var(--text-secondary);font:var(--type-caption);line-height:1.55}
+.person-candidate-item{container:person-candidate/inline-size;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;margin:0;border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:14px}
+/* Explicit, because auto-placement into a track meant for something else is the
+   defect this block exists to fix. `min-width:0` so a long unbroken word cannot
+   set a floor the column has to honour. */
+.person-candidate-item>*{grid-column:1;min-width:0}
+.person-candidate-item>legend{padding:0 6px;font:var(--type-caption);font-weight:800;color:var(--text-primary)}
+.person-candidate-evidence{margin:0;color:var(--text-secondary);font:var(--type-caption);line-height:1.55;overflow-wrap:break-word}
+.person-candidate-options{display:grid;gap:8px}
+.person-candidate-options label{display:flex;align-items:center;gap:9px;min-height:44px;padding:0 2px;cursor:pointer;font:var(--type-body);color:var(--text-primary)}
+.person-candidate-options input{flex:none;width:18px;height:18px;margin:0;cursor:pointer}
+.person-candidate-name{display:grid;gap:6px}
+.person-candidate-name label{color:var(--text-secondary);font:var(--type-caption);overflow-wrap:break-word}
+.person-candidate-name input{width:100%;min-width:0;box-sizing:border-box;min-height:44px;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:10px 12px;background:var(--background-surface);color:var(--text-primary);font:var(--type-body);font-family:inherit}
+.person-candidate-name input:disabled{background:var(--background-subtle);color:var(--text-muted);cursor:not-allowed}
+@container person-candidate (min-width:380px){
+  .person-candidate-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+}
+
 /* Phase 2X.9: decision-first progressive disclosure review */
 .entry-review{display:grid;gap:18px;width:100%}
 .review-facts{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0;padding:0}
