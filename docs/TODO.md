@@ -60,6 +60,12 @@ Previously the active milestone read, retained rather than deleted: **Phase 2N -
 
 Successor status: **the roadmap successor is NOT STARTED, not scoped and not authorized.** No successor requirement or artifact exists anywhere in the repository. Its planning needs its own owner authorization. **The published roadmap ends at Phase 2O**, so there is no roadmap entry after this phase — what A13 now guards is the next name the lettered series would take, and it is protected in advance precisely because nothing has scoped it.
 
+## Extraction and history layout fix — owner actions after merge (2026-08-22)
+
+- **Status.** Two product defects fixed in the repository, **zero migrations, no phase or roadmap effect**: the extraction prompt now separates `people` / `organizations` / `projects` / `contexts` (`EXTRACTION_PROMPT_VERSION` `2026-07-25.1` → `2026-08-22.1` in both runtimes), and `Histórico imutável` no longer places the revision summary in a track reserved for an absolutely positioned icon. Proved against the live provider by the new opt-in `npm run test:remote:extraction` — **12/12 twice consecutively on `gpt-5.6-luna`**.
+- [ ] **OWNER — deploy `process-jobs` after the merge, as its own operation.** `SYSTEM_PROMPT` lives in the Edge Function, so **merging changes nothing about interpretation until it is deployed** (ADR-021, ADR-086). `npm run byok:verify-runtime`, then `npx supabase functions deploy process-jobs`, then `npm run verify:edge-parity` reading `ok`. Record the pre-deploy `updated_at` first, or the rollback target is a guess.
+- [ ] **OWNER — do not reinterpret the reported entry until `verify:edge-parity` reads `ok`.** Reinterpreting before the deploy re-runs the **old** prompt and spends a new interpretation version on the same defect. After parity is green, *"Reinterpretar entrada"* appends a version with `origin: ai_reprocessed`; the existing version is not modified, and creating the person stays an explicit confirmation with undo.
+
 ## Phase 2O — Activation, preferences, and control — PLANNING AUTHORIZED, NOTHING SIGNED (2026-08-15, ADR-115)
 
 - **Status.** Planning package written; **zero implementation, zero migrations created, zero deploy, signup closed**. Baseline `main` `9cc1175`, CI green on that SHA, 94 migrations, parity `202608140094`.

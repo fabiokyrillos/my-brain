@@ -82,3 +82,92 @@ describe("worker extraction pipeline order", () => {
     expect(call).toContain("timezone");
   });
 });
+
+/**
+ * The entity taxonomy, and why the prompt is where it has to live.
+ *
+ * Measured on the owner's own reported record (prompt version
+ * `2026-07-25.1`): the entry *"Preciso desenvolver um relatório de Sweepstakes
+ * pra Garo. Ele faz parte da Royal Caribbean."* produced `people: []`,
+ * `organizations: ["Royal Caribbean"]` and — the second half of the same defect
+ * — `projects: ["Relatório de Sweepstakes para Garo"]`, which is the task title.
+ *
+ * Nothing downstream could have recovered from that. `people` is the only input
+ * to `derivePendingPersonCandidates`, so an empty array is a person suggestion
+ * that never existed rather than one that was filtered. The four array names
+ * were the model's *only* signal about what belonged in each: Structured
+ * Outputs carries no per-field description, and the prompt said nothing.
+ *
+ * These assertions are deliberately about **meaning stated**, not about
+ * classification achieved — a unit test cannot prove what a model returns.
+ * `src/lib/ai/extraction-classification.remote.test.ts` measures that against
+ * the live provider, using this same prompt read from the worker source.
+ */
+describe("the extraction prompt separates people, organizations, projects and contexts", () => {
+  const prompt = () => templateLiteral(nodeProvider, "systemPrompt");
+
+  it("defines each of the four entity fields rather than leaving the field name to speak", () => {
+    const body = prompt();
+    for (const field of ["people:", "organizations:", "projects:", "contexts:"]) {
+      expect(body, `${field} is never defined for the model`).toContain(`- ${field}`);
+    }
+  });
+
+  it("says a person may be one the user has never registered", () => {
+    // The failure this closes: `Known user context` lists the owner's existing
+    // people, and an empty or non-matching list read as "return nobody".
+    const body = prompt();
+    expect(body).toMatch(/named for the first time/i);
+    expect(body, "the prompt does not say what Known user context is not")
+      .toMatch(/not the set of people you are allowed to return/i);
+  });
+
+  it("forbids the task title becoming a project", () => {
+    expect(prompt(), "the projects/task-title line is gone").toMatch(/task title is never a project/i);
+  });
+
+  it("says a person attached to an organization yields both, one per field", () => {
+    expect(prompt()).toMatch(/attaches a person to an organization produces both/i);
+  });
+
+  it("keeps evidence-only extraction, no invented names, and ambiguity as a question", () => {
+    // The three guarantees the new section must not have traded away for recall.
+    const body = prompt();
+    expect(body).toContain("Never invent names");
+    expect(body).toContain("Evidence must be a short phrase grounded in the entry.");
+    expect(body).toMatch(/add one short pending question/i);
+    expect(body, "the taxonomy examples must send an unnamed individual to a question")
+      .toMatch(/add a pending question rather than choosing a name/i);
+  });
+
+  it("teaches the boundary with both a positive and a negative example", () => {
+    const body = prompt();
+    const examples = body.slice(body.indexOf("Examples of that line:"));
+    expect(examples, "the worked examples are gone").not.toBe("");
+    // Positive: one sentence that must yield a person *and* an organization.
+    // `\p{L}` rather than `\w`: the examples are Portuguese, and `\w` does not
+    // match an accented letter — a name like `Túlio` would fail this on its
+    // spelling rather than on the contract.
+    expect(examples).toMatch(/people: \p{L}+\. organizations: \p{L}+/u);
+    // Negative: one sentence that names a company and must yield no person.
+    expect(examples).toMatch(/people: none, because naming a company names no person/);
+    // Negative: one sentence with no individual named at all.
+    expect(examples).toMatch(/people: none, because no individual is named/);
+  });
+
+  /**
+   * The control that keeps this a contract and not a lookup table.
+   *
+   * The owner asked for semantic instruction, explicitly *not* a heuristic for
+   * the name that failed. It also protects the remote lane: if the reported
+   * sentence were quoted here, that lane would be reading the prompt back to
+   * itself and would pass on a build that generalized to nothing.
+   */
+  it("carries no example lifted from the record that exposed the defect", () => {
+    const body = prompt().toLowerCase();
+    for (const token of ["garo", "royal caribbean", "sweepstakes"]) {
+      expect(body, `the prompt hardcodes "${token}" instead of teaching the rule`)
+        .not.toContain(token);
+    }
+  });
+});

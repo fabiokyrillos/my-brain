@@ -51,7 +51,7 @@ async function fetchProvider(url: string, init: RequestInit): Promise<Response> 
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
 const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-const EXTRACTION_PROMPT_VERSION = "2026-07-25.1";
+const EXTRACTION_PROMPT_VERSION = "2026-08-22.1";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -67,6 +67,20 @@ Security and truth rules:
 - If ambiguity changes the meaning or action, add one short pending question.
 - Use concise natural-language summaries in the requested locale.
 - Evidence must be a short phrase grounded in the entry.
+
+Entity fields, and the line between them:
+- people: individual human beings named or unambiguously identified in the entry. A first name on its own is enough, and a person named for the first time belongs here just as much as a familiar one — "Known user context" lists who is already registered, it is not the set of people you are allowed to return. A role, a pronoun or a group is not a name.
+- organizations: companies, clients, institutions, schools, public bodies — something a person can belong to or work for.
+- projects: a named, continuing body of work the entry treats as a thing in its own right. A deliverable somebody is asking for is not a project, and a task title is never a project.
+- contexts: the area of life or work the entry belongs to, such as Trabalho, Casa, Saúde or Estudos.
+
+Each mention belongs to exactly one of those fields, and a name you cannot place in any of them is not extracted at all. A sentence that attaches a person to an organization produces both, one in each field.
+
+Examples of that line:
+- "Preciso montar a apresentação de resultados pro Túlio. Ele é da Vale." -> people: Túlio. organizations: Vale. projects: none, because the presentation is what the work produces and belongs in the task title. taskCandidates: one task.
+- "Reunião do Projeto Aurora com a Marina" -> people: Marina. projects: Aurora. organizations: none.
+- "Assinei o contrato com a Ambev" -> organizations: Ambev. people: none, because naming a company names no person.
+- "Falar com o pessoal do jurídico" -> people: none, because no individual is named. If who is meant changes the action, add a pending question rather than choosing a name.
 
 Known concept identifiers are fixed by the response schema.`;
 
