@@ -57,29 +57,42 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 | [`phase-2l/`](./phase-2l/) | Phase 2L — Work and execution (audit, gaps, threat model, traceability contract, six slice acceptance records, the traceability matrix, the closing report and the successor re-audit) | **COMPLETE** (2026-08-09) — planning by ADR-102, implementation through closeout by ADR-103, which signed all five owner decisions. **82 requirements declared, 82 classified: 73 built, 5 baseline, 3 partial, 1 not-built-by-rule, 0 undelivered** — after a post-closeout correction (2026-08-09) that reclassified `2L-BULK-011` and `2L-CLOSE-004` from `partial` **from evidence**: a missing proof was executed and a live read-only `migration list --linked` was taken. The generator now refuses a `partial` whose remainder is vacuous. **Migration budget `1 allocated · 0 spent`** — the allocation lapsed under OD-2L-2 A, so no migration exists, **no deployment record was created** and there is no G8. Hosted parity unmoved at `202608090089`; signup closed; no new RPC, write path, grant, policy, telemetry event name or gesture. Three partials each name a remainder and a destination; `2L-MOBILE-008` and `2L-ACCESS-008` are reported **NOT EXECUTED** and need owner-run hardware, and `2L-METRICS-005` needs a migration the successor must spend before its producers exist. The successor is re-audited and **stopped for owner authorization**: no successor artifact, no successor requirement, and A13 is not retargeted here |
 | [`phase-2m/`](./phase-2m/) | Phase 2M — Calendar, daily planning and notifications (audit, UX gaps, threat model, traceability contract, six slice acceptances, deployment, matrix, closing report, successor re-audit) | **COMPLETE** 2026-08-12 (planning ADR-104, implementation ADR-105, third migration ADR-106, closeout gate amended by ADR-107). 94 requirements — **89 built · 4 partial · 1 not-built-by-rule · 0 undelivered**; budget **3 allocated · 3 spent, NON-TRANSFERABLE**; hosted parity `202608120092`. **Push is implemented and hosted, FAILS on a real iPhone with HTTP 403 from Apple Web Push, cause unproven, and Android is NOT EXECUTED** — residual at `docs/initiatives/push-hardware-validation/`. Slice 2M.5 found that two shipped surfaces had never rendered, because a server-to-client boundary is only exercised when a real server renders a real page |
 | [`phase-2n/`](./phase-2n/) | Phase 2N — People, projects, memory, files and relations (current-experience audit, UX gaps, threat model, traceability contract) | **PLANNING ONLY** (2026-08-12, ADR-108), with **all seventeen decisions SIGNED by ADR-109** (2026-08-12), which authorizes **no implementation**. 127 requirements, sixteen families, eight slices, plus a **separately authorized timezone initiative that gates slice 2N.1**. Migration budget **`3 allocated · obligation ZERO · 0 spent · NONE CREATED`, non-transferable** — M1 retrieval (2N.3), M2 telemetry (2N.7), M3 deletion (2N.3); **a fourth is a stop condition** and an allocation is a destination, not a permission. Signed: **no merge** (closing `not-built-by-rule`), **no persisted inference**, **deletion IS built**, contextual surfaces **join the sensitivity contract**, graph ships **secondary under a contract that can refuse it**. The audit corrected the inherited picture in eight places: the person and project pages **already ship**; the sensitivity contract governs eight surfaces and **none is a person, project, memory or file page**; `match_internal_knowledge` filters neither validity nor sensitivity and applies its bound before reading `valid_until`, so **archiving a memory removes it from citation but not from retrieval**; there is **no `.delete()` anywhere in `src/`**; `entity_aliases` has **zero readers and zero writers**; relations carry confidence and **no source**; and the timezone defect is **thirteen call sites in twelve files outside the guard corpus**, not the four the exemption records |
+| [`phase-2o/`](./phase-2o/) | Phase 2O — Activation, preferences and control (audit, gaps, threat model, traceability contract, nine slice acceptances, matrix, closing report) | **COMPLETE** 2026-08-18 — planning by ADR-115, decisions signed by ADR-116/117, implementation by ADR-118. **116 declared · 116 classified · 0 unclassified** — 106 built · 3 baseline · 2 partial · 5 not-built-by-rule · 0 undelivered. **Both migration allocations close UNSPENT**; parity unmoved. Slice 2O.7 measured the product on a **rendered page** for the first time and that is what found six defects nothing else could see |
+| [`phase-2p/`](./phase-2p/) | Phase 2P — Trustworthy capture and everyday UX (audit, gaps, threat model, traceability contract, nine slice acceptances, four owner device checklists, matrix, closing report) | **COMPLETE** 2026-08-20, closed by ADR-125 — planning ADR-121, implementation ADR-122, a second migration ADR-123, an amendment ADR-124. **87 declared · 87 classified** — 66 built · 12 baseline · 4 partial · 5 not-built-by-rule · 0 undelivered. Budget **2 allocated · 2 spent**, parity `202608190099`. **`2P-ACCESS-005` (VoiceOver) is WAIVED, NOT PASSED** and must never be reported as approved or passing. `2P-REVIEW-CITATIONS` closed the phase **explicitly NOT DELIVERED** |
+| [`phase-2q/`](./phase-2q/) | Phase 2Q — Evidence: the record behind the claim (audit, gaps, threat model and disposition, traceability contract, six slice acceptances, deployment record, owner checkpoint, matrix, closing report) | **COMPLETE** 2026-08-21, closed by ADR-130 — planning ADR-126, decisions ADR-127, implementation ADR-128, a premise corrected append-only by ADR-129. **42 declared · 42 classified** — 36 built · 6 baseline · **zero partial, zero not-built-by-rule, zero undelivered**. Budget **1 allocated · 1 spent · 1 applied** — `202608210100`, parity **100 local = 100 hosted**. **Closed by the owner validating eight items on their own device, not by a green pipeline**, and `2P-REVIEW-CITATIONS` is **DELIVERED** after two phases. The agent made **no AI call**; the single call was the owner's. Slice 2Q.4 found that a signed premise was false — the defect was in the **test lane**, not the product |
+| [`phase-2r/`](./phase-2r/) | Phase 2R — Rotina: o que se repete (current-experience audit, gaps and opportunities, threat model, traceability contract) | **PLANNING ONLY** (2026-08-22, ADR-131), **nothing signed** — nine owner decisions are OPEN, including the theme itself (`OD-2R-1`). **73 requirements across ten families and six slices, none classified.** Migration budget **`1 PROPOSED · 0 allocated · 0 spent`**; parity unmoved at `202608210100`. Subject derived from a measured census: **`public.reminders` has no recurrence column of any kind**. The audit corrected the inherited picture in four places — real-route accessibility lanes **already exist**, so that remainder is one spec's mechanism; global **search already ships**; two of the six automation categories are **not `suggest_only`** as three ADRs stated; and `/app/search` plus *Precisa de você* carry two proved, previously unrecorded defects, routed out under `OD-2R-9` rather than absorbed |
 | [`product-ux/`](./product-ux/) | Product UX/UI remediation, including its evidence captures | historical, closed |
 | [`entity-graph/`](./entity-graph/) | Entity Graph Completion (EGC) | historical, closed |
 | [`byok/`](./byok/) | BYOK — bring your own key | historical, closed and deployed |
 | [`signup-hardening/`](./signup-hardening/) | Signup Hardening SH.0–SH.7 | closed 2026-08-05; **public signup remains closed** |
 | [`shared/governance/`](./shared/governance/) | Initiative-independent governance material | living |
 
-**The active initiative is Phase 2N — People, projects, memory, files and
-relations, and it is authorized for PLANNING ONLY** by ADR-108 (2026-08-12).
-Its governing pair lives in `docs/initiatives/phase-2n/`; its evidence files
-here. **Implementation is not authorized**: no product code, no page, no
-component, no migration, no schema, RLS, grant, policy or RPC change, no Edge
-Function, no deploy, no secret, no external integration. **127 requirements
-across sixteen families**, **migration budget `3 allocated · obligation ZERO ·
-0 spent · NONE CREATED`, non-transferable** — M1 validity-aware retrieval
-(2N.3), M2 content-free telemetry (2N.7), M3 transactional deletion (2N.3), and
-**a fourth is a stop condition** — and **all seventeen owner decisions SIGNED by
-ADR-109**, which authorizes no implementation, **amended by ADR-110** — which
-settled the one flagged interpretation and made `people.notes` masked by
-default, adding four requirements and no migration. A **separate timezone initiative
-is a mandatory dependency of slice 2N.1** and is not performed by this phase.
-The audit found that three of the roadmap's eight slices describe surfaces that
-already ship, so they are re-scoped from construction to hardening. **Push is a
-parallel track and never a precondition.**
+**The active initiative is Phase 2R — Rotina: o que se repete, and it is
+authorized for PLANNING ONLY** by ADR-131 (2026-08-22). Its governing pair lives
+in `docs/initiatives/phase-2r/`; its evidence files here. **Implementation is not
+authorized**: no product code, no page, no component, no migration, no schema,
+RLS, grant, policy or RPC change, no Edge Function, no deploy, no secret, no AI
+call. **73 requirements across ten families and six slices, none classified**;
+**migration budget `1 PROPOSED · 0 allocated · 0 spent`**, whose exclusive
+destination is the recurrence model and whose second of any kind is a stop
+condition. **Nine owner decisions are OPEN** — including the theme itself
+(`OD-2R-1`) and lifting the `2P-REMINDER-RECURRENCE` refusal (`OD-2R-8`),
+**without which the phase has no subject**. A recommendation is not a signature.
+
+*(This paragraph named **Phase 2N** until 2026-08-22, while Phases 2O, 2P and 2Q
+had each been authorized, delivered and closed — the identical drift this file
+recorded catching once before, when it named Phase 2H after 2I and 2J had both
+closed. It is corrected here rather than quietly, because the paragraph below
+says this is the one document a new reader trusts first, and a rule nobody
+applies is not a rule.)*
+
+**Phases 2N through 2Q are complete.** Phase 2N — 127 requirements, budget
+`3 allocated · 2 spent`; Phase 2O — 116 requirements, **both allocations
+unspent**; Phase 2P — 87 requirements, 2 migrations spent, closed by ADR-125
+with VoiceOver **waived, not passed**; Phase 2Q — 42 requirements, 1 migration
+allocated, spent and applied, closed by ADR-130 after the owner validated all
+eight checkpoint items on their own device, delivering `2P-REVIEW-CITATIONS`
+after two phases. Parity is **`202608210100`, 100 local = 100 hosted**.
 
 **Its predecessor, Phase 2M — Calendar, daily planning and notifications, is
 complete** (planning by ADR-104, implementation through closeout by ADR-105,
