@@ -12048,3 +12048,96 @@ The declaration guard **still forbids a closing report**, deliberately. Signup
 closed; rollout 25 · 3 · 2; `RG-DEP-3` still not closable by writing a file; push
 HTTP 403 not resumed; `2P-ACCESS-005` **WAIVED, NOT PASSED**; **successor not
 started or planned.**
+
+## §113 — Phase 2Q is CLOSED, by the owner's own device, and `2P-REVIEW-CITATIONS` is finally DELIVERED (2026-08-21)
+
+**ADR-130.** The phase closed the way ADR-128 Decision 8 said it would: **not
+when CI went green, but when the owner ran the eight-item checkpoint on their own
+device.** All eight approved.
+
+### What the owner confirmed, item by item
+
+A new review generated **with its sources** · the **task link opened the correct
+task** · the **record link opened the correct record** · a **historical review
+showed the correct message** · a **removed source degraded with no broken link**
+· **no preview, title, excerpt or reveal button appeared** · **mobile layout**
+approved · **contrast in Safari, dark mode** approved.
+
+Recorded item by item on purpose. A phase reporting *"checkpoint passed"* without
+saying what passed describes a validation nobody can audit.
+
+### `2P-REVIEW-CITATIONS` — delivered after two phases
+
+ADR-125 Decision 4 set the bar precisely: delivered when a review **on the
+owner's own device** offers a working link to a real record, and *"a 'Fontes'
+section without canonical links in it is still not delivery"*.
+
+Items 1, 2 and 3 are that bar, met. **Not by an agent run, not by a green
+pipeline, not by an ADR.**
+
+### The one AI call in this phase was the owner's — and its artifact proved three things I could not
+
+The agent made **no** AI call at any point. ADR-128 Decision 5 forbade spending
+the owner's BYOK credential, so the real producer's end-to-end proof stayed
+**UNSPENDABLE, never a pass**, through every slice.
+
+The owner's checkpoint spent it. The artifact it left on the deployed database
+was then read **for shape only** — no title, no content, no identifier of any
+cited record:
+
+| Property | Value | Proves |
+|---|---|---|
+| Declared reach | **`["entry","task"]`** | `REVIEW_REACH`, **not chat's** — the two callers really stayed separate |
+| Cited type | **`task`** | **`2Q-CITE-007` at the real producer.** A task stored **as a task**. This is the exact defect the phase existed to prevent |
+| Reference keys | **`id, sourceId, support, type`** | **`2Q-CITE-006` at the real producer.** Four identifier fields, **no content-bearing key** |
+| Evidence state | `evidenced` | retrieval recorded as a fact, not inferred from a count |
+| With / without envelope | 1 / 1 | **`2Q-CITE-008` observed in production** — the pre-phase review carries `[]` |
+
+**Reading the shape of what the owner's call produced is a different act from
+making one**, and the record says so rather than blurring it into "the proof was
+obtained".
+
+### The closeout, verified rather than carried forward
+
+**Eight merge SHAs** — `e3a3668` `c7c8db0` `553b538` `57e812a` `a67a34c`
+`198591c` `e64e2c1` `4c3f49c` — each proved an **ancestor of `main`** and each
+**CI green 3/3**, re-checked at closeout. **42 declared · 42 classified · 0
+unclassified**: `built` 36 · `baseline` 6 · **zero** `partial`,
+`not-built-by-rule`, `undelivered`. The matrix was **regenerated and came out
+byte-identical** — deterministic, and **no count edited by hand**. **1 migration
+allocated · spent · applied**, parity `202608210100`, **100 local = 100 hosted**.
+**Residue zero**, two-sided, **zero orphan profiles**. All twelve threats
+**CLOSED**, three residuals named.
+
+### Nothing was silently absorbed
+
+`2P-ACCESS-005` stays **WAIVED, NOT PASSED** — item 8 approved **contrast in
+Safari**, which is not a screen-reader test, and **nothing in this phase,
+including an accessibility lane that now runs on WebKit in CI, may ever be
+reported as screen-reader evidence.** `2P-ATTENTION-008`'s back-navigation half
+stays open and **narrower than Phase 2P recorded** — understanding a remainder
+more precisely is not discharging it. **`RG-DEP-3` still cannot be closed by
+writing a file, and the closing report does not.** Push HTTP 403 not resumed;
+`2P-CHAT-007-JOURNEY` unspendable; the four automation flows out under
+`OD-2Q-8`; the accessibility dark scan on **real routes** a later initiative.
+
+### The successor — a read-only re-audit, and it is not started
+
+No successor directory under `docs/initiatives/` or `docs/reports/`. No successor
+requirement namespace in any governing artifact. The successor's letter appears
+**only inside the A13 detector**, which is where it belongs: a detector that
+could not name its target could not detect anything. The phase-start guard sits
+exactly where ADR-126 Decision 5 put it, and **ADR-130 names no successor in its
+heading or its body**.
+
+### For whoever picks this up next
+
+**Nothing is authorized.** The roadmap ended at Phase 2O and nothing has replaced
+it; Phase 2Q's subject came from an executable census, not from a plan. The next
+phase needs an owner decision before a single artifact exists, and **a start
+signal appearing in this repository before that is a defect.**
+
+The most useful thing this phase leaves behind is not the feature. It is the
+habit that produced it: **reproduce before fixing** — which is the only reason a
+signed premise was caught being false before a product colour was changed to
+satisfy a broken fixture.

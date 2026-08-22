@@ -441,10 +441,37 @@ describe("Phase 2Q declarations", () => {
      * device checkpoint is the gate, and until they have run it there is no
      * closing report to write.
      */
-    for (const forbidden of [/CLOSING_REPORT/i]) {
-      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists before the owner closed the phase`)
+    /*
+     * **The forbidden list is now empty, and this is the last inversion.**
+     *
+     * The closing report was the one artifact an agent could not earn: ADR-128
+     * Decision 8 conditioned it on the owner's device checkpoint. The owner ran
+     * the eight items, approved all eight, and ADR-130 closes the phase — so
+     * the report is required rather than forbidden, and it is required to say
+     * the two things a premature closure would have got wrong.
+     *
+     * The list is kept as an empty loop rather than deleted, because every
+     * earlier inversion in this file was kept: the shape is what tells the next
+     * phase how its own absences should be held.
+     */
+    for (const forbidden of [] as RegExp[]) {
+      expect(filed.filter((name) => forbidden.test(name)), `${forbidden} exists too early`)
         .toEqual([]);
     }
+    expect(filed, "the closing report is missing").toContain("PHASE_2Q_CLOSING_REPORT.md");
+    /*
+     * Flattened first. Markdown wraps, and **a property of the sentence is not
+     * a property of its line breaks** — the failure this file's own open-claim
+     * rule was rewritten for, and which cost this phase a false negative on the
+     * migration scan twice more.
+     */
+    const closing = flat(read("docs/reports/phase-2q/PHASE_2Q_CLOSING_REPORT.md"));
+    expect(closing, "the closure must record the owner's validation, not a green pipeline")
+      .toContain("by owner validation on their own device");
+    expect(closing, "VoiceOver must stay waived, never reported as passed")
+      .toMatch(/WAIVED, NOT PASSED/);
+    expect(closing, "a closing report may not discharge RG-DEP-3 by existing")
+      .toMatch(/cannot be closed by writing a file/);
     expect(filed, "the generated matrix is missing").toContain("PHASE_2Q_TRACEABILITY_MATRIX.md");
     const matrix = read("docs/reports/phase-2q/PHASE_2Q_TRACEABILITY_MATRIX.md");
     expect(matrix, "the matrix no longer classifies every requirement")

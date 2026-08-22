@@ -2,6 +2,22 @@
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
+## 2026-08-21 - PHASE 2Q CLOSED (ADR-130) — the owner validated all eight checkpoint items, and 2P-REVIEW-CITATIONS is delivered
+
+**Closed by owner validation on their own device**, not by a green pipeline. All eight items approved: a new review generated **with its sources**; the **task link opened the correct task**; the **record link opened the correct record**; a **historical review showed the correct message**; a **removed source degraded with no broken link**; **no preview, title, excerpt or reveal button appeared**; **mobile layout** approved; **contrast in Safari in dark mode** approved.
+
+**`2P-REVIEW-CITATIONS` is DELIVERED.** Open since Phase 2P. ADR-125 Decision 4 set the bar — a review **on the owner's own device** offering a working link to a real record — and items 1, 2 and 3 are that bar, met. Not by an agent run, not by CI, not by an ADR.
+
+**The agent made no AI call at any point.** The single call in this phase was the owner's, at checkpoint item 1. The artifact it left was afterwards read **for shape only** — no title, no content, no identifier of any cited record — and that shape is the real-boundary proof three requirements could not otherwise have had: the owner's review declares reach `["entry","task"]` (**`REVIEW_REACH`, not chat's**), evidence `evidenced`, cites a **`task`** (`2Q-CITE-007` **at the real producer** — the exact defect the phase existed to prevent), and carries **exactly four identifier keys with no content-bearing field** (`2Q-CITE-006` at the real producer). The pre-phase review still carries `[]` — `2Q-CITE-008`, observed in production.
+
+**42 declared · 42 classified · 0 unclassified** — `built` 36, `baseline` 6, **zero `partial`, zero `not-built-by-rule`, zero `undelivered`**. The matrix was **regenerated at closeout and is byte-identical** to the merged file: the generator is deterministic and no count was edited by hand. **Eight merge SHAs**, every one an ancestor of `main` and every one **CI green 3/3**, verified at closeout rather than carried forward. **One migration allocated, spent and applied**; parity `202608210100`, **100 local = 100 hosted**, read live. **Hosted residue zero**, two-sided: four markers planted, all removed, probes proved still able to see, **zero orphan profiles**.
+
+**All twelve threats CLOSED**, re-dispositioned against the owner's own artifact, with **three residuals named rather than absorbed**. The seven inherited properties re-proved **unweakened**.
+
+**Nothing was silently absorbed.** `2P-ACCESS-005` stays **WAIVED, NOT PASSED** — item 8 approved contrast in Safari, which is **not** a screen-reader test, and nothing in this phase (including an accessibility lane that now runs on WebKit in CI) may ever be reported as screen-reader evidence. `2P-ATTENTION-008`'s back-navigation half stays open and **narrower than Phase 2P recorded**. `RG-DEP-3` stays a rollout matter and **cannot be closed by writing a file** — this report does not. Push HTTP 403 not resumed; `2P-CHAT-007-JOURNEY` unspendable; the four automation flows out under `OD-2Q-8`; the dark scan on real routes a later initiative.
+
+**Signup closed. Rollout 25 pass · 3 fail · 2 owner-signature. The successor phase is NOT started, NOT planned and NOT named as active** — a read-only re-audit found no successor directory, no successor requirement namespace in any governing artifact, and the successor's letter only inside the A13 detector, which is where it belongs.
+
 ## 2026-08-21 - Phase 2Q slice 2Q.5: 42 of 42 classified, generated or refused — awaiting the owner's checkpoint
 
 **Zero migrations; budget stays 1 allocated · 1 spent.** **42 declared · 42 classified · 0 unclassified.** The phase is **not** closed: the owner's device checkpoint is the gate.
