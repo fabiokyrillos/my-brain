@@ -576,3 +576,88 @@ describe("loadEntryReviewProjection", () => {
     expect(result?.view.attentionItems[0]?.reason).toBe("answer_existing_question");
   });
 });
+
+/**
+ * The reported defect, from the projection's side.
+ *
+ * On the reported record the model returned `people: []` for *"Preciso desenvolver
+ * um relatório de Sweepstakes pra Garo. Ele faz parte da Royal Caribbean."* and
+ * put the task title into `projects`. These cases pin what the projection owes
+ * once the extraction is right, and what it must keep refusing when no person is
+ * named — the classification itself is the prompt's job (see
+ * `src/lib/ai/extraction-contract.test.ts`) and is measured against the live
+ * model in `src/lib/ai/extraction-classification.remote.test.ts`.
+ */
+describe("person candidates from an entry that names a person and their organization", () => {
+  type Extraction = NonNullable<EntryReviewProjectionInput["extraction"]>;
+
+  function sweepstakesExtraction(overrides: Partial<Extraction> = {}): Extraction {
+    return {
+      language: "pt-BR",
+      occurredAt: "2026-08-22T12:00:00.000Z",
+      isRetroactive: false,
+      summary: "Desenvolver o relatório de Sweepstakes para Garo, da Royal Caribbean.",
+      concepts: ["task"],
+      contexts: [],
+      organizations: [{ name: "Royal Caribbean", evidence: "faz parte da Royal Caribbean", confidence: 0.99, inferred: false }],
+      projects: [],
+      people: [{ name: "Garo", evidence: "relatório de Sweepstakes pra Garo", confidence: 0.9, inferred: false }],
+      taskCandidates: [],
+      pendingQuestions: [],
+      confidence: 0.9,
+      ...overrides,
+    };
+  }
+
+  it("offers the named individual as a candidate and the organization as neither", () => {
+    const current = revision({ entityLinks: [] });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      revisions: [current],
+      extraction: sweepstakesExtraction(),
+    }));
+
+    expect(projection.pendingPersonCandidates).toEqual([{
+      candidateIndex: 0,
+      originalName: "Garo",
+      proposedName: "Garo",
+      evidence: "relatório de Sweepstakes pra Garo",
+      confidence: 0.9,
+    }]);
+    // The organization is surfaced as a mention, never as somebody to create.
+    expect(projection.extractedMentions.map((mention) => mention.name))
+      .toEqual(["Royal Caribbean", "Garo"]);
+  });
+
+  it("creates no person candidate from an organization mentioned on its own", () => {
+    const current = revision({ entityLinks: [] });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      revisions: [current],
+      extraction: sweepstakesExtraction({ people: [] }),
+    }));
+
+    expect(projection.pendingPersonCandidates).toEqual([]);
+    // …and the organization is still read, so this is not an empty extraction
+    // passing for the right reason by accident.
+    expect(projection.extractedMentions.map((mention) => mention.name)).toEqual(["Royal Caribbean"]);
+  });
+
+  it("keeps offering the candidate while no link and no resolution exist for it", () => {
+    // The negative control for the two suppression rules tested elsewhere in
+    // this file: a person is hidden by a *link* or by a *resolution*, and this
+    // entry has neither for Garo, so nothing may hide them. The organization
+    // link is present precisely to prove it is not enough to suppress a person.
+    const current = revision({
+      entityLinks: [{ entityType: "organization", entityId: "org-1", mention: "Royal Caribbean", name: "Royal Caribbean", confidence: 1 }],
+    });
+    const projection = toEntryReviewProjection(baseInput({
+      current,
+      revisions: [current],
+      extraction: sweepstakesExtraction(),
+      personCandidateResolutions: [],
+    }));
+
+    expect(projection.pendingPersonCandidates.map((candidate) => candidate.originalName)).toEqual(["Garo"]);
+  });
+});
