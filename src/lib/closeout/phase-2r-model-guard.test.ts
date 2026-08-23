@@ -165,3 +165,82 @@ describe("the migration keeps the SQL house rules this repository has paid for",
       .not.toContain("errcode = '40001'");
   });
 });
+
+/**
+ * **Every column this migration writes to a table it did not create exists.**
+ *
+ * The defect this catches shipped: both undo-recording inserts named a
+ * `description` column on `public.undo_operations`, which has sixteen columns
+ * and not that one. Nothing local failed. `npm test` was green, `tsc` was
+ * green, and the four hosted rehearsals never called the function, so the first
+ * thing to notice was `pg_prove` — thirteen minutes of CI to learn a column
+ * name.
+ *
+ * The generated types are the local copy of the deployed schema, so they can
+ * answer the question without a database. The check is deliberately scoped to
+ * tables the migration does NOT create: `reminder_series` is absent from
+ * `database.types.ts` until the types are regenerated, and demanding otherwise
+ * would make this guard fail on exactly the migrations it exists for.
+ */
+describe("the migration writes no column that does not exist", () => {
+  const types = readFileSync(
+    join(REPO, "src/lib/supabase/database.types.ts"),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  /** The tables this migration creates, which are not yet in the deployed schema. */
+  const created = new Set(
+    [...sql.matchAll(/create table if not exists (?:public|private)\.(\w+)/g)].map(
+      (match) => match[1],
+    ),
+  );
+
+  /** The `Row: { ... }` block of one table in the generated types. */
+  function rowColumns(table: string): string[] | null {
+    const anchor = new RegExp(`\n      ${table}: \\{\n        Row: \\{\n`);
+    const found = anchor.exec(types);
+    if (found === null) return null;
+    const start = found.index + found[0].length;
+    const end = types.indexOf("\n        }", start);
+    if (end < 0) return null;
+    return [...types.slice(start, end).matchAll(/^\s*(\w+)\??:/gm)].map((match) => match[1]);
+  }
+
+  const writes = [...withoutComments(sql).matchAll(
+    /insert into (public|private)\.(\w+)\s*\(([^)]*)\)/g,
+  )];
+
+  it("finds the inserts it is supposed to read", () => {
+    // Non-vacuity: an empty match list would make every assertion below pass.
+    expect(writes.length, "no insert statements were parsed").toBeGreaterThan(5);
+    expect(writes.some((match) => match[2] === "undo_operations")).toBe(true);
+    expect(created.has("reminder_series")).toBe(true);
+  });
+
+  it("names only columns the generated types declare", () => {
+    let checked = 0;
+    for (const [, schema, table, columnList] of writes) {
+      if (schema !== "public" || created.has(table)) continue;
+      const declared = rowColumns(table);
+      if (declared === null) continue;
+      const written = columnList
+        .replace(/\n/g, " ")
+        .split(",")
+        .map((column) => column.trim())
+        .filter((column) => column.length > 0);
+      for (const column of written) {
+        expect(declared, `public.${table} has no column ${column}`).toContain(column);
+        checked += 1;
+      }
+    }
+    // Non-vacuity again, from the other side: the loop really ran.
+    expect(checked, "no column was actually compared").toBeGreaterThan(20);
+  });
+
+  it("proves the check can fail, on the exact column that failed", () => {
+    const declared = rowColumns("undo_operations");
+    expect(declared, "undo_operations is missing from the generated types").not.toBeNull();
+    expect(declared).toContain("after_state");
+    expect(declared, "the control column is somehow present").not.toContain("description");
+  });
+});

@@ -269,7 +269,12 @@ asserted to contain no task or calendar path and exactly one migration.
 cannot be started by this phase, because the half of the guard that would catch
 them has nothing to widen.
 
-### Ten defects, six caught before pushing and four caught by CI
+### Thirteen defects, seven caught before pushing and six caught by CI
+
+The six CI caught are numbered 7 to 12 below; number 13 was found by reading, before the push that would have shipped it. Number 10 is one entry covering
+three closed lists that refused the slice's new objects in the same run; it is
+grouped because it is one finding — *a new table and a new function family have
+to be declared* — and not three.
 
 1. **`extensions.digest`, not `pg_catalog.digest`.** Caught by reading migration
    064's idiom rather than assuming the schema.
@@ -435,6 +440,105 @@ something**, with no undo row and no audit row to show for it. The census's
 deviation count was **re-measured** (57 public base tables read off the hosted
 database before this migration, plus one) rather than incremented from the
 prose.
+
+### 11. The fifth one CI caught, and it is the finding of the slice repeating itself
+
+`edit_future` **could not be called at all**. Every payload was refused with
+`Unsupported series command field`, from `apply_reminder_series_command_v1`
+line 70.
+
+The gate compared the number of keys in the command against
+`cardinality(allowed_command_keys)`, which turned the six **allowed** fields
+(`kind, rule, title, important, hour, minute`) into six **required** ones. The
+body immediately below it reads every optional field through
+`coalesce(…, the stored value)` — it was written for exactly the partial edit
+the gate refused. So the command's own two halves disagreed, and the half a
+reader reaches first looked deliberate: it is the same shape
+`private.reminder_rule_is_valid` uses, where key-set equality is **right**
+because every key of a frequency is required to describe it.
+
+**A command is closed in one direction only.** Unknown keys are refused; known
+keys are optional; an edit that changes nothing is refused rather than recorded
+as an undoable no-op.
+
+The part that matters more than the fix: `reminderSeriesCommandSchema` **had the
+contract right the whole time** — five optional fields plus a refine reading
+*"an edit must change something"*. This was therefore **two validators for one
+contract, disagreeing** — `2R-TZ-SECOND-AUTHORITY`'s exact shape, reproduced
+inside the slice written to answer it. `recurrence-rule-parity.test.ts` exists
+to make that impossible and did not catch it, because it compares the **rule**
+vocabulary and the command key sets were never in its scope. A parity test is
+only as wide as the contracts it was pointed at.
+
+It is caught now in three places, and the third is the one that would have
+worked:
+
+| Where | What it asserts |
+|---|---|
+| pgTAP | both refusals by **named reason**, placed *before* the partial edit that exercises the command with `rule` and `hour` and nothing else |
+| `recurrence-rule-parity.test.ts` | the SQL field sets equal the TypeScript union's, **and** the gate's *direction* — a returning `cardinality(allowed_command_keys)` comparison fails by name |
+| the migration's own comment | why the rule's shape is wrong here, so the next reader does not restore the symmetry |
+
+Two mutation controls were run against the real migration file — re-introducing
+the cardinality comparison, and dropping `minute` from the SQL set. Each fired,
+and the file was restored and re-verified green afterwards.
+
+### 12. The sixth: an assertion that reached into `private` while wearing the client's role
+
+```
+psql:.../phase_2r_reminder_recurrence.sql:729: ERROR:  permission denied for schema private
+```
+
+Section 9 opens by counting the rows in `private.undo_operation_handlers`, and
+it inherited `set local role authenticated` from Section 8. `authenticated` has
+no `usage` on `private` — which is the point of `private` — so the suite died
+with 71 of 81 run.
+
+**The test was wrong and the boundary was right**, and it is worth saying that
+way round: the assertion is only reachable from outside the client role, and
+that is a property rather than an inconvenience. Section 9 now drops to the
+owner for the registry read and returns to `authenticated` for the undo itself,
+because `2R-SERIES-007` asks for the real router exercised **by the person
+entitled to call it**, not by a superuser. Every other `private.*` reference in
+the suite already sat outside an `authenticated` span; this was the only one,
+confirmed by reading the role switches and the references together in file
+order.
+
+### 13. The seventh, found by reading rather than by CI: the ledger row was never closed
+
+Not a red run — this one was found while checking the router's calling
+convention before the next push, and it would have shipped.
+
+`public.undo_operation` **reads** `undo_operations.status` — an already-`undone`
+row short-circuits to `{"undone": true, "idempotent": true}` instead of running
+the handler again — but it never **writes** it. Closing the row is the handler's
+job, and **eleven of the twelve shipped handlers do it** with the same
+statement:
+
+```sql
+update public.undo_operations set status = 'undone', undone_at = now() where id = …;
+```
+
+Neither of this slice's two handlers did. The operation would have stayed
+`available` for its full 24 hours, so pressing undo twice would re-enter the
+compensating path and answer with a `55P03` staleness error where the contract
+says *"already done"*. Both handlers now close their row, and the suite asserts
+both halves: the row carries `status = 'undone'` **and** a timestamp, and a
+second call to the router returns the idempotent answer (plan 81 → 83).
+
+**The twelfth handler is `private.undo_apply_reminder_command_v1`, from Phase 2P
+slice G5, and it does not close its row either.** Its comment says *"The
+router's own `operation_undone` row describes who asked for it"* — the router
+writes no such row and no such status. This slice did **not** repair it: the
+migration's destination is exclusive by `2R-MODEL-009`, and editing another
+phase's compensation handler is exactly the kind of quiet widening the
+post-deploy block refuses. It leaves as a named remainder.
+
+| Remainder | What it is | Destination |
+|---|---|---|
+| `2R-UNDO-LEDGER-NOT-CLOSED` | `private.undo_apply_reminder_command_v1` never sets `status = 'undone'`, so a Phase 2P reminder-command undo stays replayable for 24 hours and the router's idempotent branch is unreachable for it | A Phase 2P follow-up or the next slice that owns a migration; needs one `update` and one assertion. `undo_operation_routing.sql` asserts nothing about `status`, which is why it shipped |
+
+**Being routed does not discharge it.**
 
 **Every hosted rehearsal ran inside `begin; … rollback;`, and residue was proved
 zero afterwards on seven probes** — users, profiles, reminders, the table, the

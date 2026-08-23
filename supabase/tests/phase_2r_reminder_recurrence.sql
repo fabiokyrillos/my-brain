@@ -36,7 +36,7 @@
 -- `reminder_lifecycle_command.sql`.
 
 begin;
-select plan(81);
+select plan(83);
 
 set local timezone to 'UTC';
 
@@ -714,11 +714,19 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 9 -- undo really restores (5)
+-- Section 9 -- undo really restores (7)
 -- ---------------------------------------------------------------------------
 --
 -- 2R-SERIES-007 asks for an undo that is EXERCISED rather than asserted, so
 -- each of these runs the real router and then reads the row back.
+
+-- The registry is read as the OWNER OF THE SCHEMA, not as the client, and that
+-- is a property rather than a convenience: `authenticated` has no `usage` on
+-- `private`, so this assertion is only reachable from outside the client role.
+-- The suite ran it under `set local role authenticated` in its first version
+-- and got `permission denied for schema private` -- the boundary asserting
+-- itself against the test that forgot it.
+reset role;
 
 select is(
   (select pg_catalog.count(*)::integer
@@ -726,6 +734,15 @@ select is(
    where action_type in ('create_reminder_series_v1', 'apply_reminder_series_command_v1')),
   2,
   'both series operations have a registered compensation handler'
+);
+
+-- Back to the owner for the undo itself: 2R-SERIES-007 asks for the real router
+-- exercised by the person entitled to call it, not by a superuser.
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"d1000001-0000-4000-8000-000000000001","role":"authenticated"}',
+  true
 );
 
 select ok(
@@ -757,6 +774,33 @@ select is(
    where entry.action_type = 'reminder_series_command_undone'),
   1,
   'and the compensating write is itself audited'
+);
+/*
+ * The ledger row is CLOSED, and the replay proves why that matters.
+ *
+ * `public.undo_operation` reads `status` and never writes it: an already-undone
+ * row short-circuits to the idempotent answer, but only if some handler set it.
+ * A handler that skips the update leaves its operation `available` for the full
+ * 24 hours, so pressing undo twice re-enters the compensating path -- which for
+ * this operation means a second `55P03` at the staleness check, an error where
+ * the contract says "already done".
+ */
+select ok(
+  (select operation.status = 'undone' and operation.undone_at is not null
+   from public.undo_operations as operation
+   where operation.action_type = 'apply_reminder_series_command_v1'
+     and operation.after_state ->> 'scope' = 'series'),
+  '2R-SERIES-007: the handler closed its own ledger row, status and timestamp'
+);
+select is(
+  public.undo_operation(
+    (select operation.id from public.undo_operations as operation
+     where operation.action_type = 'apply_reminder_series_command_v1'
+       and operation.after_state ->> 'scope' = 'series'
+     limit 1)
+  ) ->> 'idempotent',
+  'true',
+  'so a second undo answers "already done" instead of compensating twice'
 );
 
 -- ---------------------------------------------------------------------------

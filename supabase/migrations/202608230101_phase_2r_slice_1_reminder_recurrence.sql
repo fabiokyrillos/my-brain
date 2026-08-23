@@ -1339,6 +1339,11 @@ begin
   delete from public.reminder_series
   where id = target_series and user_id = p_user_id;
 
+  -- The ledger row is closed by the handler; see the note on the sibling below.
+  update public.undo_operations
+  set status = 'undone', undone_at = pg_catalog.now()
+  where id = p_undo_id;
+
   insert into public.audit_logs (
     user_id, action_type, entity_type, entity_id, actor, before_state, after_state, reason
   ) values (
@@ -1465,6 +1470,18 @@ begin
         and status = 'cancelled';
     end if;
   end if;
+
+  -- THE LEDGER ROW IS CLOSED BY THE HANDLER, NOT BY THE ROUTER.
+  --
+  -- `public.undo_operation` reads `status` -- an already-`undone` row returns
+  -- the idempotent answer instead of running the handler again -- but it never
+  -- WRITES it. Eleven of the twelve shipped handlers close their own row with
+  -- exactly this statement; that is the contract, and a handler that skips it
+  -- leaves its operation `available` forever, so a second undo re-enters the
+  -- compensating path instead of answering "already done".
+  update public.undo_operations
+  set status = 'undone', undone_at = pg_catalog.now()
+  where id = p_undo_id;
 
   insert into public.audit_logs (
     user_id, action_type, entity_type, entity_id, actor, before_state, after_state, reason
