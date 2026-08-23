@@ -107,6 +107,27 @@ const REMINDER_RECURRENCE_ALLOWLIST: readonly string[] = [
   "src/features/reminders/series-actions.test.ts",
   "src/features/reminders/series-schema.ts",
   "src/features/reminders/series-schema.test.ts",
+  /*
+   * Slice 2R.2 — the surface half of the same lift.
+   *
+   * 2R.1 added the writer; these are the files that let the owner *reach* it,
+   * plus the three the scope question made recurrence-aware. Enumerated
+   * individually for the reason above: `series-feedback.tsx` is deliberately
+   * NOT here, because it never spells a governed shape — adding it "for
+   * symmetry" would authorize a file the scan does not report, which is how an
+   * enumerated list starts drifting toward a glob.
+   *
+   * `lifecycle.test.ts`, `outcomes.test.ts` and `projection.test.ts` are the
+   * same category as the guards below: they record the model rather than
+   * implement it, and the record is what carries the shape.
+   */
+  "src/features/reminders/series-controls.tsx",
+  "src/features/reminders/series-controls.test.tsx",
+  "src/features/reminders/operation-key.ts",
+  "src/features/reminders/projection.ts",
+  "src/features/reminders/projection.test.ts",
+  "src/features/reminders/lifecycle.test.ts",
+  "src/features/reminders/outcomes.test.ts",
   "src/lib/closeout/phase-2r-model-guard.test.ts",
   /*
    * The two guards that hold `reminders`' closed column list.
@@ -328,6 +349,13 @@ describe("2M-RECUR-001: no recurrence artifact exists anywhere the decision gove
       "src/features/reminders/series-actions.test.ts",
       "src/features/reminders/series-schema.ts",
       "src/features/reminders/series-schema.test.ts",
+      "src/features/reminders/series-controls.tsx",
+      "src/features/reminders/series-controls.test.tsx",
+      "src/features/reminders/operation-key.ts",
+      "src/features/reminders/projection.ts",
+      "src/features/reminders/projection.test.ts",
+      "src/features/reminders/lifecycle.test.ts",
+      "src/features/reminders/outcomes.test.ts",
       "src/lib/closeout/phase-2r-model-guard.test.ts",
       "src/lib/closeout/phase-2p-reminder-recurrence-guard.test.ts",
       "src/lib/closeout/phase-2r-foundation.test.ts",

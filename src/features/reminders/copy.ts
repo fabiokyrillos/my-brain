@@ -136,10 +136,74 @@ type ReminderCopy = {
     readonly appliedFuture: string;
     readonly ended: string;
     readonly failed: string;
+
+    /**
+     * Slice 2R.2's surface — the scope question, the two operations that carry
+     * it, and the undo that spends exactly once.
+     *
+     * `badge` and `detachedBadge` are the two facts a row must state before the
+     * owner chooses a scope: *this repeats*, and *this one was already pulled
+     * out of the repetition*. `2R-SERIES-004` is only observable if the second
+     * is visible — a detached occurrence that looked like every other one would
+     * make "a later series edit did not reclaim it" a fact nobody could see.
+     */
+    readonly badge: string;
+    readonly detachedBadge: string;
+    readonly detachedHint: string;
+    readonly editLabel: string;
+    readonly scopeLegend: string;
+    readonly scopeHint: string;
+    readonly titleLabel: string;
+    readonly timeLabel: string;
+    readonly apply: string;
+    readonly close: string;
+    readonly endLabel: string;
+    readonly endConfirmTitle: string;
+    readonly endConfirmBody: string;
+    readonly endConfirmAccept: string;
+    readonly endConfirmDismiss: string;
+    readonly occurrenceCancelNote: string;
+    readonly resultRegionLabel: string;
+    readonly working: string;
+
+    /**
+     * Four outcomes for one button, and they are four because the ledger has
+     * four answers — not because a designer wanted variety.
+     *
+     * `undoAlready` is the idempotent branch: the row was already spent, so
+     * nothing changed on this press and nothing was wrong either. Merging it
+     * into `undoSucceeded` would claim a second reversal; merging it into
+     * `undoFailed` would send the owner hunting for a problem that does not
+     * exist.
+     */
+    readonly undoLabel: string;
+    readonly undoPending: string;
+    readonly undoRegionLabel: string;
+    readonly undoSucceeded: string;
+    readonly undoAlready: string;
+    readonly undoStale: string;
+    readonly undoFailed: string;
   };
 
   readonly cancelConfirmTitle: string;
   readonly cancelConfirmBody: string;
+  /**
+   * The same confirmation, for an occurrence that carries a rule — slice 2R.2.
+   *
+   * `cancelConfirmBody` promises the row "can be reactivated later", and for an
+   * ordinary reminder it can. For an **attached occurrence of an active series**
+   * it cannot: cancelling materialises the replacement, the replacement takes the
+   * one live slot `reminders_one_live_occurrence_per_series` allows, and
+   * `restore` is then refused by that index. Proved by execution, in both
+   * directions — the same restore succeeds on a detached occurrence and on an
+   * ended series.
+   *
+   * So there are two bodies rather than one hedged sentence. `2R-SERIES-008`
+   * asks an operation with no real compensation to **name itself** and ask
+   * first; a single body that said "may be reactivated" would be true half the
+   * time, which is the shape of a false promise rather than a caveat.
+   */
+  readonly cancelConfirmBodySeries: string;
   readonly cancelConfirmAccept: string;
   readonly cancelConfirmDismiss: string;
 
@@ -249,11 +313,41 @@ const COPY = {
       appliedFuture: "Alterei esta e as futuras. As anteriores ficaram como estavam.",
       ended: "Repetição encerrada. O histórico continua aqui.",
       failed: "Não foi possível alterar agora. Tente novamente.",
+
+      badge: "Repete",
+      detachedBadge: "Alterada só nesta vez",
+      detachedHint: "Esta ocorrência saiu da repetição. Alterações futuras da série não voltam a alcançá-la.",
+      editLabel: "Alterar repetição",
+      scopeLegend: "O que você quer alterar?",
+      scopeHint: "Escolha antes de salvar. Nada muda até você confirmar.",
+      titleLabel: "Novo título",
+      timeLabel: "Novo horário",
+      apply: "Salvar alteração",
+      close: "Fechar",
+      endLabel: "Encerrar repetição",
+      endConfirmTitle: "Encerrar esta repetição?",
+      endConfirmBody:
+        "Ela para de gerar novas ocorrências. As anteriores continuam na lista e no histórico.",
+      endConfirmAccept: "Sim, encerrar",
+      endConfirmDismiss: "Manter repetindo",
+      occurrenceCancelNote: "Cancelar esta ocorrência não encerra a repetição.",
+      resultRegionLabel: "Resultado da alteração da repetição",
+      working: "Aplicando…",
+
+      undoLabel: "Desfazer",
+      undoPending: "Desfazendo…",
+      undoRegionLabel: "Resultado de desfazer",
+      undoSucceeded: "Desfeito. A repetição voltou ao estado anterior.",
+      undoAlready: "Esta alteração já tinha sido desfeita. Nada mudou agora.",
+      undoStale: "A repetição mudou depois desta alteração. Recarregue para ver o estado atual.",
+      undoFailed: "Não foi possível desfazer agora.",
     },
 
     cancelConfirmTitle: "Cancelar este lembrete?",
     cancelConfirmBody:
       "Ele deixa de disparar. O lembrete continua na lista e pode ser reativado depois.",
+    cancelConfirmBodySeries:
+      "Esta ocorrência deixa de disparar e a próxima já entra no lugar dela. A repetição continua, mas esta ocorrência não poderá ser reativada.",
     cancelConfirmAccept: "Sim, cancelar",
     cancelConfirmDismiss: "Manter agendado",
 
@@ -281,6 +375,8 @@ const COPY = {
       G5_REMINDER_IDEMPOTENCY_MISMATCH:
         "Esta ação já foi registrada com outro conteúdo. Recarregue e tente de novo.",
       G5_REMINDER_TRANSITION_INTEGRITY: "Não foi possível aplicar a alteração.",
+      series_slot_taken:
+        "A repetição já agendou a próxima ocorrência, então esta não pode ser reativada.",
       unauthenticated: "Sua sessão expirou.",
       invalid_payload: "Revise os dados informados.",
       not_found: "Lembrete não encontrado.",
@@ -376,6 +472,33 @@ const COPY = {
       appliedOccurrence: "I changed this occurrence only. The repetition is unchanged.",
       appliedFuture: "I changed this one and the future ones. Earlier ones stayed as they were.",
       ended: "Repetition ended. The history is still here.",
+      badge: "Repeats",
+      detachedBadge: "Changed just this once",
+      detachedHint:
+        "This occurrence left the repetition. Later changes to the series will not reach it again.",
+      editLabel: "Change repetition",
+      scopeLegend: "What do you want to change?",
+      scopeHint: "Choose before saving. Nothing changes until you confirm.",
+      titleLabel: "New title",
+      timeLabel: "New time",
+      apply: "Save change",
+      close: "Close",
+      endLabel: "End repetition",
+      endConfirmTitle: "End this repetition?",
+      endConfirmBody:
+        "It stops producing new occurrences. Earlier ones stay in the list and in the history.",
+      endConfirmAccept: "Yes, end it",
+      endConfirmDismiss: "Keep repeating",
+      occurrenceCancelNote: "Cancelling this occurrence does not end the repetition.",
+      resultRegionLabel: "Repetition change result",
+      working: "Applying…",
+      undoLabel: "Undo",
+      undoPending: "Undoing…",
+      undoRegionLabel: "Undo result",
+      undoSucceeded: "Undone. The repetition is back to its previous state.",
+      undoAlready: "This change had already been undone. Nothing changed now.",
+      undoStale: "The repetition changed after this operation. Reload to see the current state.",
+      undoFailed: "Could not undo right now.",
       failed: "Could not change it right now. Try again.",
     },
     historyLink: "See in history",
@@ -383,6 +506,8 @@ const COPY = {
     cancelConfirmTitle: "Cancel this reminder?",
     cancelConfirmBody:
       "It stops firing. The reminder stays in the list and can be reactivated later.",
+    cancelConfirmBodySeries:
+      "This occurrence stops firing and the next one takes its place right away. The repetition continues, but this occurrence cannot be reactivated.",
     cancelConfirmAccept: "Yes, cancel it",
     cancelConfirmDismiss: "Keep it scheduled",
 
@@ -409,6 +534,8 @@ const COPY = {
       G5_REMINDER_IDEMPOTENCY_MISMATCH:
         "That action was already recorded with different content. Reload and try again.",
       G5_REMINDER_TRANSITION_INTEGRITY: "We could not apply the change.",
+      series_slot_taken:
+        "The repetition has already scheduled the next occurrence, so this one cannot be reactivated.",
       unauthenticated: "Your session expired.",
       invalid_payload: "Check the values you entered.",
       not_found: "Reminder not found.",

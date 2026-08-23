@@ -84,6 +84,44 @@ export function toReminderStatus(value: string): ReminderStatus | null {
 export type ReminderEligibilityInput = {
   readonly status: ReminderStatus;
   readonly taskId: string | null;
+  /**
+   * This reminder is a cancelled, still-attached occurrence of a series whose
+   * one live slot is **already taken** by its replacement — slice 2R.2.
+   *
+   * ## The fact behind the flag
+   *
+   * Cancelling an attached occurrence fires
+   * `private.reminder_series_materialise_next`, which inserts the next one.
+   * `reminders_one_live_occurrence_per_series` is a partial unique index over
+   * `(series_id) where series_id is not null and detached_at is null and status
+   * = 'scheduled'`, so the slot now holds the replacement. `restore` sets the
+   * cancelled row back to `scheduled` — a **second** live occurrence — and the
+   * index refuses it with a bare `23505`.
+   *
+   * Proved by execution against the deployed database, both directions: the same
+   * restore succeeds when the occurrence is **detached** (the trigger skips it,
+   * so no replacement exists) and when the series has **ended** (the trigger
+   * returns early). It fails only for the attached-and-active case, which is
+   * what this flag is and no wider.
+   *
+   * ## Why the surface withholds the control rather than letting it fail
+   *
+   * `23505` is not in `outcomes.ts`'s closed vocabulary, so pressing Reactivate
+   * on such a row produced the generic sentence over a raw constraint violation.
+   * UX-12's rule — do not render an action the current state cannot accept — is
+   * exactly this case: the state cannot accept it, and the reason is a
+   * database invariant rather than a preference.
+   *
+   * **This is not the whole repair.** Making the reversal work would mean
+   * standing down the replacement in the same transaction, which is DDL on a
+   * deployed function, and Phase 2R has one migration and has spent it. Carried
+   * as `2R-OCCURRENCE-CANCEL-IRREVERSIBLE`; the surface tells the truth about it
+   * in the meantime (`2R-SERIES-008`).
+   *
+   * Optional so every existing caller — and every reminder that carries no rule
+   * — keeps its behaviour unchanged, which `2R-MODEL-004` requires.
+   */
+  readonly seriesSlotTaken?: boolean;
 };
 
 const BY_STATUS: Readonly<Record<ReminderStatus, readonly ReminderAction[]>> = {
@@ -106,8 +144,13 @@ export function availableReminderActions(
   reminder: ReminderEligibilityInput,
 ): readonly ReminderAction[] {
   const actions = BY_STATUS[reminder.status];
-  if (reminder.taskId === null) return actions;
-  return actions.filter((action) => action !== "edit");
+  // Withheld before the task filter, because the two are independent and a
+  // cancelled row offers no `edit` for either to remove.
+  const offered = reminder.seriesSlotTaken === true
+    ? actions.filter((action) => action !== "restore")
+    : actions;
+  if (reminder.taskId === null) return offered;
+  return offered.filter((action) => action !== "edit");
 }
 
 export function canApplyReminderAction(

@@ -63,6 +63,23 @@ export const REMINDER_COMMAND_UNTAGGED_FAILURES = [
    * disclosure the database refuses to make.
    */
   "not_found",
+  /**
+   * `23505` — the series already has a live occurrence, so this one cannot be
+   * reactivated. Slice 2R.2.
+   *
+   * A partial unique index rather than a `raise`, which is why it has no `G5_*`
+   * token and could not have one: `reminders_one_live_occurrence_per_series`
+   * refuses the second live row directly, and the constraint violation travels
+   * to PostgREST as a bare SQLSTATE. It is declared here because it is
+   * **reachable** — the surface withholds `restore` on the rows this applies to,
+   * but a row that gained its replacement between render and submit still lands
+   * here, and the alternative is `unknown` reporting a nameable refusal as a
+   * mystery.
+   *
+   * Carried as `2R-OCCURRENCE-CANCEL-IRREVERSIBLE`: making the reversal work
+   * means standing the replacement down in the same transaction, which is DDL.
+   */
+  "series_slot_taken",
   /** Anything else. Reported as a generic failure and never as raw SQL text. */
   "unknown",
 ] as const;
@@ -134,6 +151,16 @@ export function mapReminderCommandError(
       return "invalid_payload";
     case "P0002":
       return "not_found";
+    // Matched on the constraint name, not on `23505` alone: the same SQLSTATE
+    // covers every unique index on the table, and reporting an idempotency-key
+    // collision as "the repetition already has a next one" would name the wrong
+    // cause. Anything else with this code stays `unknown`.
+    case "23505":
+      return `${error.details ?? ""}\n${error.message ?? ""}`.includes(
+        "reminders_one_live_occurrence_per_series",
+      )
+        ? "series_slot_taken"
+        : "unknown";
     default:
       return "unknown";
   }

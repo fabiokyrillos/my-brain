@@ -53,6 +53,38 @@ function shortHash(value: string): string {
   return (hash >>> 0).toString(36);
 }
 
+/**
+ * The same doctrine for a series command — slice 2R.2.
+ *
+ * `apply_reminder_series_command_v1` reserves `(user_id, operation_key)` exactly
+ * as its single-reminder sibling does, so the two requirements above apply
+ * unchanged and are satisfied the same way: derive from the state **this render
+ * saw**, never from a clock or a nonce.
+ *
+ * The pre-state is the live occurrence — its id, its instant, and whether it is
+ * already detached — because that is what every one of the three commands reads
+ * before it decides. After any of them succeeds the row re-renders with a
+ * different one (a detach sets `detached_at` and materialises a replacement, an
+ * `edit_future` moves the instant, an end withdraws the control entirely), so a
+ * deliberate second command carries a different key while a double click before
+ * any re-render carries the same one and replays.
+ *
+ * **The typed values are deliberately not in the key.** An `edit_future`
+ * resubmitted with a different title under the same key is refused by the RPC as
+ * *"Operation key reused with a different request"* rather than silently applied
+ * — which is the correct outcome for a form submitted twice from one render,
+ * and a refusal the owner can act on rather than a second undetected write.
+ */
+export function reminderSeriesOperationKey(
+  seriesId: string,
+  intent: "occurrence" | "future" | "end",
+  occurrence: { readonly id: string; readonly remindAt: string; readonly detached: boolean },
+): string {
+  const state = [occurrence.id, occurrence.remindAt, occurrence.detached ? "1" : "0"].join("|");
+  // `r2` names the slice, as `r5` does above; the RPC adds `series-cmd-v1:`.
+  return `r2-${intent}-${seriesId}-${shortHash(state)}`;
+}
+
 export function reminderOperationKey(
   reminderId: string,
   action: ReminderAction,
