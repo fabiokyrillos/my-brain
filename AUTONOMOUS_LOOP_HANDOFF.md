@@ -12839,3 +12839,131 @@ and every database object it needs already shipped in `202608230101`. Read
 `docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md` §§9–13 first — the six
 CI-found defects are written up there as failure *modes*, not incidents, and
 2R.2 is the slice most able to repeat them.
+
+## §120 — Slice 2R.2 is code-complete and BLOCKED: GitHub Actions will not start a job (2026-08-23)
+
+**The slice is finished. It is not merged, and it cannot be, because CI never
+ran.** All three jobs on PR #295 report *"The job was not started because recent
+account payments have failed or your spending limit needs to be increased."* A
+`gh run rerun --failed` reproduced the identical annotation. **No code was
+executed by CI at all**, so this is neither a red build nor a flake — it is the
+account, and only the owner can clear it.
+
+The window is narrow and worth recording: `main` at `406191d` ran green at
+**18:20Z**; PR #295 was blocked at **20:05Z**. Nothing between those times was a
+code change to CI.
+
+### Where everything is
+
+| | |
+|---|---|
+| branch | `claude/phase-2r-slice-2`, pushed, three commits on `406191d` |
+| PR | **#295, draft** — the body carries the whole account and needs no rewriting |
+| head | `aaa9423` |
+| migrations | **zero created.** 101 local = 101 hosted, parity `202608230101` unchanged |
+| local gates | lint 0 errors · typecheck clean · **9198/9198 tests** · build passes · `git diff --check` clean |
+
+**Nothing is half-done.** There is no partial migration, no orphan branch, no
+half-written record. The only missing step is a pipeline that will run.
+
+### The re-audit, which is the durable part
+
+`2R-UNDO-LEDGER-NOT-CLOSED` was a reading. It is now a measurement, taken
+against the deployed database with three controls:
+
+- **positive** — the first undo succeeds, and the ledger row stays `available`;
+- **negative** — an immediate replay is refused `55P03`, so the staleness guard
+  is real and the defect is not "there is no guard";
+- **repetition** — apply the same command again under a new key, then re-spend
+  the **first** undo: **it succeeds**. Two `reminder_command_undone` audit rows,
+  both ledger rows still open, and one operation's compensation spent on
+  another operation's change.
+
+A census bounds it: of **twenty** registered action types, **exactly one** fails
+to close its row — `apply_reminder_command_v1`. Both 2R handlers close theirs
+and reach the router's idempotent branch on the second press. **That is why 2R.2
+is not a stop condition**: it consumes the correct path and offers no undo
+through the defective one. Repairing the 2P handler is DDL on a deployed
+`SECURITY DEFINER` body, and `revoke insert, update, delete on
+public.undo_operations from authenticated` closes the Server-Action alternative,
+so it stays a named remainder rather than a quietly widened budget.
+
+### The defect the rehearsal found, and the one it corrected in me
+
+There is no local Docker, so the pgTAP file could not be run. §119's rule —
+*a rehearsal that never calls the front door proves neither* — was answered by
+transforming all **26** assertions mechanically out of the suite and running
+them against real Postgres in a rolled-back transaction. That found:
+
+1. a `\gset` idiom **no other suite in this directory uses**, removed before it
+   could fail from empty the way 2R.1's helpers did;
+2. assertion 25 expecting `22023` where `Series not found` raises `P0002`;
+3. **`undo_operation` on a cancelled occurrence does not restore it — it raises
+   `23505`.**
+
+The third is new: **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`**. Cancelling an
+attached occurrence materialises the replacement, the replacement takes the one
+live slot `reminders_one_live_occurrence_per_series` permits, and the cancelled
+row can no longer be reactivated — **not by the ledger undo and not by the
+`restore` command**. My suite's first draft asserted the opposite, in prose, with
+total confidence.
+
+Bounded in both directions by execution: the same `restore` **succeeds** on a
+detached occurrence (the trigger skips it) and on an ended series (the trigger
+returns early). Attached-and-active is the whole of the failure.
+
+It made a shipped sentence false — `cancelConfirmBody` promises *"pode ser
+reativado depois"*. Repaired in code, no migration: the surface withholds
+`Reativar` on exactly that shape, the confirmation names the consequence before
+it asks (`2R-SERIES-008`), and `23505` on that constraint gets its own sentence,
+matched on the constraint **name** because the table has other unique indexes.
+
+### The methodological finding, which outlives the slice
+
+**Three mutation controls "passed" and proved nothing.** The first attempt
+rewrote the files with LF-delimited patterns; the worktree is CRLF, so none of
+the three replacements matched and all three tests kept passing against
+unmodified source. Re-run per line with the mutation's arrival verified first,
+all six fired.
+
+*A mutation control that does not assert the mutation landed is a control of
+nothing* — the same shape as §119's "they rehearsed the rooms, not the house",
+one level down.
+
+### What the next session does
+
+**First, ask the owner to clear the Actions billing block.** Nothing below can
+proceed without it, and no amount of re-running helps.
+
+Then, in order:
+
+1. `gh run rerun` on PR #295 (or push an empty commit) and get CI green on the
+   exact head;
+2. review the diff, mark ready, merge;
+3. confirm CI green on the exact **merge** SHA;
+4. append a §121 recording the merge, and correct this section's status;
+5. re-audit slice 2R.3 against the new `main` before building.
+
+### Carried forward, none discharged
+
+- **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`** — *new*. Making the reversal work means
+  standing the replacement down in the same transaction: DDL, so a future
+  phase's migration. Pinned in `phase_2r_series_scope.sql` §3 in both
+  directions.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — measured, not repaired. Pinned on the
+  detached case, which is the one where the undo actually succeeds, so the
+  assertion is about the handler rather than about a write that never happened.
+- **`2R-TZ-SECOND-AUTHORITY`** — routed by ADR-134, not closed.
+- **`2R-TASK-RECURRENCE`** — out by `OD-2R-6`.
+- **`OD-2R-9`'s two defects** — search that cannot be linked, and the *Precisa de
+  você* filter lost on back navigation.
+- **The interval gap** — *"a cada trimestre"* still inexpressible; the refusal is
+  pinned by a test. Destination: the owner, as a possible `version: 2`.
+- **Unchanged and unmoved:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`'s back-navigation half; `RG-DEP-3`; push HTTP 403, not
+  resumed; `2P-CHAT-007-JOURNEY`, unspendable; ADR-055 expiring 2026-10-27.
+  Signup closed, rollout 25 · 3 · 2. Phase 2S not started.
+
+**Also unchanged, and worth stating because it is the thing a blocked session is
+most tempted to move:** the migration budget. Phase 2R allocated one and spent
+it in 2R.1. Slice 2R.2 created none.
