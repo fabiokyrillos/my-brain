@@ -53,7 +53,7 @@
 --      private.reminder_next_instant. TypeScript validates the rule's SHAPE and
 --      renders it in the owner's WORDS; it never computes an instant, and the
 --      preview surface reads this same function through
---      public.reminder_series_preview_v1. Slice 2R.0 reported a defect whose
+--      public.reminder_series_preview. Slice 2R.0 reported a defect whose
 --      whole shape is two implementations of one rule, and answering it by
 --      writing a second DST resolver would have reproduced the finding inside
 --      the fix.
@@ -895,7 +895,7 @@ begin
 
   insert into public.undo_operations (
     user_id, action_type, operation_key, request_fingerprint,
-    entity_type, entity_ids, before_state, after_state, description
+    entity_type, entity_ids, before_state, after_state
   ) values (
     current_user_id,
     'create_reminder_series_v1',
@@ -910,8 +910,7 @@ begin
       'remind_at', first_instant,
       'timezone', owner_timezone,
       'request_fingerprint', canonical_fingerprint
-    ),
-    'Owner created a repeating reminder'
+    )
   )
   returning id into undo_id;
 
@@ -1218,7 +1217,7 @@ begin
 
   insert into public.undo_operations (
     user_id, action_type, operation_key, request_fingerprint,
-    entity_type, entity_ids, before_state, after_state, description
+    entity_type, entity_ids, before_state, after_state
   ) values (
     current_user_id,
     'apply_reminder_series_command_v1',
@@ -1227,8 +1226,7 @@ begin
     'reminder_series',
     array[series.id],
     before_state,
-    after_state || pg_catalog.jsonb_build_object('request_fingerprint', canonical_fingerprint),
-    'Owner changed a repeating reminder'
+    after_state || pg_catalog.jsonb_build_object('request_fingerprint', canonical_fingerprint)
   )
   returning id into undo_id;
 
@@ -1477,7 +1475,17 @@ set handler_function = excluded.handler_function,
 -- private.reminder_next_instant, which is what makes 2R-TIME-007 checkable:
 -- the preview and the materialiser cannot disagree because they are the same
 -- code.
-create or replace function public.reminder_series_preview_v1(
+--
+-- AND IT CARRIES NO `_v1`, WHICH IS THE HOUSE RULE AND NOT AN OVERSIGHT. The
+-- two writers above are versioned because each records its OWN NAME as the
+-- `action_type` on `public.undo_operations`, so a future v2 needs its own
+-- registered handler while v1's rows stay compensable -- the version is a
+-- compensation namespace, exactly as `rpc_version_retirement.sql` states it for
+-- the three families that preceded them. This function compensates nothing, so
+-- a version suffix here would have claimed a namespace it does not use. It was
+-- named `reminder_series_preview_v1` in the first draft of this migration and
+-- that guard is what caught it.
+create or replace function public.reminder_series_preview(
   p_rule jsonb,
   p_anchor_date date,
   p_anchor_hour integer,
@@ -1531,9 +1539,9 @@ begin
 end;
 $$;
 
-revoke all on function public.reminder_series_preview_v1(jsonb, date, integer, integer, integer)
+revoke all on function public.reminder_series_preview(jsonb, date, integer, integer, integer)
   from public, anon, authenticated, service_role;
-grant execute on function public.reminder_series_preview_v1(jsonb, date, integer, integer, integer)
+grant execute on function public.reminder_series_preview(jsonb, date, integer, integer, integer)
   to authenticated;
 
 -- ---------------------------------------------------------------------------

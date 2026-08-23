@@ -3147,7 +3147,7 @@ export type Database = {
         }
         Returns: Json
       }
-      reminder_series_preview_v1: {
+      reminder_series_preview: {
         Args: {
           p_anchor_date: string
           p_anchor_hour: number
