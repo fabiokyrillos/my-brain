@@ -218,8 +218,20 @@ select is(
   -- role that could INSERT one could authorize the deletion of a person,
   -- project or memory it was never shown a preview of. Its two writers are
   -- SECURITY DEFINER functions that derive the binding rather than accept it.
-  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, entry_person_candidate_resolutions, error_events, product_events, rate_limit_events, scheduled_job_health, task_command_confirmations, user_ai_credentials',
-  'exactly the twelve RPC-only ledgers carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
+  -- `reminder_series` joins in Phase 2R slice 2R.1 (`202608230101`), and it is
+  -- the first member of this list that is NOT a ledger -- which is why the
+  -- assertion below now says "tables" where it said "ledgers". It is ordinary
+  -- user-owned state, closed to `service_role` because nothing on the service
+  -- side has any business with it: the two writers are SECURITY DEFINER RPCs
+  -- the owner calls, the next occurrence is materialised by a trigger running
+  -- as the definer, and the heartbeat reads `public.reminders` rather than the
+  -- series. A table grant here would be a service key able to rewrite the rule
+  -- behind a repeating reminder -- changing when a person is reminded of
+  -- something, with no undo row and no audit row to show for it. If a later
+  -- slice genuinely needs service-side access, the grant is not the answer; a
+  -- validated function is, and this line is where that argument has to be had.
+  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, entry_person_candidate_resolutions, error_events, product_events, rate_limit_events, reminder_series, scheduled_job_health, task_command_confirmations, user_ai_credentials',
+  'exactly the thirteen RPC-closed tables carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
 );
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
@@ -353,11 +365,13 @@ select is(
         and held.privileges <> 'DELETE,INSERT,SELECT,UPDATE'
     ) as deviations
   ),
-  -- Thirty-eight of the fifty-seven public base tables deviate from the norm,
+  -- Thirty-nine of the fifty-eight public base tables deviate from the norm,
   -- and every one of them deviates because a named migration said so. (The
   -- sentence read "thirty-four of the fifty-three" while the literal below
   -- already listed thirty-six; the count was re-taken from the database in
-  -- slice 2P.4 rather than from the prose.) The five shapes, so a reader can
+  -- slice 2P.4 rather than from the prose. Slice 2R.1 re-took it again: 57
+  -- base tables measured on the hosted database before its migration, plus
+  -- `reminder_series`, and 38 lines below plus the one it adds.) The five shapes, so a reader can
   -- check a line against an intent rather than against a memory:
   --
   --   (none)                 RPC-only: no client touches the table at all --
@@ -374,7 +388,8 @@ select is(
   --                          entry_task_candidate_resolutions, heartbeat_runs,
   --                          notification_consents, notification_deliveries,
   --                          product_events, push_subscriptions,
-  --                          task_command_confirmations, tasks, undo_operations
+  --                          reminder_series, task_command_confirmations,
+  --                          tasks, undo_operations
   --   INSERT,SELECT          append-only to the client -- attachments,
   --                          audit_logs (ADR-081's retained grant),
   --                          conversation_messages,
@@ -438,6 +453,13 @@ select is(
   || E'product_events -> SELECT\n'
   || E'push_subscriptions -> SELECT\n'
   || E'rate_limit_events -> (none)\n'
+  -- Phase 2R slice 2R.1. SELECT-only, and stricter than `reminders` one line
+  -- below on purpose: the single-reminder path Phase 2P shipped keeps its
+  -- INSERT grant, and the series has none, so `create_reminder_series_v1` and
+  -- `apply_reminder_series_command_v1` are the only doors. This line gaining
+  -- INSERT or UPDATE would mean a client could write a recurrence rule without
+  -- passing the validator, the audit row or the undo row.
+  || E'reminder_series -> SELECT\n'
   || E'reminders -> INSERT,SELECT\n'
   || E'scheduled_job_health -> (none)\n'
   || E'summaries -> INSERT,SELECT,UPDATE\n'

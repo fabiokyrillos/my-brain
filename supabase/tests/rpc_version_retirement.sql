@@ -12,7 +12,7 @@ begin;
 
 -- 24 through Phase 2F; Slice G5 adds two — the no-unplanned-v2 probe and the
 -- generation count — for the third versioned family.
-select plan(26);
+select plan(28);
 
 -- Retained: every version a governing document says must stay callable -------
 -- confirm_entry_task_candidates family — GATE-03,
@@ -207,8 +207,29 @@ select ok(
   to_regprocedure('public.apply_reminder_command_v2(uuid, jsonb, jsonb, text)') is null,
   'no unplanned reminder command version exists beyond v1'
 );
+select ok(
+  to_regprocedure(
+    'public.create_reminder_series_v2(jsonb, text, boolean, uuid, date, integer, integer, text)'
+  ) is null,
+  'no unplanned series creation version exists beyond v1'
+);
+select ok(
+  to_regprocedure('public.apply_reminder_series_command_v2(uuid, jsonb, text)') is null,
+  'no unplanned series command version exists beyond v1'
+);
 
 -- The inventory is complete: these are the only versioned mutation families --
+--
+-- Phase 2R slice 2R.1 (2026-08-23) made it five. `create_reminder_series_v1`
+-- and `apply_reminder_series_command_v1` each record their own name as the
+-- `action_type` on `public.undo_operations` and each has a row in
+-- `private.undo_operation_handlers`, so both meet the same test the three below
+-- meet: the version is the compensation namespace. The slice's third new
+-- function, `public.reminder_series_preview`, is deliberately NOT versioned --
+-- it is `stable`, writes nothing and names itself nowhere, so a suffix would
+-- have claimed a namespace it does not use. It was drafted as
+-- `reminder_series_preview_v1`; this assertion is what caught it, which is the
+-- guard doing the job the paragraph below describes.
 --
 -- Slice G5 (2026-07-31) made it three. `apply_reminder_command_v1` is versioned
 -- for the reason the other two are and `apply_task_command`/`create_task_command`
@@ -231,9 +252,11 @@ select is(
       and procedure.proname not like 'confirm_entry_task_candidates%'
       and procedure.proname not like 'resolve_pending_question%'
       and procedure.proname not like 'apply_reminder_command%'
+      and procedure.proname not like 'create_reminder_series%'
+      and procedure.proname not like 'apply_reminder_series_command%'
   ),
   0,
-  'no versioned public function exists outside the three inventoried families'
+  'no versioned public function exists outside the five inventoried families'
 );
 
 select is(
