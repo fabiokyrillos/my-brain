@@ -36,7 +36,7 @@
 -- `reminder_lifecycle_command.sql`.
 
 begin;
-select plan(79);
+select plan(81);
 
 set local timezone to 'UTC';
 
@@ -573,7 +573,7 @@ select ok(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 8 -- the series commands and their undo (13)
+-- Section 8 -- the series commands and their undo (15)
 -- ---------------------------------------------------------------------------
 
 set local role authenticated;
@@ -610,6 +610,32 @@ select ok(
 );
 
 -- edit_future: THIS AND FUTURE.
+--
+-- The two refusals come FIRST, and the partial edit that follows them is what
+-- makes them meaningful. `edit_future` carries five optional fields and the
+-- body reads each through `coalesce(..., the stored value)`, so the gate has to
+-- be closed in one direction only: no key outside the set, and not "every key
+-- of the set". A gate that demanded all six made the command unreachable, and
+-- the success below -- which sends `rule` and `hour` and nothing else -- is the
+-- assertion that would have caught it.
+select throws_ok(
+  $$select public.apply_reminder_series_command_v1(
+      (select series.id from public.reminder_series as series limit 1),
+      '{"kind":"edit_future","hour":7,"colour":"red"}'::jsonb,
+      'phase2r-future-bad1')$$,
+  '22023',
+  'Unsupported series command field',
+  '2R-MODEL-002: a key outside the command set is refused with a named reason'
+);
+select throws_ok(
+  $$select public.apply_reminder_series_command_v1(
+      (select series.id from public.reminder_series as series limit 1),
+      '{"kind":"edit_future"}'::jsonb,
+      'phase2r-future-bad2')$$,
+  '22023',
+  'An edit must change something',
+  'and an edit that changes nothing is refused rather than recorded as an undoable no-op'
+);
 select is(
   public.apply_reminder_series_command_v1(
     pg_temp.owned_series(),

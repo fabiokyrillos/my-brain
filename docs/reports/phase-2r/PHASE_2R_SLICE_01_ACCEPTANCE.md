@@ -269,7 +269,7 @@ asserted to contain no task or calendar path and exactly one migration.
 cannot be started by this phase, because the half of the guard that would catch
 them has nothing to widen.
 
-### Eight defects, six caught before pushing and two caught by CI
+### Ten defects, six caught before pushing and four caught by CI
 
 1. **`extensions.digest`, not `pg_catalog.digest`.** Caught by reading migration
    064's idiom rather than assuming the schema.
@@ -369,6 +369,72 @@ adversarially: a `union all … limit 1` with no guaranteed order; a `VOLATILE`
 function in an `UPDATE … WHERE` that could observe its own effects; a
 `not like '%series%'` that would have broken on `generate_series`; and an
 `edit_future` scan starting a day too late to mean *"starting today"*.
+
+### 9. The third one CI caught: a column that does not exist, on the table every write in this repository leans on
+
+The suite did not fail an assertion. It **died**, at its own line 337:
+
+```
+ERROR:  column "description" of relation "undo_operations" does not exist
+CONTEXT: PL/pgSQL function public.create_reminder_series_v1(...) line 130
+...
+Parse errors: Bad plan.  You planned 79 tests but ran 29.
+```
+
+`public.undo_operations` has sixteen columns and `description` is not one of
+them. The human-readable label lives in `private.undo_operation_handlers.description`,
+which this migration already writes; **every shipped writer in the chain omits
+it**, and reading one of them is all it would have taken. Both of this slice's
+undo-recording inserts carried it.
+
+**Why four hosted rehearsals missed it is the part worth keeping, and it is the
+same shape as defect 7.** The rehearsals exercised the resolver, the trigger,
+the index and the undo *ordering*. Not one of them called
+`create_reminder_series_v1` end to end, so the first statement inside it that
+depends on **another table's shape** was never executed until `pg_prove` ran it.
+Defect 7 was "they rehearsed the code and not the file"; this one is *they
+rehearsed the pieces and not the entry point*. A rehearsal that never calls the
+front door proves the rooms and not the house.
+
+**A method change came out of this run rather than a code change.** The three
+previous CI failures were diagnosed from the tail of the job log, which is
+drowned in the container-log dump the `if: failure()` step emits — and that tail
+is why this defect was invisible for a round: *the pgTAP output sits in the
+middle of the log, not at the end*. The log is now pulled in full to disk and
+filtered locally, and the first time that was done it showed the run had failed
+in **four** suites, not one. Three of them are the next entry.
+
+### 10. Three closed lists in the chain refused `reminder_series` and `_v1` by name
+
+`public.reminder_series` is the first user-owned table added since these guards
+were written. None of them absorbed it.
+
+| Guard | What it said | What it was right about |
+|---|---|---|
+| `rpc_version_retirement.sql` t23 | `no versioned public function exists outside the three inventoried families` — have 3, want 0 | The inventory has to be a reviewed edit, never a silent arrival |
+| `signup_hardening_cascade_drill.sql` t4, t5, t17 | `have: reminder_series` against an empty `want` | A table the runtime enumeration finds but the populator does not fill leaves the drill proving the cascade against an account that was **never row-complete** |
+| `signup_hardening_grant_census.sql` t4, t10 | the zero-`service_role` list and the `authenticated` exposure matrix, both by table and by privilege | A new table's posture is a claim, and the claim has to be written down where the census can fail on it |
+
+The first one found a real naming defect rather than just demanding an edit.
+The rule it encodes is that a function is versioned **because it records its own
+name as the `action_type` on `undo_operations`** — the version is a compensation
+namespace, so a v2 needs its own handler while v1's rows stay compensable.
+`create_reminder_series_v1` and `apply_reminder_series_command_v1` meet that
+test. `reminder_series_preview_v1` did not: it is `stable`, writes nothing and
+names itself nowhere, so its suffix claimed a namespace it does not use. It
+ships as **`public.reminder_series_preview`**.
+
+`reminder_series` is also the **first member of the zero-`service_role` list
+that is not a ledger**, so that assertion now reads *"thirteen RPC-closed
+tables"* where it read *"twelve RPC-only ledgers"*, with the argument written
+beside it: the two writers are `SECURITY DEFINER` RPCs the owner calls, the next
+occurrence is materialised by a trigger running as the definer, and the
+heartbeat reads `public.reminders` rather than the series — so a table grant
+would be a service key able to rewrite **when a person is reminded of
+something**, with no undo row and no audit row to show for it. The census's
+deviation count was **re-measured** (57 public base tables read off the hosted
+database before this migration, plus one) rather than incremented from the
+prose.
 
 **Every hosted rehearsal ran inside `begin; … rollback;`, and residue was proved
 zero afterwards on seven probes** — users, profiles, reminders, the table, the

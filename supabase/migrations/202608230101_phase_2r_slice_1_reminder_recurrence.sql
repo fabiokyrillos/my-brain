@@ -1022,17 +1022,42 @@ begin
       raise exception 'Unsupported series command' using errcode = '22023';
   end case;
 
-  if (
-    select pg_catalog.count(*)
+  -- CLOSED IN THE DIRECTION A COMMAND IS CLOSED IN, WHICH IS NOT THE DIRECTION A
+  -- RULE IS.
+  --
+  -- `private.reminder_rule_is_valid` demands key-set EQUALITY per frequency,
+  -- and that is right there: every key of a frequency is required to describe
+  -- it, so a missing one and an extra one are the same malformation. Reusing
+  -- that shape here was wrong, and wrong in a way that made `edit_future`
+  -- unreachable: the six allowed keys became six REQUIRED keys, so no caller
+  -- could change only the hour without also restating the rule, the title and
+  -- the importance -- and the body below reads every optional field through
+  -- `coalesce(..., the stored value)`, i.e. it was written for exactly the
+  -- partial edit the gate refused. `reminderSeriesCommandSchema` had the
+  -- contract right on the TypeScript side the whole time; this is the second
+  -- validator disagreeing with the first, which is the defect shape slice 2R.0
+  -- reported and this slice is supposed to be avoiding.
+  --
+  -- So: no key outside the set, in the strict direction, and an `edit_future`
+  -- that changes nothing is refused rather than silently applied as a no-op
+  -- that still records an undo row. `detach_occurrence` and `end_series` allow
+  -- `kind` alone, so for them the first check is already equality.
+  if exists (
+    select 1
     from pg_catalog.jsonb_object_keys(p_command) as command_key(key)
-  ) is distinct from pg_catalog.cardinality(allowed_command_keys)
-    or exists (
+    where not (command_key.key = any (allowed_command_keys))
+  ) then
+    raise exception 'Unsupported series command field' using errcode = '22023';
+  end if;
+
+  if command_kind = 'edit_future'
+    and not exists (
       select 1
       from pg_catalog.jsonb_object_keys(p_command) as command_key(key)
-      where not (command_key.key = any (allowed_command_keys))
+      where command_key.key <> 'kind'
     )
   then
-    raise exception 'Unsupported series command field' using errcode = '22023';
+    raise exception 'An edit must change something' using errcode = '22023';
   end if;
 
   canonical_request := pg_catalog.jsonb_build_object('series_id', p_series_id, 'command', p_command);

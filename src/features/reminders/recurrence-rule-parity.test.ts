@@ -11,6 +11,7 @@ import {
   RECURRENCE_RULE_VERSION,
   parseRecurrenceRule,
 } from "./recurrence-rule";
+import { reminderSeriesCommandSchema } from "./series-schema";
 
 /**
  * **The TypeScript validator and the SQL one admit the same closed set.**
@@ -176,5 +177,107 @@ describe("TypeScript computes no instant, and the migration says why", () => {
     // merely stated: the trigger and the preview.
     const callers = [...sql.matchAll(/private\.reminder_next_instant\(/g)];
     expect(callers.length, "the generator should have several call sites").toBeGreaterThan(2);
+  });
+});
+
+/**
+ * The migration's `apply_reminder_series_command_v1` body only, sliced for the
+ * reason `validatorBody` is sliced.
+ */
+function commandBody(): string {
+  const start = sql.indexOf("create or replace function public.apply_reminder_series_command_v1");
+  expect(start, "the command RPC moved or was renamed").toBeGreaterThan(-1);
+  const end = sql.indexOf("\n$$;", start);
+  expect(end, "the command RPC body is unterminated").toBeGreaterThan(start);
+  return sql.slice(start, end);
+}
+
+/**
+ * **The three series commands admit the same field set on both sides — and are
+ * closed in the same DIRECTION.**
+ *
+ * This block exists because the block above did not catch the defect it was
+ * shaped to catch. The rule validator demands key-set EQUALITY per frequency,
+ * which is right for a rule: every key of a frequency is required to describe
+ * it. That shape was reused for the command gate, where it is wrong — the six
+ * allowed `edit_future` fields became six REQUIRED fields, so **the command was
+ * unreachable**: no payload could change only the hour, and the body reads
+ * every optional field through `coalesce(..., the stored value)`, i.e. it was
+ * written for exactly the partial edit the gate refused.
+ * `reminderSeriesCommandSchema` had it right the whole time. Two validators,
+ * disagreeing — the finding slice 2R.0 reported, reproduced inside the slice
+ * that answers it, and caught only because the pgTAP suite calls the command.
+ *
+ * So parity here is not only "the same names". It is also **the same
+ * direction**: unknown keys refused, known keys optional, and an edit that
+ * changes nothing refused rather than recorded as an undoable no-op.
+ */
+describe("the three series commands are the same closed set on both sides", () => {
+  const expected: Record<string, string[]> = {
+    detach_occurrence: ["kind"],
+    edit_future: ["kind", "rule", "title", "important", "hour", "minute"],
+    end_series: ["kind"],
+  };
+
+  it("declares the same field set for each command", () => {
+    const body = commandBody();
+    const inSql = [...body.matchAll(/^    when '([a-z_]+)' then\n\s+allowed_command_keys := array\[([^\]]*)\];/gm)];
+    expect(inSql.map((match) => match[1])).toEqual(Object.keys(expected));
+    for (const match of inSql) {
+      const declared = match[2].split(",").map((key) => key.trim().replace(/^'|'$/g, ""));
+      expect(declared, `${match[1]}'s field set differs`).toEqual(expected[match[1]]);
+    }
+  });
+
+  it("accepts each optional field on its own, on both sides", () => {
+    // The assertion the SQL gate failed. Every one of these is a legitimate
+    // `edit_future`, and each carries exactly one changeable field.
+    const singles: Record<string, unknown>[] = [
+      { rule: { version: 1, frequency: "daily" } },
+      { title: "Renamed" },
+      { important: true },
+      { hour: 7 },
+      { minute: 30 },
+    ];
+    for (const field of singles) {
+      const parsed = reminderSeriesCommandSchema.safeParse({ kind: "edit_future", ...field });
+      expect(parsed.success, `${Object.keys(field)[0]} alone was refused`).toBe(true);
+    }
+  });
+
+  it("refuses a field outside the set, and an edit that changes nothing", () => {
+    expect(
+      reminderSeriesCommandSchema.safeParse({ kind: "edit_future", hour: 7, colour: "red" }).success,
+    ).toBe(false);
+    expect(reminderSeriesCommandSchema.safeParse({ kind: "edit_future" }).success).toBe(false);
+    expect(
+      reminderSeriesCommandSchema.safeParse({ kind: "end_series", rule: { version: 1, frequency: "daily" } })
+        .success,
+    ).toBe(false);
+
+    const body = commandBody();
+    expect(body).toContain("An edit must change something");
+    expect(body).toContain("Unsupported series command field");
+  });
+
+  it("closes the command set in the direction a command is closed in, not a rule's", () => {
+    const body = commandBody();
+    // The defect, stated as the thing that must not come back: a cardinality
+    // comparison against the allowed set turns "allowed" into "required".
+    expect(
+      body,
+      "the command gate compares key COUNT again -- that makes optional fields mandatory",
+    ).not.toMatch(/cardinality\(allowed_command_keys\)/);
+    // And the shape that must be there instead.
+    expect(body).toMatch(/where not \(command_key\.key = any \(allowed_command_keys\)\)/);
+  });
+
+  it("is not vacuous: the control re-introduces the defect and the guard fires", () => {
+    const broken = commandBody().replace(
+      "if exists (\n    select 1\n    from pg_catalog.jsonb_object_keys(p_command) as command_key(key)",
+      "if (\n    select pg_catalog.count(*)\n    from pg_catalog.jsonb_object_keys(p_command) as command_key(key)\n  ) is distinct from pg_catalog.cardinality(allowed_command_keys)\n    or exists (\n    select 1\n    from pg_catalog.jsonb_object_keys(p_command) as command_key(key)",
+    );
+    expect(broken, "the control did not change anything").not.toEqual(commandBody());
+    expect(broken).toMatch(/cardinality\(allowed_command_keys\)/);
   });
 });
