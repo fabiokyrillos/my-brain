@@ -12438,3 +12438,102 @@ Closeout guards: **2 647 passing, 0 failing**.
 including this one.* The automation state has now moved twice in three days, and
 both times the document describing it was confident and stale. §10.3 will be
 stale too, eventually. The instruction is the durable part.
+
+## §116 — All nine Phase 2R decisions are signed, one migration is allocated and none is created, and implementation is still not authorized (2026-08-23)
+
+**ADR-132.** Every decision took its recommendation. **ADR-131 is not edited.**
+
+**Two distinctions carry this whole section, and both are load-bearing:**
+**allocated is not created**, and **signed is not authorized.**
+
+### What was signed
+
+`OD-2R-8` **A** first, because it is the gate: the `2P-REMINDER-RECURRENCE`
+refusal is **LIFTED, strictly limited to reminders** — it does not reach tasks,
+the calendar or any other object, and stop condition 9 enforces that boundary.
+
+`OD-2R-1` **A** Rotina, with B, C and D **declined by name** · `OD-2R-2` **A**
+closed set, **`RRULE` refused by name** · `OD-2R-3` **A** one occurrence at a
+time · `OD-2R-4` **A** ask, default to the narrower · `OD-2R-5` **A** wall-clock,
+**all three unrepresentable cases signed rather than discovered** · `OD-2R-6`
+**A** recurring tasks OUT, remainder `2R-TASK-RECURRENCE` · `OD-2R-7` **A** one
+migration ALLOCATED · `OD-2R-9` **A** the two proved defects routed out.
+
+### The decisions did not change the package, and that is the check that matters
+
+**73 requirements, ten families, six slices — unchanged.** No requirement was
+added, renumbered, reused or removed, because every signature took the option
+the package was written for. The estimate is unchanged for the same reason —
+**6.5 / 13.5 / 21.5**, ~12-day critical path — and what *would* have moved it is
+recorded as **avoided** rather than deleted.
+
+If a signature had changed the count, that would have been the signal that the
+package and the decision had drifted apart. It did not, and the declaration
+guard pins the number so a later edit cannot quietly move it.
+
+### Coverage, generated rather than typed
+
+`docs/reports/phase-2r/PHASE_2R_REQUIREMENT_COVERAGE.md` is derived from the PRD:
+**73 declared · 0 unassigned to a slice · 0 delivery-classified.** Per slice
+2R.0 **6** · 2R.1 **13** · 2R.2 **12** · 2R.3 **16** · 2R.4 **7** · 2R.5 **19**,
+summing to 73. By kind **build 55 · baseline 15 · rule 3**.
+
+**It is deliberately not a delivery matrix, and the file says so in its own
+words.** Nothing is implemented; `2R-CLOSE-003` requires the delivery matrix to
+come from the slices' own acceptance records at closeout; and a requirement
+classified before it is built is a claim nobody measured. The delivery matrix
+does not exist and the guard asserts its absence.
+
+### Threats: 12 open · 0 closed · 4 narrowed
+
+**Zero closed is the correct outcome.** Closing requires the mitigation to exist
+and to have been *exercised*, and nothing is implemented.
+
+What the signatures did change is the *shape* of four: `T-2R-3` and `T-2R-6`
+because **a closed set cannot express an unbounded rule and no `RRULE` string
+exists to leak**; `T-2R-4` and part of `T-2R-2` because one-occurrence-at-a-time
+leaves quiet hours, the daily cap and the cooldown **inherited rather than
+re-implemented**. A narrowed threat is a smaller open threat, not a closed one.
+
+**`T-2R-8` remains the most important item in the model.** One of its inputs
+moved — the owner undid the 2026-08-20 automation opt-in, so the stored consent
+is gone — but the threat is not, because this phase would still add the
+product's **first unattended writer**.
+
+### Guards inverted, not deleted — and proved able to fail
+
+The declaration guard's *"no decision is signed"* assertions are **flipped in
+place**, keeping the same subject and strictness. Phase 2N inverted its guard at
+closeout, Phase 2P flipped rather than relaxed, Phase 2Q inverted slice by
+slice; the reason is always the same — **an absence nobody asserts is an absence
+nobody notices disappearing, and so is a signature.**
+
+`2R-CLOSE-008` is now checked in **both halves**: the mark in the PRD *and* the
+accepted ADR that earns it. **Four mutation controls run before commit:**
+un-signing a decision fails the guard; planting a Phase 2R migration file fails
+it; breaking the slice-coverage sum fails it; and dropping *"no migration file is
+created"* from the active-milestone line fails the A13 guard.
+
+The active-milestone line now cites **both** ADR-131 and ADR-132, by the rule
+this guard has always held: the line cites **every** authorization the active
+phase has received, not only the newest.
+
+### What is still forbidden
+
+**No slice may start**, including 2R.0. **No product code.** **No migration
+file**, notwithstanding that one is allocated. **Nothing deployed, nothing
+written to the hosted database.** The implementation authorization ADR does not
+exist, and it is now the only gate.
+
+**Ten stop conditions are consolidated** into implementation plan §5, because one
+scattered across six slices is one nobody finds in time.
+
+### For whoever picks this up next
+
+Read plan §4 and §5 first — the blocker and the ten stop conditions — then the
+coverage report. **Do not read the coverage report as a delivery matrix**; it
+says so itself, and the guard enforces the distinction.
+
+And the instruction this session earned twice over: **read the rows, never a
+document.** The automation state moved twice in three days; audit §10.3 will be
+stale eventually too. The instruction is the durable part.
