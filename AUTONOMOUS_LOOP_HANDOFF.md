@@ -12967,3 +12967,99 @@ Then, in order:
 **Also unchanged, and worth stating because it is the thing a blocked session is
 most tempted to move:** the migration budget. Phase 2R allocated one and spent
 it in 2R.1. Slice 2R.2 created none.
+
+## §121 — Slice 2R.2 merged: the block was the account, not the code, and the public-exposure audit came back clean (2026-08-23)
+
+**§120's blocker is cleared and its status is corrected.** The owner made the
+repository public, GitHub Actions started scheduling jobs again, and the same
+run that had aborted in ~3s ran to completion. Nothing in the repository was
+changed to achieve it: no workflow edit, no self-hosted runner, no re-push. The
+rerun was enough, which is what "the job was not started" meant all along.
+
+### What landed
+
+| | |
+|---|---|
+| PR #295 | merged as `8c13c7be963889f6afadd9f145b9f3cd2b1ceadc` |
+| head before merge | `2043250`, **CI green 3/3 at that exact SHA** |
+| merge SHA | **CI green 3/3** — `application`, `database and journey`, `edge worker` |
+| migrations | **zero created.** 101 before, 101 after; parity `202608230101` untouched |
+| classification | `2R-SERIES-001` … `-009`, `2R-TIME-005` … `-007` — **31 of 73 cumulatively** |
+
+**The pgTAP suite passed on its first real run**, from an empty database, at step
+8 of the database job. That is the whole return on the mechanical rehearsal
+§120 describes: 26 assertions transformed out of the file and run against real
+Postgres beforehand, which caught the `\gset` idiom, the wrong SQLSTATE on
+assertion 25, and the irreversibility finding — before CI ever saw them. Slice
+2R.1 spent seven CI rounds learning the same lesson the expensive way.
+
+### The public-exposure audit, which the phase did not plan for
+
+The repository went from private to public between §120 and this section, so a
+read-only sweep ran before the merge. **Nothing blocking. Nothing to rotate.**
+
+| check | result |
+|---|---|
+| env / key / dump files tracked | only `.env.example`; 15 of 16 values empty, the 16th `http://127.0.0.1:54321` |
+| `.gitignore` | covers `.env*` and `*.pem` |
+| those file shapes ever added, any ref | only `.env.example` |
+| **full-history sweep, 7098 blobs** | **0** JWT · **0** `sb_secret_` · **0** AWS · **0** GitHub token · **0** PEM private key · **0** Slack / Stripe / Google |
+| OpenAI-shaped literals (7 occurrences, 4 blobs) | fixtures. Three have **one distinct character** in the body; the fourth is bound to a variable named `bogus` in a validator-refusal test |
+| DSNs with an inline password (10 blobs) | every one `postgres:postgres@127.0.0.1:54322` — the ephemeral local Supabase container inside the runner |
+| repository Actions secrets | **0 configured** |
+| `secrets.*` references across workflows | **0** |
+| retained artifacts | 2 x 170 bytes, `database-types-generated`, July 2026 |
+| CPF / CNPJ / phone shapes | none |
+| e-mail domains | reserved test domains throughout |
+
+**Zero secrets configured and zero `secrets.*` references together mean no CI log
+or artifact could ever have carried one** — which is a stronger statement than
+"we looked at the logs", and it is available because the `application` job's
+`env:` block holds literal local placeholders rather than secret references.
+
+Two non-blocking items were reported to the owner rather than acted on: the
+owner's own gmail address appears in `src/lib/closeout/egc-operations.test.ts`
+(already public through commit authorship, not a rotation item), and the two
+retained artifacts are now publicly downloadable.
+
+**Two of the audit's own probes were defective and were repaired before anything
+was believed.** The PEM probe received `--` as its *pattern* through an argument
+-order mistake and matched every markdown file in the repository; the OpenAI
+probe matched `sk-` inside `task-command-…` and `risk-…`. A control was run
+showing the "findings" belonged to the probes rather than to the tree. *An audit
+that does not audit its own instruments reports the instrument.*
+
+### Carried forward, none discharged
+
+Unchanged from §120 and restated so nothing is absorbed by a merge:
+
+- **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`** — cancelling an attached occurrence
+  cannot be reversed by the ledger undo or by `restore`; both hit `23505`. Needs
+  DDL, so a future phase's migration. Pinned in both directions in
+  `supabase/tests/phase_2r_series_scope.sql` §3.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — measured, not repaired. Exactly 1 of 20
+  registered handlers.
+- **`2R-TZ-SECOND-AUTHORITY`** — routed by ADR-134.
+- **`2R-TASK-RECURRENCE`** — out by `OD-2R-6`.
+- **`OD-2R-9`'s two defects**; **the interval gap**, refusal still pinned.
+- **`2P-ACCESS-005` NOT EXECUTED — OWNER WAIVED.** `2P-ATTENTION-008`'s
+  back-navigation half; `RG-DEP-3`; push HTTP 403; `2P-CHAT-007-JOURNEY`;
+  ADR-055 expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. Phase 2S not
+  started.
+
+### Slice 2R.3, re-audited against this `main` before it is built
+
+The re-audit changes what 2R.3 has to *build* versus what it has to *prove*:
+
+| requirement | state on `main` at `8c13c7b` |
+|---|---|
+| `2R-SURFACE-002` occurrence preview | **`public.reminder_series_preview` already ships and has no consumer.** 2R.3 wires it; it does not write it |
+| `2R-SURFACE-005` calendar and agenda | **already satisfied by construction.** A materialised occurrence is an ordinary `reminders` row, `calendar-projection.ts` selects by status and date window with no predicate that excludes one, and `home-agenda.ts` already carries the `reminder` lane. The work is proving it, not building a path |
+| `2R-SURFACE-003` identifiable as recurring | half done. 2R.2 put the badge on the reminders list only; the calendar and the agenda do not mark it yet |
+| `2R-SURFACE-004` the rule in the owner's words | **genuinely new.** `recurrence-rule.ts` has the schema, the frequencies, the ordinals and a parser, and **no formatter** |
+| `2R-SURFACE-001` the control in the modal | the composer is a `ConfirmDialog` with five groups whose **order is asserted by position**. This is where the plan's stop condition lives: if the control cannot fit without turning the dialog into a form, return to the owner |
+
+Two files will have to be told the refusal was lifted, and both are already in
+the recurrence allowlist: `reminder-composer.tsx`'s docstring still says *"No
+recurrence, and no shape that could be mistaken for one"*, and
+`phase-2p-reminder-recurrence-guard.test.ts` still enforces it on that file.
