@@ -131,10 +131,15 @@ made of.
 
 | | |
 |---|---|
-| **Proposed** | 1 |
-| **Allocated** | **0 — `OD-2R-7` is open and unsigned** |
+| **Allocated** | **1 — `OD-2R-7` signed option A, ADR-132 Decision 8** |
 | **Spent** | 0 |
+| **Created on disk** | **0 — and none may be, until implementation is authorized** |
 | **Exclusive destination** | the recurrence model (PRD §5) |
 | **Stop condition** | a second migration of any kind halts the phase |
+
+**Allocated is not created.** Refusal 11 counts migration *files naming this
+phase* and refuses when that count exceeds the allocation; while the phase is
+unimplemented the correct count is **zero**, and the declaration guard asserts
+that separately.
 
 **A budget whose ceiling is not also its stop condition is not a budget.**

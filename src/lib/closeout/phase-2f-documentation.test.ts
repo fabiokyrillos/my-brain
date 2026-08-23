@@ -251,10 +251,31 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      */
     expect(line, "Phase 2R's authorization is ADR-131 and the line must cite it")
       .toContain("ADR-131");
+    /*
+     * **Moved again with ADR-132**, in the commit that recorded it. Phase 2R has
+     * now received a *second* decision — the nine signatures — and the rule this
+     * assertion has always held is that the line cites **every** authorization
+     * the active phase has received, not only the newest. Dropping ADR-131 here
+     * would lose the planning authorization; omitting ADR-132 would leave the
+     * backlog describing a phase with nine open questions it no longer has.
+     */
+    expect(line, "Phase 2R has received a second decision and the line must cite it")
+      .toContain("ADR-132");
     expect(line, "ADR-131 authorizes planning only, and the line must say so")
       .toMatch(/PLANNING/i);
+    expect(line, "the signatures must be recorded, not implied")
+      .toMatch(/SIGNED/i);
     expect(line, "no implementation is authorized, and the line must not overstate it")
       .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    // `OD-2R-7` allocated one migration and no file exists. Those are different
+    // facts and the line has to carry both, because "one migration" alone reads
+    // as a spend. Asserted positively so it fails when the distinction is
+    // dropped — a bare `not.toMatch` here would pass on a line that said
+    // nothing at all.
+    expect(line, "the line must say no migration file is created")
+      .toMatch(/no migration file is created/i);
+    expect(line, "and must distinguish that from the allocation")
+      .toMatch(/allocated/i);
     expect(line, "the successor is not authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2S/i);
   });

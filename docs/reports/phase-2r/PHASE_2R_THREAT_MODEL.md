@@ -209,3 +209,50 @@ would add the product's **first unattended writer**, at a moment when two
 automation categories already carry the owner's stored consent and only the
 absence of a consumer keeps them inert — and **`T-2R-3`**, because it is the one
 whose failure mode is a hang rather than a wrong answer.
+
+---
+
+## Disposition after ADR-132 (2026-08-23)
+
+**Zero threats are CLOSED, and that is the correct outcome.** Closing a threat
+requires the mitigation to exist and to have been exercised. **Nothing is
+implemented**, so nothing above may be reported as mitigated — the sections above
+are not rewritten, and this table is the disposition.
+
+**What the signatures did change** is the *shape* of several threats: a decision
+can remove an attack surface before any code is written, and where that happened
+it is recorded as **NARROWED BY DECISION** — which is a smaller open threat, not
+a closed one.
+
+| threat | disposition | what the signature changed |
+|---|---|---|
+| `T-2R-1` — series or occurrence crossing an owner boundary | **OPEN — planned** | unchanged. Composite FK, forced RLS and a **negative control** all still have to be written |
+| `T-2R-2` — materialisation writing for the wrong owner | **OPEN — planned** | `OD-2R-3` A keeps exactly one unattended write path instead of a horizon job, so the surface is **one function, not two** — still unwritten |
+| `T-2R-3` — a rule that computes without bound | **OPEN — NARROWED BY DECISION** | `OD-2R-2` A is the mitigation's foundation: **a closed set cannot express an unbounded rule**, and `RRULE` is refused by name. The bounded next-instant search that **raises** rather than looping is still unwritten |
+| `T-2R-4` — delivery amplification | **OPEN — NARROWED BY DECISION** | `OD-2R-3` A keeps quiet hours, the daily cap and the 24-hour cooldown **operating on exactly one row**, so they are inherited rather than re-implemented. `2R-NOTIFY-005`'s no-burst rule is still unwritten |
+| `T-2R-5` — content leaking into a notification | **OPEN — planned** | unchanged |
+| `T-2R-6` — a rule string reaching a surface | **OPEN — NARROWED BY DECISION** | `OD-2R-2` A means there is **no `RRULE` string in existence to leak**; what remains is not rendering the JSON object, which `2R-SURFACE-004` still has to assert |
+| `T-2R-7` — an undo that does not restore | **OPEN — planned** | `OD-2R-4` A's narrower default reduces how much a wrong undo could destroy; the **exercised** undo is still unwritten |
+| `T-2R-8` — materialisation mistaken for autonomy | **OPEN — planned. Still the most important item in this model** | unchanged by signature, and **one input moved**: the owner has **undone** the 2026-08-20 opt-in, so all six categories are `suggest_only` again (audit §10.3). That removes the stored consent this threat was sharpened by — **but not the threat**, because this phase would still add the product's **first unattended writer**, and `2R-TRUST-002`'s prohibition is still unwritten |
+| `T-2R-9` — the migration widening authority | **OPEN — planned** | `OD-2R-7` A makes the destination **exclusive and allocated**, so a widening is now a stop condition rather than a judgement call. The diff assertion is still unwritten |
+| `T-2R-10` — silent spend | **OPEN — planned** | `OD-2R-2` A makes the model **deterministic by construction** — a rule is validated, not interpreted — so no path needs a model at all. ADR-132 D12 forbids the spend |
+| `T-2R-11` — the successor phase starting by accident | **OPEN — planned** | unchanged. The detector is retargeted and re-proved with a mutation control, but `2R-CLOSE-010` re-asserts it at closeout |
+| `T-2R-12` — a hardware proof discharged by a document | **OPEN — planned** | unchanged, and `OD-2R-6` A adds nothing to the device surface |
+
+**Summary: 12 open · 0 closed · 4 narrowed by decision.**
+
+### Two threats the signatures did not create, checked because they could have
+
+- **`OD-2R-8`'s lift** is **limited to reminders**. It creates no threat, because
+  it widens no write path — it removes a *refusal*, not a *constraint*. Had it
+  reached tasks, `T-2R-2` would have acquired the task confirmation lifecycle;
+  `OD-2R-6` A is what keeps that boundary, and stop condition 9 enforces it.
+- **`OD-2R-9`'s routing out** removes no mitigation from this phase, because
+  neither defect is a threat — both are correctness defects on surfaces this
+  phase does not touch.
+
+### What would have to happen for any of these to close
+
+A slice ships the mitigation, its test exercises it rather than asserting it, and
+slice 2R.5 re-dispositions the threat against **what was actually built**. Until
+then, **every line in this model is a plan.**

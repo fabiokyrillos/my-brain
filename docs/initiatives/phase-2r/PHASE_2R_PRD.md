@@ -28,8 +28,10 @@ A personal contextual agent that cannot hold *"toda segunda-feira"*, *"todo dia
 Phase 2P met this edge and refused it on budget: `2P-REMINDER-002` named
 recurrence, recurrence needed a third migration that phase had not allocated, and
 the remainder `2P-REMINDER-RECURRENCE` was **refused by name**. That refusal was
-about budget, not about desirability, and **only the owner can lift it**
-(`OD-2R-8`).
+about budget, not about desirability, and only the owner could lift it.
+**`OD-2R-8` is SIGNED as option A and the refusal is LIFTED** (ADR-132
+Decision 1), **strictly limited to reminders** — it does not reach tasks, the
+calendar, or any other object.
 
 **What the owner should be able to do when this phase closes:** create a reminder
 that repeats, see the next occurrences before saving, change *this one* without
@@ -45,16 +47,33 @@ every exclusion. Both are binding.
 
 ---
 
-## 2. Open owner decisions
+## 2. Owner decisions — ALL NINE SIGNED (ADR-132, 2026-08-23)
 
-**A recommendation is not a signature.** Every decision below is **OPEN**.
-Requirements that depend on an unsigned decision are **not buildable**, and the
-pull request carrying this package stays a **draft** until they are answered.
+**All nine are SIGNED, and every one took its recommendation.** ADR-132 records
+them; **ADR-131 is not edited**. Each decision below keeps its original context,
+options, recommendation and consequence **exactly as they were written before
+the signature** — the record of what was offered is what makes a signature
+auditable, so nothing here is rewritten to agree with the outcome.
 
-Each decision states measured context, mutually exclusive options, a
-recommendation, a consequence, and its effect on budget and schedule.
+**Signing is not authorizing implementation.** No slice may start, no product
+code may be written and **no migration file may be created** until a separate
+owner decision authorizes implementation. That authorization does not exist.
+
+| decision | signed | ADR-132 |
+|---|---|---|
+| `OD-2R-8` — lift the recurrence refusal | **A** — lifted, **limited to reminders** | Decision 1 |
+| `OD-2R-1` — the theme | **A** — Rotina: o que se repete | Decision 2 |
+| `OD-2R-2` — the recurrence model | **A** — closed set; `RRULE` refused by name | Decision 3 |
+| `OD-2R-3` — how occurrences exist | **A** — exactly one materialised at a time | Decision 4 |
+| `OD-2R-4` — this one, or all of them | **A** — always ask, default to the narrower | Decision 5 |
+| `OD-2R-5` — daylight saving | **A** — wall-clock, three edge cases decided | Decision 6 |
+| `OD-2R-6` — recurring tasks | **A** — OUT; remainder `2R-TASK-RECURRENCE` | Decision 7 |
+| `OD-2R-7` — the migration budget | **A** — **1 ALLOCATED**, exclusive destination | Decision 8 |
+| `OD-2R-9` — the two proved defects | **A** — separate small initiative | Decision 9 |
 
 ### `OD-2R-1` — the theme itself
+
+**SIGNED — option A**, as recommended. ADR-132 Decision 2 — the theme is Rotina; B, C and D are declined by name.
 
 **Context.** The published roadmap ends at Phase 2O. Phases 2P and 2Q were each
 derived from a measured census, and so is this. There is no predefined theme for
@@ -81,6 +100,8 @@ evidence could exist is a precondition, not a slice.
 
 ### `OD-2R-2` — the recurrence model
 
+**SIGNED — option A**, as recommended. ADR-132 Decision 3 — a closed set of enumerated patterns; **`RRULE` is refused by name**.
+
 **Context.** Nothing exists to inherit. The two shapes that could work differ in
 cost by more than they differ in capability.
 
@@ -99,6 +120,8 @@ personal reminder actually needs.
 the phase, plus a dependency decision. **+2 to +4 days.**
 
 ### `OD-2R-3` — how occurrences exist
+
+**SIGNED — option A**, as recommended. ADR-132 Decision 4 — exactly one materialised occurrence at a time.
 
 **Context.** `reminders` rows are consumed by the heartbeat, which runs hourly
 via `pg_cron` and selects on `(user_id, status, remind_at)`.
@@ -122,6 +145,8 @@ the calendar and notifications all change. **+5 days.**
 
 ### `OD-2R-4` — this one, or all of them
 
+**SIGNED — option A**, as recommended. ADR-132 Decision 5 — every edit asks, and the default is **this occurrence**.
+
 **Context.** The product has **no vocabulary** for either concept today, so both
 the semantics and the words are new.
 
@@ -137,6 +162,8 @@ irreversible surprise, and this repository's standard requires an explicit
 confirmation for exactly that.
 
 ### `OD-2R-5` — daylight saving
+
+**SIGNED — option A**, as recommended. ADR-132 Decision 6 — wall-clock intention, and all three unrepresentable cases signed.
 
 **Context.** This is the decision most likely to be got wrong, and this
 repository has been wrong here before: three different local-day implementations
@@ -165,6 +192,8 @@ month's last day — each asserted by a test that fails if the behaviour changes
 
 ### `OD-2R-6` — recurring tasks
 
+**SIGNED — option A**, as recommended. ADR-132 Decision 7 — recurring tasks are OUT; remainder **`2R-TASK-RECURRENCE`**.
+
 **Context.** Tasks are a different object with a confirmation lifecycle,
 dependencies, projects, people and an undo contract. Reminders are not.
 
@@ -177,6 +206,8 @@ compensation all acquire a recurrence dimension. **This is a second phase in
 disguise: +6 to +9 days and at least one further migration.**
 
 ### `OD-2R-7` — the migration budget
+
+**SIGNED — option A**, as recommended. ADR-132 Decision 8 — exactly one migration **ALLOCATED**; a second is a stop condition.
 
 **Context.** §5 proves the need. Phase 2Q spent exactly one and treated a second
 as a stop condition; that shape is proposed again.
@@ -192,6 +223,8 @@ signature in the implementation authorization.
 
 ### `OD-2R-8` — lifting the `2P-REMINDER-RECURRENCE` refusal
 
+**SIGNED — option A**, as recommended. ADR-132 Decision 1 — the refusal is **LIFTED**, strictly limited to reminders.
+
 **Context.** ADR-123's amendment refused recurrence **by name** while correcting
 `2P-REMINDER-002`. A refusal recorded by the owner is lifted by the owner and by
 nobody else — least of all by a later phase quietly planning the thing.
@@ -204,6 +237,8 @@ nobody else — least of all by a later phase quietly planning the thing.
 phase does not have its subject.
 
 ### `OD-2R-9` — audit §8's two proved defects
+
+**SIGNED — option A**, as recommended. ADR-132 Decision 9 — a separate small initiative.
 
 **Context.** A search cannot be linked or returned to; the *Precisa de você*
 filter is lost on back navigation. Both are proved in the audit. Neither is about
@@ -410,8 +445,14 @@ unused column to repurpose.** A recurrence cannot be represented without schema.
 | **Hosted proof** | parity advances by exactly one; the new relation is readable only by its owner; residue proved gone by a two-sided control |
 | **Stop condition** | **a second migration of any kind halts the phase** and returns to the owner |
 
-**No migration is allocated by this document.** `OD-2R-7` is open and requires
-the owner's signature in a separate implementation authorization.
+**One migration is ALLOCATED — `OD-2R-7` signed as option A, ADR-132 Decision 8.**
+Budget: **1 allocated · 0 spent · 0 created.**
+
+**Allocated is not created, and it is not permission to create.** No migration
+file exists, none may be written, and the allocation is spent only when
+implementation is separately authorized and slice 2R.1 runs. **A second migration
+of any kind is a stop condition** that halts the phase and returns to the owner —
+a budget whose ceiling is not also its stop condition is not a budget.
 
 ---
 
@@ -450,3 +491,22 @@ grant, RLS policy, retention rule or authority moves. `2P-ACCESS-005` stays
 **NOT EXECUTED — OWNER WAIVED**. The four automation review flows stay out under
 `OD-2Q-8`. Audit §8's two defects stay out under `OD-2R-9`. **The phase after
 this one is not started, not planned and not named as active.**
+
+### 7.1 Out of the phase, each with a destination — signed by ADR-132 Decision 11
+
+Named individually so that excluding each is a decision on the record rather
+than an omission. **None is discharged by being listed here.**
+
+| out of Phase 2R | destination | signed by |
+|---|---|---|
+| **`2R-TASK-RECURRENCE`** — recurring **tasks** | the owner. `OD-2R-8`'s lift is **limited to reminders** and does not reach tasks | `OD-2R-6` A |
+| **Search that cannot be linked or returned to** — `/app/search` reads no `searchParams` | a separate small initiative | `OD-2R-9` A |
+| **`2P-ATTENTION-008`** — the *Precisa de você* filter lost on back navigation | the same separate initiative. **Not discharged by being understood** | `OD-2R-9` A |
+| **The dead-man switch blind to a gateway 401** — repair by alerting on staleness of `last_success_at`, not on a failure count | **operations**, deploy-and-operate track | ADR-132 D11 |
+| **The dark accessibility scan on real routes** | a later initiative at the owner's discretion | ADR-129, inherited |
+| **Push HTTP 403 · Android never executed** | `push-hardware-validation`; external provider + owner hardware | ADR-107, inherited |
+| **`RG-DEP-3`** restore drill | rollout track. **Cannot be closed by writing a file** | inherited |
+| **`2P-CHAT-007-JOURNEY`** | unspendable until the owner spends their own credential | inherited |
+| **The four automation review flows** | separate initiative | `OD-2Q-8` |
+| **Autonomy — the agent acting on its own** | **out until calibration evidence exists**, not because it is unwanted. Two observations against thresholds of 50 and 80, and four of six categories still have no producer | `OD-2R-1` A declines B and D |
+| **VoiceOver `2P-ACCESS-005`** | **NOT EXECUTED — OWNER WAIVED.** Never a priority, never to be reported as passing | ADR-125, ADR-130 |

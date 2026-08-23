@@ -98,7 +98,7 @@ const EXPECTED_FAMILIES = [
 ] as const;
 
 describe("Phase 2R: the planning package is present and coherent", () => {
-  it("ships exactly the seven documents ADR-131 authorizes", () => {
+  it("ships the seven documents ADR-131 authorizes, plus the coverage report ADR-132 earned", () => {
     for (const file of [
       PRD,
       PLAN,
@@ -107,6 +107,9 @@ describe("Phase 2R: the planning package is present and coherent", () => {
       "docs/reports/phase-2r/PHASE_2R_GAPS_AND_OPPORTUNITIES.md",
       "docs/reports/phase-2r/PHASE_2R_THREAT_MODEL.md",
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_CONTRACT.md",
+      // Added once the decisions were signed: coverage is only meaningful when
+      // every requirement's governing decision has an answer.
+      "docs/reports/phase-2r/PHASE_2R_REQUIREMENT_COVERAGE.md",
     ]) {
       expect(existsSync(join(REPO, file)), `${file} is missing`).toBe(true);
     }
@@ -210,18 +213,75 @@ describe("Phase 2R: no family name is invisible to the tooling", () => {
 });
 
 describe("Phase 2R: nothing is signed, and nothing is implemented", () => {
-  it("keeps all nine owner decisions OPEN, including the theme", () => {
-    // Pin 1 / `2R-CLOSE-008`. A recommendation is not a signature.
+  /**
+   * **Inverted by ADR-132, not deleted.**
+   *
+   * This case used to assert the opposite — that no decision was marked signed
+   * and that the package said so. That property was true and is now false, so
+   * the assertion is **flipped in place**, keeping the same subject and the same
+   * strictness. Phase 2N's guard was inverted at closeout, Phase 2P's was
+   * flipped rather than relaxed, and Phase 2Q's was inverted slice by slice; the
+   * reason is always the same one: an absence nobody asserts is an absence
+   * nobody notices disappearing, and the same is true of a signature.
+   *
+   * `2R-CLOSE-008` is the requirement: **a decision may be marked signed only
+   * where an accepted ADR names it.** Both halves are checked — the mark in the
+   * PRD, and the ADR that earns it.
+   */
+  it("holds all nine owner decisions SIGNED, each named by an accepted ADR", () => {
     const prd = read(PRD);
+    const decisions = read("docs/DECISIONS.md");
+
     for (let n = 1; n <= 9; n += 1) {
       expect(prd, `OD-2R-${n} is not declared`).toContain(`\`OD-2R-${n}\``);
+      expect(decisions, `ADR-132 does not name OD-2R-${n}`).toContain(`\`OD-2R-${n}\``);
     }
-    expect(prd, "a decision is marked signed while no ADR signs one")
-      .not.toMatch(/\*\*SIGNED/);
-    expect(prd, "the decisions must be declared open").toMatch(/Every decision below is \*\*OPEN\*\*/);
-    expect(prd, "the theme itself must be one of them").toMatch(/`OD-2R-1` — the theme itself/);
-    expect(prd, "a recommendation must not be presented as a decision")
-      .toMatch(/A recommendation is not a signature/);
+
+    // Nine signatures, one per decision — counted, so a copy-paste that stamped
+    // one decision twice and another not at all fails here.
+    const stamps = [...prd.matchAll(/^\*\*SIGNED — option A\*\*/gm)];
+    expect(stamps, "expected exactly nine signature stamps").toHaveLength(9);
+
+    expect(prd, "the package must say all nine are signed")
+      .toMatch(/ALL NINE SIGNED \(ADR-132/);
+    expect(prd, "the theme itself must be one of the signed decisions")
+      .toMatch(/`OD-2R-1` — the theme itself/);
+    expect(prd, "signing must not be presented as authorizing implementation")
+      .toMatch(/Signing is not authorizing implementation/);
+    expect(prd, "the original options must survive the signature")
+      .toMatch(/exactly as they were written before/);
+  });
+
+  it("keeps ADR-132 an owner signature that authorizes no implementation", () => {
+    const decisions = read("docs/DECISIONS.md");
+    const at = decisions.indexOf("## ADR-132");
+    expect(at, "ADR-132 is missing").toBeGreaterThan(-1);
+    const next = decisions.indexOf("\n## ADR-", at + 1);
+    const body = next < 0 ? decisions.slice(at) : decisions.slice(at, next);
+
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "it must authorize no implementation").toMatch(/authorizes no implementation/i);
+    expect(body, "it must not authorize a migration file")
+      .toMatch(/no migration file/i);
+    expect(body, "the refusal lift must be limited to reminders")
+      .toMatch(/limited to reminders/i);
+    expect(body, "a second migration must remain a stop condition")
+      .toMatch(/second migration of any kind is a stop condition/);
+    expect(body, "the waiver must not move").toMatch(/NOT EXECUTED — OWNER WAIVED/);
+    expect(body, "an ADR in this series must not name the successor").not.toMatch(/2S/i);
+  });
+
+  it("keeps ADR-131 intact rather than rewritten into agreement with ADR-132", () => {
+    // The rule since ADR-108: an accepted ADR is never edited to agree with a
+    // later one. ADR-132 signs what ADR-131 left open; it does not revise it.
+    const decisions = read("docs/DECISIONS.md");
+    const at = decisions.indexOf("## ADR-131");
+    const next = decisions.indexOf("\n## ADR-", at + 1);
+    const body = decisions.slice(at, next);
+    expect(body, "ADR-131 must still declare the decisions open")
+      .toMatch(/the eight open decisions|nine decisions are OPEN|are OPEN/i);
+    expect(body, "ADR-131 must still read as planning-only")
+      .toMatch(/authorizes \*\*planning only\*\*/);
   });
 
   it("keeps ADR-131 planning-only, and naming no successor", () => {
@@ -243,13 +303,73 @@ describe("Phase 2R: nothing is signed, and nothing is implemented", () => {
     expect(body, "an ADR in this series must not name the successor").not.toMatch(/2S/i);
   });
 
-  it("holds the migration budget at PROPOSED, with no Phase 2R migration on disk", () => {
-    expect(read(PRD), "the budget must not read as allocated")
-      .toMatch(/No migration is allocated by this document/);
+  /**
+   * **Inverted by ADR-132 Decision 8: the budget moved from PROPOSED to
+   * ALLOCATED — and the file count did not.**
+   *
+   * This is the distinction the whole case exists for. *Allocated* is a
+   * decision; *created* is a file. Conflating them is how a phase spends a
+   * budget nobody authorized it to spend, so both are asserted, in opposite
+   * directions, in the same test.
+   */
+  it("holds the migration budget at 1 ALLOCATED and 0 CREATED", () => {
+    const prd = read(PRD);
+    expect(prd, "the allocation must be recorded").toMatch(/One migration is ALLOCATED/);
+    expect(prd, "the stale 'not allocated' wording must be gone")
+      .not.toMatch(/No migration is allocated by this document/);
+    expect(prd, "allocated must not be read as permission to create")
+      .toMatch(/Allocated is not created/);
+    expect(prd, "a second must remain a stop condition")
+      .toMatch(/second migration\s+of any kind is a stop condition/);
+
+    const contract = read("docs/reports/phase-2r/PHASE_2R_TRACEABILITY_CONTRACT.md");
+    expect(contract, "the contract must carry the allocation").toMatch(/\*\*Allocated\*\* \| \*\*1/);
+
+    // And the half that matters most: nothing exists on disk.
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration exists")
+    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration file exists")
       .toEqual([]);
     expect(migrations.length, "the migration count moved during a planning-only phase").toBe(100);
+  });
+
+  it("covers every requirement with a slice, and classifies none for delivery", () => {
+    // `2R-CLOSE-004`. The coverage report is derived from the PRD, so a
+    // requirement missing a slice cannot be hidden by editing one of them.
+    const coverage = read("docs/reports/phase-2r/PHASE_2R_REQUIREMENT_COVERAGE.md");
+    expect(coverage, "the declared total must match the PRD").toContain("| Declared | **73** |");
+    expect(coverage, "nothing may be left unassigned").toContain("| Unassigned to a slice | **0** |");
+    expect(coverage, "delivery classification must not have happened")
+      .toContain("| Delivery-classified | **0 — by rule, until closeout** |");
+    expect(coverage, "the coverage report must refuse to be read as a delivery matrix")
+      .toMatch(/It is not a delivery matrix/);
+
+    // Per-slice counts sum to the declared total, derived rather than trusted.
+    const perSlice = [...coverage.matchAll(/^\| \*\*(2R\.\d)\*\* \| (\d+) \|/gm)]
+      .map((m) => Number(m[2]));
+    expect(perSlice, "expected six slice rows").toHaveLength(6);
+    expect(perSlice.reduce((a, b) => a + b, 0)).toBe(73);
+  });
+
+  it("keeps the coverage report generated rather than typed, and not stale", async () => {
+    // The report claims it is generated. That claim is only worth anything if
+    // the generator exists and the file on disk still matches it — otherwise a
+    // hand-edit would read exactly like a regeneration.
+    const generator = (await import(
+      "../../../scripts/generate-phase-2r-coverage.mjs"
+    )) as typeof import("../../../scripts/generate-phase-2r-coverage.mjs");
+
+    const rows = generator.requirements();
+    expect(rows).toHaveLength(73);
+    expect(generator.refusals(rows), "the generator refuses this package").toEqual([]);
+    expect(
+      generator.renderCoverage(rows),
+      "the coverage report on disk differs from a fresh generation — regenerate it",
+    ).toBe(read("docs/reports/phase-2r/PHASE_2R_REQUIREMENT_COVERAGE.md").replace(/\r\n/g, "\n"));
+
+    // Non-vacuity: the generator must refuse a corpus it should refuse.
+    const broken = [...rows.slice(0, 72), { ...rows[72], id: "2R-A11Y-001" }];
+    expect(generator.refusals(broken).length, "a digit-bearing family was accepted")
+      .toBeGreaterThan(0);
   });
 
   it("carries none of the artifacts that only exist after implementation", () => {

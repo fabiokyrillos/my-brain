@@ -4,10 +4,16 @@
 half of the governing pair with
 [`PHASE_2R_PRD.md`](./PHASE_2R_PRD.md), and it authorizes nothing on its own.
 
-**The only remaining blocker on the whole phase is an owner decision.** Nine are
-open (`OD-2R-1` … `OD-2R-9`), and three of them — `OD-2R-1`, `OD-2R-7` and
-`OD-2R-8` — block slice 2R.1 absolutely. Without `OD-2R-8` the phase has no
-subject at all.
+**All nine decisions are SIGNED — ADR-132, 2026-08-23 — and every one took its
+recommendation.** `OD-2R-8` lifted the `2P-REMINDER-RECURRENCE` refusal, limited
+to reminders, so the phase has its subject; `OD-2R-7` **allocated one migration**;
+and no slice is blocked by an unanswered question any more.
+
+**The only remaining blocker on the whole phase is the implementation
+authorization ADR, which does not exist.** No slice may start, no product code
+may be written and **no migration file may be created** until the owner records
+it. Signing the decisions that would deliver a feature is not authorizing its
+construction.
 
 ---
 
@@ -44,17 +50,19 @@ Re-prove the absence of recurrence against the live schema at the slice's own
 baseline; record the heartbeat's quiet hours, daily cap, 24-hour cooldown and
 per-user lock as **observed** rather than as read; record the reminder modal's
 current field groups from the component; identify the single timezone-resolution
-path and report any second one as a defect; and re-read the four
-`automation_category_policies` rows so audit §5 is either confirmed or corrected
-at the moment the phase starts.
+path and report any second one as a defect; and re-read
+`automation_category_policies` **whatever its row count** so audit §10.3 is
+either confirmed or corrected at the moment the phase starts.
 
 **Zero product behaviour changes.** The slice's own diff is the evidence.
 
 - **Migration:** none. **Dependencies:** none. **Parallel with:** nothing.
 - **Closes on:** the baseline record, reviewed against the diff.
 - **Stop conditions:** a second timezone authority exists → report before
-  building on either; audit §5's rows differ from what the audit recorded →
-  stop and tell the owner rather than adjusting the record.
+  building on either; `automation_category_policies` differs from what audit
+  §10.3 recorded → **stop and tell the owner rather than adjusting the record**.
+  That table has now moved twice in three days, so this is a live condition, not
+  a formality.
 - **Excludes:** any change to `reminders`, the heartbeat or the modal.
 
 ### Slice 2R.1 — the model
@@ -215,20 +223,31 @@ only 2R.3 and 2R.4 are candidates for overlap, and §2 makes that conditional on
 re-audit rather than assumed. If they do overlap, the path shortens by about 1.5
 days; the table above does **not** assume it.
 
-**What moves the estimate, and by how much:**
+**The estimate is unchanged by the signatures, and that is the expected result:**
+every decision took the option this package was written for, so no requirement
+was added, renumbered, reused or removed and no slice changed shape. **73
+requirements, ten families, six slices, 6.5 / 13.5 / 21.5 working days.**
+
+**What would have moved it — now resolved, kept for the record:**
+
+| driver | effect | outcome |
+|---|---|---|
+| `OD-2R-2` answered **B** (`RRULE`) | +2 to +4 days — a parser and a generator become the phase's highest-risk code | **avoided** — signed A |
+| `OD-2R-3` answered **B** (horizon) | +3 days and probably a **second migration** | **avoided** — signed A |
+| `OD-2R-3` answered **C** (pure compute) | +5 days — heartbeat, agenda, calendar and notifications all change | **avoided** — signed A |
+| `OD-2R-6` answered **B** (recurring tasks) | +6 to +9 days and a further migration | **avoided** — signed A, remainder `2R-TASK-RECURRENCE` |
+| `OD-2R-9` answered **B** | +2 days, and the phase becomes two things | **avoided** — signed A |
+
+**What still moves it, and is not resolved by any signature:**
 
 | driver | effect |
 |---|---|
-| `OD-2R-2` answered **B** (`RRULE`) | **+2 to +4 days** — a parser and a generator become the phase's highest-risk code |
-| `OD-2R-3` answered **B** (horizon) | **+3 days** and probably a **second migration** — a stop condition |
-| `OD-2R-3` answered **C** (pure compute) | **+5 days** — heartbeat, agenda, calendar and notifications all change |
-| `OD-2R-6` answered **B** (recurring tasks) | **+6 to +9 days** and a further migration — a second phase in disguise |
-| `OD-2R-9` answered **B** | **+2 days**, and the phase becomes two things |
 | **the migration** | ~1 day of slice 2R.1 is gates, not code: pgTAP, db lint, the full chain on an empty database, dry run, application, hosted proof, parity, residue |
 | **hardware** | `2R-MOBILE-003` and the closing checkpoint are **owner wall-clock**, not agent time. Historically the largest source of elapsed-time variance in this repository |
-| **owner decisions** | the phase cannot start slice 2R.1 until `OD-2R-1`, `OD-2R-7` and `OD-2R-8` are signed |
+| **the implementation authorization** | slice 2R.0 cannot start without it. This is now the only gate, and its duration is the owner's |
+| **`OD-2R-5`'s three edge cases** | signed, so they are specified rather than discovered — which removes the *risk* but not the *work*: each still needs a test that fails if the behaviour changes |
 
-**Owner actions required, in order:** sign `OD-2R-1` … `OD-2R-9`; authorize
+**Owner actions remaining, in order:** ~~sign `OD-2R-1` … `OD-2R-9`~~ **done, ADR-132**; authorize
 implementation in a separate ADR; run the `2R-MOBILE-003` device item; run the
 closing checkpoint; decide closure.
 
@@ -251,10 +270,36 @@ condition under which parallelism is not claimed.
 
 ## 4. The only blocker
 
-**Record the owner's answers to `OD-2R-1` … `OD-2R-9`, then record an
-implementation authorization ADR.** Until both exist, this package is a draft and
-no slice may start.
+**Record an implementation authorization ADR.** That is now the whole of it.
 
-`OD-2R-8` deserves separate mention: `2P-REMINDER-RECURRENCE` was refused **by
-name** by the owner. If it is not lifted, **Phase 2R as written has no subject**,
-and `OD-2R-1` must be answered with B, C or D instead.
+The nine decisions are **signed** (ADR-132) and `OD-2R-8`'s lift gave the phase
+its subject. What remains is the separate owner decision that permits
+construction — and until it exists:
+
+- **no slice may start**, including 2R.0;
+- **no product code may be written**;
+- **no migration file may be created**, notwithstanding that one is *allocated*;
+- **nothing is deployed and no hosted data is written.**
+
+**Allocated is not created, and signed is not authorized.** Both distinctions are
+the whole reason this section still exists.
+
+---
+
+## 5. Stop conditions, consolidated
+
+Gathered here because a stop condition scattered across six slices is one nobody
+finds in time. Each halts the phase and returns to the owner.
+
+| # | condition | source |
+|---|---|---|
+| 1 | **A second migration of any kind is needed** | `OD-2R-7` A · ADR-132 D8 |
+| 2 | **A rule cannot be validated at the boundary without a parser** — that would mean `OD-2R-2` was effectively answered B, and the estimate is wrong | `OD-2R-2` A · ADR-132 D3 |
+| 3 | **The heartbeat, quiet hours, the daily cap or the 24-hour cooldown would have to change** — `OD-2R-3` A was chosen precisely so they do not | `OD-2R-3` A · ADR-132 D4 |
+| 4 | **A series operation is found to have no real, tested undo** — it becomes an explicit confirmation under `2R-SERIES-008` and is **reported, not absorbed** | `2R-SERIES-007/-008` |
+| 5 | **The recurrence control cannot fit the existing modal without becoming a form** | slice 2R.3 |
+| 6 | **Any half can only be proved by spending the owner's AI credential** — recorded **unspendable**, never a pass | ADR-132 D12 |
+| 7 | **A second timezone authority is found** at slice 2R.0 | `2R-FOUNDATION-004` |
+| 8 | **Audit §10.3's automation rows differ from what slice 2R.0 re-reads** — stop and tell the owner rather than adjusting the record | `2R-FOUNDATION-006` |
+| 9 | **Any requirement would need recurring *tasks*** — `OD-2R-8`'s lift is limited to reminders | `OD-2R-6` A · ADR-132 D7 |
+| 10 | **A start signal for the roadmap successor appears** | ADR-131 D9 |
