@@ -876,3 +876,364 @@ test.describe("the immutable history timeline never starves the revision summary
     expect(component, "the row no longer renders a <time>").toMatch(/<time dateTime=\{revision\.createdAt\}>/);
   });
 });
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `Pessoas mencionadas` — the person-candidate card.
+ *
+ * The owner reported it at ~440px: the evidence in an extremely narrow column
+ * wrapping one word per line, colliding with `Criar pessoa`, `Ignorar menção`
+ * out of alignment, the form illegible.
+ *
+ * The cause was a **shared layout class between two different shapes**.
+ * `.candidate-item` describes the task form's `<label>` — a visually hidden
+ * checkbox, a 24px check indicator, a copy block — so it declares
+ * `grid-template-columns:24px 1fr auto` and
+ * `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}`.
+ * `PersonCandidateForm` put that class on a `<fieldset>` whose children are a
+ * legend, an evidence paragraph, two radio options, a name label and a text
+ * input. Measured at 440px before the fix: the evidence occupied a **24px**
+ * column, 5 words on 5 lines; the name label likewise; and the text input was
+ * `position:absolute`, `opacity:0`, `pointer-events:none` — **invisible and
+ * unusable**, which is a functional defect and not only a visual one.
+ *
+ * The two shapes now have two classes. Nothing here touches the task form.
+ */
+
+const PERSON_NAME = "Garo";
+const PERSON_EVIDENCE = "relatório de Sweepstakes pra Garo";
+/** A real sentence of evidence, long enough that any starved column shows it. */
+const LONG_EVIDENCE =
+  "preciso desenvolver um relatório de Sweepstakes pra Garo, que faz parte da Royal Caribbean, com o prazo jogado para a sexta-feira seguinte";
+/** A name at the contract's own ceiling of meaningfulness, not at 160 chars. */
+const LONG_NAME = "Garogandharva Vasconcellos de Albuquerque Menezes";
+
+type CandidateFixture = { index: number; name: string; evidence: string; decision?: "confirmed" | "rejected" };
+
+/**
+ * Mirrors the per-candidate block `person-candidate-form.tsx` emits, including
+ * the two wrappers that make the layout explicit rather than auto-placed.
+ */
+function personCandidate({ index, name, evidence, decision }: CandidateFixture) {
+  const inputId = `person-candidate-${index}-name`;
+  const radio = (value: "confirmed" | "rejected", label: string) =>
+    `<label><input${decision === value ? " checked" : ""} name="person-decision-${index}" type="radio" value="${value}">${label}</label>`;
+  return `<fieldset class="person-candidate-item" aria-label="Pessoa mencionada: ${name}"><legend>${name}</legend>${
+    evidence ? `<p class="person-candidate-evidence">${evidence}</p>` : ""
+  }<div class="person-candidate-options">${radio("confirmed", "Criar pessoa")}${radio("rejected", "Ignorar menção")}</div><div class="person-candidate-name"><label for="${inputId}">Nome para criar: ${name}</label><input${
+    decision === "confirmed" ? "" : " disabled"
+  } id="${inputId}" maxlength="160" type="text" value="${name}"></div></fieldset>`;
+}
+
+/**
+ * The card renders inside the decision column of the record page, which is what
+ * decides how much room it actually has — so the fixture composes that ancestry
+ * rather than the card alone.
+ */
+function personCandidateBody(candidates: CandidateFixture[]) {
+  return `<div class="content-page entry-detail-page"><div class="entry-review record-detail">
+    <div class="record-detail-columns">
+      <div class="record-decision">
+        <section class="review-next-actions interpretation-actions phase-2b-task-actions" aria-label="Próximas ações">
+          <div class="person-candidate-section">
+            <form class="candidate-form">
+              <fieldset class="candidate-list" aria-describedby="person-candidate-help">
+                <legend>Pessoas mencionadas</legend>
+                <p id="person-candidate-help" class="field-hint">Confirme apenas quem deve virar uma pessoa permanente. Você pode corrigir o nome ou ignorar a menção.</p>
+                ${candidates.map(personCandidate).join("")}
+              </fieldset>
+              <button class="button-primary" type="submit">${ICON}Salvar decisões sobre pessoas</button>
+            </form>
+          </div>
+        </section>
+      </div>
+      <aside class="record-explanation"></aside>
+    </div>
+  </div></div>`;
+}
+
+const ONE_CANDIDATE: CandidateFixture[] = [{ index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE }];
+
+type PersonGeometry = {
+  cardWidth: number;
+  evidenceWidth: number;
+  evidenceWordsPerLine: number;
+  evidenceColumn: string;
+  nameInputVisible: boolean;
+  nameInputWidth: number;
+  nameInputPointerEvents: string;
+  nameInputPosition: string;
+  optionHeights: number[];
+  optionsSideBySide: boolean;
+  anyOverlap: boolean;
+};
+
+async function personGeometry(page: Page): Promise<PersonGeometry[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".person-candidate-item")].map((card) => {
+      const rect = (el: Element) => el.getBoundingClientRect();
+      const evidence = card.querySelector(".person-candidate-evidence") as HTMLElement | null;
+      const input = card.querySelector(".person-candidate-name input") as HTMLInputElement;
+      const options = [...card.querySelectorAll(".person-candidate-options label")] as HTMLElement[];
+      const inputStyle = getComputedStyle(input);
+
+      let wordsPerLine = Number.POSITIVE_INFINITY;
+      let evidenceWidth = 0;
+      let evidenceColumn = "n/a";
+      if (evidence) {
+        const style = getComputedStyle(evidence);
+        const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+        const lines = Math.max(1, Math.round(rect(evidence).height / lineHeight));
+        const words = (evidence.textContent ?? "").trim().split(/\s+/u).filter(Boolean).length;
+        wordsPerLine = words / lines;
+        evidenceWidth = Math.round(rect(evidence).width);
+        evidenceColumn = getComputedStyle(evidence).gridColumnStart;
+      }
+
+      // Every visible pair inside the card, checked for geometric intersection.
+      const boxes = [evidence, ...options, input, card.querySelector(".person-candidate-name label")]
+        .filter((el): el is HTMLElement => el !== null)
+        .map(rect)
+        .filter((r) => r.width > 0 && r.height > 0);
+      let anyOverlap = false;
+      for (let a = 0; a < boxes.length; a += 1) {
+        for (let b = a + 1; b < boxes.length; b += 1) {
+          const x = boxes[a], y = boxes[b];
+          if (!(x.right <= y.left + 0.5 || y.right <= x.left + 0.5 || x.bottom <= y.top + 0.5 || y.bottom <= x.top + 0.5)) {
+            anyOverlap = true;
+          }
+        }
+      }
+
+      return {
+        cardWidth: Math.round(rect(card).width),
+        evidenceWidth,
+        evidenceWordsPerLine: wordsPerLine,
+        evidenceColumn,
+        nameInputVisible: inputStyle.opacity !== "0" && inputStyle.visibility !== "hidden" && rect(input).width > 0,
+        nameInputWidth: Math.round(rect(input).width),
+        nameInputPointerEvents: inputStyle.pointerEvents,
+        nameInputPosition: inputStyle.position,
+        optionHeights: options.map((el) => Math.round(rect(el).height)),
+        optionsSideBySide: options.length === 2 && Math.abs(rect(options[0]).top - rect(options[1]).top) < 4,
+        anyOverlap,
+      };
+    }),
+  );
+}
+
+/** The widths the owner asked for, plus the phone the repository already uses. */
+const PERSON_VIEWPORTS = [
+  { name: "1440x900", width: 1440, height: 900 },
+  { name: "600x900", width: 600, height: 900 },
+  { name: "440x900", width: 440, height: 900 },
+  { name: "375x812", width: 375, height: 812 },
+] as const;
+
+/**
+ * The same words-per-line floor the revision timeline uses, and for the same
+ * reason: the defect measured **1.00** — literally one word per line.
+ */
+const PERSON_MIN_WORDS_PER_LINE = 2;
+/** The product's own control height, from `.task-control input`. */
+const TOUCH_TARGET = 44;
+
+test.describe("the person-candidate card stays usable at every width", () => {
+  for (const viewport of PERSON_VIEWPORTS) {
+    test(`reads and behaves correctly at ${viewport.name}`, async ({ page }) => {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+
+      expect(card.evidenceColumn, `${viewport.name}: the evidence is not in the main column`).toBe("1");
+      expect(
+        card.evidenceWordsPerLine,
+        `${viewport.name}: ${card.evidenceWordsPerLine.toFixed(2)} words per line in a ${card.evidenceWidth}px column (card ${card.cardWidth}px)`,
+      ).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+
+      /*
+        The functional half, and the one a screenshot would not have named: the
+        shared rule made this input `position:absolute; opacity:0;
+        pointer-events:none`. The owner could not see or reach the field the
+        form exists to edit.
+      */
+      expect(card.nameInputPosition, `${viewport.name}: the name field left the flow`).not.toBe("absolute");
+      expect(card.nameInputVisible, `${viewport.name}: the name field is invisible`).toBe(true);
+      expect(card.nameInputPointerEvents, `${viewport.name}: the name field cannot be clicked`).not.toBe("none");
+
+      for (const [index, height] of card.optionHeights.entries()) {
+        expect(height, `${viewport.name}: option ${index} is ${height}px tall`).toBeGreaterThanOrEqual(TOUCH_TARGET);
+      }
+      expect(card.anyOverlap, `${viewport.name}: two elements of the card overlap`).toBe(false);
+    });
+  }
+
+  test("the evidence uses the width the card has, whatever that width is", async ({ page }) => {
+    // The defect was a 24px column inside a 338px card. This is the invariant
+    // that fails on it regardless of type metrics: the evidence is nearly the
+    // whole content box, not a gutter beside it.
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+      const chrome = 30; // 14px padding each side plus the 1px borders, rounded up.
+      expect(
+        card.evidenceWidth,
+        `${viewport.name}: evidence ${card.evidenceWidth}px inside a ${card.cardWidth}px card`,
+      ).toBeGreaterThanOrEqual(card.cardWidth - chrome - 1);
+      expect(card.nameInputWidth, `${viewport.name}: the name field is narrower than its card`)
+        .toBeGreaterThanOrEqual(card.cardWidth - chrome - 1);
+    }
+  });
+
+  test("long evidence and a long name stay readable and never overflow", async ({ page }) => {
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(
+        page,
+        personCandidateBody([{ index: 0, name: LONG_NAME, evidence: LONG_EVIDENCE }]),
+        viewport.width,
+        viewport.height,
+      );
+      const [card] = await personGeometry(page);
+      expect(
+        card.evidenceWordsPerLine,
+        `${viewport.name}: long evidence at ${card.evidenceWordsPerLine.toFixed(2)} words per line in ${card.evidenceWidth}px`,
+      ).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+      expect(card.anyOverlap, `${viewport.name}: overlap with a long name`).toBe(false);
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(overflow.scrollWidth, `${viewport.name}: horizontal overflow`).toBeLessThanOrEqual(overflow.clientWidth + 1);
+    }
+  });
+
+  test("several candidates each keep their own card, none overlapping", async ({ page }) => {
+    const many: CandidateFixture[] = [
+      { index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE },
+      { index: 1, name: "Marina Sobral", evidence: LONG_EVIDENCE, decision: "confirmed" },
+      { index: 2, name: LONG_NAME, evidence: "com o pessoal do jurídico", decision: "rejected" },
+    ];
+    for (const viewport of [PERSON_VIEWPORTS[0], PERSON_VIEWPORTS[2]]) {
+      await render(page, personCandidateBody(many), viewport.width, viewport.height);
+      const cards = await personGeometry(page);
+      expect(cards, `${viewport.name}: not every candidate rendered`).toHaveLength(3);
+      for (const [index, card] of cards.entries()) {
+        expect(card.anyOverlap, `${viewport.name}: card ${index} overlaps itself`).toBe(false);
+        expect(card.evidenceWordsPerLine, `${viewport.name}: card ${index} evidence density`).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+      }
+      // Cards are stacked, never on top of one another.
+      const tops = await page.evaluate(() =>
+        [...document.querySelectorAll(".person-candidate-item")].map((el) => Math.round(el.getBoundingClientRect().top)),
+      );
+      expect(new Set(tops).size, `${viewport.name}: two cards share a top edge`).toBe(3);
+    }
+  });
+
+  test("a confirmed candidate exposes an enabled name field; a rejected one does not", async ({ page }) => {
+    // The decision states the owner will actually be in. Both must lay out.
+    for (const decision of ["confirmed", "rejected"] as const) {
+      await render(page, personCandidateBody([{ index: 0, name: PERSON_NAME, evidence: LONG_EVIDENCE, decision }]), 440, 900);
+      const [card] = await personGeometry(page);
+      expect(card.anyOverlap, `${decision}: overlap`).toBe(false);
+      expect(card.nameInputVisible, `${decision}: the name field is invisible`).toBe(true);
+      const enabled = await page.evaluate(() => !(document.querySelector(".person-candidate-name input") as HTMLInputElement).disabled);
+      expect(enabled, `${decision}: wrong enabled state`).toBe(decision === "confirmed");
+    }
+  });
+
+  test("the options split into two columns only where the card has the room", async ({ page }) => {
+    // Stated as an invariant plus two counters, so a build that never split —
+    // or always split — fails rather than satisfying this vacuously.
+    let split = 0;
+    let stacked = 0;
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+      if (card.optionsSideBySide) {
+        split += 1;
+        expect(card.cardWidth, `${viewport.name}: split in a ${card.cardWidth}px card`).toBeGreaterThanOrEqual(380);
+      } else {
+        stacked += 1;
+      }
+      expect(card.anyOverlap, `${viewport.name}: overlap`).toBe(false);
+    }
+    expect(split, "no width ever put the two options side by side").toBeGreaterThan(0);
+    expect(stacked, "no width ever stacked the two options").toBeGreaterThan(0);
+  });
+
+  test("keyboard reaches both options and the name field, in that order", async ({ page }) => {
+    await render(page, personCandidateBody([{ index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE, decision: "confirmed" }]), 440, 900);
+    const focused = async () => page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return "none";
+      return `${el.tagName.toLowerCase()}:${el.getAttribute("type") ?? el.className}:${(el as HTMLInputElement).value ?? ""}`;
+    });
+
+    await page.locator('.person-candidate-options input[value="confirmed"]').focus();
+    expect(await focused()).toContain("input:radio");
+    // Radios with one name are a single tab stop; the arrow keys move inside it.
+    await page.keyboard.press("ArrowDown");
+    const afterArrow = await page.evaluate(() => (document.activeElement as HTMLInputElement).value);
+    expect(afterArrow, "the arrow key did not move within the radio group").toBe("rejected");
+
+    /*
+      And the keyboard reaches the field the form exists to edit. Asserted as
+      "within a few tabs" rather than as an exact stop count: a radio group is a
+      single tab stop whose position depends on which member is checked, and
+      pinning that would be testing the browser rather than the card.
+    */
+    let reached = false;
+    for (let press = 0; press < 4 && !reached; press += 1) {
+      await page.keyboard.press("Tab");
+      reached = (await focused()).includes("input:text");
+    }
+    expect(reached, "the keyboard never reached the name field").toBe(true);
+
+    // The focused control must be visible — the defect made it opacity:0.
+    const visible = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return s.opacity !== "0" && s.visibility !== "hidden" && r.width > 0 && r.height > 0;
+    });
+    expect(visible, "the focused name field is not visible").toBe(true);
+  });
+
+  test("survives print emulation", async ({ page }) => {
+    await page.emulateMedia({ media: "print" });
+    try {
+      for (const viewport of [PERSON_VIEWPORTS[0], PERSON_VIEWPORTS[2]]) {
+        await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+        const [card] = await personGeometry(page);
+        expect(card.evidenceWordsPerLine, `${viewport.name} in print`).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+        expect(card.anyOverlap, `${viewport.name} in print: overlap`).toBe(false);
+      }
+    } finally {
+      await page.emulateMedia({ media: "screen" });
+    }
+  });
+
+  test("the fixture still mirrors the markup the component emits", () => {
+    const component = readFileSync(
+      join(ROOT, "src", "features", "interpretations", "person-candidate-form.tsx"),
+      "utf8",
+    );
+    for (const token of [
+      'className="person-candidate-item"',
+      'className="person-candidate-evidence"',
+      'className="person-candidate-options"',
+      'className="person-candidate-name"',
+    ]) {
+      expect(component, `the component no longer emits ${token}`).toContain(token);
+    }
+    /*
+      And it must not go back to sharing the task form's layout class. Compared
+      as a whole class token: `\bcandidate-item\b` also matches inside
+      `person-candidate-item`, because `-` is not a word character — a guard
+      that would have failed on the fix itself.
+    */
+    for (const value of [...component.matchAll(/className="([^"]*)"/g)].map((match) => match[1])) {
+      expect(value.split(/\s+/u), "the person card is sharing `.candidate-item` again")
+        .not.toContain("candidate-item");
+    }
+  });
+});
