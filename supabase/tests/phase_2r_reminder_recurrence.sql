@@ -36,7 +36,7 @@
 -- `reminder_lifecycle_command.sql`.
 
 begin;
-select plan(76);
+select plan(78);
 
 set local timezone to 'UTC';
 
@@ -70,8 +70,84 @@ insert into public.tasks (id, user_id, title, status) values
   ('d1100001-0000-4000-8000-000000000001', 'd1000001-0000-4000-8000-000000000001',
    'A task a series may link to', 'todo');
 
+-- Helpers ---------------------------------------------------------------------
+--
+-- **Every one is created HERE, before any `set local role`, and that is not
+-- tidiness.** Creating a function in `pg_temp` needs TEMP privilege on the
+-- database, which `authenticated` is not granted -- so a helper defined after a
+-- role switch fails on the CREATE rather than on the thing it was written to
+-- test, and the failure names the wrong subject. `reminder_lifecycle_command.sql`
+-- puts its helper at the top for the same reason.
+
+create function pg_temp.series_insert_refused(p_rule jsonb) returns boolean
+language plpgsql as $$
+begin
+  insert into public.reminder_series (user_id, title, rule, anchor_date, anchor_hour, anchor_minute)
+  values ('d1000001-0000-4000-8000-000000000001', 'probe', p_rule, current_date, 9, 0);
+  return false;
+exception when check_violation then
+  return true;
+end;
+$$;
+
+create function pg_temp.create_daily(p_key text) returns jsonb
+language sql as $$
+  select public.create_reminder_series_v1(
+    '{"version":1,"frequency":"daily"}'::jsonb,
+    'Take the medication',
+    false,
+    null,
+    (now() at time zone 'America/New_York')::date,
+    9, 0,
+    p_key
+  );
+$$;
+
+create function pg_temp.second_live_refused() returns boolean
+language plpgsql as $$
+declare
+  target uuid;
+begin
+  select series.id into target from public.reminder_series as series limit 1;
+  insert into public.reminders (user_id, title, remind_at, status, series_id, series_sequence)
+  values ('d1000001-0000-4000-8000-000000000001', 'a second live occurrence',
+          now() + interval '2 days', 'scheduled', target, 99);
+  return false;
+exception when unique_violation then
+  return true;
+end;
+$$;
+
+create function pg_temp.direct_series_write_refused() returns boolean
+language plpgsql as $$
+begin
+  insert into public.reminder_series (user_id, title, rule, anchor_date, anchor_hour, anchor_minute)
+  values ('d1000001-0000-4000-8000-000000000001', 'direct',
+          '{"version":1,"frequency":"daily"}'::jsonb, current_date, 9, 0);
+  return false;
+exception when insufficient_privilege then
+  return true;
+end;
+$$;
+
+create function pg_temp.live_occurrence() returns public.reminders
+language sql stable as $$
+  select occurrence.* from public.reminders as occurrence
+  where occurrence.series_id is not null
+    and occurrence.detached_at is null
+    and occurrence.status = 'scheduled'
+    and occurrence.user_id = 'd1000001-0000-4000-8000-000000000001'
+  limit 1;
+$$;
+
+create function pg_temp.owned_series() returns uuid
+language sql as $$
+  select series.id from public.reminder_series as series
+  where series.user_id = 'd1000001-0000-4000-8000-000000000001' limit 1;
+$$;
+
 -- ---------------------------------------------------------------------------
--- Section 1 -- the grant and policy posture (9)
+-- Section 1 -- the grant and policy posture (11)
 -- ---------------------------------------------------------------------------
 --
 -- 2R-TRUST-004 and 2R-TRUST-005. The new table is STRICTER than public
@@ -98,6 +174,26 @@ select ok(
 select ok(
   not pg_catalog.has_table_privilege('anon', 'public.reminder_series', 'select'),
   'anon holds nothing on public.reminder_series'
+);
+-- service_role too, and this one is not decoration.
+--
+-- A table created in `public` inherits this project's DEFAULT PRIVILEGES, which
+-- grant every API role everything the moment it exists -- so `grant select` on
+-- its own leaves INSERT, UPDATE and DELETE in place and reads exactly like a
+-- lock-down. The migration shipped that wording once and the post-deploy block
+-- caught it on the first chain run against an empty database. These assertions
+-- are the second reader of the same fact.
+select ok(
+  not pg_catalog.has_table_privilege('service_role', 'public.reminder_series', 'select'),
+  'service_role holds nothing on public.reminder_series either -- nothing needs it'
+);
+select is(
+  (select pg_catalog.string_agg(distinct grants.privilege_type::text, ',' order by grants.privilege_type::text)
+   from information_schema.role_table_grants as grants
+   where grants.table_schema = 'public' and grants.table_name = 'reminder_series'
+     and grants.grantee = 'authenticated'),
+  'SELECT',
+  'authenticated holds EXACTLY select on public.reminder_series, and nothing beside it'
 );
 select ok(
   not pg_catalog.has_table_privilege('authenticated', 'public.reminders', 'update'),
@@ -172,16 +268,6 @@ select ok(
 
 -- The constraint itself, driven as an insert. Written as a DO block because a
 -- failing statement would abort the whole suite otherwise.
-create function pg_temp.series_insert_refused(p_rule jsonb) returns boolean
-language plpgsql as $$
-begin
-  insert into public.reminder_series (user_id, title, rule, anchor_date, anchor_hour, anchor_minute)
-  values ('d1000001-0000-4000-8000-000000000001', 'probe', p_rule, current_date, 9, 0);
-  return false;
-exception when check_violation then
-  return true;
-end;
-$$;
 
 select ok(
   pg_temp.series_insert_refused('{"version":1,"frequency":"hourly"}'::jsonb),
@@ -244,18 +330,6 @@ select set_config(
   true
 );
 
-create function pg_temp.create_daily(p_key text) returns jsonb
-language sql as $$
-  select public.create_reminder_series_v1(
-    '{"version":1,"frequency":"daily"}'::jsonb,
-    'Take the medication',
-    false,
-    null,
-    (now() at time zone 'America/New_York')::date,
-    9, 0,
-    p_key
-  );
-$$;
 
 select ok(
   (pg_temp.create_daily('phase2r-create-0001') ->> 'series_id') is not null,
@@ -319,20 +393,6 @@ select is(
 
 reset role;
 
-create function pg_temp.second_live_refused() returns boolean
-language plpgsql as $$
-declare
-  target uuid;
-begin
-  select series.id into target from public.reminder_series as series limit 1;
-  insert into public.reminders (user_id, title, remind_at, status, series_id, series_sequence)
-  values ('d1000001-0000-4000-8000-000000000001', 'a second live occurrence',
-          now() + interval '2 days', 'scheduled', target, 99);
-  return false;
-exception when unique_violation then
-  return true;
-end;
-$$;
 
 select ok(
   pg_temp.second_live_refused(),
@@ -415,17 +475,6 @@ select is(
   'and the refusal did not change it -- it is still not even readable'
 );
 
-create function pg_temp.direct_series_write_refused() returns boolean
-language plpgsql as $$
-begin
-  insert into public.reminder_series (user_id, title, rule, anchor_date, anchor_hour, anchor_minute)
-  values ('d1000001-0000-4000-8000-000000000001', 'direct',
-          '{"version":1,"frequency":"daily"}'::jsonb, current_date, 9, 0);
-  return false;
-exception when insufficient_privilege then
-  return true;
-end;
-$$;
 
 select ok(
   pg_temp.direct_series_write_refused(),
@@ -442,15 +491,6 @@ reset role;
 -- re-evaluated per candidate row and observe the statement's own effects, which
 -- would make "cancel the live occurrence" cancel whatever the trigger had just
 -- created. STABLE pins it to the statement snapshot.
-create function pg_temp.live_occurrence() returns public.reminders
-language sql stable as $$
-  select occurrence.* from public.reminders as occurrence
-  where occurrence.series_id is not null
-    and occurrence.detached_at is null
-    and occurrence.status = 'scheduled'
-    and occurrence.user_id = 'd1000001-0000-4000-8000-000000000001'
-  limit 1;
-$$;
 
 -- The heartbeat's own write: status moves to `sent`. Nothing in this statement
 -- knows a series exists, which is the point -- OD-2R-3 option A was signed so
@@ -543,11 +583,6 @@ select set_config(
   true
 );
 
-create function pg_temp.owned_series() returns uuid
-language sql as $$
-  select series.id from public.reminder_series as series
-  where series.user_id = 'd1000001-0000-4000-8000-000000000001' limit 1;
-$$;
 
 -- detach: THIS ONE only.
 select is(

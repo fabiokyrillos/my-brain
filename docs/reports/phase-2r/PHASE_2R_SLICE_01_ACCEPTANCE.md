@@ -21,7 +21,7 @@
 - **Surface: none.** No route, component or rendered control is added.
   `2R-SURFACE-*` is slice 2R.3.
 
-Executed by `supabase/tests/phase_2r_reminder_recurrence.sql` (**76
+Executed by `supabase/tests/phase_2r_reminder_recurrence.sql` (**78
 assertions**), `src/features/reminders/recurrence-rule.test.ts`,
 `recurrence-rule-parity.test.ts`, and the guards named in §7.
 
@@ -269,7 +269,7 @@ asserted to contain no task or calendar path and exactly one migration.
 cannot be started by this phase, because the half of the guard that would catch
 them has nothing to widen.
 
-### Seven defects, six caught before pushing and one caught by CI
+### Eight defects, six caught before pushing and two caught by CI
 
 1. **`extensions.digest`, not `pg_catalog.digest`.** Caught by reading migration
    064's idiom rather than assuming the schema.
@@ -322,6 +322,47 @@ Every plpgsql body was then checked mechanically for block balance — `if`,
 `loop` and `case` openers against their closers, with expression-form `case`
 counted separately — and the postcondition block's catalog queries were executed
 against the real catalog in a rolled-back transaction.
+
+### 8. The second one CI caught, and it was a false claim about authority
+
+The post-deploy block refused the deploy with **`public.reminder_series granted
+INSERT to authenticated`**.
+
+**A table created in `public` does not start with no privileges.** This project
+carries Supabase's default privileges, which grant every API role *everything*
+on a new table the moment it exists. So the original wording —
+
+```sql
+grant select on public.reminder_series to authenticated;
+revoke all on public.reminder_series from anon;
+```
+
+— was a no-op on top of a full grant. Measured on the real server, in a
+rolled-back transaction:
+
+| | what `authenticated` held |
+|---|---|
+| a brand-new table, before anything | `DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE` |
+| after the original wording | **the same seven, unchanged** |
+| after `revoke all` then `grant select` | `SELECT` |
+
+`service_role` held the same seven and now holds nothing.
+
+**This is not a cosmetic defect, and it is worth being plain about.** The table
+would have shipped writable by `authenticated` while `2R-TRUST-005`, this
+record, the pull request and `SECURITY.md` all stated *"SELECT and nothing
+else"*. The claim of authority would have been **false**, and nothing that reads
+like a review would have noticed — the migration contains a `grant select` line,
+and a guard that checked for one would have passed.
+
+What caught it is that the post-deploy block asserts **the grant set the catalog
+actually reports**, not the presence of a statement. The pgTAP suite now reads
+the same fact a second way — `authenticated` holds *exactly* `SELECT`, as a
+string equality rather than a set of negatives — and asserts `service_role`
+holds nothing.
+
+**The lesson generalises past this table:** a `revoke` that names only `anon`
+leaves the two roles that matter untouched, and reads as a lock-down.
 
 Plus four fragilities in this slice's own test file, found by re-reading it
 adversarially: a `union all … limit 1` with no guaranteed order; a `VOLATILE`

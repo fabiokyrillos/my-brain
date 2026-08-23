@@ -554,8 +554,22 @@ alter table public.reminder_series force row level security;
 -- which is what 2R-SERIES-005 means by "without destroying its history".
 create policy reminder_series_select_own on public.reminder_series
   for select to authenticated using ((select auth.uid()) = user_id);
+
+-- REVOKE FIRST, AND THAT ORDER IS THE WHOLE CONTROL.
+--
+-- A table created in `public` does NOT start with no privileges: this project
+-- carries Supabase's default privileges, which grant the API roles everything on
+-- a new table the moment it exists. So `grant select` alone is not "select and
+-- nothing else" -- it is a no-op on top of a full grant, and the table would
+-- have shipped with INSERT, UPDATE and DELETE for `authenticated` while every
+-- record in this phase claimed the opposite.
+--
+-- This was caught by the post-deploy block below, on the first chain run against
+-- an empty database. It is the reason that block asserts the grant set rather
+-- than asserting that this file contains a `grant` line: the second would have
+-- passed.
+revoke all on public.reminder_series from public, anon, authenticated, service_role;
 grant select on public.reminder_series to authenticated;
-revoke all on public.reminder_series from anon;
 
 comment on table public.reminder_series is
   'Phase 2R: the rule a repeating reminder follows. Exactly one concrete public.reminders row exists for the next occurrence at any time (OD-2R-3 option A), which is what leaves run_user_heartbeat unchanged.';
