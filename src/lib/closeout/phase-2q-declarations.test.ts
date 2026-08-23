@@ -54,6 +54,31 @@ import { describe, expect, it } from "vitest";
 
 const REPO = join(__dirname, "..", "..", "..");
 const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
+
+/**
+ * One ADR's own block — from its heading to the next one, never to end of file.
+ *
+ * **This is a repair, and it is worth saying what was broken.** These cases used
+ * to take the body as `decisions.slice(at)`, with **no upper bound**, so the
+ * "body" of ADR-127 was ADR-127 *and every ADR appended after it.* The
+ * assertions that read positively still passed, which is why it went unnoticed.
+ * The negative one did not: `not.toMatch(/2R/i)` over an unbounded tail means
+ * **any future ADR naming the successor fails an assertion about an earlier
+ * one**, and `DECISIONS.md` is append-only, so that was guaranteed to fire on
+ * the next authorization rather than on a real defect.
+ *
+ * ADR-131 Decision 10 repairs it by **bounding the slice to the subject each
+ * assertion names**. The regexes are not loosened and no assertion is removed —
+ * the resolution to a guard firing on correct work is a corrected subject, never
+ * a weaker pattern. The two-sided control is the case at the end of this file,
+ * *"bounds an ADR block to its own ADR, and still fires inside it"*.
+ */
+function adrBlock(decisions: string, adr: string): string {
+  const at = decisions.indexOf(`## ${adr}`);
+  if (at < 0) return "";
+  const next = decisions.indexOf("\n## ADR-", at + 1);
+  return next < 0 ? decisions.slice(at) : decisions.slice(at, next);
+}
 const exists = (relative: string) => existsSync(join(REPO, relative));
 
 const PRD = "docs/initiatives/phase-2q/PHASE_2Q_PRD.md";
@@ -315,9 +340,8 @@ describe("Phase 2Q declarations", () => {
 
   it("records the signature ADR, and what it still does not authorize", () => {
     const decisions = read("docs/DECISIONS.md");
-    const at = decisions.indexOf("## ADR-127");
-    expect(at, "ADR-127 is missing").toBeGreaterThan(-1);
-    const body = decisions.slice(at);
+    const body = adrBlock(decisions, "ADR-127");
+    expect(body, "ADR-127 is missing").not.toBe("");
     expect(body).toMatch(/\*\*Status:\*\* Accepted/);
     expect(body, "signing decisions must not authorize implementation")
       .toMatch(/authorizes no implementation/i);
@@ -357,9 +381,8 @@ describe("Phase 2Q declarations", () => {
 
   it("records the authorization, its narrow supersession, and what it refuses", () => {
     const decisions = read("docs/DECISIONS.md");
-    const start = decisions.indexOf("## ADR-126");
-    expect(start, "ADR-126 is missing").toBeGreaterThan(-1);
-    const body = decisions.slice(start);
+    const body = adrBlock(decisions, "ADR-126");
+    expect(body, "ADR-126 is missing").not.toBe("");
     expect(body).toMatch(/\*\*Status:\*\* Accepted/);
     expect(body, "the authorization must be planning-only").toMatch(/authorizes \*\*planning only\*\*/);
     expect(body, "the supersession must be narrow and named in the heading")
@@ -538,9 +561,8 @@ describe("Phase 2Q declarations", () => {
 
   it("records the implementation authorization, and what it still refuses", () => {
     const decisions = read("docs/DECISIONS.md");
-    const at = decisions.indexOf("## ADR-128");
-    expect(at, "ADR-128 is missing").toBeGreaterThan(-1);
-    const body = decisions.slice(at);
+    const body = adrBlock(decisions, "ADR-128");
+    expect(body, "ADR-128 is missing").not.toBe("");
     expect(body).toMatch(/\*\*Status:\*\* Accepted/);
     expect(body, "the authorization must name what it authorizes")
       .toMatch(/authorizes \*\*implementation\*\*/);
@@ -567,5 +589,50 @@ describe("Phase 2Q declarations", () => {
     expect(familyOf("2Q-TRUST-004")).toBe("TRUST");
     expect(indexOf("2Q-TRUST-004")).toBe(4);
     expect(/\*\*Class:\*\* (baseline|construction|not-built-by-rule)/.test("**Class:** built")).toBe(false);
+  });
+
+  /**
+   * The control for ADR-131 Decision 10's repair.
+   *
+   * Both halves are required. Without the **negative** half, bounding the slice
+   * could have been achieved by returning the empty string, and every
+   * `not.toMatch` above would pass forever on nothing — the exact failure mode
+   * this repository has recorded as "a check that can never fail".
+   */
+  it("bounds an ADR block to its own ADR, and still fires inside it", () => {
+    const fixture = [
+      "# Decisions",
+      "",
+      "## ADR-127 — signs the decisions",
+      "",
+      "- **Status:** Accepted",
+      "- It names no successor.",
+      "",
+      "## ADR-199 — a later ADR that does name Phase 2R",
+      "",
+      "- **Status:** Accepted",
+      "- Phase 2R is authorized.",
+      "",
+    ].join("\n");
+
+    // Positive: the block stops at the next ADR, so a later one naming the
+    // successor cannot fail an assertion about this one.
+    const bounded = adrBlock(fixture, "ADR-127");
+    expect(bounded).toContain("It names no successor.");
+    expect(bounded, "the block must not run into the following ADR")
+      .not.toMatch(/2R/i);
+
+    // Negative: the assertion still fires when *this* ADR names the successor.
+    // If it did not, the repair would have disabled the check rather than
+    // corrected its subject.
+    const offending = adrBlock(fixture.replace("It names no successor.", "Phase 2R starts here."), "ADR-127");
+    expect(offending).toMatch(/2R/i);
+
+    // And the unbounded form really did have the defect being repaired, so the
+    // change is a fix rather than a preference.
+    expect(fixture.slice(fixture.indexOf("## ADR-127"))).toMatch(/2R/i);
+
+    // A missing ADR yields "", which the call sites assert against explicitly.
+    expect(adrBlock(fixture, "ADR-404")).toBe("");
   });
 });

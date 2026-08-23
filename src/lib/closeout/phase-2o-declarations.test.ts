@@ -770,9 +770,9 @@ describe("Phase 2O: A13 has moved off this phase, in this same commit", () => {
     // missed it.
     const guard = read("src/lib/closeout/phase-2f-documentation.test.ts");
     expect(guard).not.toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2O_/);
-    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2R_/);
-    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2R-/);
-    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2r\/i;/);
+    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2S_/);
+    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2S-/);
+    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2s\/i;/);
   });
 
   it("records Phase 2O's start as an authorization rather than an accident", () => {

@@ -91,13 +91,36 @@ fails the build on an addition to it.
 | [`initiatives/phase-2p/`](./initiatives/phase-2p/) | `PHASE_2P_PRD.md`, `PHASE_2P_IMPLEMENTATION_PLAN.md` — Trustworthy capture and everyday UX, authorized for planning by ADR-121 and for implementation by ADR-122, with a second migration by ADR-123. **CLOSED 2026-08-20 by ADR-125**: 87 of 87 classified — 66 built, 12 baseline, 5 not-built-by-rule, 4 partial, 0 undelivered. VoiceOver is **waived, not passed**, and `2P-REVIEW-CITATIONS` is **not delivered**. |
 | [`initiatives/phase-2q/`](./initiatives/phase-2q/) | `PHASE_2Q_PRD.md`, `PHASE_2Q_IMPLEMENTATION_PLAN.md` — Evidence: the record behind the claim. Planning authorized by ADR-126, all eight owner decisions signed by ADR-127, implementation by ADR-128, one premise corrected append-only by ADR-129. **CLOSED 2026-08-21 by ADR-130, after the owner validated all eight checkpoint items on their own device**: 42 of 42 classified — 36 built, 6 baseline, **zero partial, zero not-built-by-rule, zero undelivered**. Migration budget **1 allocated · 1 spent · 1 applied** (`202608210100`, parity 100 = 100). `OD-2Q-5` was signed as **option C against the recommendation** — the sources area identifies and links, shows no content preview and carries no reveal control. **`2P-REVIEW-CITATIONS` is DELIVERED**, by real owner validation. **`2P-ACCESS-005` (VoiceOver) stays WAIVED, NOT PASSED** — item 8 approved contrast in Safari, which is not a screen-reader test. `A11Y-WEBKIT-DARK-CONTRAST` turned out to be a **test-lane defect, not a product one** (ADR-129); the lane was corrected and CI now runs the accessibility lane on WebKit. |
 
+| [`initiatives/phase-2r/`](./initiatives/phase-2r/) | `PHASE_2R_PRD.md`, `PHASE_2R_IMPLEMENTATION_PLAN.md`, `PHASE_2R_THEME_OPTIONS.md` — Rotina: o que se repete. Planning authorized by ADR-131 (2026-08-22). **Planning only — implementation is not authorized and nine owner decisions are open.** |
+| [`initiatives/push-hardware-validation/`](./initiatives/push-hardware-validation/) | `PUSH_HARDWARE_VALIDATION_BACKLOG.md` — the real-device push track deferred out of Phase 2M by ADR-107. **Backlog, not an authorized initiative**, and blocked on an unexplained Apple `403` plus owner hardware. |
+
 *(The rows for phases 2N, 2O and 2P were missing from this table until
 2026-08-21 and are added here with the Phase 2Q row, because this index is one
-of the two places the repository has already recorded drifting behind the ADRs.)*
+of the two places the repository has already recorded drifting behind the ADRs.
+The `phase-2r` and `push-hardware-validation` rows were added on 2026-08-22 —
+the second had been missing since ADR-107 created it, which is the same drift
+one row over.)*
+
+**The successor's letter is pinned in five places, not one.** ADR-131 Decision 9
+enumerates them, because `STATE.md` and ADR-130 both recorded it as appearing
+*"only inside the A13 detector"* and that was wrong. Any future retarget must
+pass through **all five**, consciously, and never by a global replace:
+
+1. `src/lib/closeout/phase-2f-documentation.test.ts` — the A13 detector's three
+   constants and its fixtures;
+2. `src/lib/closeout/phase-2o-declarations.test.ts` — the literal pin on the
+   detector's target;
+3. `scripts/generate-phase-2p-traceability.mjs` — refusal 12;
+4. `scripts/generate-phase-2q-traceability.mjs` — the successor check;
+5. `src/lib/closeout/phase-2q-declarations.test.ts` — the assertions that the
+   ADR-125…128 series never names the successor.
+
+Three of the five are discoverable only by **running the suite**; nothing in the
+governance documents points at them, which is exactly why they are listed here.
 
 **The roadmap successor has no governing artifact and must not acquire one
-without owner authorization.** Phase 2Q now has one — ADR-126 — and the guard
-has moved past it, so "the successor" below means the phase **after** 2Q. The
+without owner authorization.** Phase 2R now has one — ADR-131 — and the guard
+has moved past it, so "the successor" below means the phase **after** 2R. The
 A13 guard in
 `src/lib/closeout/phase-2f-documentation.test.ts` fails the build the moment a
 successor `*_PRD.md` or `*_IMPLEMENTATION_PLAN.md` appears anywhere under
@@ -105,11 +128,12 @@ successor `*_PRD.md` or `*_IMPLEMENTATION_PLAN.md` appears anywhere under
 the successor in its heading, or a migration or source file is named for its
 implementation.
 
-**The retarget precedent, now applied eleven times.** Phase 2G was started the
+**The retarget precedent, now applied twelve times.** Phase 2G was started the
 sanctioned way — ADR-083 and the guard's retarget in one commit — then Phase 2H
 by ADR-085, Phase 2I by ADR-092, Phase 2J by ADR-094, Phase 2K by ADR-097,
 Phase 2L by ADR-102, Phase 2M by ADR-104, Phase 2N by ADR-108, Phase 2O by
-ADR-115, Phase 2P by ADR-121, and Phase 2Q by **ADR-126** (2026-08-21), each
+ADR-115, Phase 2P by ADR-121, Phase 2Q by ADR-126, and Phase 2R by **ADR-131**
+(2026-08-22), each
 moving the guard to the next
 unauthorized lettered phase in the same change that recorded the authorization.
 *(This sentence said "eight times" and stopped listing at ADR-104 until
