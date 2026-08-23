@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { recurrenceArtifacts } from "./phase-2m-recurrence-guard.test";
+import { REMINDER_COLUMNS as TWO_P_REMINDER_COLUMNS } from "./phase-2p-reminder-recurrence-guard.test";
 
 /**
  * Phase 2R slice 2R.0 — **measure, change nothing.**
@@ -67,11 +68,14 @@ function blankComments(source: string): string {
  */
 const REMINDER_COLUMNS = [
   "created_at",
+  "detached_at",
   "entry_id",
   "id",
   "important",
   "remind_at",
   "sent_at",
+  "series_id",
+  "series_sequence",
   "snoozed_until",
   "status",
   "task_id",
@@ -90,8 +94,20 @@ function reminderRowColumns(): string[] {
 }
 
 describe("2R-FOUNDATION-001: recurrence is absent, re-proved rather than inherited", () => {
-  it("finds `reminders` carrying exactly the twelve columns it has always carried", () => {
+  /**
+   * **Moved by slice 2R.1, exactly as this file said it would have to be.**
+   *
+   * The comment on `REMINDER_COLUMNS` promised that when the model landed,
+   * **both** this list and `phase-2p-reminder-recurrence-guard.test.ts`'s would
+   * have to move — and that a phase which satisfied one while forgetting the
+   * other would have changed the schema in one place and the record in none.
+   * Both moved, in this commit, and the equality below is what proves it: the
+   * two files hold the same fifteen names.
+   */
+  it("finds `reminders` carrying the twelve it had plus the three the model added", () => {
     expect(reminderRowColumns().sort()).toEqual([...REMINDER_COLUMNS]);
+    expect(REMINDER_COLUMNS).toHaveLength(15);
+    expect([...REMINDER_COLUMNS]).toEqual([...TWO_P_REMINDER_COLUMNS]);
   });
 
   it("finds no recurrence artifact anywhere the 2M decision governs", () => {
@@ -101,16 +117,25 @@ describe("2R-FOUNDATION-001: recurrence is absent, re-proved rather than inherit
     expect(recurrenceArtifacts(REPO)).toEqual([]);
   });
 
-  it("finds no migration whose name claims this phase, and one hundred that do not", () => {
+  /**
+   * **Inverted by slice 2R.1: the allocation is spent, and spent exactly once.**
+   *
+   * Slice 2R.0 asserted zero Phase 2R migrations and one hundred files. Both
+   * are now false by authorization rather than by accident, so the assertion is
+   * flipped and keeps its strictness: **exactly one** file names this phase, and
+   * a second is the stop condition ADR-132 Decision 8 made it.
+   */
+  it("finds exactly ONE migration naming this phase, and one hundred and one in all", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name))).toEqual([]);
-    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(100);
+    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)))
+      .toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
+    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(101);
   });
 
   it("is not vacuous: the column reader really reads, and the closed list really closes", () => {
     expect(reminderRowColumns()).toContain("remind_at");
     expect(reminderRowColumns()).toHaveLength(REMINDER_COLUMNS.length);
-    expect([...REMINDER_COLUMNS, "recurrence_id"].sort()).not.toEqual([...REMINDER_COLUMNS]);
+    expect([...REMINDER_COLUMNS, "an_extra_column"].sort()).not.toEqual([...REMINDER_COLUMNS]);
   });
 });
 
@@ -408,11 +433,21 @@ describe("2R-FOUNDATION-005: this slice changes no product behaviour", () => {
     expect(kinds).toEqual(["snooze", "reschedule", "cancel", "restore", "edit"]);
   });
 
-  it("adds no route, component, action or migration of its own", () => {
-    // The slice's whole diff is `docs/`, this file, and the declaration guard it
-    // inverts. Asserted as the absence of the artifacts a building slice leaves.
+  /**
+   * **Slice 2R.0's own claim, kept true by scoping it to slice 2R.0.**
+   *
+   * This asserted that no Phase 2R migration existed. Slice 2R.1 created one,
+   * under ADR-133, so the assertion is re-aimed at what `2R-FOUNDATION-005`
+   * actually says: **the measurement slice** changed nothing. It is now
+   * expressed as "the one migration that exists belongs to 2R.1, not to 2R.0",
+   * which is checkable and which a bare deletion of this case would not be.
+   */
+  it("leaves slice 2R.0 with no migration of its own", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /2r/i.test(name))).toEqual([]);
+    const mine = migrations.filter((name) => /phase[_-]?2r/i.test(name));
+    expect(mine).toHaveLength(1);
+    expect(mine[0], "slice 2R.0 must not own a migration").toContain("slice_1");
+    expect(mine[0]).not.toContain("slice_0");
   });
 });
 

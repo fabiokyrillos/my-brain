@@ -297,6 +297,25 @@ begin
     values (p_user, v_task, 'Drill reminder ' || p_tag, now() + interval '1 hour');
   exception when others then failures := failures || ('reminders: ' || sqlerrm); end;
 
+  -- Phase 2R slice 2R.1. The row is inserted directly rather than through
+  -- `create_reminder_series_v1`, for the reason the whole populator inserts
+  -- directly: the RPC derives its owner from `auth.uid()` and this function
+  -- runs without a session. The rule is the simplest member of the closed set,
+  -- so the CHECK constraint is satisfied without the fixture taking a position
+  -- on recurrence semantics. It materialises nothing: the trigger that creates
+  -- the next occurrence fires on `public.reminders` leaving `scheduled`, not on
+  -- this insert, so the reminder row above stays the only one and the drill's
+  -- per-table counts stay one-to-one.
+  begin
+    insert into public.reminder_series (
+      user_id, title, rule, anchor_date, anchor_hour, anchor_minute
+    )
+    values (
+      p_user, 'Drill series ' || p_tag,
+      '{"version":1,"frequency":"daily"}'::jsonb, current_date, 9, 0
+    );
+  exception when others then failures := failures || ('reminder_series: ' || sqlerrm); end;
+
   begin
     insert into public.notifications (user_id, type, title, body)
     values (p_user, 'heartbeat', 'Drill notification ' || p_tag, 'Drill body');

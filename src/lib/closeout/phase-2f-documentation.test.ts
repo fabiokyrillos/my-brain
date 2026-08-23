@@ -290,15 +290,32 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
       .toMatch(/IMPLEMENTATION AUTHORIZED/i);
     expect(line, "closure is NOT authorized, and the line must not overstate it")
       .not.toMatch(/PHASE (2R )?CLOSED|CLOSURE AUTHORIZED/i);
-    // `OD-2R-7` allocated one migration and no file exists. Those are different
-    // facts and the line has to carry both, because "one migration" alone reads
-    // as a spend. Asserted positively so it fails when the distinction is
-    // dropped — a bare `not.toMatch` here would pass on a line that said
-    // nothing at all.
-    expect(line, "the line must say no migration file is created")
-      .toMatch(/no migration file is created/i);
-    expect(line, "and must distinguish that from the allocation")
+    /*
+     * **Inverted by slice 2R.1, in the commit that spent the allocation.**
+     *
+     * This required the line to say *"no migration file is created"*, because
+     * `OD-2R-7` had allocated one and none existed — two different facts the
+     * line had to carry separately, since "one migration" alone reads as a
+     * spend. Slice 2R.1 created it under ADR-133 Decision 3, so keeping that
+     * requirement would force the backlog to state something false.
+     *
+     * The distinction the assertion existed for does not go away; it moves.
+     * The line must now carry **allocated, spent AND created**, all three, so a
+     * later line saying only "one migration" — which would leave a reader unable
+     * to tell whether the ceiling had been reached — still fails here. And the
+     * ceiling itself is asserted where it belongs, on the tree, by four guards
+     * that count the files.
+     */
+    expect(line, "the line must state the allocation")
       .toMatch(/allocated/i);
+    expect(line, "the line must state that the allocation was spent")
+      .toMatch(/spent/i);
+    expect(line, "the line must state that the file exists, and name it")
+      .toMatch(/created/i);
+    expect(line, "the migration must be named, not merely counted")
+      .toContain("202608230101");
+    expect(line, "a second must still be a stop condition on the record")
+      .toMatch(/stop condition/i);
     expect(line, "the successor is not authorized, and the backlog must not imply one")
       .not.toMatch(/Phase 2S/i);
   });

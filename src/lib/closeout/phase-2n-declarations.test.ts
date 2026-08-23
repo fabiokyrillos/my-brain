@@ -320,12 +320,25 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     // phase closed. Pinned at exactly one for the same reason: a SECOND is a
     // stop condition and fails here too, rather than only at closeout.
     const laterPhase2q = migrations.filter((name) => /phase[_-]?2q/i.test(name));
+    // Phase 2R spent the ONE migration ADR-132 Decision 8 allocated and ADR-133
+    // Decision 3 authorized, after this phase closed. Counted the same way and
+    // for the same reason: a SECOND is a stop condition, and the total below is
+    // what makes an UNATTRIBUTED migration fail rather than merely a numerous
+    // one.
+    const laterPhase2r = migrations.filter((name) => /phase[_-]?2r/i.test(name));
     expect(laterPhase2p, `Phase 2P must have exactly two migrations: ${laterPhase2p.join(", ")}`)
       .toHaveLength(2);
+    expect(laterPhase2q, `Phase 2Q must have exactly one migration: ${laterPhase2q.join(", ")}`)
+      .toHaveLength(1);
+    expect(laterPhase2r, `Phase 2R must have exactly one migration: ${laterPhase2r.join(", ")}`)
+      .toHaveLength(1);
     expect(
       migrations,
       "a migration appeared that belongs to neither the pre-phase baseline nor this phase",
-    ).toHaveLength(MIGRATIONS_BEFORE_PHASE_2N + mine.length + 3 + laterPhase2p.length + laterPhase2q.length);
+    ).toHaveLength(
+      MIGRATIONS_BEFORE_PHASE_2N + mine.length + 3
+      + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length,
+    );
   });
 
   it("gives every proposed migration an exclusive destination", () => {

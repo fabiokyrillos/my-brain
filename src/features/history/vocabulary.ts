@@ -55,6 +55,13 @@ export const HISTORY_ENTITY_TYPES = [
   // (`202607160003:132`), so nothing in the database gated this — the surface
   // would simply have rendered the fallback until it was listed here.
   "reminder",
+  // Phase 2R slice 2R.1. `create_reminder_series_v1` and
+  // `apply_reminder_series_command_v1` are the first writers to record the RULE
+  // as the subject rather than an occurrence of it. Listed for the same reason
+  // `reminder` was: `audit_logs.entity_type` still carries no CHECK, so nothing
+  // in the database gates this and the surface would simply have rendered the
+  // fallback.
+  "reminder_series",
   // EGC.1. `entities/actions.ts` is the first writer to record either, and both
   // are TypeScript writers — the migration scan in `vocabulary.test.ts` cannot
   // see them, so the test names them explicitly beside the other TS-only ones.
@@ -143,8 +150,16 @@ export const HISTORY_ACTION_TYPES = [
   "reminder_cancelled",
   "reminder_command_undone",
   "reminder_edited",
+  // Phase 2R slice 2R.1: the repeating half. `reminder_occurrence_materialised`
+  // is written by the trigger with `actor = 'system'` -- 2R-TRUST-001 -- and is
+  // the only one of the four nobody asked for, which is exactly why it has to be
+  // readable in the history rather than silent.
+  "reminder_occurrence_materialised",
   "reminder_rescheduled",
   "reminder_restored",
+  "reminder_series_command_undone",
+  "reminder_series_created",
+  "reminder_series_creation_undone",
   "reminder_snoozed",
   "resolve_pending_question_v1",
   "resolve_pending_question_v2",
@@ -251,8 +266,16 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   reminder_cancelled: "lifecycle",
   reminder_command_undone: "undone",
   reminder_edited: "changed",
+  // Phase 2R. Materialising the next occurrence CREATES a row, so it is
+  // `created` and not `changed` -- the distinction matters because it is the
+  // product's first unattended writer, and a history that filed it under
+  // "something changed" would understate that.
+  reminder_occurrence_materialised: "created",
   reminder_rescheduled: "changed",
   reminder_restored: "lifecycle",
+  reminder_series_command_undone: "undone",
+  reminder_series_created: "created",
+  reminder_series_creation_undone: "undone",
   reminder_snoozed: "changed",
   resolve_pending_question_v1: "answered",
   resolve_pending_question_v2: "answered",

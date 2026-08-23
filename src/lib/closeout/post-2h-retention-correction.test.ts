@@ -202,6 +202,11 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // row. The citations it stores are identifiers on a row that is already
       // deleted by the `auth.users` cascade with its review.
       "202608210100_phase_2q_slice_1_summary_citations.sql",
+      // Phase 2R slice 2R.1's ONE authorized migration (ADR-132 Decision 8 /
+      // ADR-133 Decision 3). Enumerated rather than counted, which is the whole
+      // point of this assertion: a migration appended after the correction and
+      // never reviewed against it fails here by name.
+      "202608230101_phase_2r_slice_1_reminder_recurrence.sql",
     ]);
   });
 });

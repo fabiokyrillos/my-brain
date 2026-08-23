@@ -59,13 +59,20 @@ const TYPES = read("src/lib/supabase/database.types.ts");
  * column added under **any** name, and it says what the table is instead of what
  * it is not.
  */
-const REMINDER_COLUMNS = [
+export const REMINDER_COLUMNS = [
   "created_at",
+  // Phase 2R slice 2R.1's three, added by the ONE migration ADR-132 Decision 8
+  // allocated. **The list grew; it was not loosened** — it is still a closed
+  // list, so a fourth column under any name still fails here, which is the
+  // property this array has always had.
+  "detached_at",
   "entry_id",
   "id",
   "important",
   "remind_at",
   "sent_at",
+  "series_id",
+  "series_sequence",
   "snoozed_until",
   "status",
   "task_id",
@@ -132,10 +139,31 @@ describe("2P-REMINDER-002 dropped recurrence, and the schema stays as it is", ()
     expect(DECISIONS).toMatch(/a recurrence column on `reminders` in particular is refused by name/);
   });
 
-  it("leaves `reminders` with exactly the columns it had", () => {
-    // A closed list, so a column added under any name at all fails here — not
-    // only one whose name resembles a repeat rule.
+  /**
+   * **Inverted by ADR-132 Decision 1 and ADR-133, not deleted.**
+   *
+   * This asserted that `reminders` had exactly the twelve columns Phase 2P left
+   * it, and it was the executable half of `2P-REMINDER-002`'s correction: the
+   * owner had refused recurrence **by name**, so the schema had to stay put.
+   *
+   * The owner has since **lifted that refusal**, strictly for reminders, and
+   * authorized the model. So the assertion is flipped in place rather than
+   * removed: the list is now fifteen, it is still closed, and a sixteenth
+   * column under any name still fails. What the case guards has not changed —
+   * only which set of columns is the correct one.
+   *
+   * The refusal itself is NOT deleted from the record. The amendment, the
+   * superseded wording and the remainder's name are all still asserted above,
+   * because a refusal that was lifted is a different thing from one that never
+   * happened.
+   */
+  it("now has the recurrence columns the lift authorized, and no others", () => {
     expect(reminderRowColumns().sort()).toEqual([...REMINDER_COLUMNS]);
+    // Non-vacuity, in the direction that matters: the OLD list must now fail.
+    expect(reminderRowColumns().sort()).not.toEqual([
+      "created_at", "entry_id", "id", "important", "remind_at", "sent_at",
+      "snoozed_until", "status", "task_id", "title", "updated_at", "user_id",
+    ]);
   });
 
   it("delegates the artifact scan rather than running a second one", () => {
@@ -221,6 +249,7 @@ describe("2P-CALENDAR-001 means a real month, and Agenda is not it", () => {
     expect(DECISIONS.length).toBeGreaterThan(10_000);
     expect(reminderRowColumns()).toContain("remind_at");
     expect(reminderRowColumns().length).toBe(REMINDER_COLUMNS.length);
+    expect(REMINDER_COLUMNS.length).toBe(15);
     // And the closed-list assertion is shown failing on a planted extra column.
     expect([...REMINDER_COLUMNS, "extra"].sort()).not.toEqual([...REMINDER_COLUMNS]);
   });
