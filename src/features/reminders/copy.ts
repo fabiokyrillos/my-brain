@@ -2,6 +2,8 @@ import type { Locale } from "@/lib/preferences";
 
 import type { ReminderAction, ReminderStatus, SnoozePresetMinutes } from "./lifecycle";
 import type { ReminderView } from "./projection";
+import type { RecurrenceChoice } from "./recurrence-derivation";
+import type { RecurrenceLanguage } from "./recurrence-language";
 import type {
   ReminderCommandErrorDetail,
   ReminderCommandFailureCode,
@@ -74,10 +76,17 @@ type ReminderCopy = {
    * below are grouped the same way so a reader can check the order without
    * opening the component.
    *
-   * There is no recurrence key, and its absence is load-bearing rather than an
-   * omission: `2P-REMINDER-RECURRENCE` forbids a control that does not work and
-   * a rule encoded in free text, and a placeholder reading *"every week"* would
-   * be the second of those.
+   * **Slice 2R.3 adds a sixth group, and the refusal above is lifted.**
+   * `2P-REMINDER-RECURRENCE` forbade a control that does not work and a rule
+   * encoded in free text; ADR-132 Decision 1 lifted it for reminders once the
+   * model existed, and `202608230101` is the model. The control that arrives is
+   * one select whose options are the five signed patterns — not a rule field,
+   * and not a placeholder.
+   *
+   * It sits **immediately after date and time**, because every parameter it
+   * needs comes from that date (`recurrence-derivation.ts`). The order the
+   * requirement named is otherwise unchanged, and `reminder-composer.test.tsx`
+   * asserts all six by position.
    */
   readonly creation: {
     readonly open: string;
@@ -87,6 +96,23 @@ type ReminderCopy = {
     readonly contentHint: string;
     readonly whenLabel: string;
     readonly whenHint: string;
+    /**
+     * The sixth group — `2R-SURFACE-001`, slice 2R.3.
+     *
+     * `recurrenceOption` is keyed by `RecurrenceChoice`, so the five signed
+     * patterns plus *does not repeat* each need a label in each locale or the
+     * build fails. The options are phrased as what the owner gets — *"toda
+     * semana, neste dia"* — rather than as the pattern's name, because
+     * `monthlyWeekday` is a schema word and `2R-SURFACE-004` keeps schema words
+     * off the screen.
+     */
+    readonly recurrenceLabel: string;
+    readonly recurrenceHint: string;
+    readonly recurrenceOption: Readonly<Record<RecurrenceChoice, string>>;
+    readonly previewLabel: string;
+    readonly previewHeading: string;
+    readonly previewPending: string;
+    readonly previewRegionLabel: string;
     readonly importantLabel: string;
     readonly linkLabel: string;
     readonly linkHint: string;
@@ -183,6 +209,22 @@ type ReminderCopy = {
     readonly undoAlready: string;
     readonly undoStale: string;
     readonly undoFailed: string;
+
+    /**
+     * Slice 2R.3 — the rule in the owner's words, and the words it is made of.
+     *
+     * `2R-SURFACE-004` forbids a surface rendering a raw rule, an `RRULE` or a
+     * JSON fragment, so the nouns and the sentence templates both live here and
+     * `describeRecurrenceRule` is the only thing that assembles them. Being a
+     * typed block is what makes `2R-SURFACE-007`'s *"asserted per key"*
+     * enforceable: a weekday missing from one locale does not render blank, it
+     * fails the build.
+     *
+     * The weekday names are **full** and deliberately not the calendar's
+     * `["Seg", "Ter", …]`. Those are column headings for a grid; these have to
+     * survive inside a sentence.
+     */
+    readonly language: RecurrenceLanguage;
   };
 
   readonly cancelConfirmTitle: string;
@@ -285,6 +327,20 @@ const COPY = {
       contentHint: "Escreva como você quer ler isso na hora.",
       whenLabel: "Quando avisar",
       whenHint: "No seu fuso horário.",
+      recurrenceLabel: "Repetir",
+      recurrenceHint: "A repetição segue a data e a hora escolhidas acima.",
+      recurrenceOption: {
+        none: "Não repete",
+        daily: "Todo dia",
+        weekly: "Toda semana, neste dia da semana",
+        monthlyDay: "Todo mês, neste dia",
+        monthlyWeekday: "Todo mês, nesta posição da semana",
+        yearly: "Todo ano, nesta data",
+      },
+      previewLabel: "Ver as próximas datas",
+      previewHeading: "Próximas ocorrências",
+      previewPending: "Calculando…",
+      previewRegionLabel: "Próximas ocorrências da repetição",
       importantLabel: "Marcar como importante",
       linkLabel: "Vincular a uma tarefa (opcional)",
       linkHint: "Só tarefas suas aparecem aqui.",
@@ -341,6 +397,51 @@ const COPY = {
       undoAlready: "Esta alteração já tinha sido desfeita. Nada mudou agora.",
       undoStale: "A repetição mudou depois desta alteração. Recarregue para ver o estado atual.",
       undoFailed: "Não foi possível desfazer agora.",
+
+      /*
+        The five weekdays ending in `-feira` are feminine; `sábado` and `domingo`
+        are masculine. Carrying the gender is what lets one template produce
+        "Toda segunda-feira" and "Todo domingo" instead of one of them being
+        wrong -- which is exactly what the first draft of this block shipped,
+        with a test that agreed with it.
+      */
+      language: {
+        weekdays: [
+          { name: "segunda-feira", gender: "f" },
+          { name: "terça-feira", gender: "f" },
+          { name: "quarta-feira", gender: "f" },
+          { name: "quinta-feira", gender: "f" },
+          { name: "sexta-feira", gender: "f" },
+          { name: "sábado", gender: "m" },
+          { name: "domingo", gender: "m" },
+        ],
+        months: [
+          "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+          "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+        ],
+        // `-1` is spelled, never rendered. Both forms, because the weekday it
+        // qualifies decides which one: "toda última sexta-feira", "todo último
+        // sábado".
+        ordinals: {
+          1: { f: "primeira", m: "primeiro" },
+          2: { f: "segunda", m: "segundo" },
+          3: { f: "terceira", m: "terceiro" },
+          4: { f: "quarta", m: "quarto" },
+          "-1": { f: "última", m: "último" },
+        },
+        daily: "Todo dia",
+        weeklyOne: (weekday) =>
+          `${weekday.gender === "f" ? "Toda" : "Todo"} ${weekday.name}`,
+        weeklyMany: (weekdays) => `Toda semana: ${weekdays}`,
+        monthlyDay: (day) => `Todo dia ${day}`,
+        monthlyWeekday: (ordinal, weekday) =>
+          weekday.gender === "f"
+            ? `Toda ${ordinal.f} ${weekday.name} do mês`
+            : `Todo ${ordinal.m} ${weekday.name} do mês`,
+        yearly: (day, month) => `Todo dia ${day} de ${month}`,
+        listSeparator: ", ",
+        listFinal: " e ",
+      },
     },
 
     cancelConfirmTitle: "Cancelar este lembrete?",
@@ -445,6 +546,20 @@ const COPY = {
       contentHint: "Write it the way you want to read it at the time.",
       whenLabel: "When to tell you",
       whenHint: "In your time zone.",
+      recurrenceLabel: "Repeat",
+      recurrenceHint: "The repetition follows the date and time chosen above.",
+      recurrenceOption: {
+        none: "Does not repeat",
+        daily: "Every day",
+        weekly: "Every week, on this weekday",
+        monthlyDay: "Every month, on this day",
+        monthlyWeekday: "Every month, in this weekday position",
+        yearly: "Every year, on this date",
+      },
+      previewLabel: "See the next dates",
+      previewHeading: "Next occurrences",
+      previewPending: "Calculating…",
+      previewRegionLabel: "Next occurrences of the repetition",
       importantLabel: "Mark as important",
       linkLabel: "Link to a task (optional)",
       linkHint: "Only your own tasks appear here.",
@@ -499,6 +614,43 @@ const COPY = {
       undoAlready: "This change had already been undone. Nothing changed now.",
       undoStale: "The repetition changed after this operation. Reload to see the current state.",
       undoFailed: "Could not undo right now.",
+      /*
+        English does not inflect the article, so every weekday is `"n"` and both
+        ordinal forms are the same word. Declared rather than made optional: a
+        locale that opted out of the field would be a locale the formatter has to
+        branch on, and the branch belongs in the language, not in the formatter.
+      */
+      language: {
+        weekdays: [
+          { name: "Monday", gender: "n" },
+          { name: "Tuesday", gender: "n" },
+          { name: "Wednesday", gender: "n" },
+          { name: "Thursday", gender: "n" },
+          { name: "Friday", gender: "n" },
+          { name: "Saturday", gender: "n" },
+          { name: "Sunday", gender: "n" },
+        ],
+        months: [
+          "January", "February", "March", "April", "May", "June",
+          "July", "August", "September", "October", "November", "December",
+        ],
+        ordinals: {
+          1: { f: "first", m: "first" },
+          2: { f: "second", m: "second" },
+          3: { f: "third", m: "third" },
+          4: { f: "fourth", m: "fourth" },
+          "-1": { f: "last", m: "last" },
+        },
+        daily: "Every day",
+        weeklyOne: (weekday) => `Every ${weekday.name}`,
+        weeklyMany: (weekdays) => `Every week: ${weekdays}`,
+        monthlyDay: (day) => `Every month on day ${day}`,
+        monthlyWeekday: (ordinal, weekday) =>
+          `Every ${ordinal.f} ${weekday.name} of the month`,
+        yearly: (day, month) => `Every ${month} ${day}`,
+        listSeparator: ", ",
+        listFinal: " and ",
+      },
       failed: "Could not change it right now. Try again.",
     },
     historyLink: "See in history",

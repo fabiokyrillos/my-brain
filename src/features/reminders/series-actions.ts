@@ -40,10 +40,25 @@
 import { revalidatePath } from "next/cache";
 
 import { assertActiveAccount, requireUser } from "@/lib/auth/require-user";
+import { defaultAgentPreferences } from "@/lib/preferences";
+import { requireSupabaseData } from "@/lib/supabase/result";
 import { isLocale, type Locale } from "@/lib/preferences";
 
-import type { ReminderSeriesActionState } from "./series-action-state";
+import {
+  IDLE_REMINDER_SERIES_PREVIEW,
+  type ReminderSeriesActionState,
+  type ReminderSeriesPreviewState,
+} from "./series-action-state";
+import { describeRecurrenceRule } from "./recurrence-language";
+import {
+  deriveRecurrenceRule,
+  isRecurrenceChoice,
+  parseLocalAnchor,
+} from "./recurrence-derivation";
+import { createReminder } from "./actions";
+import type { ReminderCreationState } from "./action-state";
 import { getReminderCopy } from "./copy";
+import { reminderSeriesCreationKey } from "./operation-key";
 import {
   reminderSeriesCommandSchema,
   reminderSeriesCreationSchema,
@@ -51,6 +66,16 @@ import {
   reminderSeriesUndoSchema,
   commandForScope,
 } from "./series-schema";
+
+/**
+ * How many occurrences the preview shows.
+ *
+ * `2R-SURFACE-002` says *"at least the next three"*. Three is the floor the
+ * requirement names and the ceiling a dialog can show without the preview
+ * pushing save off a phone screen -- which is `2R-MOBILE-002`, and the reason
+ * this is a constant rather than a number typed into the call.
+ */
+const PREVIEW_OCCURRENCES = 3;
 
 function resolveLocale(value: unknown): Locale {
   return isLocale(value) ? value : "pt-BR";
@@ -335,5 +360,202 @@ export async function undoReminderSeriesOperation(
       placeholder for an unsupported operation" UX-12 refuses.
     */
     undoId: null,
+  };
+}
+
+/**
+ * `2R-SURFACE-002` — the next three occurrences, before anything is written.
+ *
+ * ## Why this is a Server Action and not a computation
+ *
+ * `2R-TIME-007` puts occurrence instants in exactly one place, and that place is
+ * `private.reminder_next_instant`. A browser that computed "the next three
+ * Mondays" would be a second implementation of the daylight-saving rules
+ * `OD-2R-5` signed — right almost always, wrong twice a year, and wrong in a way
+ * the owner would only notice after the reminder failed to fire.
+ *
+ * So the dates come from `public.reminder_series_preview`, which resolves them
+ * in the owner's **profile** zone, and they are formatted here with an `Intl`
+ * bound to that same zone. What crosses back to the browser is finished text.
+ *
+ * ## It writes nothing, and could not
+ *
+ * The RPC is `stable` and `security definer` over `auth.uid()`. This action
+ * exists so the owner can check what the single select derived from the date
+ * they picked — which is the other half of `2R-SURFACE-001`'s "without becoming
+ * a form": the control is small because the preview makes it legible.
+ */
+export async function previewReminderSeries(
+  _state: ReminderSeriesPreviewState,
+  formData: FormData,
+): Promise<ReminderSeriesPreviewState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getReminderCopy(locale);
+
+  const choice = formData.get("recurrence");
+  const anchorValue = formData.get("remindAtLocal");
+  if (!isRecurrenceChoice(choice) || typeof anchorValue !== "string") {
+    return { ...IDLE_REMINDER_SERIES_PREVIEW, status: "error", message: copy.series.invalidAnchor };
+  }
+  // `none` is not a failure: it is the owner saying this does not repeat, and
+  // the preview simply has nothing to show.
+  if (choice === "none") return IDLE_REMINDER_SERIES_PREVIEW;
+
+  const anchor = parseLocalAnchor(anchorValue);
+  if (anchor === null) {
+    return { ...IDLE_REMINDER_SERIES_PREVIEW, status: "error", message: copy.series.invalidAnchor };
+  }
+  const rule = deriveRecurrenceRule(choice, anchor);
+  if (rule === null) return IDLE_REMINDER_SERIES_PREVIEW;
+
+  const [hour, minute] = anchorValue.slice(11).split(":").map(Number);
+  const description = describeRecurrenceRule(rule, copy.series.language);
+
+  const { supabase, user } = await requireUser(locale);
+  const { data, error } = await supabase.rpc("reminder_series_preview", {
+    p_rule: rule,
+    p_anchor_date: anchorValue.slice(0, 10),
+    p_anchor_hour: hour ?? 0,
+    p_anchor_minute: minute ?? 0,
+    p_count: PREVIEW_OCCURRENCES,
+  });
+
+  if (error) {
+    console.error("Reminder series preview failed", error.code);
+    return {
+      ...IDLE_REMINDER_SERIES_PREVIEW,
+      status: "error",
+      message: seriesFailureMessage(locale, error.message),
+      description,
+    };
+  }
+
+  /*
+    The owner's zone, read from their profile -- never the browser's, and never
+    the server's. `2R-TIME-005`: one timezone authority, and this is a second
+    surface reading the same one rather than a second authority.
+  */
+  const profile = requireSupabaseData(
+    await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle(),
+    "load reminder preview timezone",
+  );
+  const timezone =
+    typeof profile?.timezone === "string" && profile.timezone !== ""
+      ? profile.timezone
+      : defaultAgentPreferences.timezone;
+
+  const formatter = new Intl.DateTimeFormat(locale, {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: timezone,
+  });
+
+  const occurrences = ((data ?? []) as string[]).map((iso) => formatter.format(new Date(iso)));
+  return {
+    status: "ready",
+    occurrences,
+    // `2R-TRUST-006`: a horizon the rule never reaches produces no row and no
+    // guess, so an empty list gets a sentence rather than an empty panel.
+    message: occurrences.length === 0 ? copy.series.noHorizon : "",
+    description,
+  };
+}
+
+/**
+ * `2R-SURFACE-001` — one composer, one submit, and the rule decides where it goes.
+ *
+ * ## Why the branch is here and not in the dialog
+ *
+ * A reminder that repeats is written by `create_reminder_series_v1`; one that
+ * does not is written by `createReminder`. The surface must not know that: a
+ * client that picked an RPC by reading its own select would be a second place
+ * deciding what "repeats" means, and the first place is
+ * `deriveRecurrenceRule`. So the composer submits one form to one action, and
+ * the fork is a server-side consequence of whether a rule was derived.
+ *
+ * It returns `ReminderCreationState` for both paths, so the dialog's existing
+ * state handling — including the `pending`-derived openness that slice 2P.6
+ * found the hard way — is untouched by this slice.
+ *
+ * ## `2R-SURFACE-008` is a property of returning early
+ *
+ * Every refusal below returns an error state **without revalidating**. A
+ * `revalidatePath` on the failure path would refresh the page out from under the
+ * dialog and take the owner's typing with it, which is the defect
+ * `updateProfile` and slice 2N.3's undo control both already record. The fields
+ * keep their values because nothing re-rendered them.
+ */
+export async function createReminderOrSeries(
+  state: ReminderCreationState,
+  formData: FormData,
+): Promise<ReminderCreationState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getReminderCopy(locale);
+
+  const choice = formData.get("recurrence");
+  // Absent or `none` is the overwhelmingly common case and stays on the path it
+  // has always been on, byte for byte. `2R-MODEL-004`: a reminder without a rule
+  // behaves exactly as it does today.
+  if (!isRecurrenceChoice(choice) || choice === "none") {
+    return createReminder(state, formData);
+  }
+
+  const rawAnchor = formData.get("remindAtLocal");
+  // Narrowed once into a `string` rather than asserted at each use: a non-null
+  // assertion on a `FormDataEntryValue` compiles and hands `Blob` to
+  // `String.prototype.slice` at runtime.
+  const anchorLocal = typeof rawAnchor === "string" ? rawAnchor : "";
+  const anchor = parseLocalAnchor(anchorLocal);
+  if (anchor === null) {
+    return { status: "error", message: copy.creation.invalidDate, reminderId: null };
+  }
+  const rule = deriveRecurrenceRule(choice, anchor);
+  if (rule === null) return createReminder(state, formData);
+
+  const title = formData.get("title");
+  if (typeof title !== "string" || title.trim() === "" || title.trim().length > 500) {
+    return { status: "error", message: copy.creation.invalid, reminderId: null };
+  }
+  const rawTask = formData.get("taskId");
+  const taskId = typeof rawTask === "string" && rawTask !== "" ? rawTask : null;
+
+  const { supabase, user } = await requireUser(locale);
+  await assertActiveAccount(supabase, user.id, locale);
+
+  const [hour, minute] = anchorLocal.slice(11).split(":").map(Number);
+  const { data, error } = await supabase.rpc("create_reminder_series_v1", {
+    p_rule: rule,
+    p_title: title.trim(),
+    p_important: formData.get("important") === "on",
+    p_task_id: taskId,
+    p_anchor_date: anchorLocal.slice(0, 10),
+    p_anchor_hour: hour ?? 0,
+    p_anchor_minute: minute ?? 0,
+    /*
+      Derived from the request, not random, for the reason `operation-key.ts`
+      sets out: two submits of the same dialog state must carry the same key so
+      the second replays rather than creating a second series, while a
+      deliberate second reminder differs in title or instant and so differs
+      here.
+    */
+    p_operation_key: reminderSeriesCreationKey(user.id, title.trim(), anchorLocal, choice),
+  });
+
+  if (error) {
+    console.error("Recurring reminder creation failed", error.code);
+    return {
+      status: "error",
+      message: seriesFailureMessage(locale, error.message),
+      reminderId: null,
+    };
+  }
+
+  revalidatePath(`/${locale}/app/reminders`);
+  return {
+    status: "success",
+    message: copy.series.created,
+    // The first occurrence, which IS a reminder and is what the surface means
+    // when it says "the row that now exists".
+    reminderId: (data as { reminder_id?: string } | null)?.reminder_id ?? null,
   };
 }

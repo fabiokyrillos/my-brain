@@ -163,39 +163,112 @@ describe("2P-REMINDER-002: the five groups, in the order the requirement names",
 });
 
 /**
- * `2P-REMINDER-RECURRENCE` — the remainder, asserted on the surface.
+ * `2R-SURFACE-001` — the control that arrived, and the shape it did not.
  *
- * Recorded negatively and in both directions: no control, and no *word* either,
- * because "encoded in free text" is one of the shapes the owner forbade while
- * the remainder stands. A disabled control or a "coming soon" note would be the
- * fake affordance the amendment names first.
+ * ## What this assertion used to say, and why it changes here
+ *
+ * It read *"the dialog offers no recurrence, in any shape"*, and that was right
+ * while `2P-REMINDER-RECURRENCE` stood: `reminders` had no column for a rule, so
+ * any control would have been a fake affordance. **ADR-132 Decision 1 lifted the
+ * refusal for reminders**, `202608230101` shipped the model, and slice 2R.3 adds
+ * exactly one `<select>`.
+ *
+ * The closed list below is doing MORE work than before, not less. It still
+ * refuses every control that is not named — a seventh cannot arrive unnoticed —
+ * and because it is compared in **document order** it now also pins where the
+ * new one sits. `recurrence` between `remindAtLocal` and `important` is not an
+ * arrangement: the rule is derived from that date, and the two being adjacent is
+ * the whole reason the group needs no fields of its own.
+ *
+ * Still a closed list rather than a blocklist of forbidden words, for the reason
+ * §100 recorded: `phase-2m-recurrence-guard.test.ts` is the one enforcer of the
+ * recurrence vocabulary across the tree, and a second scanner here would have to
+ * spell the shapes as code to look for them.
  */
-describe("2P-REMINDER-RECURRENCE: the dialog offers no recurrence, in any shape", () => {
-  it("submits a closed set of fields, so a sixth control cannot arrive unnoticed", async () => {
+describe("2R-SURFACE-001: the dialog gains one control and does not become a form", () => {
+  it("submits a closed set of fields, in order, so a seventh cannot arrive unnoticed", async () => {
     const user = userEvent.setup();
     const { container } = mount();
     await openDialog(user);
 
-    /*
-     * A **closed list**, not a blocklist of forbidden words.
-     *
-     * Two reasons, and the second is the load-bearing one. First, a closed list
-     * cannot be outgrown: a blocklist only refuses the shapes somebody thought
-     * of, while this refuses every control that is not one of the five the
-     * requirement names. Second, `phase-2m-recurrence-guard.test.ts` is the
-     * enforcer for the recurrence vocabulary across the whole tree and it
-     * exempts exactly one file — its own. A second scanner here would have to
-     * spell the forbidden shapes as code to look for them, which is precisely
-     * what that guard reports; §100 recorded the collision, and the resolution
-     * was one enforcer and one recorder rather than a broader exemption.
-     */
     const dialog = screen.getByRole("dialog");
     const names = [...dialog.querySelectorAll("input, select, textarea")]
       .map((control) => control.getAttribute("name"));
-    expect(names).toEqual(["locale", "title", "remindAtLocal", "important", "taskId"]);
+    expect(names).toEqual([
+      "locale", "title", "remindAtLocal", "recurrence", "important", "taskId",
+    ]);
 
     // And nothing disabled is sitting there implying something is coming.
     expect(container.querySelectorAll("[disabled]")).toHaveLength(0);
+  });
+
+  it("adds no field when a repetition is chosen — the date supplies them all", async () => {
+    /*
+      THE STOP CONDITION, ASSERTED.
+
+      The plan makes turning this dialog into a form a stop condition, and the
+      form it would have become is the obvious one: a frequency picker, then
+      seven weekday checkboxes, a day-of-month number, an ordinal, a month. Every
+      one of those parameters is the date two groups above, so choosing a
+      repetition reveals a preview and **not a single new input**.
+
+      Asserted by comparing the field list before and after, because "no new
+      fields" is a claim about a difference and a snapshot of the after-state
+      alone would not be one.
+    */
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    const dialog = screen.getByRole("dialog");
+    const fields = () => [...dialog.querySelectorAll("input, select, textarea")]
+      .map((control) => control.getAttribute("name"));
+
+    const before = fields();
+    await user.selectOptions(
+      screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+      "monthlyWeekday",
+    );
+    expect(fields()).toEqual(before);
+  });
+
+  it("offers the five signed patterns and `does not repeat`, and nothing else", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    const select = screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false });
+    const values = [...select.querySelectorAll("option")].map((option) => option.value);
+    // `OD-2R-2` signed five. A sixth would have to be added to the schema, the
+    // derivation and the copy before it could appear here, and this is the last
+    // of the three to notice.
+    expect(values).toEqual([
+      "none", "daily", "weekly", "monthlyDay", "monthlyWeekday", "yearly",
+    ]);
+  });
+
+  it("defaults to not repeating", async () => {
+    // The overwhelmingly common reminder does not repeat, and `2R-MODEL-004`
+    // requires that one to behave exactly as it does today — which starts with
+    // the dialog not having quietly opted it in.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    expect(
+      (screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }) as HTMLSelectElement)
+        .value,
+    ).toBe("none");
+  });
+
+  it("shows no preview until a repetition is chosen", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    expect(screen.queryByRole("button", { name: copy.creation.previewLabel })).toBeNull();
+
+    await user.selectOptions(
+      screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+      "daily",
+    );
+    expect(screen.getByRole("button", { name: copy.creation.previewLabel })).toBeTruthy();
   });
 });
 

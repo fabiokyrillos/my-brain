@@ -15,8 +15,13 @@
  * `2P-REMINDER-002` asks the dialog to group **content; date and time;
  * importance; an optional link; then save and cancel, in that order**. That
  * order is the DOM order below, and `reminder-composer.test.tsx` asserts it by
- * position rather than by presence — a test that only checked the five groups
- * existed would pass on any arrangement of them.
+ * position rather than by presence — a test that only checked the groups existed
+ * would pass on any arrangement of them.
+ *
+ * Slice 2R.3 inserts **repetition** between date-and-time and importance, so
+ * there are six. The insertion point is not free: every parameter the rule needs
+ * comes from the date above it, and a group that depended on a field two groups
+ * away would be a dependency the owner has to infer.
  *
  * ## The fourth consumer of `ConfirmDialog`, not a fifth dialog
  *
@@ -39,12 +44,26 @@
  * response does carry a re-render to apply. The derivation is therefore load
  * bearing here rather than precautionary.
  *
- * ## No recurrence, and no shape that could be mistaken for one
+ * ## Recurrence, and why it is one select rather than a form
  *
- * `reminders` has no column for it, so the owner corrected `2P-REMINDER-002` and
- * recurrence became the named remainder `2P-REMINDER-RECURRENCE`. There is no
- * control, no disabled control, no "coming soon", and no placeholder inviting
- * the owner to write a rule into the title.
+ * This block used to read *"no recurrence, and no shape that could be mistaken
+ * for one"*, and that was correct for as long as `reminders` had no column for
+ * it: the owner corrected `2P-REMINDER-002` and recurrence became the named
+ * remainder `2P-REMINDER-RECURRENCE`. **ADR-132 Decision 1 lifted that refusal
+ * for reminders**, `202608230101` shipped the model, and slice 2R.3 adds the
+ * control.
+ *
+ * It is one `<select>` and no new fields, which is `2R-SURFACE-001`'s *"without
+ * becoming a form"* — the plan makes turning this dialog into one a stop
+ * condition. The five signed patterns each need parameters, and every one of
+ * those parameters is the date the owner has already entered: *every week* is
+ * the weekday of that date, *every month* its day, *every year* its month and
+ * day. `recurrence-derivation.ts` holds that reading; this file submits a word
+ * and knows nothing about rules.
+ *
+ * The preview beside it is not decoration. It is how the owner checks what was
+ * derived, which is what makes a control this small honest — and its dates come
+ * from the database (`2R-TIME-007`), never from this component.
  */
 
 import { BellPlus, LoaderCircle } from "lucide-react";
@@ -56,6 +75,9 @@ import type { Locale } from "@/lib/preferences";
 
 import { IDLE_REMINDER_CREATION_STATE, type ReminderCreationState } from "./action-state";
 import { getReminderCopy } from "./copy";
+import { RECURRENCE_CHOICES } from "./recurrence-derivation";
+import { previewReminderSeries } from "./series-actions";
+import { IDLE_REMINDER_SERIES_PREVIEW } from "./series-action-state";
 import type { ReminderTaskOption } from "./task-options";
 
 export type ReminderCreationHandler = (
@@ -86,6 +108,25 @@ export function ReminderComposer({
    */
   const [round, setRound] = useState<ReminderCreationState | null>(null);
   const [dismissed, setDismissed] = useState(false);
+
+  /**
+   * The recurrence choice, and the preview it asks for — slice 2R.3.
+   *
+   * `choice` is controlled because two other things read it: whether the preview
+   * block renders at all, and — through the action — which RPC the save reaches.
+   * An uncontrolled select would leave the first of those to a `ref` and the
+   * second to chance.
+   *
+   * The preview has its **own** `useActionState`. Sharing the create action's
+   * would mean a preview leaving `state.status === "success"` behind, which is
+   * the signal the dialog closes on: asking for the next three dates would shut
+   * the dialog in the owner's face.
+   */
+  const [choice, setChoice] = useState<string>("none");
+  const [preview, previewAction, previewPending] = useActionState(
+    previewReminderSeries,
+    IDLE_REMINDER_SERIES_PREVIEW,
+  );
 
   const changed = round !== null && state !== round ? state : null;
   const outcome = changed ?? IDLE_REMINDER_CREATION_STATE;
@@ -216,7 +257,102 @@ export function ReminderComposer({
             />
           </label>
 
-          {/* 3 — importance. */}
+          {/*
+            3 — repetition (slice 2R.3, `2R-SURFACE-001`).
+
+            **One select, and no new fields**, which is what keeps this a control
+            rather than a form — the stop condition the plan names. Every
+            parameter a rule needs is already above: *every week* means the
+            weekday of the date just chosen, *every month* its day, *every year*
+            its month and day. `recurrence-derivation.ts` is where that reading
+            lives, and this component does not know it — it submits a word.
+
+            Immediately after date and time on purpose. The group depends on that
+            field, and a dependency the owner has to infer from two screens apart
+            is one they will get wrong.
+          */}
+          <label htmlFor="reminder-compose-field-recurrence">
+            <span className="reminder-compose-label">{copy.creation.recurrenceLabel}</span>
+            <span className="reminder-compose-hint">{copy.creation.recurrenceHint}</span>
+            <select
+              disabled={pending}
+              id="reminder-compose-field-recurrence"
+              name="recurrence"
+              onChange={(event) => setChoice(event.target.value)}
+              value={choice}
+            >
+              {RECURRENCE_CHOICES.map((option) => (
+                <option key={option} value={option}>
+                  {copy.creation.recurrenceOption[option]}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/*
+            `2R-SURFACE-002` — the next occurrences, before saving.
+
+            `formAction` rather than a second `<form>`, because a form cannot
+            nest and the preview needs the very fields this one holds. React 19
+            lets a submit button redirect its own form to another action, so the
+            same `recurrence` and `remindAtLocal` reach the preview without being
+            duplicated into hidden inputs that could drift.
+
+            `formNoValidate` because the title is `required` and previewing a
+            date before naming the reminder is a reasonable thing to do; the
+            preview writes nothing, so there is nothing to guard.
+          */}
+          {choice === "none" ? null : (
+            <div className="reminder-compose-preview">
+              <button
+                className="reminder-button"
+                disabled={pending || previewPending}
+                formAction={previewAction}
+                formNoValidate
+                type="submit"
+              >
+                {previewPending ? copy.creation.previewPending : copy.creation.previewLabel}
+              </button>
+
+              {/*
+                The region exists before it has anything to say. A live region
+                created together with its first sentence is a new element rather
+                than a changed one, and a screen reader announces nothing at all.
+              */}
+              <div
+                aria-atomic="true"
+                aria-busy={previewPending}
+                aria-label={copy.creation.previewRegionLabel}
+                aria-live="polite"
+                className="reminder-compose-preview-result"
+                role="status"
+              >
+                {preview.status === "error" ? (
+                  <p className="reminder-compose-error">{preview.message}</p>
+                ) : preview.status === "ready" ? (
+                  <>
+                    {preview.description === null ? null : (
+                      <p className="reminder-compose-preview-rule">{preview.description}</p>
+                    )}
+                    {preview.occurrences.length === 0 ? (
+                      <p className="reminder-compose-hint">{preview.message}</p>
+                    ) : (
+                      <>
+                        <p className="reminder-compose-label">{copy.creation.previewHeading}</p>
+                        <ul className="reminder-compose-preview-list">
+                          {preview.occurrences.map((occurrence) => (
+                            <li key={occurrence}>{occurrence}</li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {/* 4 — importance. */}
           <label className="reminder-compose-check" htmlFor="reminder-compose-field-important">
             <input
               disabled={pending}
@@ -228,7 +364,7 @@ export function ReminderComposer({
             <span>{copy.creation.importantLabel}</span>
           </label>
 
-          {/* 4 — the optional link. */}
+          {/* 5 — the optional link. */}
           <label htmlFor="reminder-compose-field-task">
             <span className="reminder-compose-label">{copy.creation.linkLabel}</span>
             <span className="reminder-compose-hint">{copy.creation.linkHint}</span>
@@ -242,7 +378,7 @@ export function ReminderComposer({
             </select>
           </label>
 
-          {/* 5 — save. Cancel is `ConfirmDialog`'s own, rendered after this. */}
+          {/* 6 — save. Cancel is `ConfirmDialog`'s own, rendered after this. */}
           <button className="task-command-primary" disabled={pending} type="submit">
             {pending ? <LoaderCircle aria-hidden="true" className="spin" size={16} /> : null}
             {pending ? copy.creation.saving : copy.creation.save}

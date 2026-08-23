@@ -17,6 +17,14 @@ import { asReminderView, loadReminderPage } from "./projection";
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const NOW = new Date("2026-12-01T12:00:00Z");
 
+/*
+  A real rule, because the projection now describes it — slice 2R.3.
+
+  A series fixture without one would exercise only the `description: null`
+  fallback and would say nothing about the path every real row takes.
+*/
+const DAILY = { version: 1, frequency: "daily" };
+
 type Row = Record<string, unknown>;
 
 type Call = {
@@ -259,13 +267,15 @@ describe("the series a row came from", () => {
     // asserts exactly that pair — so reading `active` off the row's status would
     // report the opposite of the truth for the interesting case.
     const { page } = await load([occurrence({ status: "scheduled" })], "pending", {
-      reminder_series: [{ id: SERIES_ID, status: "ended" }],
+      reminder_series: [{ id: SERIES_ID, status: "ended", rule: DAILY }],
     });
     expect(page.reminders[0].series).toEqual({
       id: SERIES_ID,
       active: false,
       detached: false,
       sequence: 3,
+      // Described here, so the rule object never reaches a component.
+      description: "Todo dia",
     });
   });
 
@@ -276,13 +286,14 @@ describe("the series a row came from", () => {
     const { page } = await load(
       [occurrence({ detached_at: "2026-12-02T10:00:00+00:00" })],
       "pending",
-      { reminder_series: [{ id: SERIES_ID, status: "active" }] },
+      { reminder_series: [{ id: SERIES_ID, status: "active", rule: DAILY }] },
     );
     expect(page.reminders[0].series).toEqual({
       id: SERIES_ID,
       active: true,
       detached: true,
       sequence: 3,
+      description: "Todo dia",
     });
   });
 
@@ -304,7 +315,7 @@ describe("the series a row came from", () => {
     const { calls } = await load(
       [occurrence(), occurrence({ id: "b" }), occurrence({ id: "c", series_id: OTHER })],
       "pending",
-      { reminder_series: [{ id: SERIES_ID, status: "active" }] },
+      { reminder_series: [{ id: SERIES_ID, status: "active", rule: DAILY }] },
     );
     const seriesCalls = calls.filter((call) => call.table === "reminder_series");
     expect(seriesCalls).toHaveLength(1);
@@ -349,7 +360,7 @@ describe("reactivating a cancelled occurrence", () => {
       ...overrides,
     });
 
-  const series = { reminder_series: [{ id: SERIES_ID, status: "active" }] };
+  const series = { reminder_series: [{ id: SERIES_ID, status: "active", rule: DAILY }] };
   const withLiveReplacement = {
     ...series,
     live_occurrences: [{ series_id: SERIES_ID }],
@@ -364,7 +375,7 @@ describe("reactivating a cancelled occurrence", () => {
     // An ended series materialises nothing, so the slot is free and the restore
     // succeeds — proved against the deployed database.
     const { page } = await load([cancelled()], "cancelled", {
-      reminder_series: [{ id: SERIES_ID, status: "ended" }],
+      reminder_series: [{ id: SERIES_ID, status: "ended", rule: DAILY }],
       live_occurrences: [],
     });
     expect(page.reminders[0].actions).toEqual(["restore"]);

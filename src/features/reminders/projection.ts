@@ -11,6 +11,9 @@ import {
   type ReminderAction,
   type ReminderStatus,
 } from "./lifecycle";
+import { getReminderCopy } from "./copy";
+import { describeRecurrenceRule, type RecurrenceLanguage } from "./recurrence-language";
+import { parseRecurrenceRule } from "./recurrence-rule";
 import type { ExpectedReminderState } from "./schema";
 
 /**
@@ -106,6 +109,21 @@ export type ReminderSeriesRef = {
   /** This occurrence has been pulled out of the rule and will not be reclaimed. */
   readonly detached: boolean;
   readonly sequence: number | null;
+  /**
+   * The rule in the owner's words — `2R-SURFACE-003`/`-004`, slice 2R.3.
+   *
+   * **A sentence, not the rule.** The `jsonb` never leaves this module: it is
+   * parsed here, described here, and only the finished string crosses to a
+   * component. That makes *"no surface renders a raw rule"* true by
+   * construction rather than by every surface remembering — a client component
+   * cannot print what it was never given.
+   *
+   * `null` when the stored rule does not parse, which the CHECK constraint
+   * should make unreachable. The badge then says *that* it repeats without
+   * claiming to know how, because a wrong description is worse than a missing
+   * one.
+   */
+  readonly description: string | null;
 };
 
 export type ReminderViewModel = {
@@ -182,6 +200,9 @@ export async function loadReminderPage(
     items,
   );
   const at = options.now.getTime();
+  // One language block for the page, bound to the reader's locale -- the same
+  // discipline the page applies to its one zone-bound date formatter.
+  const language = getReminderCopy(options.locale).series.language;
 
   /**
    * `2R-OCCURRENCE-CANCEL-IRREVERSIBLE` — is `restore` reachable for this row?
@@ -216,7 +237,7 @@ export async function loadReminderPage(
       overdue:
         hasPendingDelivery(status) && !Number.isNaN(remindAtMs) && remindAtMs <= at,
       link: buildLink(row, labels, options),
-      series: buildSeriesRef(row, seriesStatus),
+      series: buildSeriesRef(row, seriesStatus, language),
       actions: availableReminderActions({
         status,
         taskId: row.task_id,
@@ -257,7 +278,7 @@ async function loadSeriesStatuses(
   supabase: SupabaseClient,
   userId: string,
   rows: readonly ReminderRow[],
-): Promise<ReadonlyMap<string, string>> {
+): Promise<ReadonlyMap<string, SeriesRow>> {
   /*
     `typeof === "string"`, not `!== null`.
 
@@ -275,18 +296,19 @@ async function loadSeriesStatuses(
 
   const result = await supabase
     .from("reminder_series")
-    .select("id,status")
+    .select("id,status,rule")
     .eq("user_id", userId)
     .in("id", ids);
 
-  const statuses = new Map<string, string>();
+  const series = new Map<string, SeriesRow>();
   for (const row of (requireSupabaseData(result, "load reminder series") ?? []) as {
     id: string;
     status: string;
+    rule: unknown;
   }[]) {
-    statuses.set(row.id, row.status);
+    series.set(row.id, { status: row.status, rule: row.rule });
   }
-  return statuses;
+  return series;
 }
 
 /**
@@ -329,20 +351,38 @@ async function loadSeriesWithLiveOccurrence(
   return live;
 }
 
+/**
+ * The `jsonb` rule, turned into a sentence and left behind.
+ *
+ * Parsed and described **here**, so the rule object never reaches a component.
+ * `2R-SURFACE-004` forbids a surface rendering a raw rule; withholding the rule
+ * from every surface is a stronger form of that than asking each one to
+ * remember, because a component cannot print what it was never handed.
+ *
+ * A rule that fails to parse yields `null` rather than a guess. The CHECK
+ * constraint makes that unreachable through the product, and if something ever
+ * does reach it, "this repeats" without the "how" is the honest half.
+ */
 function buildSeriesRef(
   row: ReminderRow,
-  statuses: ReadonlyMap<string, string>,
+  series: ReadonlyMap<string, SeriesRow>,
+  language: RecurrenceLanguage,
 ): ReminderSeriesRef | null {
   if (typeof row.series_id !== "string") return null;
-  const status = statuses.get(row.series_id);
-  if (status === undefined) return null;
+  const found = series.get(row.series_id);
+  if (found === undefined) return null;
+  const parsed = parseRecurrenceRule(found.rule);
   return {
     id: row.series_id,
-    active: status === "active",
+    active: found.status === "active",
     detached: row.detached_at !== null,
     sequence: row.series_sequence,
+    description: parsed.ok ? describeRecurrenceRule(parsed.rule, language) : null,
   };
 }
+
+/** The shape `loadSeriesStatuses` returns per series: enough to decide and to describe. */
+type SeriesRow = { readonly status: string; readonly rule: unknown };
 
 type SubjectLabels = {
   readonly tasks: ReadonlyMap<string, string>;

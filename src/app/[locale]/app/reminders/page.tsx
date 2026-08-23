@@ -11,7 +11,7 @@ import { NotificationInvitation } from "@/features/notifications/notification-in
 import { deriveThreeFacts, mayInviteAtMomentOfValue } from "@/features/notifications/three-facts";
 
 import { getAgentName } from "@/features/profile/agent-identity";
-import { createReminder } from "@/features/reminders/actions";
+import { createReminderOrSeries } from "@/features/reminders/series-actions";
 import { ReminderComposer } from "@/features/reminders/reminder-composer";
 import { loadReminderTaskOptions } from "@/features/reminders/task-options";
 import { getReminderCopy } from "@/features/reminders/copy";
@@ -194,7 +194,7 @@ export default async function RemindersPage({
           content; see `task-options.ts` for why that resolution cannot happen
           inside an `<option>`.
         */}
-        <ReminderComposer action={createReminder} locale={locale} taskOptions={taskOptions} />
+        <ReminderComposer action={createReminderOrSeries} locale={locale} taskOptions={taskOptions} />
       </header>
 
       <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />

@@ -85,6 +85,30 @@ export function reminderSeriesOperationKey(
   return `r2-${intent}-${seriesId}-${shortHash(state)}`;
 }
 
+/**
+ * The key a **creation** carries — slice 2R.3.
+ *
+ * Creation has no pre-state to derive from, which is the difference from the two
+ * above: there is no row yet. What stands in for it is the request itself, and
+ * that satisfies the same two requirements. Two submits of one dialog carry
+ * identical fields and therefore an identical key, so the second replays rather
+ * than creating a second series. A deliberate second recurring reminder differs
+ * in its title or its instant — otherwise it is not a second reminder, it is the
+ * same one asked for twice.
+ *
+ * The owner id is folded in even though `undo_operations` scopes the key by
+ * `user_id` already: it costs nothing and it makes the hash meaningful on its
+ * own when one turns up in a log.
+ */
+export function reminderSeriesCreationKey(
+  userId: string,
+  title: string,
+  anchorLocal: string,
+  choice: string,
+): string {
+  return `r3-create-${choice}-${shortHash([userId, title, anchorLocal].join("|"))}`;
+}
+
 export function reminderOperationKey(
   reminderId: string,
   action: ReminderAction,

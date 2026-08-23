@@ -79,6 +79,7 @@ const attached: ReminderSeriesRef = {
   id: SERIES_ID,
   active: true,
   detached: false,
+  description: "Todo dia",
   sequence: 2,
 };
 
@@ -376,5 +377,39 @@ describe("no rule, no controls", () => {
       </ReminderSeriesProvider>,
     );
     expect(container.querySelector(".reminder-series")).toBeNull();
+  });
+});
+
+/**
+ * `2R-SURFACE-003`/`-004` — the row says that it repeats, and how, slice 2R.3.
+ *
+ * The sentence arrives already built. That is the property worth asserting:
+ * this component is handed a string, never a rule, so there is no path by which
+ * it could render `monthlyWeekday` or a JSON fragment even if someone tried.
+ */
+describe("the rule in the owner's words", () => {
+  it("shows the description beside the badge", () => {
+    mount({ ...attached, description: "Toda última sexta-feira do mês" });
+    expect(screen.getByText(copy.badge)).toBeTruthy();
+    expect(screen.getByText("Toda última sexta-feira do mês")).toBeTruthy();
+  });
+
+  it("says only that it repeats when the rule did not parse", () => {
+    // A wrong description is worse than a missing one, so `null` withholds the
+    // "how" rather than guessing or rendering an empty element.
+    const { container } = mount({ ...attached, description: null });
+    expect(screen.getByText(copy.badge)).toBeTruthy();
+    expect(container.querySelector(".reminder-series-rule")).toBeNull();
+  });
+
+  it("cannot render a rule, because it is never given one", () => {
+    // The type is `string | null`. Asserted on the rendered output too, so the
+    // day someone widens it the page still refuses to print machine vocabulary.
+    const { container } = mount({ ...attached, description: "Todo dia" });
+    const text = container.textContent ?? "";
+    for (const frequency of ["daily", "weekly", "monthlyDay", "monthlyWeekday", "yearly"]) {
+      expect(text).not.toContain(frequency);
+    }
+    expect(text).not.toMatch(/[{}]/);
   });
 });
