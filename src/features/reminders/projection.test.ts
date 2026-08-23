@@ -19,16 +19,47 @@ const NOW = new Date("2026-12-01T12:00:00Z");
 
 type Row = Record<string, unknown>;
 
-/** Records the query it was asked to build, so ordering and filters are assertable. */
+type Call = {
+  table: string;
+  order?: [string, boolean];
+  in?: [string, unknown[]];
+  eq: [string, unknown][];
+  is: [string, unknown][];
+};
+
+/**
+ * Records the query it was asked to build, so ordering and filters are
+ * assertable.
+ *
+ * ## Why the dataset is not keyed by table name alone
+ *
+ * Slice 2R.2 made `reminders` the target of **two** different queries in one
+ * load: the page itself, and the owner-scoped probe for which series still hold
+ * a live occurrence. A stub that answered `tables["reminders"]` to both would
+ * hand the probe the page's rows — so a probe that filtered wrongly, or did not
+ * filter at all, would still produce a plausible answer and the test would
+ * defend the bug instead of finding it.
+ *
+ * So the live-occurrence probe is recognised by its own filters and answered
+ * from its own dataset, and `calls` still records everything for the assertions
+ * that check the filters were the intended ones.
+ */
 function client(tables: Readonly<Record<string, Row[]>>) {
-  const calls: { table: string; order?: [string, boolean]; in?: [string, unknown[]] }[] = [];
+  const calls: Call[] = [];
   const supabase = {
     from(table: string) {
-      const call: (typeof calls)[number] = { table };
+      const call: Call = { table, eq: [], is: [] };
       calls.push(call);
       const builder: Record<string, unknown> = {};
       builder.select = () => builder;
-      builder.eq = () => builder;
+      builder.eq = (column: string, value: unknown) => {
+        call.eq.push([column, value]);
+        return builder;
+      };
+      builder.is = (column: string, value: unknown) => {
+        call.is.push([column, value]);
+        return builder;
+      };
       builder.in = (column: string, values: unknown[]) => {
         call.in = [column, values];
         return builder;
@@ -41,11 +72,24 @@ function client(tables: Readonly<Record<string, Row[]>>) {
       // Both a terminal `range(...)` and a bare `select(...)` are awaited, so the
       // builder itself resolves.
       builder.then = (resolve: (value: unknown) => unknown) =>
-        resolve({ data: tables[table] ?? [], error: null });
+        resolve({ data: tables[datasetFor(call)] ?? [], error: null });
       return builder;
     },
   } as unknown as SupabaseClient;
   return { supabase, calls };
+}
+
+/** The live-occurrence probe is `reminders` filtered by both of its own predicates. */
+export function isLiveOccurrenceProbe(call: Call): boolean {
+  return (
+    call.table === "reminders"
+    && call.eq.some(([column, value]) => column === "status" && value === "scheduled")
+    && call.is.some(([column, value]) => column === "detached_at" && value === null)
+  );
+}
+
+function datasetFor(call: Call): string {
+  return isLiveOccurrenceProbe(call) ? "live_occurrences" : call.table;
 }
 
 function reminder(overrides: Row = {}): Row {
@@ -193,5 +237,167 @@ describe("the linked subject", () => {
     });
     expect(page.reminders[0].link?.label.length).toBeLessThanOrEqual(70);
     expect(page.reminders[0].link?.label.endsWith("…")).toBe(true);
+  });
+});
+
+/**
+ * The rule behind a row — slice 2R.2.
+ *
+ * Each case here is one the surface would get wrong in a way the owner could
+ * see: a scope chooser offered on a rule that has ended, a detached occurrence
+ * that looks like every other one, or a second query issued for a page with no
+ * repeating reminder on it at all.
+ */
+describe("the series a row came from", () => {
+  const SERIES_ID = "77777777-7777-4777-8777-777777777777";
+
+  const occurrence = (overrides: Row = {}) =>
+    reminder({ series_id: SERIES_ID, series_sequence: 3, detached_at: null, ...overrides });
+
+  it("carries the rule's own status, not the occurrence's", async () => {
+    // An ended series can still own a `scheduled` detached occurrence — pgTAP
+    // asserts exactly that pair — so reading `active` off the row's status would
+    // report the opposite of the truth for the interesting case.
+    const { page } = await load([occurrence({ status: "scheduled" })], "pending", {
+      reminder_series: [{ id: SERIES_ID, status: "ended" }],
+    });
+    expect(page.reminders[0].series).toEqual({
+      id: SERIES_ID,
+      active: false,
+      detached: false,
+      sequence: 3,
+    });
+  });
+
+  it("marks a detached occurrence detached while keeping its provenance", async () => {
+    // `series_id` survives detachment on purpose (`202608230101:619`). Reading
+    // detachment as "no series" would lose the provenance and hide the badge
+    // `2R-SERIES-004` needs on screen.
+    const { page } = await load(
+      [occurrence({ detached_at: "2026-12-02T10:00:00+00:00" })],
+      "pending",
+      { reminder_series: [{ id: SERIES_ID, status: "active" }] },
+    );
+    expect(page.reminders[0].series).toEqual({
+      id: SERIES_ID,
+      active: true,
+      detached: true,
+      sequence: 3,
+    });
+  });
+
+  it("treats a series that did not come back as absent rather than as active", async () => {
+    // `public.reminder_series` is behind an owner policy, so somebody else's row
+    // simply is not returned. Defaulting to `active: true` would point a scope
+    // chooser at a rule this reader cannot see.
+    const { page } = await load([occurrence()], "pending", { reminder_series: [] });
+    expect(page.reminders[0].series).toBeNull();
+  });
+
+  it("says nothing about a reminder that carries no rule", async () => {
+    const { page } = await load([reminder()], "pending");
+    expect(page.reminders[0].series).toBeNull();
+  });
+
+  it("asks for exactly the series ids on the page, once, owner-scoped", async () => {
+    const OTHER = "88888888-8888-4888-8888-888888888888";
+    const { calls } = await load(
+      [occurrence(), occurrence({ id: "b" }), occurrence({ id: "c", series_id: OTHER })],
+      "pending",
+      { reminder_series: [{ id: SERIES_ID, status: "active" }] },
+    );
+    const seriesCalls = calls.filter((call) => call.table === "reminder_series");
+    expect(seriesCalls).toHaveLength(1);
+    // Deduplicated: two rows of one series ask for it once.
+    expect(seriesCalls[0].in).toEqual(["id", [SERIES_ID, OTHER]]);
+  });
+
+  it("issues no series query at all when nothing on the page repeats", async () => {
+    /*
+      The regression this case exists for.
+
+      The filter was `id !== null`, and a fixture row that predates the column
+      carries `undefined`, which passes that predicate — so a page of ordinary
+      reminders issued `in("id", [undefined])`. `typeof id === "string"` is the
+      predicate that means what the guard intended.
+    */
+    const { calls } = await load([reminder(), reminder({ id: "x" })], "pending");
+    expect(calls.filter((call) => call.table === "reminder_series")).toHaveLength(0);
+  });
+});
+
+/**
+ * `2R-OCCURRENCE-CANCEL-IRREVERSIBLE` — withholding a control that cannot work.
+ *
+ * Cancelling an attached occurrence materialises the replacement, the
+ * replacement takes the one live slot
+ * `reminders_one_live_occurrence_per_series` permits, and `restore` is then
+ * refused by that index with a bare `23505`. Proved by execution against the
+ * deployed database in both directions, which is what the two "still offers it"
+ * cases below encode: the failure is narrow, and a wider predicate would
+ * withhold a control that works.
+ */
+describe("reactivating a cancelled occurrence", () => {
+  const SERIES_ID = "77777777-7777-4777-8777-777777777777";
+
+  const cancelled = (overrides: Row = {}) =>
+    reminder({
+      status: "cancelled",
+      series_id: SERIES_ID,
+      series_sequence: 1,
+      detached_at: null,
+      ...overrides,
+    });
+
+  const series = { reminder_series: [{ id: SERIES_ID, status: "active" }] };
+  const withLiveReplacement = {
+    ...series,
+    live_occurrences: [{ series_id: SERIES_ID }],
+  };
+
+  it("withholds restore when the replacement already holds the live slot", async () => {
+    const { page } = await load([cancelled()], "cancelled", withLiveReplacement);
+    expect(page.reminders[0].actions).toEqual([]);
+  });
+
+  it("still offers restore when the series has no live occurrence", async () => {
+    // An ended series materialises nothing, so the slot is free and the restore
+    // succeeds — proved against the deployed database.
+    const { page } = await load([cancelled()], "cancelled", {
+      reminder_series: [{ id: SERIES_ID, status: "ended" }],
+      live_occurrences: [],
+    });
+    expect(page.reminders[0].actions).toEqual(["restore"]);
+  });
+
+  it("still offers restore for a detached occurrence", async () => {
+    // The materialisation trigger skips a detached row, so no replacement was
+    // ever created for it and the index has nothing to refuse.
+    const { page } = await load(
+      [cancelled({ detached_at: "2026-12-02T10:00:00+00:00" })],
+      "cancelled",
+      withLiveReplacement,
+    );
+    expect(page.reminders[0].actions).toEqual(["restore"]);
+  });
+
+  it("leaves an ordinary cancelled reminder exactly as it was", async () => {
+    // `2R-MODEL-004`: a reminder without a rule behaves as it does today.
+    const { page } = await load([reminder({ status: "cancelled" })], "cancelled");
+    expect(page.reminders[0].actions).toEqual(["restore"]);
+  });
+
+  it("asks the database which series are live rather than scanning the page", async () => {
+    /*
+      The replacement is very often NOT on this page — the cancelled occurrence
+      is in the `cancelled` view while its replacement is in `pending`. Deriving
+      this from the rows in hand would report "no live occurrence" for exactly
+      the case the flag exists to catch.
+    */
+    const { calls } = await load([cancelled()], "cancelled", withLiveReplacement);
+    const probe = calls.find(isLiveOccurrenceProbe);
+    expect(probe).toBeDefined();
+    expect(probe?.in).toEqual(["series_id", [SERIES_ID]]);
+    expect(probe?.eq).toContainEqual(["user_id", USER_ID]);
   });
 });

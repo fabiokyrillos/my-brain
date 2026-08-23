@@ -103,6 +103,21 @@ const UNDO_ROUTER_ALLOWLIST: readonly string[] = [
   "src/features/agent/automation-actions.ts",
   "src/features/deletion/actions.ts",
   "src/features/interpretations/actions.ts",
+  /*
+   * The **seventh**, joining in Phase 2R slice 2R.2. `202608230101` registers
+   * `create_reminder_series_v1` and `apply_reminder_series_command_v1` in the
+   * same handler registry, and 2R.2 is the slice that gives the owner a button
+   * to spend them.
+   *
+   * `reminders/actions.ts` is deliberately NOT here. Phase 2P's
+   * `apply_reminder_command_v1` also has a registered handler, but that handler
+   * never closes its ledger row (`2R-UNDO-LEDGER-NOT-CLOSED`) and its
+   * compensation cannot run at all for a live series occurrence
+   * (`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`) — so no surface offers it, and its
+   * absence from this list is the enforceable form of that decision. A line
+   * appearing here for `reminders/actions.ts` would mean somebody wired it.
+   */
+  "src/features/reminders/series-actions.ts",
   "src/features/task-commands/actions.ts",
   "src/features/tasks/actions.ts",
 ];
@@ -195,7 +210,10 @@ describe("2L-EDIT-002: task authority has exactly the call sites it declares", (
     ]);
   });
 
-  it("keeps the undo router to the four domains that already own an undo", () => {
+  // "the domains it declares", not a number. The name said "four" while the
+  // list held six, and a name that has to be edited every time the list grows is
+  // a name that will stop being edited.
+  it("keeps the undo router to the domains it declares", () => {
     expect(actual.undo).toEqual([...UNDO_ROUTER_ALLOWLIST].sort());
   });
 

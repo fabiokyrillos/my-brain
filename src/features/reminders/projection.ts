@@ -57,7 +57,8 @@ const VIEW_STATUSES: Readonly<Record<ReminderView, readonly ReminderStatus[] | n
   all: null,
 };
 
-const SELECT = "id,title,remind_at,important,status,task_id,entry_id,sent_at";
+const SELECT =
+  "id,title,remind_at,important,status,task_id,entry_id,sent_at,series_id,series_sequence,detached_at";
 
 type ReminderRow = {
   readonly id: string;
@@ -68,6 +69,9 @@ type ReminderRow = {
   readonly task_id: string | null;
   readonly entry_id: string | null;
   readonly sent_at: string | null;
+  readonly series_id: string | null;
+  readonly series_sequence: number | null;
+  readonly detached_at: string | null;
 };
 
 /** What the surface links to, when the reminder has a subject at all. */
@@ -75,6 +79,33 @@ export type ReminderLink = {
   readonly kind: "task" | "entry";
   readonly href: string;
   readonly label: string;
+};
+
+/**
+ * What a row needs to know about the rule behind it — slice 2R.2.
+ *
+ * ## `detached` is carried, not derived from `series === null`
+ *
+ * A detached occurrence **keeps its `series_id`**: the column is provenance, and
+ * `202608230101:619` says so in terms. Reading detachment as "no series" would
+ * therefore be wrong twice — it would lose the provenance the migration went out
+ * of its way to keep, and it would hide the badge `2R-SERIES-004` needs on
+ * screen for "a later series edit did not reclaim it" to be a fact the owner can
+ * observe rather than one a test asserts privately.
+ *
+ * ## `active` comes from the series row, never from the occurrence's status
+ *
+ * An ended series can still own a `scheduled` detached occurrence — pgTAP
+ * asserts exactly that pair — so inferring the rule's state from any one
+ * occurrence would report the opposite of the truth for the interesting case.
+ */
+export type ReminderSeriesRef = {
+  readonly id: string;
+  /** `status = 'active'` on `public.reminder_series`. An ended rule offers no scope choice. */
+  readonly active: boolean;
+  /** This occurrence has been pulled out of the rule and will not be reclaimed. */
+  readonly detached: boolean;
+  readonly sequence: number | null;
 };
 
 export type ReminderViewModel = {
@@ -89,6 +120,8 @@ export type ReminderViewModel = {
   /** True when a scheduled reminder's time has already passed. */
   readonly overdue: boolean;
   readonly link: ReminderLink | null;
+  /** The rule this occurrence came from, or `null` for an ordinary reminder. */
+  readonly series: ReminderSeriesRef | null;
   readonly actions: readonly ReminderAction[];
   /** The four scalars the RPC compares, exactly as this render saw them. */
   readonly expectedState: ExpectedReminderState;
@@ -142,7 +175,28 @@ export async function loadReminderPage(
   );
 
   const labels = await loadSubjectLabels(supabase, options.userId, items);
+  const seriesStatus = await loadSeriesStatuses(supabase, options.userId, items);
+  const seriesWithLiveOccurrence = await loadSeriesWithLiveOccurrence(
+    supabase,
+    options.userId,
+    items,
+  );
   const at = options.now.getTime();
+
+  /**
+   * `2R-OCCURRENCE-CANCEL-IRREVERSIBLE` — is `restore` reachable for this row?
+   *
+   * True only for a **cancelled, still-attached** occurrence whose series has a
+   * live one. Each conjunct is load-bearing and each was proved by execution:
+   * a detached occurrence restores (the trigger skips it, so no replacement
+   * exists), and an occurrence of an ended series restores (the trigger returns
+   * early). Widening the predicate would withhold a control that works.
+   */
+  const slotTaken = (row: ReminderRow): boolean =>
+    row.status === "cancelled"
+    && typeof row.series_id === "string"
+    && row.detached_at === null
+    && seriesWithLiveOccurrence.has(row.series_id);
 
   const reminders = items.map((row): ReminderViewModel => {
     // A status outside the CHECK constraint cannot exist, but the row arrives as
@@ -162,7 +216,12 @@ export async function loadReminderPage(
       overdue:
         hasPendingDelivery(status) && !Number.isNaN(remindAtMs) && remindAtMs <= at,
       link: buildLink(row, labels, options),
-      actions: availableReminderActions({ status, taskId: row.task_id }),
+      series: buildSeriesRef(row, seriesStatus),
+      actions: availableReminderActions({
+        status,
+        taskId: row.task_id,
+        seriesSlotTaken: slotTaken(row),
+      }),
       expectedState: {
         status,
         remindAt: row.remind_at,
@@ -176,6 +235,113 @@ export async function loadReminderPage(
   });
 
   return { reminders, hasNext };
+}
+
+/**
+ * The rules behind this page's rows, in one owner-scoped query.
+ *
+ * One query for the page rather than one per row, the same discipline
+ * `loadSubjectLabels` follows and for the same reason. Skipped entirely when no
+ * row on the page carries a `series_id`, which is every page in an account that
+ * has never created a repeating reminder — so the read half of slice 2R.1's
+ * table costs nothing until something uses it.
+ *
+ * **A series that does not come back is treated as absent, never as active.**
+ * `public.reminder_series` grants `authenticated` select behind an owner policy,
+ * so a row belonging to somebody else simply is not returned — and the fallback
+ * has to be the one that offers no controls. Defaulting a missing row to
+ * `active: true` would turn a row this reader cannot see into a scope chooser
+ * pointed at it.
+ */
+async function loadSeriesStatuses(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: readonly ReminderRow[],
+): Promise<ReadonlyMap<string, string>> {
+  /*
+    `typeof === "string"`, not `!== null`.
+
+    A row that predates this column — or any caller handing over a projection
+    fixture built before slice 2R.2 — carries `undefined` rather than `null`, and
+    `undefined !== null` is true. The looser predicate therefore let a page of
+    reminders with no series at all issue a query for `in(id, [undefined])`, and
+    `projection.test.ts`'s "does not query for labels when no row has a subject"
+    is what caught it. `buildSeriesRef` below is guarded the same way.
+  */
+  const ids = [
+    ...new Set(rows.map((row) => row.series_id).filter((id): id is string => typeof id === "string")),
+  ];
+  if (ids.length === 0) return new Map();
+
+  const result = await supabase
+    .from("reminder_series")
+    .select("id,status")
+    .eq("user_id", userId)
+    .in("id", ids);
+
+  const statuses = new Map<string, string>();
+  for (const row of (requireSupabaseData(result, "load reminder series") ?? []) as {
+    id: string;
+    status: string;
+  }[]) {
+    statuses.set(row.id, row.status);
+  }
+  return statuses;
+}
+
+/**
+ * Which of this page's series currently hold a live occurrence.
+ *
+ * A second query rather than a scan of `items`, and the difference is the whole
+ * point: the replacement occurrence is very often **not on this page**. A
+ * cancelled occurrence sits in the `cancelled` view while its replacement sits
+ * in `pending`, so deriving this from the rows in hand would report "no live
+ * occurrence" for exactly the case the flag exists to catch — and the surface
+ * would offer a Reactivate that raises `23505`.
+ *
+ * Owner-scoped and bounded to the series already on the page. Skipped entirely
+ * when no row carries a rule.
+ */
+async function loadSeriesWithLiveOccurrence(
+  supabase: SupabaseClient,
+  userId: string,
+  rows: readonly ReminderRow[],
+): Promise<ReadonlySet<string>> {
+  const ids = [
+    ...new Set(rows.map((row) => row.series_id).filter((id): id is string => typeof id === "string")),
+  ];
+  if (ids.length === 0) return new Set();
+
+  const result = await supabase
+    .from("reminders")
+    .select("series_id")
+    .eq("user_id", userId)
+    .eq("status", "scheduled")
+    .is("detached_at", null)
+    .in("series_id", ids);
+
+  const live = new Set<string>();
+  for (const row of (requireSupabaseData(result, "load live series occurrences") ?? []) as {
+    series_id: string | null;
+  }[]) {
+    if (typeof row.series_id === "string") live.add(row.series_id);
+  }
+  return live;
+}
+
+function buildSeriesRef(
+  row: ReminderRow,
+  statuses: ReadonlyMap<string, string>,
+): ReminderSeriesRef | null {
+  if (typeof row.series_id !== "string") return null;
+  const status = statuses.get(row.series_id);
+  if (status === undefined) return null;
+  return {
+    id: row.series_id,
+    active: status === "active",
+    detached: row.detached_at !== null,
+    sequence: row.series_sequence,
+  };
 }
 
 type SubjectLabels = {

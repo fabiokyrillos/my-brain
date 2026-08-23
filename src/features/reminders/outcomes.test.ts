@@ -141,3 +141,60 @@ describe("every failure has a sentence, in both locales", () => {
     }
   });
 });
+
+/**
+ * `23505` — the one refusal that arrives without a token, slice 2R.2.
+ *
+ * `reminders_one_live_occurrence_per_series` is a partial unique index, so it
+ * has no `raise` and can have no `G5_*` name. It reaches the product as a bare
+ * SQLSTATE, and before this it fell through to `unknown`: a nameable refusal
+ * reported as a mystery.
+ *
+ * The cases below run in both directions, because matching on `23505` alone
+ * would have been wrong. The table carries other unique indexes — the
+ * idempotency key among them — and reporting a key collision as "the repetition
+ * already has a next one" would name the wrong cause with total confidence.
+ */
+describe("the live-occurrence collision", () => {
+  it("is named when the constraint is the series one", () => {
+    expect(
+      mapReminderCommandError({
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "reminders_one_live_occurrence_per_series"',
+        details: null,
+      }),
+    ).toBe("series_slot_taken");
+  });
+
+  it("reads the constraint out of `details` too, not only `message`", () => {
+    // PostgREST has put the constraint in either field depending on the context
+    // the error passed through — the same reason `detailFrom` scans both.
+    expect(
+      mapReminderCommandError({
+        code: "23505",
+        message: null,
+        details: 'Key (series_id)=(…) already exists. reminders_one_live_occurrence_per_series',
+      }),
+    ).toBe("series_slot_taken");
+  });
+
+  it("stays `unknown` for a different unique index with the same SQLSTATE", () => {
+    expect(
+      mapReminderCommandError({
+        code: "23505",
+        message: 'duplicate key value violates unique constraint "undo_operations_operation_key_key"',
+        details: null,
+      }),
+    ).toBe("unknown");
+  });
+
+  it("has a sentence in both locales that names the cause", () => {
+    for (const locale of locales) {
+      const message = reminderFailureMessage(locale, "series_slot_taken");
+      expect(message).toBeTruthy();
+      // Distinct from the generic failure: the whole point is that this one can
+      // be explained, and "we could not apply the change" explains nothing.
+      expect(message).not.toBe(getReminderCopy(locale).failure.unknown);
+    }
+  });
+});

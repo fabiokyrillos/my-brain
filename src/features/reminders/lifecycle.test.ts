@@ -186,3 +186,64 @@ describe("DEC-7: the dormant status stays dormant", () => {
     expect(body).not.toContain("snoozed_until");
   });
 });
+
+/**
+ * `2R-OCCURRENCE-CANCEL-IRREVERSIBLE` — the one eligibility rule that comes from
+ * an index rather than from the state machine.
+ *
+ * Every other rule in this module mirrors a transition
+ * `apply_reminder_command_v1` enforces. This one mirrors
+ * `reminders_one_live_occurrence_per_series`, a partial unique index, which is
+ * why it is an input rather than a status: two cancelled occurrences of the same
+ * series differ only in whether a replacement currently holds the live slot.
+ *
+ * The migration text is read below so the mirror cannot drift from the index it
+ * mirrors — the discipline the snooze-preset case in this file already uses.
+ */
+describe("a cancelled occurrence whose series already has a live one", () => {
+  it("offers no restore", () => {
+    expect(
+      availableReminderActions({ status: "cancelled", taskId: null, seriesSlotTaken: true }),
+    ).toEqual([]);
+  });
+
+  it("offers restore when the slot is free", () => {
+    expect(
+      availableReminderActions({ status: "cancelled", taskId: null, seriesSlotTaken: false }),
+    ).toEqual(["restore"]);
+  });
+
+  it("is unchanged when the caller says nothing, so no existing behaviour moved", () => {
+    // `2R-MODEL-004`: a reminder without a rule behaves exactly as it did.
+    expect(availableReminderActions({ status: "cancelled", taskId: null })).toEqual(["restore"]);
+  });
+
+  it("does not withhold anything from a scheduled occurrence", () => {
+    // The flag is about `restore` alone. A live occurrence still cancels, snoozes,
+    // reschedules and edits, and withholding those would break the surface the
+    // requirement is about.
+    expect(
+      availableReminderActions({ status: "scheduled", taskId: null, seriesSlotTaken: true }),
+    ).toEqual(["snooze", "reschedule", "edit", "cancel"]);
+  });
+
+  it("mirrors an index the migration really declares", () => {
+    /*
+      The rule has no `raise` to grep for, because the database enforces it with
+      a partial unique index and the violation arrives as a bare `23505`. So the
+      thing to pin is the index itself: if its predicate ever stopped covering
+      `detached_at is null`, a detached occurrence would start colliding too and
+      this mirror would be withholding the wrong control.
+    */
+    const recurrence = readFileSync(
+      path.join(process.cwd(), "supabase/migrations/202608230101_phase_2r_slice_1_reminder_recurrence.sql"),
+      "utf8",
+    );
+    const index = recurrence.slice(
+      recurrence.indexOf("reminders_one_live_occurrence_per_series"),
+      recurrence.indexOf("reminders_series_sequence_key"),
+    );
+    expect(index).toContain("detached_at is null");
+    expect(index).toContain("status = 'scheduled'");
+  });
+});

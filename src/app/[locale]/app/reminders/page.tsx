@@ -19,6 +19,10 @@ import {
   ReminderFeedbackBanner,
   ReminderFeedbackProvider,
 } from "@/features/reminders/feedback";
+import {
+  ReminderSeriesBanner,
+  ReminderSeriesProvider,
+} from "@/features/reminders/series-feedback";
 import { asReminderView, loadReminderPage } from "@/features/reminders/projection";
 import {
   ReminderEmptyState,
@@ -112,11 +116,26 @@ export default async function RemindersPage({
     minute: "2-digit",
     hourCycle: "h23",
   });
-  const formatLocalInput = (iso: string) => {
+  const localParts = (iso: string) => {
     const parts = localInputFormatter.formatToParts(new Date(iso));
-    const part = (type: Intl.DateTimeFormatPartTypes) =>
+    return (type: Intl.DateTimeFormatPartTypes) =>
       parts.find((candidate) => candidate.type === type)?.value ?? "";
+  };
+  const formatLocalInput = (iso: string) => {
+    const part = localParts(iso);
     return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
+  };
+  /**
+   * The wall clock alone, for slice 2R.2's series time field.
+   *
+   * Built from the **same** zone-bound formatter as everything else on this
+   * page, which is the whole of `2R-TIME-005`'s "one timezone authority, not
+   * several" as it applies to this surface: a second `Intl.DateTimeFormat` here
+   * would be a second authority even if it were given the same zone today.
+   */
+  const formatLocalTime = (iso: string) => {
+    const part = localParts(iso);
+    return `${part("hour")}:${part("minute")}`;
   };
 
   const taskOptions = await loadReminderTaskOptions(
@@ -196,18 +215,32 @@ export default async function RemindersPage({
         view, and the row's own result would unmount with it. Server-rendered
         children pass through a client provider unchanged.
       */}
+      {/*
+        Two providers, not one, and the nesting is the point.
+
+        `ReminderSeriesProvider` owns the series command and its undo, and it
+        sits OUTSIDE the list for the reason `feedback.tsx` records and one more:
+        ending a series cancels the live occurrence, so the row that carried the
+        control is gone after revalidation — and the undo button would go with
+        it. State that outlives the row is what keeps the offer alive long enough
+        to be used (`2R-SERIES-007`).
+      */}
       <ReminderFeedbackProvider>
-        <ReminderFeedbackBanner label={copy.heading} working={copy.working} />
-        {reminders.length ? (
-          <ReminderList
-            formatInstant={formatInstant}
-            formatLocalInput={formatLocalInput}
-            locale={locale}
-            reminders={reminders}
-          />
-        ) : (
-          <ReminderEmptyState agentName={agentName} locale={locale} view={view} />
-        )}
+        <ReminderSeriesProvider>
+          <ReminderFeedbackBanner label={copy.heading} working={copy.working} />
+          <ReminderSeriesBanner locale={locale} />
+          {reminders.length ? (
+            <ReminderList
+              formatInstant={formatInstant}
+              formatLocalInput={formatLocalInput}
+              formatLocalTime={formatLocalTime}
+              locale={locale}
+              reminders={reminders}
+            />
+          ) : (
+            <ReminderEmptyState agentName={agentName} locale={locale} view={view} />
+          )}
+        </ReminderSeriesProvider>
       </ReminderFeedbackProvider>
 
       {/* The view travels through `query`, not concatenated into `path` —

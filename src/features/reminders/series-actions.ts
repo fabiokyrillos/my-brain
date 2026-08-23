@@ -48,6 +48,7 @@ import {
   reminderSeriesCommandSchema,
   reminderSeriesCreationSchema,
   reminderSeriesSubmissionSchema,
+  reminderSeriesUndoSchema,
   commandForScope,
 } from "./series-schema";
 
@@ -78,7 +79,7 @@ function seriesFailureMessage(locale: Locale, message: string | undefined): stri
 }
 
 function failure(locale: Locale, message: string): ReminderSeriesActionState {
-  return { status: "error", message, seriesId: null, scope: null };
+  return { status: "error", message, seriesId: null, scope: null, undoId: null };
 }
 
 /**
@@ -155,6 +156,7 @@ export async function createReminderSeries(
     message: copy.series.created,
     seriesId: result?.series_id ?? null,
     scope: null,
+    undoId: null,
   };
 }
 
@@ -234,7 +236,8 @@ export async function applyReminderSeriesCommand(
   }
 
   // The scope the DATABASE says it applied, not the one that was asked for.
-  const applied = (data as { scope?: string } | null)?.scope ?? null;
+  const result = data as { scope?: string; undo_id?: string; replayed?: boolean } | null;
+  const applied = result?.scope ?? null;
   const message = applied === "occurrence"
     ? copy.series.appliedOccurrence
     : applied === "future"
@@ -247,5 +250,90 @@ export async function applyReminderSeriesCommand(
     message,
     seriesId: submission.data.seriesId,
     scope: applied === "occurrence" || applied === "future" ? applied : null,
+    /*
+      Passed through, never synthesised.
+
+      The RPC returns `undo_id` on the round that wrote the ledger row AND on a
+      replay of the same operation key — the idempotent branch hands back the id
+      of the row the first round wrote, which is the same operation and the same
+      single compensation. So a double-submitted form offers one undo for one
+      row rather than two buttons for one change.
+    */
+    undoId: typeof result?.undo_id === "string" ? result.undo_id : null,
+  };
+}
+
+/**
+ * `2R-SERIES-007` — spend a series undo, exactly once.
+ *
+ * ## Why this reads a second consumption as success rather than as an error
+ *
+ * `public.undo_operation` closes the ledger row it spends, so a second press
+ * lands on its idempotent branch and returns `{undone: true, affected: 0,
+ * idempotent: true}` — no exception, no second compensation. This action
+ * therefore has a sentence for *"already undone"* that is distinct from both
+ * success and failure: telling the owner "could not undo" when the change is in
+ * fact already reversed would send them looking for a problem that does not
+ * exist, and telling them "undone" twice would claim a second reversal that
+ * never happened.
+ *
+ * **That branch is reachable here because the two 2R handlers close their row.**
+ * `undo_apply_reminder_series_command_v1` and `undo_create_reminder_series_v1`
+ * both set `status = 'undone'`; slice 2R.1's `a46b525` is where they learned to.
+ * The Phase 2P single-reminder handler does not, which is the remainder
+ * `2R-UNDO-LEDGER-NOT-CLOSED` — and it is exactly why no control in this slice
+ * offers an undo for `apply_reminder_command_v1`. Cancelling one occurrence
+ * asks first instead (`2R-SERIES-008`); see `reminder-actions.tsx`.
+ */
+export async function undoReminderSeriesOperation(
+  _state: ReminderSeriesActionState,
+  formData: FormData,
+): Promise<ReminderSeriesActionState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getReminderCopy(locale);
+
+  const parsed = reminderSeriesUndoSchema.safeParse({
+    locale: formData.get("locale"),
+    undoId: formData.get("undoId"),
+  });
+  if (!parsed.success) {
+    return failure(locale, copy.series.undoFailed);
+  }
+
+  const { supabase } = await requireUser(locale);
+  const { data, error } = await supabase.rpc("undo_operation", {
+    p_undo_id: parsed.data.undoId,
+  });
+
+  if (error) {
+    /*
+      `55P03` means the series moved since the operation was recorded and the
+      handler refused rather than overwriting a newer decision with an older
+      one. Reporting that as "try again" would invite the retry that will keep
+      being refused — the distinction `undoAutomationCategoryPolicy` draws, for
+      the same reason.
+    */
+    console.error("Reminder series undo failed", error.code);
+    return failure(
+      locale,
+      error.code === "55P03" ? copy.series.undoStale : copy.series.undoFailed,
+    );
+  }
+
+  const idempotent = (data as { idempotent?: boolean } | null)?.idempotent === true;
+
+  revalidatePath(`/${locale}/app/reminders`);
+  return {
+    status: "success",
+    message: idempotent ? copy.series.undoAlready : copy.series.undoSucceeded,
+    seriesId: null,
+    scope: null,
+    /*
+      The offer is not renewed. The row this spent is closed, and handing its id
+      back would render a button whose only possible outcome is the sentence
+      above — an affordance that cannot change anything is the "disabled
+      placeholder for an unsupported operation" UX-12 refuses.
+    */
+    undoId: null,
   };
 }

@@ -409,6 +409,128 @@
   color: var(--tone-risk-fg);
 }
 
+/*
+ * Slice 2R.2 — the rule behind a row, the scope question, and the undo.
+ *
+ * Every rule below sits ABOVE the one media query in this file, which is not
+ * arrangement. `@media (max-width: 480px)` adds no specificity, so a base rule
+ * written after it wins at every width and the narrow layout silently stops
+ * applying. The narrow overrides for these classes are inside that block, at
+ * the end, with the others.
+ */
+.reminder-series {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-default);
+}
+
+.reminder-series-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.reminder-series-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/*
+ * The detached badge reads as a *state*, not as a risk and not as a demand.
+ *
+ * `information`, deliberately, and the two it is not are the reasoning.
+ * `risk` would colour a choice the owner made on purpose as a problem.
+ * `attention` is the amber `experience.css:31` reserves **exclusively** for
+ * "precisa de você", and a badge that merely reports a fact is not asking for
+ * anything — spending that tone here would blunt it where it does mean that.
+ *
+ * The pair is the token set's own: `#3a6ea5` on `#ecf1f7` measures 4.74:1,
+ * which passes AA for the 11px text a `.status-badge` renders.
+ */
+.reminder-series-detached {
+  border: 1px solid var(--tone-information-line);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+}
+
+.reminder-series-hint {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/*
+ * The scope question.
+ *
+ * A real `fieldset`/`legend` pair, so the two radios are announced as one group
+ * with its question — the accessible shape a `<p>` plus two loose radios does
+ * not have. The default browser fieldset border is replaced rather than removed:
+ * the grouping has to be visible as well as announced.
+ */
+.reminder-scope {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+}
+
+.reminder-scope legend {
+  padding: 0 4px;
+  font: 700 11px var(--font-mono, inherit);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The time field the series panel adds, matched to the panel's other inputs
+   rather than left to the user-agent default. */
+.reminder-panel input[type="time"] {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: 400 14px var(--font-ui);
+}
+
+/*
+ * The banner, above the list.
+ *
+ * `min-height` rather than a conditional render: the live region exists from
+ * first paint so its first sentence is a *change* to announce, and reserving its
+ * height stops the list jumping when that sentence arrives.
+ */
+.reminder-series-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.reminder-series-live {
+  min-height: 20px;
+  flex: 1 1 200px;
+}
+
+.reminder-series-live .reminder-feedback {
+  margin-top: 0;
+}
+
+.reminder-series-undo {
+  display: flex;
+}
+
 @media (max-width: 480px) {
   .reminder-action-row > form,
   .reminder-action-row > button {
@@ -425,5 +547,18 @@
 
   .reminder-panel-actions > .reminder-button {
     flex: 1 1 100%;
+  }
+
+  /* Slice 2R.2. The banner stacks so the undo button keeps a full-width target
+     rather than being squeezed beside the sentence it belongs to, and the live
+     region keeps its reserved height at every width. */
+  .reminder-series-feedback {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reminder-series-undo > .reminder-button {
+    flex: 1 1 100%;
+    justify-content: center;
   }
 }

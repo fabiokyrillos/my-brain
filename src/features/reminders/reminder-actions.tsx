@@ -290,7 +290,22 @@ export function ReminderActions({
         <form action={formAction} className="reminder-panel danger">
           {hidden("cancel")}
           <p className="reminder-panel-title">{copy.cancelConfirmTitle}</p>
-          <p className="reminder-panel-body">{copy.cancelConfirmBody}</p>
+          {/*
+            Two bodies, chosen by a fact rather than hedged into one sentence —
+            slice 2R.2, `2R-SERIES-008`.
+
+            For an attached occurrence of an active rule, cancelling materialises
+            the replacement, the replacement takes the one live slot
+            `reminders_one_live_occurrence_per_series` allows, and `restore` is
+            then refused by that index. So `cancelConfirmBody`'s promise that the
+            row "can be reactivated later" is false for exactly this shape, and
+            the operation has to name itself before it asks.
+          */}
+          <p className="reminder-panel-body">
+            {reminder.series !== null && reminder.series.active && !reminder.series.detached
+              ? copy.cancelConfirmBodySeries
+              : copy.cancelConfirmBody}
+          </p>
           <div className="reminder-panel-actions">
             <button className="reminder-button danger" disabled={pending} type="submit">
               {pending ? copy.working : copy.cancelConfirmAccept}

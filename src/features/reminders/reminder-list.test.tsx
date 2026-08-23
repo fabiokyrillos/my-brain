@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Locale } from "@/lib/preferences";
@@ -8,6 +9,7 @@ import type { Locale } from "@/lib/preferences";
 import { getReminderCopy } from "./copy";
 import type { ReminderViewModel } from "./projection";
 import { ReminderFeedbackProvider } from "./feedback";
+import { ReminderSeriesProvider } from "./series-feedback";
 import { ReminderEmptyState, ReminderList, ReminderViewNav } from "./reminder-list";
 
 /**
@@ -31,6 +33,7 @@ const formatInstant = (iso: string) => `[${iso}]`;
 // minute — which is what every snooze produces and what crashed the reschedule
 // panel when the client formatted it.
 const formatLocalInput = (iso: string) => iso.slice(0, 16);
+const formatLocalTime = (iso: string) => iso.slice(11, 16);
 
 function reminder(overrides: Partial<ReminderViewModel> = {}): ReminderViewModel {
   return {
@@ -43,6 +46,9 @@ function reminder(overrides: Partial<ReminderViewModel> = {}): ReminderViewModel
     hasPendingDelivery: true,
     overdue: false,
     link: null,
+    // Slice 2R.2. The default fixture is an ordinary reminder, which is what
+    // every case below is about; the series cases build their own.
+    series: null,
     actions: ["snooze", "reschedule", "edit", "cancel"],
     expectedState: {
       status: "scheduled",
@@ -60,12 +66,15 @@ function renderList(reminders: readonly ReminderViewModel[], locale: Locale = "p
   // list without it is the wiring mistake `useReminderCommand` throws on.
   return render(
     <ReminderFeedbackProvider>
-      <ReminderList
-        formatInstant={formatInstant}
-        formatLocalInput={formatLocalInput}
-        locale={locale}
-        reminders={reminders}
-      />
+      <ReminderSeriesProvider>
+        <ReminderList
+          formatInstant={formatInstant}
+          formatLocalInput={formatLocalInput}
+          formatLocalTime={formatLocalTime}
+          locale={locale}
+          reminders={reminders}
+        />
+      </ReminderSeriesProvider>
     </ReminderFeedbackProvider>,
   );
 }
@@ -271,5 +280,57 @@ describe("a long title does not break the row", () => {
     const title = "Ligar para o contador ".repeat(20).trim();
     renderList([reminder({ title, expectedState: { ...reminder().expectedState, title } })]);
     expect(screen.getByText(title)).toBeInTheDocument();
+  });
+});
+
+/**
+ * `2R-SERIES-008` — the confirmation names what it is about to do, slice 2R.2.
+ *
+ * Cancelling an attached occurrence of an active rule materialises the
+ * replacement, the replacement takes the one live slot the database permits, and
+ * the cancelled row can no longer be reactivated. The standing body promises
+ * reactivation, so for this shape it is a false promise — and a promise that is
+ * true half the time is worse than two bodies, because nothing on screen tells
+ * the owner which half they are in.
+ */
+describe("cancelling an occurrence that carries a rule", () => {
+  const SERIES_ID = "77777777-7777-4777-8777-777777777777";
+  const copy = getReminderCopy("pt-BR");
+
+  const withSeries = (overrides: Partial<ReminderViewModel["series"]> = {}) =>
+    reminder({
+      series: { id: SERIES_ID, active: true, detached: false, sequence: 2, ...overrides },
+    });
+
+  const openCancel = async () => {
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: copy.actionLabel.cancel }));
+  };
+
+  it("warns that this occurrence cannot be reactivated", async () => {
+    renderList([withSeries()]);
+    await openCancel();
+    expect(screen.getByText(copy.cancelConfirmBodySeries)).toBeTruthy();
+    expect(screen.queryByText(copy.cancelConfirmBody)).toBeNull();
+  });
+
+  it("keeps the ordinary promise for a detached occurrence", async () => {
+    // The trigger skips a detached row, so nothing replaces it and `restore`
+    // works — proved against the deployed database.
+    renderList([withSeries({ detached: true })]);
+    await openCancel();
+    expect(screen.getByText(copy.cancelConfirmBody)).toBeTruthy();
+  });
+
+  it("keeps the ordinary promise when the rule has ended", async () => {
+    renderList([withSeries({ active: false })]);
+    await openCancel();
+    expect(screen.getByText(copy.cancelConfirmBody)).toBeTruthy();
+  });
+
+  it("keeps the ordinary promise for a reminder with no rule at all", async () => {
+    renderList([reminder()]);
+    await openCancel();
+    expect(screen.getByText(copy.cancelConfirmBody)).toBeTruthy();
   });
 });

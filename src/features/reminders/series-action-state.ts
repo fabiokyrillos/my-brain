@@ -30,6 +30,21 @@ export type ReminderSeriesActionState = {
   readonly seriesId: string | null;
   /** The scope the database reports it applied. `null` for a create or an end. */
   readonly scope: ReminderSeriesScope | null;
+  /**
+   * `2R-SERIES-007`/`-008` — the ledger row this operation wrote, or `null`.
+   *
+   * **The offer of an undo is this field being non-null, and nothing else.**
+   * There is no branch in the surface that can decide an operation is
+   * reversible: the id arrives because `apply_reminder_series_command_v1`
+   * returned one, which it does exactly when it inserted a compensable row.
+   * An operation with no real compensation therefore cannot be given a button
+   * that claims one — which is what `2R-SERIES-008` asks for, expressed as a
+   * type rather than as a rule somebody has to remember.
+   *
+   * `null` for a create (slice 2R.3's surface has its own affordance to build)
+   * and for every failure.
+   */
+  readonly undoId: string | null;
 };
 
 export const IDLE_REMINDER_SERIES_STATE: ReminderSeriesActionState = {
@@ -37,4 +52,5 @@ export const IDLE_REMINDER_SERIES_STATE: ReminderSeriesActionState = {
   message: "",
   seriesId: null,
   scope: null,
+  undoId: null,
 };

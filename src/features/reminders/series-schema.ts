@@ -152,3 +152,21 @@ export const reminderSeriesSubmissionSchema = z
   .strict();
 
 export type ReminderSeriesSubmission = z.infer<typeof reminderSeriesSubmissionSchema>;
+
+/**
+ * `2R-SERIES-007` — the undo submission, which is one identifier and nothing else.
+ *
+ * Deliberately **not** carrying the scope, the series or the reminder it came
+ * from. `public.undo_operation` re-reads the recorded operation and decides for
+ * itself what to compensate; anything else travelling here would be a second
+ * opinion about a decision the router has already made from the ledger, and a
+ * second opinion is what makes two authorities.
+ */
+export const reminderSeriesUndoSchema = z
+  .object({
+    locale: localeSchema,
+    undoId: z.string().uuid(),
+  })
+  .strict();
+
+export type ReminderSeriesUndo = z.infer<typeof reminderSeriesUndoSchema>;
