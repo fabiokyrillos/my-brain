@@ -15,26 +15,43 @@ import { describe, expect, it } from "vitest";
  *
  * ## The posture it holds
  *
- * ADR-131 authorizes **planning only** and signs **nothing**. So the assertions
- * come in two directions, and both matter:
+ * The assertions come in two directions, and both matter:
  *
- *  - the package is **present and coherent** — seven documents, 73 declarations,
+ *  - the package is **present and coherent** — eight documents, 73 declarations,
  *    ten families with locked counts and no gaps, every requirement carrying a
  *    slice and an observable criterion;
- *  - everything that only exists *after* implementation is **absent** — no
- *    acceptance record, no matrix, no closing report, no deployment record, and
- *    **no Phase 2R migration**.
+ *  - everything the phase has **not yet reached** is asserted absent — the
+ *    matrix, the closing report, the acceptance records of slices that have not
+ *    run, the deployment record, and **the Phase 2R migration**.
  *
  * Phase 2N's equivalent was inverted at closeout rather than deleted, Phase 2P's
  * was flipped rather than relaxed, and Phase 2Q's was inverted slice by slice.
- * This file is written to be **inverted the same way**, not thrown away: an
- * absence nobody asserts is an absence nobody notices disappearing.
+ * This file is inverted **the same way**, not thrown away: an absence nobody
+ * asserts is an absence nobody notices disappearing.
+ *
+ * ## Its posture has moved twice, and the moves are recorded rather than tidied
+ *
+ * It was written under ADR-131 — planning only, nothing signed, nothing
+ * implemented — and every one of those was a checkable property that has since
+ * become false:
+ *
+ *  - **ADR-132** signed all nine decisions and moved the migration budget from
+ *    PROPOSED to **ALLOCATED**. The *"no decision is signed"* assertions were
+ *    flipped in place; the *"no migration file exists"* assertion was not,
+ *    because allocated is not created.
+ *  - **ADR-133** authorized implementation, slices 2R.0 … 2R.5. The *"nothing is
+ *    implemented"* assertions become *"exactly what the authorized slices
+ *    produced, and nothing further"*, one entry crossing over per slice.
+ *
+ * Neither move loosened anything. Each kept the same subject and the same
+ * strictness and changed only the direction, which is the difference between
+ * inverting a guard and retiring one.
  *
  * ## The pins this file carries
  *
- * 1. **No decision is signed.** All nine `OD-2R-*` are OPEN, including the theme
- *    itself. A package that reported a recommendation as a signature would be
- *    describing a decision nobody made — which is `2R-CLOSE-008`.
+ * 1. **A signature or an authorization is claimable only where an accepted ADR
+ *    names it.** That is `2R-CLOSE-008`, and it is checked in both halves — the
+ *    mark in the document, and the ADR that earns it.
  * 2. **No family name may contain a digit.** `2K-A11Y` did, which made Phase
  *    2K's seven accessibility requirements invisible to every prose count, to
  *    the traceability generator's attribution check, *and* to the A13 detector's
@@ -46,7 +63,8 @@ import { describe, expect, it } from "vitest";
  *    nine families" when the tables held 73 across ten; it was caught by
  *    counting the table rows rather than by reading the sentence. So the
  *    sentence is asserted **against the derived count**, in both directions.
- * 4. **The migration budget is PROPOSED, not allocated.**
+ * 4. **Allocated is not created.** The budget is 1 allocated; the file count is
+ *    still asserted at zero, and moves only in the commit slice 2R.1 spends it.
  */
 
 const REPO = resolve(__dirname, "../../..");
@@ -212,7 +230,16 @@ describe("Phase 2R: no family name is invisible to the tooling", () => {
   });
 });
 
-describe("Phase 2R: nothing is signed, and nothing is implemented", () => {
+/**
+ * **Renamed at slice 2R.0, because the block no longer describes what it holds.**
+ *
+ * It was *"nothing is signed, and nothing is implemented"*. ADR-132 made the
+ * first half false and ADR-133 the second, and a block whose name contradicts
+ * its assertions is how a reader stops trusting the assertions. The subject is
+ * unchanged: **every claim of a signature or an authorization is earned by an
+ * accepted ADR, and everything not yet reached is asserted absent.**
+ */
+describe("Phase 2R: every signature and every authorization is earned by an ADR", () => {
   /**
    * **Inverted by ADR-132, not deleted.**
    *
@@ -329,7 +356,10 @@ describe("Phase 2R: nothing is signed, and nothing is implemented", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
     expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration file exists")
       .toEqual([]);
-    expect(migrations.length, "the migration count moved during a planning-only phase").toBe(100);
+    // Slice 2R.1 spends the allocation and moves this to 101, in the commit that
+    // creates the file. Until then the count is the proof that it has not been
+    // spent early.
+    expect(migrations.length, "the migration count moved before slice 2R.1").toBe(100);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {
@@ -372,17 +402,85 @@ describe("Phase 2R: nothing is signed, and nothing is implemented", () => {
       .toBeGreaterThan(0);
   });
 
-  it("carries none of the artifacts that only exist after implementation", () => {
-    // Inverted, slice by slice, as each legitimately appears — never deleted.
+  /**
+   * **Inverted at slice 2R.0 by ADR-133, not deleted.**
+   *
+   * The list was the whole of it while nothing was authorized. Slice 2R.0 has
+   * now shipped, so its acceptance record has moved from the forbidden column
+   * to the required one — **in place**, keeping the same subject and the same
+   * strictness. Everything the phase has not yet reached is still asserted
+   * absent, and each entry moves across as, and only as, its slice lands.
+   *
+   * The reason is the one this file has given three times: an absence nobody
+   * asserts is an absence nobody notices disappearing.
+   */
+  it("carries exactly the artifacts its authorized slices have produced, and no others", () => {
+    for (const present of [
+      "docs/reports/phase-2r/PHASE_2R_SLICE_00_ACCEPTANCE.md",
+    ]) {
+      expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
+    }
     for (const forbidden of [
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_00_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_01_DEPLOYMENT.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_05_ACCEPTANCE.md",
       "scripts/generate-phase-2r-traceability.mjs",
     ]) {
-      expect(existsSync(join(REPO, forbidden)), `${forbidden} exists before implementation`).toBe(false);
+      expect(existsSync(join(REPO, forbidden)), `${forbidden} exists before its slice`).toBe(false);
     }
+  });
+
+  /**
+   * **`2R-CLOSE-008`'s shape, applied to the authorization rather than to a
+   * signature.**
+   *
+   * ADR-131 and ADR-132 both said, in terms, that signing is not authorizing
+   * implementation and that allocated is not created. That made "implementation
+   * is not authorized" a checkable property, and it was checked. It is now
+   * false, so the check is **flipped rather than dropped**: implementation may
+   * be claimed only where an accepted ADR authorizes it, and the two facts the
+   * earlier ADRs were careful to separate must stay separate in this one.
+   */
+  it("holds implementation AUTHORIZED, by an accepted ADR that still refuses to close the phase", () => {
+    const decisions = read("docs/DECISIONS.md");
+    const at = decisions.indexOf("## ADR-133");
+    expect(at, "ADR-133 is missing").toBeGreaterThan(-1);
+    const next = decisions.indexOf("\n## ADR-", at + 1);
+    const body = next < 0 ? decisions.slice(at) : decisions.slice(at, next);
+
+    expect(body).toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "it must authorize construction").toMatch(/authorizes the \*\*construction\*\*/);
+    expect(body, "every slice must be named").toMatch(/2R\.0 … 2R\.5/);
+    expect(body, "it must not authorize closure").toMatch(/does not authorize the phase to close/i);
+    expect(body, "a second migration must remain a stop condition")
+      .toMatch(/second migration of any kind (is|remains) a stop condition/);
+    expect(body, "the lift must not reach tasks").toMatch(/2R-TASK-RECURRENCE/);
+    /*
+     * The refusal `OD-2R-2` signed, checked without writing the four letters as
+     * a string literal. `phase-2m-recurrence-guard.test.ts` scans this tree for
+     * exactly that token and does not exempt this file, so naming it here would
+     * report this guard as the artifact it exists to forbid — the collision
+     * slice 2P.7 already paid for once.
+     */
+    expect(body, "the open recurrence language must stay refused by name")
+      .toMatch(/refused by name/);
+    expect(body, "the waiver must not move").toMatch(/NOT EXECUTED — OWNER WAIVED/);
+    expect(body, "merge-SHA CI must be distinguished from a green pull-request head")
+      .toMatch(/exact merge SHA/);
+    expect(body, "hardware must not be dischargeable by a document")
+      .toMatch(/emulator, a viewport, a document or an automated test/);
+    expect(body, "an ADR in this series must not name the successor").not.toMatch(/2S/i);
+
+    // And the two facts ADR-131 and ADR-132 kept apart stay apart: authorized to
+    // create is not created, and slice 2R.0 created none.
+    const migrations = readdirSync(join(REPO, "supabase/migrations"));
+    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration file exists")
+      .toEqual([]);
   });
 
   it("classifies no requirement while the phase is unimplemented", () => {

@@ -261,12 +261,35 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      */
     expect(line, "Phase 2R has received a second decision and the line must cite it")
       .toContain("ADR-132");
-    expect(line, "ADR-131 authorizes planning only, and the line must say so")
+    /*
+     * **Moved again with ADR-133**, in the commit that recorded it, and the
+     * direction reverses for the eighth time in this assertion's life. ADR-133
+     * authorizes **implementation** of slices 2R.0 … 2R.5, so requiring the line
+     * to say "no implementation is authorized" would now force it to
+     * *understate* an authorization the owner has given — which is exactly the
+     * error ADR-128 corrected and ADR-131 corrected back.
+     *
+     * The rule has not moved and is the only thing that never does: **the line
+     * cites every authorization the active phase has received, and overstates
+     * none of them.** Phase 2R now has three, so all three are required here,
+     * and the word "PLANNING" survives because ADR-131 is still one of them —
+     * dropping it would lose an authorization, not tidy one.
+     *
+     * What is *not* asserted here is closure. ADR-133 explicitly does not
+     * authorize it, so a line claiming the phase is closed would be the
+     * overstatement this assertion has always existed to catch, and
+     * `phase-2r-declarations.test.ts` holds that half against the ADR itself.
+     */
+    expect(line, "Phase 2R's implementation authorization is ADR-133 and the line must cite it")
+      .toContain("ADR-133");
+    expect(line, "the planning authorization is still one of the three and must not be dropped")
       .toMatch(/PLANNING/i);
     expect(line, "the signatures must be recorded, not implied")
       .toMatch(/SIGNED/i);
-    expect(line, "no implementation is authorized, and the line must not overstate it")
-      .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    expect(line, "implementation is authorized, and the line must not understate it")
+      .toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    expect(line, "closure is NOT authorized, and the line must not overstate it")
+      .not.toMatch(/PHASE (2R )?CLOSED|CLOSURE AUTHORIZED/i);
     // `OD-2R-7` allocated one migration and no file exists. Those are different
     // facts and the line has to carry both, because "one migration" alone reads
     // as a spend. Asserted positively so it fails when the distinction is
