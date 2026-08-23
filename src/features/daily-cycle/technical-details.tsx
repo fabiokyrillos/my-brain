@@ -176,7 +176,15 @@ export function TechnicalDetails({
               {history.map((revision) => (
                 <li key={revision.interpretationId} className={revision.isCurrent ? "revision-current" : undefined}>
                   <History size={17} aria-hidden="true" />
-                  <div><strong>v{revision.version} · {originLabels[revision.origin]?.[locale] ?? revision.origin}</strong><p>{revision.summary}</p>{revision.correctionReason && <small>{revision.correctionReason}</small>}</div>
+                  {/*
+                    The class is load-bearing, not decorative. The icon above is
+                    `position:absolute`, so it is not a grid item and does not
+                    consume a column; without an explicit `grid-column` this
+                    block auto-placed into the first track and the summary
+                    wrapped one word per line. See `.revision-entry` in
+                    `src/app/operations.css`.
+                  */}
+                  <div className="revision-entry"><strong>v{revision.version} · {originLabels[revision.origin]?.[locale] ?? revision.origin}</strong><p>{revision.summary}</p>{revision.correctionReason && <small>{revision.correctionReason}</small>}</div>
                   <time dateTime={revision.createdAt}>{formatInstant(revision.createdAt, "dayAndTime", locale, timeZone)}</time>
                 </li>
               ))}

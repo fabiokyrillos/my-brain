@@ -552,3 +552,688 @@ test.describe("the task detail composes into two columns without reordering them
     }
   });
 });
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `Histórico imutável` — the revision timeline.
+ *
+ * The owner reported the interpretation summary rendering "praticamente uma
+ * palavra por linha" inside `Ver detalhes técnicos`. The cause is invisible to
+ * every jsdom test in the repository, because it is a grid-placement fact:
+ * `.revision-timeline li` declared three columns whose first was reserved for
+ * the `History` icon, but that icon is `position:absolute` — so it is not a grid
+ * item, does not consume a track, and the summary block auto-placed into the
+ * 24px column meant for it.
+ *
+ * The second half of the finding is width, and it is why these tests measure the
+ * **real ancestry** rather than the timeline alone: from 1080px up the block
+ * lives in `.record-explanation`, a `minmax(320px,.65fr)` aside, so a desktop row
+ * has ~240px of content — less than a 375px phone gives it. The viewport says
+ * nothing useful about this container, which is why the layout switches on the
+ * container and why the assertions below never hardcode "desktop means two
+ * columns".
+ */
+
+/** Mirrors the `History` icon `technical-details.tsx` renders per row. */
+const TIMELINE_ICON = '<svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true"></svg>';
+
+/** A real interpretation summary, long enough that any starved column wraps it. */
+const REVISION_SUMMARY =
+  "Preciso desenvolver um relatório de Sweepstakes para Garo, que faz parte da Royal Caribbean, com o prazo jogado para a sexta-feira seguinte.";
+const REVISION_SUMMARY_EN =
+  "Develop the Sweepstakes report for Garo at Royal Caribbean, with the deadline moved to the following Friday.";
+const CORRECTION_REASON = "Corrigi o prazo porque a sexta-feira seguinte cai depois dos quinze dias.";
+
+/** `formatInstant(…, "dayAndTime", …)` — `dateStyle:"medium"`, `timeStyle:"short"`. */
+const MEDIUM_DATE = "22 de ago. de 2026, 14:32";
+/**
+ * The longest timestamp this surface can be asked to render. `dayAndTime` is
+ * medium today, so this is a deliberate over-statement of the input: a date
+ * column that survives this cannot starve the summary with the real one.
+ */
+const LONG_DATE = "sábado, 22 de agosto de 2026 às 14:32:07 BRT";
+
+function revisionRow(options: {
+  version: number;
+  origin: string;
+  summary: string;
+  date: string;
+  current?: boolean;
+  reason?: string;
+}) {
+  const reason = options.reason ? `<small>${options.reason}</small>` : "";
+  return `<li${options.current ? ' class="revision-current"' : ""}>${TIMELINE_ICON}<div class="revision-entry"><strong>v${options.version} · ${options.origin}</strong><p>${options.summary}</p>${reason}</div><time datetime="2026-08-22T17:32:00.000Z">${options.date}</time></li>`;
+}
+
+/**
+ * The disclosure is `open` here and closed in the product. That is the one
+ * concession this fixture makes: a `<details>` that is shut has no layout to
+ * measure, and the defect is in the layout it has when the owner opens it.
+ */
+function historyBody(options: { date?: string; revisions?: number } = {}) {
+  const date = options.date ?? MEDIUM_DATE;
+  const rows = [
+    revisionRow({ version: 3, origin: "Reinterpretação por IA", summary: REVISION_SUMMARY, date, current: true }),
+    revisionRow({ version: 2, origin: "Correção do usuário", summary: REVISION_SUMMARY_EN, date, reason: CORRECTION_REASON }),
+    revisionRow({ version: 1, origin: "Interpretação inicial", summary: REVISION_SUMMARY, date }),
+  ].slice(0, options.revisions ?? 3);
+  return `<div class="content-page entry-detail-page"><div class="entry-review record-detail">
+    <div class="record-detail-columns">
+      <div class="record-decision"><section class="review-understanding"><p class="review-understanding-body">${REVISION_SUMMARY}</p></section></div>
+      <aside class="record-explanation" aria-label="Como este registro foi lido">
+        <details class="technical-details" open>
+          <summary>Ver detalhes técnicos</summary>
+          <div class="technical-details-body">
+            <section class="interpretation-history">
+              <div class="section-heading"><span aria-hidden="true">${ICON}</span><div><h2>Histórico imutável</h2><p>Cada correção, undo e reinterpretação acrescenta uma versão.</p></div></div>
+              <ol class="revision-timeline">${rows.join("")}</ol>
+            </section>
+          </div>
+        </details>
+      </aside>
+    </div>
+  </div></div>`;
+}
+
+type RevisionGeometry = {
+  lines: number;
+  words: number;
+  wordsPerLine: number;
+  timeOverflows: boolean;
+  entryColumn: string;
+  timeColumn: string;
+  entryLeft: number;
+  entryWidth: number;
+  timeLeft: number;
+  timeWidth: number;
+  rowWidth: number;
+  sideBySide: boolean;
+  iconIsGridItem: boolean;
+};
+
+/** `border-left:2px` plus `padding-left:18px` on `.revision-timeline li`. */
+const ROW_CHROME = 20;
+/** The `column-gap` on `.revision-timeline li`. */
+const ROW_GAP = 11;
+
+async function revisionGeometry(page: Page): Promise<RevisionGeometry[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".revision-timeline li")].map((row) => {
+      const entry = row.querySelector(".revision-entry") as HTMLElement | null;
+      if (!entry) throw new Error("the revision row rendered no .revision-entry block");
+      const paragraph = entry.querySelector("p") as HTMLElement;
+      const time = row.querySelector("time") as HTMLElement;
+      const icon = row.querySelector(":scope > svg") as HTMLElement;
+      const style = getComputedStyle(paragraph);
+      const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+      const height = paragraph.getBoundingClientRect().height;
+      const lines = Math.max(1, Math.round(height / lineHeight));
+      const words = (paragraph.textContent ?? "").trim().split(/\s+/u).filter(Boolean).length;
+      const entryBox = entry.getBoundingClientRect();
+      const timeBox = time.getBoundingClientRect();
+      return {
+        lines,
+        words,
+        wordsPerLine: words / lines,
+        // A `nowrap` timestamp wider than its column is truncated by the card's
+        // `overflow:hidden` with no ellipsis, which the page-level overflow
+        // check cannot see.
+        timeOverflows: time.scrollWidth > time.clientWidth + 1,
+        entryColumn: getComputedStyle(entry).gridColumnStart,
+        timeColumn: getComputedStyle(time).gridColumnStart,
+        entryLeft: Math.round(entryBox.left),
+        entryWidth: Math.round(entryBox.width),
+        timeLeft: Math.round(timeBox.left),
+        timeWidth: Math.round(timeBox.width),
+        rowWidth: Math.round(row.getBoundingClientRect().width),
+        sideBySide: Math.abs(entryBox.top - timeBox.top) < 4,
+        iconIsGridItem: getComputedStyle(icon).position !== "absolute",
+      };
+    }),
+  );
+}
+
+/**
+ * Every width the owner asked to see, plus the two the repository already
+ * measures. 1440 and 1280 are above the 1080px split, so they exercise the
+ * narrow aside; 900 and 700 are below it, so they exercise the wide row.
+ */
+/**
+ * **Words** per line, not characters, and the metric change is deliberate.
+ *
+ * The row-title floor above is 24 characters, chosen for 13px UI titles in a
+ * panel. This surface is a 17px reading serif inside a column the stylesheet
+ * deliberately narrows: at 1440x900 the timeline is nested three cards deep —
+ * `.record-explanation` is 320px, and `.technical-details-body` and
+ * `.interpretation-history` each add 25px of padding on both sides — so the
+ * summary has **188px**, and a character floor calibrated for a wide list is
+ * measuring the aside's width rather than the defect.
+ *
+ * Words per line measures the reported symptom itself: *"praticamente uma
+ * palavra por linha"*. The broken layout put the summary in a 24px track, about
+ * one word per line; the fixed layout measures 2.8 (English, whose words are
+ * longer) to 3.7 (Portuguese) in that same 188px column, and more everywhere
+ * else. A floor of 2 separates those two populations and cannot be satisfied by
+ * the defect returning in any form.
+ */
+const TIMELINE_MIN_WORDS_PER_LINE = 2;
+
+const TIMELINE_VIEWPORTS = [
+  { name: "1440x900", width: 1440, height: 900 },
+  { name: "1280x800", width: 1280, height: 800 },
+  { name: "900x900", width: 900, height: 900 },
+  { name: "700x900", width: 700, height: 900 },
+  { name: "600x900", width: 600, height: 900 },
+  { name: "440x900", width: 440, height: 900 },
+  { name: "375x667", width: 375, height: 667 },
+] as const;
+
+test.describe("the immutable history timeline never starves the revision summary", () => {
+  test("the summary block owns the main column at every width, and the icon owns none", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      const rows = await revisionGeometry(page);
+      expect(rows, `no revision rows rendered at ${viewport.name}`).toHaveLength(3);
+      for (const [index, row] of rows.entries()) {
+        expect(row.iconIsGridItem, `${viewport.name} row ${index}: the icon became a grid item`).toBe(false);
+        expect(row.entryColumn, `${viewport.name} row ${index}: the summary is not in the first column`).toBe("1");
+        /*
+          The font-independent half of the guard, and the one that would have
+          caught the original defect on its own: the summary claims every pixel
+          the date does not. A track reserved for something that is not there —
+          the `24px` the absolutely-positioned icon never occupied — shows up
+          here as missing width, whatever the type is doing.
+        */
+        const claimed = row.entryWidth + (row.sideBySide ? row.timeWidth + ROW_GAP : 0);
+        expect(
+          claimed,
+          `${viewport.name} row ${index}: ${row.rowWidth - ROW_CHROME - claimed}px of the row is reserved for nothing`,
+        ).toBeGreaterThanOrEqual(row.rowWidth - ROW_CHROME - 1);
+      }
+    }
+  });
+
+  for (const viewport of TIMELINE_VIEWPORTS) {
+    test(`keeps the summary readable at ${viewport.name}`, async ({ page }) => {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      for (const [index, row] of (await revisionGeometry(page)).entries()) {
+        expect(
+          row.wordsPerLine,
+          `row ${index} at ${viewport.name}: ${row.words} words on ${row.lines} lines in a ${row.entryWidth}px column (row ${row.rowWidth}px)`,
+        ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+      }
+    });
+  }
+
+  test("a long timestamp cannot compress the summary", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody({ date: LONG_DATE }), viewport.width, viewport.height);
+      for (const [index, row] of (await revisionGeometry(page)).entries()) {
+        expect(
+          row.wordsPerLine,
+          `row ${index} at ${viewport.name} with a long date: ${row.words} words on ${row.lines} lines in ${row.entryWidth}px`,
+        ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+        expect(
+          row.timeOverflows,
+          `row ${index} at ${viewport.name}: the long timestamp overflowed its column and was truncated`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  /*
+   * The placement invariant, stated without naming a viewport: where the date
+   * shares the row it is the *final* column and sits to the right of the
+   * summary; where it does not, it is stacked underneath in the same column.
+   * The two counters below make this a real control — a build where the date
+   * never shared a row, or never stacked, would satisfy the invariant vacuously.
+   */
+  test("the date is either the final column or stacked under the summary, never beside it in column one", async ({ page }) => {
+    let sideBySideSeen = 0;
+    let stackedSeen = 0;
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      for (const date of [MEDIUM_DATE, LONG_DATE]) {
+        await render(page, historyBody({ date }), viewport.width, viewport.height);
+        for (const [index, row] of (await revisionGeometry(page)).entries()) {
+          const where = `row ${index} at ${viewport.name}`;
+          if (row.sideBySide) {
+            sideBySideSeen += 1;
+            expect(row.timeColumn, `${where}: a shared row put the date outside the final column`).toBe("2");
+            expect(row.timeLeft, `${where}: the date is not to the right of the summary`).toBeGreaterThan(row.entryLeft);
+          } else {
+            stackedSeen += 1;
+            expect(row.timeColumn, `${where}: a stacked date left the main column`).toBe("1");
+          }
+        }
+      }
+    }
+    expect(sideBySideSeen, "no width put the date in the final column").toBeGreaterThan(0);
+    expect(stackedSeen, "no width stacked the date under the summary").toBeGreaterThan(0);
+  });
+
+  test("multiple revisions and their correction reasons each keep their own row", async ({ page }) => {
+    for (const viewport of [TIMELINE_VIEWPORTS[0], TIMELINE_VIEWPORTS[5]]) {
+      await render(page, historyBody(), viewport.width, viewport.height);
+      const reasons = await page.locator(".revision-timeline small").count();
+      expect(reasons, `the correction reason disappeared at ${viewport.name}`).toBe(1);
+      const tops = await page.evaluate(() =>
+        [...document.querySelectorAll(".revision-timeline li")].map((row) =>
+          Math.round(row.getBoundingClientRect().top),
+        ),
+      );
+      // Three rows, none overlapping: a collapsed row would repeat a top.
+      expect(new Set(tops).size, `revision rows overlapped at ${viewport.name}`).toBe(3);
+    }
+  });
+
+  test("survives print emulation, which is the export path", async ({ page }) => {
+    // There is no `@media print` block in the repository, so printing renders
+    // the screen layout — which is exactly why it has to be measured rather than
+    // assumed: a rule that only held under a `screen`-scoped query would not.
+    await page.emulateMedia({ media: "print" });
+    try {
+      for (const viewport of [TIMELINE_VIEWPORTS[0], TIMELINE_VIEWPORTS[5]]) {
+        await render(page, historyBody(), viewport.width, viewport.height);
+        for (const [index, row] of (await revisionGeometry(page)).entries()) {
+          expect(
+            row.wordsPerLine,
+            `row ${index} at ${viewport.name} in print: ${row.words} words on ${row.lines} lines in ${row.entryWidth}px`,
+          ).toBeGreaterThanOrEqual(TIMELINE_MIN_WORDS_PER_LINE);
+        }
+      }
+    } finally {
+      await page.emulateMedia({ media: "screen" });
+    }
+  });
+
+  test("the timeline never scrolls its page sideways", async ({ page }) => {
+    for (const viewport of TIMELINE_VIEWPORTS) {
+      await render(page, historyBody({ date: LONG_DATE }), viewport.width, viewport.height);
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(overflow.scrollWidth, `horizontal overflow at ${viewport.name}`).toBeLessThanOrEqual(
+        overflow.clientWidth + 1,
+      );
+    }
+  });
+
+  /*
+   * The mirror guard this file's own header warns about: every fixture here is a
+   * copy of markup that lives somewhere else, and a copy that drifts keeps
+   * measuring a layout the product no longer renders. `PRIMARY` and `MOBILE_BAR`
+   * were stale for six destinations before anybody noticed.
+   */
+  test("the fixture still mirrors the markup the component emits", () => {
+    const component = readFileSync(
+      join(ROOT, "src", "features", "daily-cycle", "technical-details.tsx"),
+      "utf8",
+    );
+    expect(component, "the timeline list lost its class").toContain('className="revision-timeline"');
+    expect(component, "the summary block lost the class these assertions place")
+      .toContain('className="revision-entry"');
+    expect(component, "the row no longer renders a <time>").toMatch(/<time dateTime=\{revision\.createdAt\}>/);
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `Pessoas mencionadas` — the person-candidate card.
+ *
+ * The owner reported it at ~440px: the evidence in an extremely narrow column
+ * wrapping one word per line, colliding with `Criar pessoa`, `Ignorar menção`
+ * out of alignment, the form illegible.
+ *
+ * The cause was a **shared layout class between two different shapes**.
+ * `.candidate-item` describes the task form's `<label>` — a visually hidden
+ * checkbox, a 24px check indicator, a copy block — so it declares
+ * `grid-template-columns:24px 1fr auto` and
+ * `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}`.
+ * `PersonCandidateForm` put that class on a `<fieldset>` whose children are a
+ * legend, an evidence paragraph, two radio options, a name label and a text
+ * input. Measured at 440px before the fix: the evidence occupied a **24px**
+ * column, 5 words on 5 lines; the name label likewise; and the text input was
+ * `position:absolute`, `opacity:0`, `pointer-events:none` — **invisible and
+ * unusable**, which is a functional defect and not only a visual one.
+ *
+ * The two shapes now have two classes. Nothing here touches the task form.
+ */
+
+const PERSON_NAME = "Garo";
+const PERSON_EVIDENCE = "relatório de Sweepstakes pra Garo";
+/** A real sentence of evidence, long enough that any starved column shows it. */
+const LONG_EVIDENCE =
+  "preciso desenvolver um relatório de Sweepstakes pra Garo, que faz parte da Royal Caribbean, com o prazo jogado para a sexta-feira seguinte";
+/** A name at the contract's own ceiling of meaningfulness, not at 160 chars. */
+const LONG_NAME = "Garogandharva Vasconcellos de Albuquerque Menezes";
+
+type CandidateFixture = { index: number; name: string; evidence: string; decision?: "confirmed" | "rejected" };
+
+/**
+ * Mirrors the per-candidate block `person-candidate-form.tsx` emits, including
+ * the two wrappers that make the layout explicit rather than auto-placed.
+ */
+function personCandidate({ index, name, evidence, decision }: CandidateFixture) {
+  const inputId = `person-candidate-${index}-name`;
+  const radio = (value: "confirmed" | "rejected", label: string) =>
+    `<label><input${decision === value ? " checked" : ""} name="person-decision-${index}" type="radio" value="${value}">${label}</label>`;
+  return `<fieldset class="person-candidate-item" aria-label="Pessoa mencionada: ${name}"><legend>${name}</legend>${
+    evidence ? `<p class="person-candidate-evidence">${evidence}</p>` : ""
+  }<div class="person-candidate-options">${radio("confirmed", "Criar pessoa")}${radio("rejected", "Ignorar menção")}</div><div class="person-candidate-name"><label for="${inputId}">Nome para criar: ${name}</label><input${
+    decision === "confirmed" ? "" : " disabled"
+  } id="${inputId}" maxlength="160" type="text" value="${name}"></div></fieldset>`;
+}
+
+/**
+ * The card renders inside the decision column of the record page, which is what
+ * decides how much room it actually has — so the fixture composes that ancestry
+ * rather than the card alone.
+ */
+function personCandidateBody(candidates: CandidateFixture[]) {
+  return `<div class="content-page entry-detail-page"><div class="entry-review record-detail">
+    <div class="record-detail-columns">
+      <div class="record-decision">
+        <section class="review-next-actions interpretation-actions phase-2b-task-actions" aria-label="Próximas ações">
+          <div class="person-candidate-section">
+            <form class="candidate-form">
+              <fieldset class="candidate-list" aria-describedby="person-candidate-help">
+                <legend>Pessoas mencionadas</legend>
+                <p id="person-candidate-help" class="field-hint">Confirme apenas quem deve virar uma pessoa permanente. Você pode corrigir o nome ou ignorar a menção.</p>
+                ${candidates.map(personCandidate).join("")}
+              </fieldset>
+              <button class="button-primary" type="submit">${ICON}Salvar decisões sobre pessoas</button>
+            </form>
+          </div>
+        </section>
+      </div>
+      <aside class="record-explanation"></aside>
+    </div>
+  </div></div>`;
+}
+
+const ONE_CANDIDATE: CandidateFixture[] = [{ index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE }];
+
+type PersonGeometry = {
+  cardWidth: number;
+  evidenceWidth: number;
+  evidenceWordsPerLine: number;
+  evidenceColumn: string;
+  nameInputVisible: boolean;
+  nameInputWidth: number;
+  nameInputPointerEvents: string;
+  nameInputPosition: string;
+  optionHeights: number[];
+  optionsSideBySide: boolean;
+  anyOverlap: boolean;
+};
+
+async function personGeometry(page: Page): Promise<PersonGeometry[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".person-candidate-item")].map((card) => {
+      const rect = (el: Element) => el.getBoundingClientRect();
+      const evidence = card.querySelector(".person-candidate-evidence") as HTMLElement | null;
+      const input = card.querySelector(".person-candidate-name input") as HTMLInputElement;
+      const options = [...card.querySelectorAll(".person-candidate-options label")] as HTMLElement[];
+      const inputStyle = getComputedStyle(input);
+
+      let wordsPerLine = Number.POSITIVE_INFINITY;
+      let evidenceWidth = 0;
+      let evidenceColumn = "n/a";
+      if (evidence) {
+        const style = getComputedStyle(evidence);
+        const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+        const lines = Math.max(1, Math.round(rect(evidence).height / lineHeight));
+        const words = (evidence.textContent ?? "").trim().split(/\s+/u).filter(Boolean).length;
+        wordsPerLine = words / lines;
+        evidenceWidth = Math.round(rect(evidence).width);
+        evidenceColumn = getComputedStyle(evidence).gridColumnStart;
+      }
+
+      // Every visible pair inside the card, checked for geometric intersection.
+      const boxes = [evidence, ...options, input, card.querySelector(".person-candidate-name label")]
+        .filter((el): el is HTMLElement => el !== null)
+        .map(rect)
+        .filter((r) => r.width > 0 && r.height > 0);
+      let anyOverlap = false;
+      for (let a = 0; a < boxes.length; a += 1) {
+        for (let b = a + 1; b < boxes.length; b += 1) {
+          const x = boxes[a], y = boxes[b];
+          if (!(x.right <= y.left + 0.5 || y.right <= x.left + 0.5 || x.bottom <= y.top + 0.5 || y.bottom <= x.top + 0.5)) {
+            anyOverlap = true;
+          }
+        }
+      }
+
+      return {
+        cardWidth: Math.round(rect(card).width),
+        evidenceWidth,
+        evidenceWordsPerLine: wordsPerLine,
+        evidenceColumn,
+        nameInputVisible: inputStyle.opacity !== "0" && inputStyle.visibility !== "hidden" && rect(input).width > 0,
+        nameInputWidth: Math.round(rect(input).width),
+        nameInputPointerEvents: inputStyle.pointerEvents,
+        nameInputPosition: inputStyle.position,
+        optionHeights: options.map((el) => Math.round(rect(el).height)),
+        optionsSideBySide: options.length === 2 && Math.abs(rect(options[0]).top - rect(options[1]).top) < 4,
+        anyOverlap,
+      };
+    }),
+  );
+}
+
+/** The widths the owner asked for, plus the phone the repository already uses. */
+const PERSON_VIEWPORTS = [
+  { name: "1440x900", width: 1440, height: 900 },
+  { name: "600x900", width: 600, height: 900 },
+  { name: "440x900", width: 440, height: 900 },
+  { name: "375x812", width: 375, height: 812 },
+] as const;
+
+/**
+ * The same words-per-line floor the revision timeline uses, and for the same
+ * reason: the defect measured **1.00** — literally one word per line.
+ */
+const PERSON_MIN_WORDS_PER_LINE = 2;
+/** The product's own control height, from `.task-control input`. */
+const TOUCH_TARGET = 44;
+
+test.describe("the person-candidate card stays usable at every width", () => {
+  for (const viewport of PERSON_VIEWPORTS) {
+    test(`reads and behaves correctly at ${viewport.name}`, async ({ page }) => {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+
+      expect(card.evidenceColumn, `${viewport.name}: the evidence is not in the main column`).toBe("1");
+      expect(
+        card.evidenceWordsPerLine,
+        `${viewport.name}: ${card.evidenceWordsPerLine.toFixed(2)} words per line in a ${card.evidenceWidth}px column (card ${card.cardWidth}px)`,
+      ).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+
+      /*
+        The functional half, and the one a screenshot would not have named: the
+        shared rule made this input `position:absolute; opacity:0;
+        pointer-events:none`. The owner could not see or reach the field the
+        form exists to edit.
+      */
+      expect(card.nameInputPosition, `${viewport.name}: the name field left the flow`).not.toBe("absolute");
+      expect(card.nameInputVisible, `${viewport.name}: the name field is invisible`).toBe(true);
+      expect(card.nameInputPointerEvents, `${viewport.name}: the name field cannot be clicked`).not.toBe("none");
+
+      for (const [index, height] of card.optionHeights.entries()) {
+        expect(height, `${viewport.name}: option ${index} is ${height}px tall`).toBeGreaterThanOrEqual(TOUCH_TARGET);
+      }
+      expect(card.anyOverlap, `${viewport.name}: two elements of the card overlap`).toBe(false);
+    });
+  }
+
+  test("the evidence uses the width the card has, whatever that width is", async ({ page }) => {
+    // The defect was a 24px column inside a 338px card. This is the invariant
+    // that fails on it regardless of type metrics: the evidence is nearly the
+    // whole content box, not a gutter beside it.
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+      const chrome = 30; // 14px padding each side plus the 1px borders, rounded up.
+      expect(
+        card.evidenceWidth,
+        `${viewport.name}: evidence ${card.evidenceWidth}px inside a ${card.cardWidth}px card`,
+      ).toBeGreaterThanOrEqual(card.cardWidth - chrome - 1);
+      expect(card.nameInputWidth, `${viewport.name}: the name field is narrower than its card`)
+        .toBeGreaterThanOrEqual(card.cardWidth - chrome - 1);
+    }
+  });
+
+  test("long evidence and a long name stay readable and never overflow", async ({ page }) => {
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(
+        page,
+        personCandidateBody([{ index: 0, name: LONG_NAME, evidence: LONG_EVIDENCE }]),
+        viewport.width,
+        viewport.height,
+      );
+      const [card] = await personGeometry(page);
+      expect(
+        card.evidenceWordsPerLine,
+        `${viewport.name}: long evidence at ${card.evidenceWordsPerLine.toFixed(2)} words per line in ${card.evidenceWidth}px`,
+      ).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+      expect(card.anyOverlap, `${viewport.name}: overlap with a long name`).toBe(false);
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        clientWidth: document.documentElement.clientWidth,
+      }));
+      expect(overflow.scrollWidth, `${viewport.name}: horizontal overflow`).toBeLessThanOrEqual(overflow.clientWidth + 1);
+    }
+  });
+
+  test("several candidates each keep their own card, none overlapping", async ({ page }) => {
+    const many: CandidateFixture[] = [
+      { index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE },
+      { index: 1, name: "Marina Sobral", evidence: LONG_EVIDENCE, decision: "confirmed" },
+      { index: 2, name: LONG_NAME, evidence: "com o pessoal do jurídico", decision: "rejected" },
+    ];
+    for (const viewport of [PERSON_VIEWPORTS[0], PERSON_VIEWPORTS[2]]) {
+      await render(page, personCandidateBody(many), viewport.width, viewport.height);
+      const cards = await personGeometry(page);
+      expect(cards, `${viewport.name}: not every candidate rendered`).toHaveLength(3);
+      for (const [index, card] of cards.entries()) {
+        expect(card.anyOverlap, `${viewport.name}: card ${index} overlaps itself`).toBe(false);
+        expect(card.evidenceWordsPerLine, `${viewport.name}: card ${index} evidence density`).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+      }
+      // Cards are stacked, never on top of one another.
+      const tops = await page.evaluate(() =>
+        [...document.querySelectorAll(".person-candidate-item")].map((el) => Math.round(el.getBoundingClientRect().top)),
+      );
+      expect(new Set(tops).size, `${viewport.name}: two cards share a top edge`).toBe(3);
+    }
+  });
+
+  test("a confirmed candidate exposes an enabled name field; a rejected one does not", async ({ page }) => {
+    // The decision states the owner will actually be in. Both must lay out.
+    for (const decision of ["confirmed", "rejected"] as const) {
+      await render(page, personCandidateBody([{ index: 0, name: PERSON_NAME, evidence: LONG_EVIDENCE, decision }]), 440, 900);
+      const [card] = await personGeometry(page);
+      expect(card.anyOverlap, `${decision}: overlap`).toBe(false);
+      expect(card.nameInputVisible, `${decision}: the name field is invisible`).toBe(true);
+      const enabled = await page.evaluate(() => !(document.querySelector(".person-candidate-name input") as HTMLInputElement).disabled);
+      expect(enabled, `${decision}: wrong enabled state`).toBe(decision === "confirmed");
+    }
+  });
+
+  test("the options split into two columns only where the card has the room", async ({ page }) => {
+    // Stated as an invariant plus two counters, so a build that never split —
+    // or always split — fails rather than satisfying this vacuously.
+    let split = 0;
+    let stacked = 0;
+    for (const viewport of PERSON_VIEWPORTS) {
+      await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+      const [card] = await personGeometry(page);
+      if (card.optionsSideBySide) {
+        split += 1;
+        expect(card.cardWidth, `${viewport.name}: split in a ${card.cardWidth}px card`).toBeGreaterThanOrEqual(380);
+      } else {
+        stacked += 1;
+      }
+      expect(card.anyOverlap, `${viewport.name}: overlap`).toBe(false);
+    }
+    expect(split, "no width ever put the two options side by side").toBeGreaterThan(0);
+    expect(stacked, "no width ever stacked the two options").toBeGreaterThan(0);
+  });
+
+  test("keyboard reaches both options and the name field, in that order", async ({ page }) => {
+    await render(page, personCandidateBody([{ index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE, decision: "confirmed" }]), 440, 900);
+    const focused = async () => page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return "none";
+      return `${el.tagName.toLowerCase()}:${el.getAttribute("type") ?? el.className}:${(el as HTMLInputElement).value ?? ""}`;
+    });
+
+    await page.locator('.person-candidate-options input[value="confirmed"]').focus();
+    expect(await focused()).toContain("input:radio");
+    // Radios with one name are a single tab stop; the arrow keys move inside it.
+    await page.keyboard.press("ArrowDown");
+    const afterArrow = await page.evaluate(() => (document.activeElement as HTMLInputElement).value);
+    expect(afterArrow, "the arrow key did not move within the radio group").toBe("rejected");
+
+    /*
+      And the keyboard reaches the field the form exists to edit. Asserted as
+      "within a few tabs" rather than as an exact stop count: a radio group is a
+      single tab stop whose position depends on which member is checked, and
+      pinning that would be testing the browser rather than the card.
+    */
+    let reached = false;
+    for (let press = 0; press < 4 && !reached; press += 1) {
+      await page.keyboard.press("Tab");
+      reached = (await focused()).includes("input:text");
+    }
+    expect(reached, "the keyboard never reached the name field").toBe(true);
+
+    // The focused control must be visible — the defect made it opacity:0.
+    const visible = await page.evaluate(() => {
+      const el = document.activeElement as HTMLElement;
+      const s = getComputedStyle(el);
+      const r = el.getBoundingClientRect();
+      return s.opacity !== "0" && s.visibility !== "hidden" && r.width > 0 && r.height > 0;
+    });
+    expect(visible, "the focused name field is not visible").toBe(true);
+  });
+
+  test("survives print emulation", async ({ page }) => {
+    await page.emulateMedia({ media: "print" });
+    try {
+      for (const viewport of [PERSON_VIEWPORTS[0], PERSON_VIEWPORTS[2]]) {
+        await render(page, personCandidateBody(ONE_CANDIDATE), viewport.width, viewport.height);
+        const [card] = await personGeometry(page);
+        expect(card.evidenceWordsPerLine, `${viewport.name} in print`).toBeGreaterThanOrEqual(PERSON_MIN_WORDS_PER_LINE);
+        expect(card.anyOverlap, `${viewport.name} in print: overlap`).toBe(false);
+      }
+    } finally {
+      await page.emulateMedia({ media: "screen" });
+    }
+  });
+
+  test("the fixture still mirrors the markup the component emits", () => {
+    const component = readFileSync(
+      join(ROOT, "src", "features", "interpretations", "person-candidate-form.tsx"),
+      "utf8",
+    );
+    for (const token of [
+      'className="person-candidate-item"',
+      'className="person-candidate-evidence"',
+      'className="person-candidate-options"',
+      'className="person-candidate-name"',
+    ]) {
+      expect(component, `the component no longer emits ${token}`).toContain(token);
+    }
+    /*
+      And it must not go back to sharing the task form's layout class. Compared
+      as a whole class token: `\bcandidate-item\b` also matches inside
+      `person-candidate-item`, because `-` is not a word character — a guard
+      that would have failed on the fix itself.
+    */
+    for (const value of [...component.matchAll(/className="([^"]*)"/g)].map((match) => match[1])) {
+      expect(value.split(/\s+/u), "the person card is sharing `.candidate-item` again")
+        .not.toContain("candidate-item");
+    }
+  });
+});

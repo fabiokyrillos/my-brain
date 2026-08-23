@@ -121,41 +121,62 @@ export function PersonCandidateForm({
                 ? `Pessoa mencionada: ${candidate.originalName}`
                 : `Mentioned person: ${candidate.originalName}`;
               const inputId = `person-candidate-${candidate.candidateIndex}-name`;
+              /*
+                `person-candidate-item`, not `candidate-item`. The two are
+                different shapes and must not share a layout class: the task
+                form's `.candidate-item` is a `<label>` holding a visually
+                hidden checkbox, a 24px check indicator and a copy block, and
+                its rules say so — a `24px 1fr auto` grid plus
+                `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}`.
+                Applied to this `<fieldset>` those rules put the evidence in the
+                indicator's 24px gutter (measured at 440px: one word per line)
+                and made the name field invisible and `pointer-events:none`.
+              */
               return (
-                <fieldset key={candidate.candidateIndex} className="candidate-item" aria-label={groupLabel}>
+                <fieldset key={candidate.candidateIndex} className="person-candidate-item" aria-label={groupLabel}>
                   <legend>{candidate.originalName}</legend>
-                  {candidate.evidence && <p>{candidate.evidence}</p>}
-                  <label>
+                  {candidate.evidence && <p className="person-candidate-evidence">{candidate.evidence}</p>}
+                  {/*
+                    The two options are grouped so the layout can place them as
+                    one unit — side by side only where the card is genuinely
+                    wide enough, stacked otherwise. Auto-placement across the
+                    fieldset is what scattered them in the first place.
+                  */}
+                  <div className="person-candidate-options">
+                    <label>
+                      <input
+                        checked={decision === "confirmed"}
+                        name={`person-decision-${candidate.candidateIndex}`}
+                        onChange={() => setDecisions((current) => new Map(current).set(candidate.candidateIndex, "confirmed"))}
+                        type="radio"
+                        value="confirmed"
+                      />
+                      {pt ? "Criar pessoa" : "Create person"}
+                    </label>
+                    <label>
+                      <input
+                        checked={decision === "rejected"}
+                        name={`person-decision-${candidate.candidateIndex}`}
+                        onChange={() => setDecisions((current) => new Map(current).set(candidate.candidateIndex, "rejected"))}
+                        type="radio"
+                        value="rejected"
+                      />
+                      {pt ? "Ignorar menção" : "Ignore mention"}
+                    </label>
+                  </div>
+                  <div className="person-candidate-name">
+                    <label htmlFor={inputId}>
+                      {pt ? `Nome para criar: ${candidate.originalName}` : `Name to create: ${candidate.originalName}`}
+                    </label>
                     <input
-                      checked={decision === "confirmed"}
-                      name={`person-decision-${candidate.candidateIndex}`}
-                      onChange={() => setDecisions((current) => new Map(current).set(candidate.candidateIndex, "confirmed"))}
-                      type="radio"
-                      value="confirmed"
+                      disabled={decision !== "confirmed" || pending}
+                      id={inputId}
+                      maxLength={160}
+                      onChange={(event) => setNames((current) => new Map(current).set(candidate.candidateIndex, event.target.value))}
+                      type="text"
+                      value={names.get(candidate.candidateIndex) ?? candidate.proposedName}
                     />
-                    {pt ? "Criar pessoa" : "Create person"}
-                  </label>
-                  <label>
-                    <input
-                      checked={decision === "rejected"}
-                      name={`person-decision-${candidate.candidateIndex}`}
-                      onChange={() => setDecisions((current) => new Map(current).set(candidate.candidateIndex, "rejected"))}
-                      type="radio"
-                      value="rejected"
-                    />
-                    {pt ? "Ignorar menção" : "Ignore mention"}
-                  </label>
-                  <label htmlFor={inputId}>
-                    {pt ? `Nome para criar: ${candidate.originalName}` : `Name to create: ${candidate.originalName}`}
-                  </label>
-                  <input
-                    disabled={decision !== "confirmed" || pending}
-                    id={inputId}
-                    maxLength={160}
-                    onChange={(event) => setNames((current) => new Map(current).set(candidate.candidateIndex, event.target.value))}
-                    type="text"
-                    value={names.get(candidate.candidateIndex) ?? candidate.proposedName}
-                  />
+                  </div>
                 </fieldset>
               );
             })}

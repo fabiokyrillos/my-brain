@@ -161,7 +161,21 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
 /* 44 -> 43 on 2026-08-20: the day review's schedule paragraphs were drawn by
    the user-agent default and are now typed, as part of demoting that section
    from a card to a footnote. The ratchet only ever goes down. */
-const RECORDED_UNSTYLED = 43;
+/* 43 -> 41 on 2026-08-22: both remaining entries for
+   `person-candidate-form.tsx` left the census —
+
+     src/features/interpretations/person-candidate-form.tsx: person-candidate-section
+     src/features/interpretations/person-candidate-form.tsx: field-hint
+
+   — because that card was repaired. And this guard **knew again**: the owner
+   reported `Pessoas mencionadas` as illegible at 440px, and the section
+   wrapping it had been sitting here the whole time as a class no stylesheet
+   reached. It was not the cause — the card was borrowing the task form's
+   `.candidate-item` grid, which is a different failure — but a section with no
+   rule of its own is exactly the condition under which borrowing goes unnoticed.
+   A debt counter records that something is owed; it still does not decide what
+   is worth paying first. */
+const RECORDED_UNSTYLED = 41;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();
