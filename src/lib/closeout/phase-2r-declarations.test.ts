@@ -428,19 +428,24 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
     for (const present of [
       "docs/reports/phase-2r/PHASE_2R_SLICE_00_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md",
+      /*
+       * Moved across IN PLACE, and the order it moved in is the whole reason it
+       * was on the other list. The record was forbidden while the migration was
+       * merged but not applied, because a deployment record existing then would
+       * have been a record of something nobody did. It is required now because
+       * the migration IS applied: merged as `ac5af97` with CI green 3/3 at that
+       * exact merge SHA, then applied, parity `202608210100` -> `202608230101`,
+       * 101 local = 101 hosted. The strictness did not move with it -- what was
+       * an assertion of absence is now an assertion of presence, and the
+       * remaining entries below still cannot appear early.
+       */
+      "docs/reports/phase-2r/PHASE_2R_SLICE_01_DEPLOYMENT.md",
     ]) {
       expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
     }
     for (const forbidden of [
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      /*
-       * Still forbidden, and the ORDER is the point: the migration is created
-       * and merged in this slice, and applied to the hosted database only after
-       * CI is green on the exact merge SHA. A deployment record existing before
-       * that would be a record of something nobody did.
-       */
-      "docs/reports/phase-2r/PHASE_2R_SLICE_01_DEPLOYMENT.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",

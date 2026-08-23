@@ -2449,18 +2449,18 @@ export type Database = {
             referencedColumns: ["user_id", "id"]
           },
           {
-            foreignKeyName: "reminders_task_id_fkey"
-            columns: ["task_id"]
-            isOneToOne: false
-            referencedRelation: "tasks"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "reminders_series_owner_fk"
             columns: ["user_id", "series_id"]
             isOneToOne: false
             referencedRelation: "reminder_series"
             referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "reminders_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "reminders_task_owner_fk"
