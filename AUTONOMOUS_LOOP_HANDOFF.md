@@ -12723,3 +12723,119 @@ read showing local = remote advanced by exactly one. **Parity is still
 `2R-SERIES-*` is deliberately **not** classified by this slice. The database
 contract exists and is exercised; the semantics, the surface and the undo
 journeys are 2R.2's to prove.
+
+---
+
+## §119 — Slice 2R.1 finished: seven CI rounds, six defects CI found, and the migration applied behind a gate the database enforces (2026-08-23)
+
+**The slice is closed. The phase is not.** The owner narrowed this session's
+scope mid-run — *"Conclua apenas essa slice"* — so slices 2R.2 … 2R.5 are **not
+started, not planned and not begun**, and ADR-133 still authorizes construction
+rather than closure.
+
+### What landed
+
+| | |
+|---|---|
+| PR #292 | the model, the suite, the guards — merged as `ac5af97607804d9cecc354b484e31001c1eb3143`, **CI green 3/3 at that exact merge SHA** (run 32653470021, `event: push`) |
+| the migration | `202608230101`, **applied**. Parity `202608210100` → `202608230101`, 100 → 101, advancing by exactly one |
+| PR #293 | the deployment record — merged as `81827aa4ec7645bd6bd7b9d88d98071ff0b722cf` |
+| classification | `2R-MODEL-001` … `-009`, `2R-TIME-001` … `-004` — **19 of 73 cumulatively**. `2R-SERIES-*` deliberately **not** classified: the contract is deployed and exercised, but a passing RPC call is not a delivered feature |
+
+### The methodological finding, which outlives the slice
+
+**Four hosted rehearsals passed and CI still found six defects.** That is the
+number worth carrying forward, and the reason is a pattern with two halves:
+
+1. **They rehearsed the code, not the file.** Each rehearsal declared helpers in
+   dependency order, so a `language sql` body resolving a helper declared *later*
+   passed every time and failed the first chain run from empty.
+2. **They rehearsed the rooms, not the house.** Not one of them ever called
+   `create_reminder_series_v1` end to end, so the first statement inside it that
+   depends on **another table's shape** — a `description` column
+   `public.undo_operations` does not have — went unexecuted until `pg_prove`
+   ran it.
+
+A rehearsal that never calls the front door proves neither.
+
+**And the sharpest defect was a repeat of the phase's own finding.**
+`edit_future` was **unreachable**: the command gate compared key COUNT against
+the allowed set, turning six *allowed* fields into six *required* ones, while
+the body below reads each optional field through `coalesce(…, the stored
+value)`. `reminderSeriesCommandSchema` had the contract right the whole time —
+**two validators for one contract, disagreeing**, which is
+`2R-TZ-SECOND-AUTHORITY`'s exact shape reproduced inside the slice written to
+answer it. The parity test that exists to make this impossible did not catch it,
+because it compares the **rule** vocabulary and command key sets were never in
+its scope. *A parity test is only as wide as the contracts it was pointed at.*
+
+Also: **the grant posture was a false claim of authority in four places at
+once** — a table created in `public` starts with Supabase's default privileges,
+so `grant select` on top of them is a no-op, and the migration, the record, the
+PR and `SECURITY.md` all said *"SELECT and nothing else"* while `authenticated`
+held all seven. Nothing that reads like a review would have caught it; the
+post-deploy block did, because it asserts the grant set **the catalog reports**
+rather than the presence of a `grant` line.
+
+### Three guards now close those classes locally, without a database
+
+| guard | what it refuses |
+|---|---|
+| `recurrence-rule-parity.test.ts` | the three commands' field sets **and the gate's direction** — a returning `cardinality(allowed_command_keys)` comparison fails by name |
+| `phase-2r-model-guard.test.ts` | any column written to a table the migration did not create that the generated types do not declare, **and** any `language sql` body resolving a helper declared later |
+| `phase-2r-declarations.test.ts` | the deployment record existing before the apply — inverted **in place** once it did |
+
+Each was proved by a mutation control run against the real file and reverted.
+
+### The apply, and the gate that fired
+
+The CLI here has **no access token** (`supabase projects list` →
+`LegacyPlatformAuthRequiredError`) and there is no database password for `psql`,
+so `db push` was unavailable and the SQL had to be **transcribed** through the
+MCP boundary. That was not trusted: `main`'s copy was split into eight chunks,
+each staged with the database reporting back the `md5` **it** computed, and the
+applying transaction re-checks all eight hashes, the whole-file hash and the
+byte length — refusing anything but `main`'s 68 609 bytes.
+
+**It fired on chunk 1**: one byte short, because that chunk ends on a blank line
+and a blank line at the end of a paste is invisible. Nothing had been applied.
+
+**The owner-scoped proof ran inside `begin; … rollback;` rather than
+create-then-clean**, because creating a series writes **append-only**
+`undo_operations` and `audit_logs` rows that a cleanup would have had to violate
+the ledger contract to remove. Residue zero on both sides with the probes shown
+sighted — 312 audit rows before and after.
+
+**A fourth parity proof** compared types generated from the deployed project
+against the tree, block for block. It found one drift: a hand-appended
+relationship sorted after where the generator puts it. Corrected.
+
+### Carried forward, none of it discharged
+
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — *new*. Phase 2P's
+  `private.undo_apply_reminder_command_v1` never sets `status = 'undone'`, so
+  that undo stays replayable for 24 hours and the router's idempotent branch is
+  unreachable for it. Its comment credits the router with a row the router does
+  not write. **Not repaired here**: editing another phase's compensation handler
+  is the quiet widening `2R-MODEL-009` refuses. `undo_operation_routing.sql`
+  asserts nothing about `status`, which is why it shipped.
+- **`2R-TZ-SECOND-AUTHORITY`** — eight inline sites plus the missing check
+  constraint on `profiles.timezone`. Routed by ADR-134, not closed.
+- **`2R-TASK-RECURRENCE`** — recurring tasks stay out by `OD-2R-6`.
+- **`OD-2R-9`'s two defects** — search that cannot be linked, and the *Precisa de
+  você* filter lost on back navigation.
+- **The interval gap** — PRD §1 names *"a cada trimestre"* and the signed set
+  cannot express it. A test pins the refusal. Destination: the owner, as a
+  possible `version: 2`.
+- **Unchanged and unmoved:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`'s back-navigation half; `RG-DEP-3`, still not closable by
+  writing a file; push HTTP 403, not resumed; `2P-CHAT-007-JOURNEY`,
+  unspendable; ADR-055 expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2.
+
+### Where the next session starts
+
+Re-audit slice 2R.2 against `main` **before** building: it has **no migration**,
+and every database object it needs already shipped in `202608230101`. Read
+`docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md` §§9–13 first — the six
+CI-found defects are written up there as failure *modes*, not incidents, and
+2R.2 is the slice most able to repeat them.
