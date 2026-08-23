@@ -12537,3 +12537,107 @@ says so itself, and the guard enforces the distinction.
 And the instruction this session earned twice over: **read the rows, never a
 document.** The automation state moved twice in three days; audit §10.3 will be
 stale eventually too. The instruction is the durable part.
+
+## §117 — Phase 2R implementation is AUTHORIZED (ADR-133), slice 2R.0 is complete, and it found a second timezone authority (2026-08-23)
+
+**The only blocker plan §4 named is gone, and slice 2R.0 immediately produced a
+new one.** That is the slice working, not the slice failing: a measurement slice
+that cannot stop the phase is a measurement nobody would act on.
+
+### What was authorized
+
+**ADR-133** authorizes the **construction** of slices 2R.0 … 2R.5 — branches,
+code, tests, guards, documentation, acceptance records, one pull request per
+slice, ready only after the gates, merged only on green CI at the head, and CI
+verified again **on the exact merge SHA**. It authorizes creating and applying
+**the one migration ADR-132 allocated**, and only synthetic, owner-scoped
+fixtures removed under a two-sided residue control.
+
+**It does not authorize closure.** `2R-CLOSE-012` stands: the phase stops at the
+owner's device checkpoint and closes by a separate ADR. **ADR-131 and ADR-132
+are not edited**, and not one of ADR-132's twelve decisions is reopened.
+
+Two distinctions carried forward unchanged, because both are still load-bearing:
+**allocated is not created**, and **a green pull-request head is not a green
+merge SHA**.
+
+### What slice 2R.0 measured
+
+Six requirements, all `built`, **6 of 73**. Zero product behaviour changed —
+the diff is `docs/`, two guards and one ADR.
+
+The heartbeat's rules were read off the **deployed** `pg_proc.prosrc` and
+re-asserted against the migration that defines the function, so a divergence
+between the two would show as one passing while the other failed. Per-user
+advisory lock; quiet hours 22:30–07:00 by default against the owner's local wall
+clock; cap 3 by default, spent as remaining slots; **the 24-hour cooldown is
+scoped to `task_overdue` and `task_stale` and does not apply to reminders at
+all**; and `dedupe_key = 'reminder:' ‖ id`, so **one reminder yields at most one
+notification, ever**.
+
+**That last fact is the one slice 2R.4 will need.** One materialised occurrence
+per series means one candidate per run, which the cap then bounds — which is
+exactly why `OD-2R-3` option A makes `2R-NOTIFY-005` answerable without touching
+the heartbeat.
+
+`automation_category_policies` holds **zero** rows, with the probe proved
+sighted in the same statement. **Audit §10.3 is confirmed, not corrected**, and
+that stop condition was **not** reached.
+
+### The stop condition that was reached
+
+**`2R-FOUNDATION-004`: a second timezone authority exists** — plan §5 row 7.
+
+`resolveOwnerTimeZone` is the contract. **Eight inline call sites across seven
+files** apply a laxer rule that keeps any non-empty string, and **two of them
+are `app/reminders/page.tsx` and `features/reminders/actions.ts`** — the surface
+this phase builds a wall-clock feature onto.
+
+It is **reachable rather than theoretical**, and that is the half worth
+remembering: `profiles.timezone` has **no check constraint** — read live from
+`pg_constraint` — and `public.save_profile_and_preferences` stores
+`p_profile ->> 'timezone'` unvalidated, so the only enforcement of the IANA rule
+is a Zod refinement in a Server Action. A caller reaching the RPC directly
+stores what it likes. `EST` constructs, carries no DST rule, and the two rules
+disagree about it; they agree about `America/Sao_Paulo`, which is all that is
+stored today.
+
+**Recorded as `2R-TZ-SECOND-AUTHORITY`, built on by nothing.** The three options
+and the recommendation are in `PHASE_2R_SLICE_00_ACCEPTANCE.md` §8, and the
+recommendation is **A**: slice 2R.1 resolves every recurrence instant through
+the contract, and the eight pre-existing sites are routed out with a
+destination rather than repaired inside a phase about recurring reminders.
+
+**Slice 2R.1 does not start until the owner answers.**
+
+### One thing named so it is not folded in quietly
+
+`profiles.timezone` deserves a database-side check constraint. A check
+constraint is a **migration**, and Phase 2R has exactly one, whose destination is
+exclusive. **It is not taken here**, it is routed to the same destination as the
+census, and no document in this phase may report it as closed.
+
+### Guards inverted, not deleted, and proved able to fail
+
+`phase-2r-declarations.test.ts`'s forbidden-artifact list now moves **one entry
+per slice**; everything unreached stays asserted absent. A new case holds
+implementation claimable only where an accepted ADR authorizes it. The A13
+active-milestone assertion moves to cite **all three** authorizations, by the
+rule it has always held.
+
+**Five mutation controls ran before commit** and every one fired: a planted
+Phase 2R migration file; a census site repaired without the record; the backlog
+line losing *"no migration file is created"*; the line losing **every** ADR-133
+citation; and the line claiming closure.
+
+### For whoever picks this up next
+
+**Do not start slice 2R.1 on your own reading of the timezone finding.** It is a
+signed stop condition with a recommendation attached, and the recommendation is
+cheap to accept — but accepting it is the owner's, not the next agent's.
+
+Everything else is unchanged and re-proved: budget **1 allocated · 0 spent · 0
+created**, parity **`202608210100`, 100 = 100**, signup closed, rollout gate
+untouched, push HTTP 403 not resumed, `2P-ACCESS-005` **NOT EXECUTED — OWNER
+WAIVED**, and **the phase after this one is not started, not planned and not
+named as active**.
