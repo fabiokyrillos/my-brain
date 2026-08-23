@@ -63,8 +63,10 @@ exists to prevent.
 
 - **(A) Rotina — what repeats (recommended).** The subject of §1.
 - **(B) Autonomy — the agent acts.** Highest value; **disqualified today** by
-  audit §4 — `automation_calibration_observations` holds **zero** rows and
-  `task` alone needs 50 at 0.90 precision.
+  audit §4 as corrected by §10.2 — `automation_calibration_observations` holds
+  **2** rows against a `task` threshold of 50 at 0.90 precision, evidence accrues
+  at two rows per reviewed entry, and **four of the six categories still have no
+  producer at all**.
 - **(C) Find it, and come back to it.** Audit §8's two proved defects. Low risk,
   **zero migrations**, and honestly **a slice rather than a phase**.
 - **(D) Evidence for autonomy** — `project` and `organization` review flows only.
@@ -247,7 +249,7 @@ the recorded refusal.
 | `2R-FOUNDATION-003` | The reminder surface's current shape is recorded | The modal's current field groups listed from the component, not from Phase 2P's description | baseline | — |
 | `2R-FOUNDATION-004` | The owner's timezone resolution path is identified and named | The single function every surface uses is named, and any second path is reported as a defect | baseline | — |
 | `2R-FOUNDATION-005` | Zero product behaviour changes in this slice | The slice's diff contains no change under `src/features/**` or `supabase/migrations/**` that alters behaviour | build | — |
-| `2R-FOUNDATION-006` | The audit's §5 finding is re-checked against the live database at slice start | The four `automation_category_policies` rows are re-read and the record either confirms or corrects §5 | baseline | — |
+| `2R-FOUNDATION-006` | The audit's automation finding is re-checked against the live database at slice start | `automation_category_policies` is re-read **whatever its row count**, and the record confirms or corrects audit §10.3. *(The criterion said "the four rows" until 2026-08-23, when there were none — a criterion that names a count cannot survive the count changing, which is the defect it exists to catch.)* | baseline | — |
 
 ### `2R-MODEL` — the recurrence model · slice 2R.1
 
@@ -439,9 +441,11 @@ Stated so that each exclusion is a recorded decision rather than an omission.
 Signup stays **closed**. The rollout gate stays **25 pass · 3 fail · 2
 owner-signature**, and `RG-DEP-3` **cannot be closed by writing a file**. Push
 HTTP 403 is **not resumed**. No BYOK credit is spent and **no AI call is made**.
-No audio is persisted. All six automation categories keep the state audit §5
-recorded — which is **not** what three prior ADRs said it was, and the correction
-is carried by this package's authorizing ADR rather than by editing them. No
+No audio is persisted. All six automation categories keep the state audit **§10.3**
+records — which, since the owner undid their 2026-08-20 opt-in through the
+product's own undo, is once again `suggest_only` for all six. ADR-131 Decision 6
+recorded the earlier state truthfully and is **not edited**; §10.3 supersedes it
+by name, the way ADR-129 superseded ADR-127's premise. No
 grant, RLS policy, retention rule or authority moves. `2P-ACCESS-005` stays
 **NOT EXECUTED — OWNER WAIVED**. The four automation review flows stay out under
 `OD-2Q-8`. Audit §8's two defects stay out under `OD-2R-9`. **The phase after

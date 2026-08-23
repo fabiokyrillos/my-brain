@@ -21,10 +21,14 @@ which is why the cost of each alternative is stated here rather than implied.
 
 | table | rows, read live |
 |---|---|
-| `automation_calibration_observations` | **0** |
-| `reminders` | **2** |
-| `summaries` | **2** |
-| `automation_category_policies` | 4 |
+| `automation_calibration_observations` | **2** *(was 0 on 2026-08-22)* |
+| `reminders` | **1** |
+| `summaries` | **0** |
+| `automation_category_policies` | **0** *(was 4; the owner undid them)* |
+
+*Re-read live on 2026-08-23 against `main` `73f30b39`. The movement is explained
+in audit §10.2 and §10.3 and changes one argument below without changing the
+ranking.*
 
 **This is a pre-MVP with one user and almost no accumulated data.** So the first
 question asked of every option is not *"how valuable is it?"* but **"can it be
@@ -82,9 +86,14 @@ evidence to enable it did not exist.
 **It is the most valuable thing on this list and it is the one that cannot be
 built now.**
 
-- `automation_calibration_observations` holds **zero rows**.
+- `automation_calibration_observations` holds **2 rows** — one `task`, one
+  `person`, both written 2026-08-23. *(This read **zero** on 2026-08-22, and the
+  correction matters: the producers **do** fire. See audit §10.2.)*
 - `task` alone needs **50** reviewed subjects at **0.90** precision, **≥10**
-  inside 90 days, newest inside 30. `person` needs 80 at 0.97.
+  inside 90 days, newest inside 30. `person` needs 80 at 0.97. Evidence accrues
+  at **two rows per reviewed entry**, so the gap is a rate problem, not an
+  impossibility — and a rate this far below the threshold is still
+  disqualifying **today**.
 - **Four of the six categories have no producer at all** —
   `private.automation_category_has_producer` returns true only for `'task'` and
   `'person'`, so `project`, `organization`, `memory` and `relation` can never

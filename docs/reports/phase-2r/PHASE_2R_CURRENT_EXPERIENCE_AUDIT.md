@@ -500,3 +500,154 @@ reader who scrolled would be misled.
   required either the owner's password past a live CAPTCHA or a
   service-role-minted link — the first is not available to this task and the
   second creates hosted auth artifacts the authorization does not permit.
+
+---
+
+## 10. Revalidation against `main` at `73f30b39` (2026-08-23)
+
+**Everything in §1–§9 was measured at `main` = `43c8be17`.** The branch has since
+merged `origin/main`, which brought PRs **#288**, **#289** and **#290**. Every
+premise this phase rests on was re-measured against the new tree and the
+deployed database, read-only.
+
+**Sections 1–9 are not rewritten.** They record what was true when they were
+written, and this repository corrects by appending. Where a fact has moved, it is
+superseded here, by name.
+
+### 10.1 What PRs #288–#290 changed, and what they did not
+
+| PR | change | effect on this phase |
+|---|---|---|
+| #288 | the extraction prompt named four entity arrays and defined none; the immutable history reserved a grid track for an out-of-flow icon | **none** — neither touches reminders, recurrence or scheduling |
+| #289 | the unattended entry-dispatch drain had been answering **401 since 2026-08-12**; `process-jobs` redeployed (v29), the reported entry reinterpreted as **v2** with **v1 preserved** | **none directly**; but see §10.3 and §10.4 — the drain's return is what moved two of this audit's numbers |
+| #290 | person-candidate responsive layout repaired; stylesheet-class debt **43 → 41** | **none** |
+
+**Zero migrations across all three.** Local **100**, hosted **100**, parity
+**`202608210100`** — re-read live and unchanged. `public.reminders` is still
+altered by exactly one migration since creation (`202607170016`), and there is
+still no `recurrence`, `rrule` or `repeat_*` anywhere in `supabase/migrations/`.
+**§1's parity claim and §3.6's schema claim both stand.**
+
+### 10.2 The hosted counts have moved, and §4's argument needs one correction
+
+| table | §4 (2026-08-22, morning) | now (2026-08-23) |
+|---|---|---|
+| `automation_calibration_observations` | 0 | **2** |
+| `automation_category_policies` | 4 | **0** |
+| `reminders` | 2 | **1** |
+| `summaries` | 2 | **0** |
+| `entries` | — | 1 |
+| `tasks` | — | 6 |
+
+**§4's conclusion stands; one of its reasons does not.** §4 argued that autonomy
+is unbuildable partly because the calibration table held **zero** rows. It now
+holds two — one `task/approved/task_candidate` and one
+`person/approved/person_candidate`, both written **2026-08-23 00:42** — so
+**the producers demonstrably fire.** That is a direct consequence of #289
+restoring the drain and #288 repairing extraction: an entry was reinterpreted,
+candidates were produced, and approving them fired both observation triggers.
+
+**The corrected argument, which is narrower and better evidenced:**
+
+- evidence **can** accumulate for `task` and `person` — proved, not assumed;
+- it accumulates **two rows per reviewed entry**, against thresholds of **50**
+  (`task`, 0.90 precision) and **80** (`person`, 0.97), plus **≥10 inside 90
+  days** and a newest observation **inside 30 days**;
+- and **four of the six categories still have no producer at all** —
+  `private.automation_category_has_producer` still returns true only for
+  `'task'` and `'person'`, re-read on the merged tree.
+
+So autonomy remains **not buildable now**, but because the rate is far below the
+threshold and four categories cannot participate — **not** because nothing can
+ever be recorded. §3.4's four-flow finding is unaffected and stands.
+
+### 10.3 §5 is superseded: the owner's opt-in was undone
+
+**§5 recorded that `task` and `person` were stored `automatic_when_eligible`.
+That is no longer true.** `automation_category_policies` now holds **zero rows**,
+so all six categories resolve to `suggest_only` by the **computed** default.
+
+**The probe was checked before the product**, because "rows gone" and "probe
+blind" look identical from a zero: the same query read `auth.users` 2,
+`profiles` 2, `entries` 1, `tasks` 6 and `reminders` 1 in the same statement.
+The probe sees; the rows are gone.
+
+**How they went, established from the code rather than guessed:**
+`private.undo_set_automation_category_policy` (migration `202608190099`,
+line 685) deletes the row when there is no prior state to restore —
+
+```
+if restore is null then
+  delete from public.automation_category_policies
+  where user_id = p_user_id and category = target_category;
+```
+
+— which is exactly the shape of undoing a policy that did not exist before it was
+set. **The owner set four policies on 2026-08-20 and has since undone them,
+through the product's own audited undo path.** No agent wrote or deleted
+anything: every hosted statement behind this audit and this revalidation is a
+`select`.
+
+**Two consequences worth stating plainly.**
+
+1. **ADR-131 Decision 6 is not edited and is not wrong.** It recorded a state
+   that genuinely existed when it was signed. This series never rewrites an
+   accepted ADR into agreement with a later fact, and the supersession is here,
+   by name — the same treatment ADR-129 gave ADR-127's premise.
+2. **ADR-128 Decision 9, ADR-129 Decision 10 and ADR-130 Decision 8 are accurate
+   again.** Their sentence — *"all six automation categories stay `suggest_only`
+   with no automatic writer"* — now describes the deployed state exactly. They
+   were wrong for the window between 2026-08-20 and the undo, and they are right
+   now. **That does not retroactively make them have been right**, and the audit
+   keeps both facts rather than tidying the awkward one away.
+
+**Unchanged and re-verified:** there is still **no automatic writer**.
+`private.automation_category_decision` is consumed only by
+`public.automation_category_status()`, consumed only by
+`src/features/agent/automation-data.ts`, a display path. Nothing in
+`supabase/migrations/`, `src/` or `supabase/functions/` writes as a consequence
+of `eligible`. **That was and remains the real protection.**
+
+### 10.4 A new finding, and it is not this phase's
+
+**The dead-man switch cannot see a gateway 401.** Recorded by #289 and confirmed
+here: a 401 is answered by the gateway *before the function body runs*, so
+`reportDispatchRun` fires neither `record_scheduled_job_run` nor
+`record_scheduled_job_failure`. `scheduled_job_health` therefore read
+`failure_count: 0` for the whole ten-day outage — **frozen, not red**, and
+indistinguishable in a dashboard from a healthy idle job.
+
+The candidate repair — **alert on staleness of `last_success_at` rather than on a
+failure count** — is sound and is the right shape: a liveness check that requires
+the thing being watched to report its own death cannot detect the deaths that
+prevent reporting.
+
+**Classification: operations. Not a Phase 2R requirement, and not an
+opportunity to widen this phase into.** It belongs with the deploy-and-operate
+track, it needs no product surface, and folding an observability repair into a
+phase about recurring reminders would be precisely the debt-container this phase
+was told not to become. It is named here so that excluding it is a decision on
+the record rather than an omission.
+
+### 10.5 Every §3 candidate, re-checked
+
+| candidate | §3 verdict | after revalidation |
+|---|---|---|
+| `2P-ATTENTION-008` (§3.1) | open, mechanism proved | **unchanged** — `needs-attention-list.tsx` still holds `activeFilter` in local `useState` with no URL backing |
+| push HTTP 403 (§3.2) | separate initiative, external + hardware | **unchanged** |
+| `RG-DEP-3` (§3.3) | rollout; not closable by writing a file | **unchanged** |
+| four automation flows (§3.4) | separate initiative | **unchanged** — still only `task` and `person` have a producer |
+| accessibility on real routes (§3.5) | backlog, test infrastructure | **unchanged** |
+| **recurrence (§3.6)** | **the phase's subject** | **unchanged — still absent from the schema** |
+| `2P-CHAT-007` (§3.7) | unspendable | **unchanged** |
+| mobile / voice (§3.8) | owner hardware, and already-approved items closed | **unchanged** |
+| VoiceOver (§3.9) | **NOT EXECUTED — OWNER WAIVED** | **unchanged, and never to be reported as passing** |
+| search URL state (§8.1) | proved defect, `OD-2R-9` | **unchanged** — `/app/search` still reads no `searchParams` |
+
+### 10.6 What this revalidation did not do
+
+No AI call, no BYOK credit, no hosted write, no migration, no deploy, no product
+code, no restore, no push send, no secret read, no policy change. **Every hosted
+statement was a `select`**, no fixture was planted, and no residue is claimed
+because none can exist. No browser run — §3.1's behavioural observation remains a
+closing condition rather than a document.

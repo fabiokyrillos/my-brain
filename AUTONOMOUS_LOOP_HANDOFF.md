@@ -12321,3 +12321,120 @@ thing. **If it is not lifted, Phase 2R as written has no subject.**
 in this session — the automation record and the unbounded ADR slice — came from
 **reading the deployed rows and the guard's own source instead of the documents
 describing them.** The documents were confident and wrong in both cases.
+
+## §115 — The Phase 2R branch is reconciled onto the new `main`, and revalidation moved two hosted facts — one of which corrected an argument (2026-08-23)
+
+**Still planning only.** PR #287 stays a **DRAFT**, unmerged. Zero
+implementation, zero migration, zero deploy, zero hosted write, zero AI call,
+zero BYOK credit. **Nine owner decisions remain OPEN**, including the theme.
+
+### The reconciliation
+
+`origin/main` had moved from `43c8be17` to **`73f30b39`** with PRs **#288**,
+**#289** and **#290**. The branch was **3 ahead, 9 behind**, and PR #287 was
+`CONFLICTING/DIRTY`.
+
+**Merge, not rebase** — the branch is published with an open PR, so history is
+not rewritten and no force push was used.
+
+**Only three files were touched by both sides**, all prepend-style logs:
+
+| file | conflict | resolution |
+|---|---|---|
+| `docs/STATE.md` | 1 entry vs 2 | main's newer entries at the head; the Phase 2R entry demoted to `Previously:`. **Neither side dropped** |
+| `docs/CHANGELOG.md` | 1 entry vs 3 | main's three above the Phase 2R entry, in the order they happened |
+| `docs/TODO.md` | auto-merged | **verified by hand rather than trusted** — the `Active milestone` line still names Phase 2R and ADR-131, which is the line the A13 guard reads |
+
+**Nothing from #288–#290 is regressed**: the drain incident record and its open
+monitoring gap, `process-jobs` **v29**, the **v2** reinterpretation with **v1
+preserved**, prompt `2026-08-22.1`, the CSS repairs, and the stylesheet-class
+debt **43 → 41**.
+
+### The subject survives
+
+`public.reminders` is still altered by exactly one migration since creation, and
+there is still no `recurrence`, `rrule` or `repeat_*` anywhere in
+`supabase/migrations/`. **Parity unchanged — 100 local = 100 hosted,
+`202608210100`.** All three PRs created zero migrations. **The recommendation
+stands and `OD-2R-1` stays OPEN.**
+
+### Two hosted facts moved
+
+**`automation_calibration_observations`: 0 → 2.** One `task/approved`, one
+`person/approved`, both written 2026-08-23 00:42 — the direct consequence of
+#289 restoring the drain and #288 repairing extraction. **The producers
+demonstrably fire.**
+
+This **corrects an argument rather than a number**. §4 of the audit disqualified
+autonomy partly on *"zero rows"*. The corrected reason is narrower and better
+evidenced: evidence accrues at **two rows per reviewed entry** against thresholds
+of **50** (`task`, 0.90) and **80** (`person`, 0.97), and **four of six
+categories still have no producer at all**. Autonomy stays disqualified —
+because the rate is far below the threshold, **not** because nothing can be
+recorded.
+
+**`automation_category_policies`: 4 → ZERO.** The probe was checked before the
+product, because "rows gone" and "probe blind" look identical from a zero: the
+same statement read `auth.users` 2, `profiles` 2, `entries` 1, `tasks` 6 and
+`reminders` 1. The probe sees.
+
+**The owner undid their own 2026-08-20 opt-in**, through
+`private.undo_set_automation_category_policy`, which deletes the row when there
+is no prior state to restore — the exact shape of undoing a policy that did not
+exist before it was set. All six categories are `suggest_only` again, by the
+**computed** default. No agent wrote or deleted anything; every hosted statement
+was a `select`.
+
+**Two consequences, kept together rather than tidied.** ADR-131 Decision 6 is
+**not edited** — it recorded a state that genuinely existed when signed, and
+audit **§10.3** supersedes it by name, the way ADR-129 superseded ADR-127's
+premise. And ADR-128 D9, ADR-129 D10 and ADR-130 D8 **describe the deployed state
+accurately again** — which does **not** retroactively make them have been right.
+
+**Unchanged and re-verified: there is still no automatic writer.** That was, and
+remains, the real protection.
+
+### A criterion that could not survive its own subject moving
+
+`2R-FOUNDATION-006` said *"the four `automation_category_policies` rows are
+re-read"*. There are now none, so the criterion would have been unsatisfiable by
+a correct product. It now re-reads the table **whatever its row count**. **A
+criterion that names a count cannot survive the count changing** — which is the
+class of defect it existed to catch, pointed at itself.
+
+### One new finding, classified out
+
+**The dead-man switch cannot see a gateway 401.** A 401 is answered before the
+function body runs, so `reportDispatchRun` fires neither
+`record_scheduled_job_run` nor `record_scheduled_job_failure`, and
+`scheduled_job_health` read `failure_count: 0` through the whole ten-day
+outage — **frozen, not red**, and indistinguishable from a healthy idle job.
+
+The candidate repair — alert on **staleness of `last_success_at`** rather than on
+a failure count — is sound, and is the right shape: *a liveness check that
+requires the watched thing to report its own death cannot detect the deaths that
+prevent reporting.*
+
+**Operations, not Phase 2R.** Named so that excluding it is a decision on the
+record rather than an omission.
+
+### Guards
+
+All five successor pins re-proved after the merge, **with a mutation control run
+twice**: reverting the detector constant fails the guard, and reverting the 2P
+generator's refusal 12 fails it too. The ADR-127/128 slices remain bounded to
+their own blocks — the only `decisions.slice(at)` left in the file is the comment
+explaining why it was wrong.
+
+Closeout guards: **2 647 passing, 0 failing**.
+
+### For whoever picks this up next
+
+**Nothing is signed.** The nine decisions are the whole remaining blocker, and
+`OD-2R-8` is still the one to read first: without lifting the
+`2P-REMINDER-RECURRENCE` refusal, the phase has no subject.
+
+**And the lesson this session paid for twice:** *read the rows, never a document —
+including this one.* The automation state has now moved twice in three days, and
+both times the document describing it was confident and stale. §10.3 will be
+stale too, eventually. The instruction is the durable part.

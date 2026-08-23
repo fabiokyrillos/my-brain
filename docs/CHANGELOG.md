@@ -3,6 +3,30 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-23 - The Phase 2R planning branch is reconciled onto `main` `73f30b39`, and revalidation moved two facts
+
+**Still planning only.** Zero implementation, zero migrations, zero deploy, zero hosted write, zero AI call, zero BYOK credit. PR #287 stays a **DRAFT** and is not merged. Nine owner decisions remain **OPEN**, including the theme itself.
+
+**Merge, not rebase.** The branch is published with an open PR, so history is not rewritten and no force push was used. Two conflicts, both in prepend-style logs, both resolved semantically rather than by taking a side: `STATE.md` and `CHANGELOG.md` put main's newer entries at the head and demote the Phase 2R entry, with **neither side dropped**. `docs/TODO.md` auto-merged and was **verified by hand rather than trusted** — the `Active milestone` line still names Phase 2R and ADR-131, which is the line the A13 guard reads.
+
+**Nothing from PRs #288–#290 is regressed:** the drain incident record and its open monitoring gap, `process-jobs` **v29**, the **v2** reinterpretation with **v1 preserved**, prompt `2026-08-22.1`, the person-candidate and immutable-history CSS repairs, and the stylesheet-class debt **43 → 41** all stand as main recorded them.
+
+**The subject survives revalidation.** `public.reminders` is still altered by exactly one migration since creation, and no `recurrence`, `rrule` or `repeat_*` exists anywhere in `supabase/migrations/`. **Parity unchanged — 100 local = 100 hosted, `202608210100`**; all three PRs created zero migrations.
+
+**Two hosted facts moved, and one corrects an argument rather than a number.**
+
+`automation_calibration_observations` went **0 → 2** — one `task/approved`, one `person/approved`, both written 2026-08-23 00:42, the direct consequence of #289 restoring the drain and #288 repairing extraction. **The producers demonstrably fire.** Autonomy stays disqualified as a theme, but the reason is corrected: evidence accrues at **two rows per reviewed entry** against thresholds of **50** (`task`, 0.90) and **80** (`person`, 0.97), and **four of the six categories still have no producer at all** — *not* that nothing can ever be recorded.
+
+`automation_category_policies` went **4 → ZERO**. The probe was checked before the product: the same statement read `auth.users` 2, `profiles` 2, `entries` 1, `tasks` 6 and `reminders` 1, so the rows are gone rather than hidden. **The owner undid their own 2026-08-20 opt-in** through `private.undo_set_automation_category_policy`, which deletes the row when there is no prior state to restore. All six categories are `suggest_only` again, by the **computed** default.
+
+**ADR-131 Decision 6 is not edited.** It recorded a state that genuinely existed when it was signed; audit **§10.3** supersedes it by name, the way ADR-129 superseded ADR-127's premise. **ADR-128 D9, ADR-129 D10 and ADR-130 D8 describe the deployed state accurately again** — which does not retroactively make them have been right, and both facts are kept rather than the awkward one tidied away. **Unchanged and re-verified: there is still no automatic writer**, and that was and remains the real protection.
+
+**One new finding, classified out.** The **dead-man switch cannot see a gateway 401** — a 401 is answered before the function body runs, so `reportDispatchRun` fires nothing and `scheduled_job_health` read `failure_count: 0` through the whole ten-day outage: **frozen, not red**. The candidate repair — alert on **staleness of `last_success_at`** rather than on a failure count — is sound and is **operations, not Phase 2R scope**. Named so that excluding it is a decision on the record rather than an omission.
+
+**Corrections made to the package rather than left standing:** `2R-FOUNDATION-006`'s criterion named *"the four rows"* and could not have survived the count changing — it now re-reads the table **whatever its row count**. The theme comparison, the gaps report and the PRD's option B all carried the superseded "zero rows" argument and now carry the corrected one.
+
+**All five successor pins re-proved after the merge**, with a mutation control: removing one makes the guard fail. Guards: **2 647 passing, 0 failing** locally.
+
 ## 2026-08-22 - INCIDENT: the unattended entry-dispatch drain had been answering 401 since 2026-08-12, and the dead-man switch could not see it
 
 **No migration, no product code, no schema change.** The repair is a rotation of one shared secret in the two stores that hold it, plus a redeploy.

@@ -35,8 +35,11 @@ Each is genuinely missing. Each has a reason it loses to §1.
 The most valuable missing thing, and **unbuildable today**. The entire policy
 framework exists — per-category state, thresholds, freshness, an undo-block rule,
 an audited policy writer — and nothing acts, correctly, because
-`automation_calibration_observations` holds **zero rows** and `task` alone needs
-50 at 0.90 precision.
+`automation_calibration_observations` holds **2 rows** against a `task` threshold
+of 50 at 0.90 precision. *(Revalidated 2026-08-23; it read zero on 2026-08-22 and
+the producers have since fired for the first time — audit §10.2. The conclusion
+is unchanged; the reason is now "far below the rate", not "nothing can be
+recorded".)*
 
 Four of the six categories have **no producer at all**, so they cannot accumulate
 evidence even in principle.
@@ -45,9 +48,12 @@ evidence even in principle.
 component — a writer that acts unasked — with **no evidence to validate it
 against**, and shipping something that most likely never fires.
 
-**One thing whoever takes this must know**, from audit §5: the owner has
-**already** set `task` and `person` to `automatic_when_eligible`. The consent is
-stored. Three ADRs say otherwise and are wrong. Start from the rows.
+**One thing whoever takes this must know**, from audit §5 **as superseded by
+§10.3**: the owner set `task` and `person` to `automatic_when_eligible` on
+2026-08-20 and **undid it** before 2026-08-23, so the table is empty and the
+computed default governs. **Read the rows, never a document** — including this
+one. That instruction is the durable part; the state it described has now moved
+twice in three days, which is exactly why the instruction exists.
 
 ### 2.2 A search cannot be returned to
 
@@ -105,6 +111,29 @@ more robust shape"*, available later.
 | **VoiceOver** | **NOT EXECUTED — OWNER WAIVED.** Not a gap to close; a waiver to respect. Never to be described as approved, tested or passing |
 | A real BYOK conversation journey | **unspendable** — it needs the owner's own credential. Not declined, not failed |
 
+### 3.1 The dead-man switch cannot see a gateway 401 — **operations, added 2026-08-23**
+
+Surfaced by PR #289 and confirmed in audit §10.4. The unattended entry-dispatch
+cron answered **401 for ten days** and the liveness monitor never went red,
+because a gateway 401 is answered **before the function body runs** — so
+`reportDispatchRun` fires neither `record_scheduled_job_run` nor
+`record_scheduled_job_failure`, and `scheduled_job_health` read
+`failure_count: 0` throughout: **frozen, not red**, and indistinguishable from a
+healthy idle job.
+
+The candidate repair is sound and is the right shape: **alert on staleness of
+`last_success_at` rather than on a failure count.** A liveness check that
+requires the watched thing to report its own death cannot detect the deaths that
+prevent reporting.
+
+**Classification: operations — not a Phase 2R requirement and not an
+opportunity to widen this phase into.** It needs no product surface, it belongs
+with the deploy-and-operate track, and folding an observability repair into a
+phase about recurring reminders would be exactly the debt-container this phase
+was told not to become. It is named here so that excluding it is a decision on
+the record rather than an omission. **This phase does not close it, and no
+document here may report it as closed.**
+
 ---
 
 ## 4. Opportunities that cost almost nothing
@@ -112,9 +141,13 @@ more robust shape"*, available later.
 Listed because they are cheap and real, **not** as an argument to widen the
 phase. Each would fit anywhere.
 
-1. **Correct the automation record.** Three ADRs state all six categories are
-   `suggest_only`; two are not. Costs nothing but an appended correction, and
-   this package's authorizing ADR carries it.
+1. ~~**Correct the automation record.**~~ **Resolved by the owner, not by this
+   package.** Three ADRs stated all six categories were `suggest_only` while two
+   were `automatic_when_eligible`; ADR-131 Decision 6 corrected the record on
+   2026-08-22. The owner has since **undone the opt-in** through the product's
+   own audited undo, so the table is empty and those three ADRs describe the
+   deployed state accurately again. Audit §10.3 records both facts — that they
+   were wrong for a window, and that they are right now. Neither is tidied away.
 2. **`STATE.md`'s tail sections are ~1 month stale.** *"Next priorities"* still
    describes Phase 2C slices as unpushed and Phases 2D–2F as future work. The
    prepended head — which is what every process reads — is current, so the
