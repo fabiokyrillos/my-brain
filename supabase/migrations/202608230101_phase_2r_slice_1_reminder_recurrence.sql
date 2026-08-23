@@ -331,6 +331,29 @@ comment on function private.reminder_resolve_local(timestamp, text) is
 -- 3. Which local dates a rule falls on -- OD-2R-5 case 3 lives here
 -- ---------------------------------------------------------------------------
 
+-- DEFINED BEFORE ITS CALLER, AND THAT ORDER IS NOT COSMETIC.
+--
+-- `reminder_rule_matches_date` is `language sql`, and a SQL-language body is
+-- parsed and RESOLVED AT CREATION TIME -- unlike plpgsql, which resolves names
+-- when it runs. A helper declared after its caller therefore fails the whole
+-- migration with `42883 function ... does not exist`, at apply time, on an
+-- empty database. This file shipped that mistake once and CI caught it on the
+-- first chain run; the rehearsals had passed because they happened to declare
+-- the helper first, which is the difference between rehearsing the code and
+-- rehearsing the file.
+--
+-- `phase-2r-model-guard.test.ts` now asserts the property for every
+-- `language sql` function here, so the next one cannot repeat it.
+create or replace function private.reminder_month_end(p_date date)
+returns date
+language sql
+immutable
+set search_path = ''
+as $$
+  select (pg_catalog.date_trunc('month', p_date::timestamp)
+          + interval '1 month' - interval '1 day')::date;
+$$;
+
 create or replace function private.reminder_rule_matches_date(
   p_rule jsonb,
   p_date date
@@ -378,15 +401,6 @@ as $$
   end;
 $$;
 
-create or replace function private.reminder_month_end(p_date date)
-returns date
-language sql
-immutable
-set search_path = ''
-as $$
-  select (pg_catalog.date_trunc('month', p_date::timestamp)
-          + interval '1 month' - interval '1 day')::date;
-$$;
 
 -- ---------------------------------------------------------------------------
 -- 4. The one place an occurrence instant is computed -- 2R-TIME-007
@@ -1495,7 +1509,7 @@ begin
       p_rule, scan_from, p_anchor_hour, p_anchor_minute, owner_timezone, boundary
     );
     exit when next_instant is null;
-    return next query select next_instant;
+    return next next_instant;
     produced := produced + 1;
     boundary := next_instant;
     scan_from := (next_instant at time zone owner_timezone)::date;
@@ -1532,7 +1546,11 @@ begin
 
   -- 2R-TRUST-004: public.reminders keeps the Phase 2F posture exactly.
   for offender in
-    select privilege_type
+    -- Cast explicitly: `privilege_type` is `information_schema.character_data`,
+    -- a domain over varchar, and `offender` is text. The implicit coercion works
+    -- today; naming it costs nothing and removes a way for this block to fail
+    -- at apply time rather than in review.
+    select privilege_type::text
     from information_schema.role_table_grants
     where table_schema = 'public' and table_name = 'reminders'
       and grantee = 'authenticated'
@@ -1543,7 +1561,11 @@ begin
 
   -- The new table is stricter than the old one, and stays that way.
   for offender in
-    select privilege_type
+    -- Cast explicitly: `privilege_type` is `information_schema.character_data`,
+    -- a domain over varchar, and `offender` is text. The implicit coercion works
+    -- today; naming it costs nothing and removes a way for this block to fail
+    -- at apply time rather than in review.
+    select privilege_type::text
     from information_schema.role_table_grants
     where table_schema = 'public' and table_name = 'reminder_series'
       and grantee = 'authenticated'

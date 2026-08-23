@@ -269,9 +269,7 @@ asserted to contain no task or calendar path and exactly one migration.
 cannot be started by this phase, because the half of the guard that would catch
 them has nothing to widen.
 
-### Four defects found before pushing, by rehearsal rather than by CI
-
-Each would have cost a CI cycle:
+### Seven defects, six caught before pushing and one caught by CI
 
 1. **`extensions.digest`, not `pg_catalog.digest`.** Caught by reading migration
    064's idiom rather than assuming the schema.
@@ -283,6 +281,47 @@ Each would have cost a CI cycle:
 4. **A comment naming another phase's column tripped that phase's own closed-list
    guard.** Reworded, rather than widening `phase-2q-foundation.test.ts` — an
    enforcer must not be defeated by a recorder.
+5. **An ordering bug in the detach undo** (§ above): un-detaching before deleting
+   the replacement violates the very index the undo is restoring. Found by
+   re-reading the handler against the index; both orders were then executed.
+6. **`return next query select …` is not plpgsql.** `RETURN NEXT` takes an
+   expression and `RETURN QUERY` takes a query; the preview function had them
+   fused. Found by reading, and it would have been the **second** red CI run.
+
+### 7. The one CI caught, and why the rehearsals did not
+
+**`ERROR: function private.reminder_month_end(date) does not exist (SQLSTATE
+42883)`**, applying the chain to an empty database.
+
+`reminder_rule_matches_date` is `language sql`, and **a SQL-language body is
+parsed and resolved when the function is CREATED** — unlike plpgsql, which
+resolves names when it runs. The helper was declared *after* its caller, so the
+whole migration failed at apply time.
+
+**Why four hosted rehearsals missed it is the part worth recording.** Each
+rehearsal declared the helpers in dependency order, because that is the order a
+person writes them in when composing a test. **They rehearsed the code and not
+the file.** The property only breaks when the chain runs top to bottom from
+empty, which is exactly what CI does and exactly what a hand-assembled rehearsal
+does not.
+
+Two things came out of it rather than one:
+
+- the helper moved above its caller, with the asymmetry written down where the
+  next person will be standing;
+- **`src/lib/closeout/phase-2r-model-guard.test.ts`** now reads the migration in
+  file order and asserts, for **every** `language sql` function, that everything
+  its body calls is declared earlier. A control re-introduces the exact bug and
+  shows the guard failing, and a second control shows the same shape in plpgsql
+  is legitimate and must **not** fire. The guard also pins the house rules this
+  file got wrong or nearly got wrong: `pg_catalog.` never in front of a grammar
+  special form, `digest` through `extensions`, and `55P03` rather than the code
+  that hangs the gateway.
+
+Every plpgsql body was then checked mechanically for block balance — `if`,
+`loop` and `case` openers against their closers, with expression-form `case`
+counted separately — and the postcondition block's catalog queries were executed
+against the real catalog in a rolled-back transaction.
 
 Plus four fragilities in this slice's own test file, found by re-reading it
 adversarially: a `union all … limit 1` with no guaranteed order; a `VOLATILE`
