@@ -36,7 +36,7 @@
 -- `reminder_lifecycle_command.sql`.
 
 begin;
-select plan(78);
+select plan(79);
 
 set local timezone to 'UTC';
 
@@ -573,7 +573,7 @@ select ok(
 );
 
 -- ---------------------------------------------------------------------------
--- Section 8 -- the series commands and their undo (12)
+-- Section 8 -- the series commands and their undo (13)
 -- ---------------------------------------------------------------------------
 
 set local role authenticated;
@@ -658,12 +658,33 @@ select ok(
    where occurrence.series_id = pg_temp.owned_series()) >= 3,
   '2R-SERIES-005: ending destroyed no history -- every past occurrence is still there'
 );
+/*
+ * Scoped to the ATTACHED occurrence, and the scope is the assertion.
+ *
+ * The detached one from the previous block is still `scheduled` -- detaching
+ * changes `detached_at`, not `status` -- and ending the series deliberately
+ * leaves it alone: a detached occurrence is the owner's one-off, no longer
+ * governed by the rule, so ending the rule must not silently cancel it
+ * (`2R-SERIES-004`). Counting every scheduled row here would have asserted the
+ * opposite behaviour, and the first draft of this suite did exactly that.
+ */
 select is(
   (select pg_catalog.count(*)::integer
    from public.reminders as occurrence
-   where occurrence.series_id = pg_temp.owned_series() and occurrence.status = 'scheduled'),
+   where occurrence.series_id = pg_temp.owned_series()
+     and occurrence.detached_at is null
+     and occurrence.status = 'scheduled'),
   0,
   'and it stopped the future one rather than leaving it armed'
+);
+select is(
+  (select pg_catalog.count(*)::integer
+   from public.reminders as occurrence
+   where occurrence.series_id = pg_temp.owned_series()
+     and occurrence.detached_at is not null
+     and occurrence.status = 'scheduled'),
+  1,
+  '2R-SERIES-004: and the detached occurrence survived the series ending'
 );
 
 -- ---------------------------------------------------------------------------
@@ -698,9 +719,11 @@ select is(
 select is(
   (select pg_catalog.count(*)::integer
    from public.reminders as occurrence
-   where occurrence.series_id = pg_temp.owned_series() and occurrence.status = 'scheduled'),
+   where occurrence.series_id = pg_temp.owned_series()
+     and occurrence.detached_at is null
+     and occurrence.status = 'scheduled'),
   1,
-  'and re-armed the occurrence it had cancelled'
+  'and re-armed the occurrence it had cancelled -- exactly one live again'
 );
 select is(
   (select pg_catalog.count(*)::integer
