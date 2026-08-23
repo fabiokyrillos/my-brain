@@ -6,6 +6,7 @@ import { UniversalStateView } from "@/features/experience/universal-state";
 import type { Locale } from "@/lib/preferences";
 
 import { ReminderActions } from "./reminder-actions";
+import { ReminderSeriesControls } from "./series-controls";
 import { getReminderCopy } from "./copy";
 import { REMINDER_VIEWS, type ReminderView, type ReminderViewModel } from "./projection";
 
@@ -34,10 +35,20 @@ export function ReminderList({
   locale,
   formatInstant,
   formatLocalInput,
+  formatLocalTime,
 }: {
   reminders: readonly ReminderViewModel[];
   locale: Locale;
   formatInstant: (iso: string) => string;
+  /**
+   * The occurrence's wall clock as `HH:MM` in the owner's zone — slice 2R.2.
+   *
+   * A third formatted string rather than a slice of `formatLocalInput`'s result:
+   * a substring of a value that exists for a `datetime-local` input is a
+   * dependency on that value's shape, and the shape is not this file's to
+   * assume. Both come off the page's single zone-bound formatter.
+   */
+  formatLocalTime: (iso: string) => string;
   /**
    * The instant as a `datetime-local` value in the owner's timezone.
    *
@@ -124,6 +135,18 @@ export function ReminderList({
               reminder={reminder}
               remindAtLocalValue={formatLocalInput(reminder.remindAt)}
             />
+
+            {/* Slice 2R.2. Absent — not disabled — for a reminder that carries no
+                rule, which is every reminder in an account that has created
+                none. The component itself returns null on a null series, so the
+                two agree rather than one guarding the other. */}
+            {reminder.series === null ? null : (
+              <ReminderSeriesControls
+                anchorTimeValue={formatLocalTime(reminder.remindAt)}
+                locale={locale}
+                reminder={reminder}
+              />
+            )}
           </div>
 
           <div className="list-meta">
