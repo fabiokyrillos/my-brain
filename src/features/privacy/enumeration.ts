@@ -191,6 +191,18 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
     surface: "reminders",
     tables: [
       { table: "reminders" },
+      /*
+       * Phase 2R slice 2R.1. The rule a repeating reminder follows is the
+       * owner's own writing — a title and a schedule they typed — so it is
+       * exported and deleted with the reminders it produces, in the same
+       * category, rather than withheld.
+       *
+       * Nothing in it is a capability or a secret: `rule` is one of five
+       * enumerated shapes with no free text, and the anchor is a date and a
+       * wall clock. There is therefore no `withheldColumns` entry, and its
+       * absence is the decision rather than an omission.
+       */
+      { table: "reminder_series" },
       { table: "notifications" },
       { table: "notification_deliveries" },
       { table: "notification_consents" },

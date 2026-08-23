@@ -198,6 +198,8 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
     "2M.4b browser subscription. Same posture and same writers as the consent above -- a row exists only because the owner pressed a control and their browser returned a subscription; no Phase 2F proof writes it; cascades at 202608120092:133",
   notification_deliveries:
     "2M.4b content-free delivery audit. Written only by the leased sender through begin_push_delivery/finish_push_delivery, and the ONE table here with its own retention window (90 days, private.retention_windows, swept by a function granted to no role); no Phase 2F proof writes it; cascades at 202608120092:184",
+  reminder_series:
+    "Phase 2R slice 2R.1 recurrence model. Written ONLY through create_reminder_series_v1 and apply_reminder_series_command_v1 -- authenticated holds SELECT and nothing else, so there is no write for a Phase 2F fixture to make and no Phase 2F proof makes one; cascades at 202608230101:488",
 });
 
 /** Tables whose correct deployed posture is "service_role cannot read this", with the reason. */

@@ -339,7 +339,19 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
    * budget nobody authorized it to spend, so both are asserted, in opposite
    * directions, in the same test.
    */
-  it("holds the migration budget at 1 ALLOCATED and 0 CREATED", () => {
+  /**
+   * **Inverted by slice 2R.1: the allocation is SPENT, and the ceiling is now
+   * the only thing left to guard.**
+   *
+   * This asserted 1 allocated and 0 created, and the distinction between those
+   * two was the whole reason the case existed. Slice 2R.1 created the file
+   * under ADR-133, so "0 created" is false by authorization — and the assertion
+   * flips rather than relaxes: **exactly one**, named, and a second is the stop
+   * condition ADR-132 Decision 8 made it. The PRD's own sentences are still
+   * asserted, because the record of what was allocated does not stop mattering
+   * once it is spent.
+   */
+  it("holds the migration budget at 1 ALLOCATED and exactly 1 CREATED", () => {
     const prd = read(PRD);
     expect(prd, "the allocation must be recorded").toMatch(/One migration is ALLOCATED/);
     expect(prd, "the stale 'not allocated' wording must be gone")
@@ -352,14 +364,12 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
     const contract = read("docs/reports/phase-2r/PHASE_2R_TRACEABILITY_CONTRACT.md");
     expect(contract, "the contract must carry the allocation").toMatch(/\*\*Allocated\*\* \| \*\*1/);
 
-    // And the half that matters most: nothing exists on disk.
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration file exists")
-      .toEqual([]);
-    // Slice 2R.1 spends the allocation and moves this to 101, in the commit that
-    // creates the file. Until then the count is the proof that it has not been
-    // spent early.
-    expect(migrations.length, "the migration count moved before slice 2R.1").toBe(100);
+    expect(
+      migrations.filter((name) => /phase[_-]?2r/i.test(name)),
+      "a SECOND Phase 2R migration is a stop condition",
+    ).toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
+    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(101);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {
@@ -417,13 +427,19 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
   it("carries exactly the artifacts its authorized slices have produced, and no others", () => {
     for (const present of [
       "docs/reports/phase-2r/PHASE_2R_SLICE_00_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md",
     ]) {
       expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
     }
     for (const forbidden of [
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_01_ACCEPTANCE.md",
+      /*
+       * Still forbidden, and the ORDER is the point: the migration is created
+       * and merged in this slice, and applied to the hosted database only after
+       * CI is green on the exact merge SHA. A deployment record existing before
+       * that would be a record of something nobody did.
+       */
       "docs/reports/phase-2r/PHASE_2R_SLICE_01_DEPLOYMENT.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
@@ -476,11 +492,10 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
       .toMatch(/emulator, a viewport, a document or an automated test/);
     expect(body, "an ADR in this series must not name the successor").not.toMatch(/2S/i);
 
-    // And the two facts ADR-131 and ADR-132 kept apart stay apart: authorized to
-    // create is not created, and slice 2R.0 created none.
+    // The ceiling ADR-133 Decision 3 authorized this phase to reach, and no
+    // further: authorized to create ONE is not authorized to create two.
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
-    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)), "a Phase 2R migration file exists")
-      .toEqual([]);
+    expect(migrations.filter((name) => /phase[_-]?2r/i.test(name))).toHaveLength(1);
   });
 
   it("classifies no requirement while the phase is unimplemented", () => {

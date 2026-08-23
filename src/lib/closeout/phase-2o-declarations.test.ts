@@ -566,7 +566,15 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
     const laterPhase2q = migrations.filter((name) => /phase[_-]?2q/i.test(name));
     expect(laterPhase2q, `Phase 2Q is allocated exactly one migration: ${laterPhase2q.join(", ")}`)
       .toHaveLength(1);
-    expect(migrations).toHaveLength(MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length);
+    // Phase 2R spent the ONE migration ADR-132 Decision 8 allocated. Counted the
+    // same way, for the same reason: bumping the total instead would let an
+    // unattributed migration hide inside the new number.
+    const laterPhase2r = migrations.filter((name) => /phase[_-]?2r/i.test(name));
+    expect(laterPhase2r, `Phase 2R is allocated exactly one migration: ${laterPhase2r.join(", ")}`)
+      .toHaveLength(1);
+    expect(migrations).toHaveLength(
+      MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length,
+    );
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);
     // Non-vacuous: the filter really filters.

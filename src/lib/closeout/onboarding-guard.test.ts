@@ -252,7 +252,8 @@ describe("2O-ACTIVATION-002 is absolute: the path stores no progress", () => {
     // Chain head moved to 98 by Phase 2P slice 2P.1's single authorized migration (the owner's replacement authorization). This guard's own claim -- that THIS initiative spent nothing -- is unchanged.
     // Chain head moved to 99 by Phase 2P slice 2P.4's second authorized migration (ADR-123: per-category automation policy and calibration). Same reasoning.
     // Chain head moved to 100 by Phase 2Q slice 2Q.1's ONE authorized migration (ADR-127 Decision 7 / ADR-128 Decision 3: summaries.citations). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched. A SECOND 2Q migration is a stop condition and fails here.
-    expect(migrations).toHaveLength(100);
+    // Chain head moved to 101 by Phase 2R slice 2R.1's ONE authorized migration (ADR-132 Decision 8 / ADR-133 Decision 3: the reminder recurrence model). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2R migration is a stop condition and fails here.
+    expect(migrations).toHaveLength(101);
     expect(migrations.some((name) => /onboard/i.test(name))).toBe(false);
   });
 

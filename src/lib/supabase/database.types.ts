@@ -2325,14 +2325,73 @@ export type Database = {
         }
         Relationships: []
       }
+      reminder_series: {
+        Row: {
+          anchor_date: string
+          anchor_hour: number
+          anchor_minute: number
+          created_at: string
+          ended_at: string | null
+          id: string
+          important: boolean
+          rule: Json
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          anchor_date: string
+          anchor_hour: number
+          anchor_minute: number
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          important?: boolean
+          rule: Json
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          anchor_date?: string
+          anchor_hour?: number
+          anchor_minute?: number
+          created_at?: string
+          ended_at?: string | null
+          id?: string
+          important?: boolean
+          rule?: Json
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_series_task_owner_fk"
+            columns: ["user_id", "task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       reminders: {
         Row: {
           created_at: string
+          detached_at: string | null
           entry_id: string | null
           id: string
           important: boolean
           remind_at: string
           sent_at: string | null
+          series_id: string | null
+          series_sequence: number | null
           snoozed_until: string | null
           status: string
           task_id: string | null
@@ -2342,11 +2401,14 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          detached_at?: string | null
           entry_id?: string | null
           id?: string
           important?: boolean
           remind_at: string
           sent_at?: string | null
+          series_id?: string | null
+          series_sequence?: number | null
           snoozed_until?: string | null
           status?: string
           task_id?: string | null
@@ -2356,11 +2418,14 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          detached_at?: string | null
           entry_id?: string | null
           id?: string
           important?: boolean
           remind_at?: string
           sent_at?: string | null
+          series_id?: string | null
+          series_sequence?: number | null
           snoozed_until?: string | null
           status?: string
           task_id?: string | null
@@ -2389,6 +2454,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "tasks"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminders_series_owner_fk"
+            columns: ["user_id", "series_id"]
+            isOneToOne: false
+            referencedRelation: "reminder_series"
+            referencedColumns: ["user_id", "id"]
           },
           {
             foreignKeyName: "reminders_task_owner_fk"
@@ -3057,6 +3129,33 @@ export type Database = {
           p_reminder_id: string
         }
         Returns: Json
+      }
+      apply_reminder_series_command_v1: {
+        Args: { p_command: Json; p_operation_key: string; p_series_id: string }
+        Returns: Json
+      }
+      create_reminder_series_v1: {
+        Args: {
+          p_anchor_date: string
+          p_anchor_hour: number
+          p_anchor_minute: number
+          p_important: boolean
+          p_operation_key: string
+          p_rule: Json
+          p_task_id: string
+          p_title: string
+        }
+        Returns: Json
+      }
+      reminder_series_preview_v1: {
+        Args: {
+          p_anchor_date: string
+          p_anchor_hour: number
+          p_anchor_minute: number
+          p_count: number
+          p_rule: Json
+        }
+        Returns: string[]
       }
       apply_entity_deletion: {
         Args: { p_entity_id: string; p_entity_type: string; p_operation_key: string }

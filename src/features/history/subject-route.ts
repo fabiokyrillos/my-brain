@@ -83,6 +83,25 @@ export const HISTORY_SUBJECT_ROUTES = {
   // automation section on Settings, and a link built from a category name this
   // row does not carry would be a guess.
   automation_category_policy: null,
+  /*
+   * Phase 2R slice 2R.1 — **null, and a literal one.**
+   *
+   * The rule this map states is that a link is offered only where the
+   * destination genuinely shows the subject. Slice 2R.1 ships the recurrence
+   * model and **no surface**: there is no page for a series, no list and no
+   * anchor, so an href here would be a guess dressed as a destination —
+   * `2R-TRUST-006` one surface over.
+   *
+   * It is `null` rather than `() => null` because `LINKABLE_ENTITY_TYPES`
+   * derives from `!== null`, so a function returning null would be counted
+   * linkable and then checked against a route that does not exist. That is not
+   * a nicety: the first draft of this entry did exactly that, and the
+   * route-exists assertion caught it.
+   *
+   * Slice 2R.3 builds the surface, and turns this into a real builder in the
+   * commit that does — the assertion above is what makes forgetting impossible.
+   */
+  reminder_series: null,
 } satisfies Record<HistoryEntityType, SubjectRouteBuilder | null>;
 
 /** The entity types whose subject has a page — derived, never re-listed. */

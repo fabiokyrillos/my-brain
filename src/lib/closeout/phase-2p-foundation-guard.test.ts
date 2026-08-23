@@ -559,6 +559,7 @@ describe("the census walks a real tree", () => {
     // phase-2p-declarations.test.ts, which asserts exactly two 2P migrations
     // and names the authorization for each.
     // Chain head moved to 100 by Phase 2Q slice 2Q.1's ONE authorized migration (ADR-127 Decision 7 / ADR-128 Decision 3: summaries.citations). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched. A SECOND 2Q migration is a stop condition and fails here.
-    expect(migrationFiles).toHaveLength(100);
+    // Chain head moved to 101 by Phase 2R slice 2R.1's ONE authorized migration (ADR-132 Decision 8 / ADR-133 Decision 3: the reminder recurrence model). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched. A SECOND 2R migration is a stop condition and fails here.
+    expect(migrationFiles).toHaveLength(101);
   });
 });

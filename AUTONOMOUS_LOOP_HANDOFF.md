@@ -12641,3 +12641,85 @@ created**, parity **`202608210100`, 100 = 100**, signup closed, rollout gate
 untouched, push HTTP 403 not resumed, `2P-ACCESS-005` **NOT EXECUTED — OWNER
 WAIVED**, and **the phase after this one is not started, not planned and not
 named as active**.
+
+## §118 — Slice 2R.1: the recurrence model, the one allocated migration spent, and the operator every reviewer would have approved is wrong twice (2026-08-23)
+
+**ADR-134 answered slice 2R.0's stop condition — option A.** The model resolves
+every instant through the `resolveOwnerTimeZone` contract; the eight
+pre-existing inline sites leave as `2R-TZ-SECOND-AUTHORITY`, with the missing
+check constraint on `profiles.timezone` routed to the same destination because
+repairing it needs a migration this phase does not have. **Neither is
+discharged by being routed.**
+
+### The finding, and why it is the important part of the slice
+
+**Postgres's own `AT TIME ZONE` disagrees with two of the three signed
+daylight-saving cases, in opposite directions.** Measured on the deployed
+database *before* the migration was written:
+
+| case | native | `OD-2R-5` signs for |
+|---|---|---|
+| spring-forward gap, 02:30 | `07:30+00` → local **03:30** | first valid local instant, **03:00** |
+| fall-back overlap, 01:30 | the **second** occurrence | the **first** |
+
+A migration using the native operator would have fired at the wrong time at
+every transition, **with no error anywhere**, and would have read as obviously
+correct in review. That is the failure mode `OD-2R-2` refused `RRULE` for,
+arriving through a door nobody was watching.
+
+The lesson is not about timezones. **ADR-132 Decision 6 signed those three cases
+rather than leaving them to be discovered, and that is the only reason anybody
+went and measured.** A phase that had treated them as an implementation detail
+would have shipped the wrong behaviour and passed every gate.
+
+### What is in the migration, and why 2R.2's surface is in it too
+
+Slice 2R.2 has **no migration**. So every database object it needs had to exist
+here or it never could: the series command boundary, both undo handlers, both
+registry rows. Shipping the table now and its commands later would have spent
+the allocation on half the model and then discovered the other half needed a
+second one — the exact stop condition the budget exists to make visible.
+
+`run_user_heartbeat` is **unchanged**, and that is now asserted rather than
+intended: the deployed body mentions neither `series_id` nor `reminder_series`.
+Materialisation is an `after update` trigger because it is the only place that
+sees **both** ways an occurrence completes.
+
+### `OD-2R-6` is enforced mechanically now
+
+The 2M guard is **split**. Task shapes are scanned everywhere with **no
+exemption at all**; neutral shapes are exempt only in a twelve-file enumerated
+allowlist asserted to contain no tasks path, no calendar path and exactly one
+migration. **Recurring tasks cannot be started by this phase, because the half
+of the guard that would catch them has nothing to widen.**
+
+### Five defects caught before pushing, four of them by rehearsal
+
+`extensions.digest` not `pg_catalog.digest` · the `on_auth_user_created` trigger
+already writes the profile row, so the pgTAP fixture collided on `profiles_pkey`
+· the plan said 66 against 76 assertions · a comment naming another phase's
+column tripped that phase's closed-list guard.
+
+And the one that matters: **an ordering bug in the detach undo.** Un-detaching
+before deleting the replacement leaves the series with two live occurrences and
+violates the very index the undo is restoring. Found by re-reading the handler
+**against the index**, and proved fixed by executing both orders.
+
+**Every hosted rehearsal ran inside `begin; … rollback;`**, residue proved zero
+on seven probes with the probe shown sighted in the same statement. There is no
+local Docker in this environment, so a rolled-back transaction on the deployed
+database is the only real-Postgres rehearsal available — it is worth using, and
+it is worth proving empty afterwards every single time.
+
+### For whoever picks this up next
+
+**The migration is created and merged. It is NOT applied.** The apply comes
+after CI is green on this slice's exact merge SHA, and it has its own gate
+chain: byte-identity with `main`, a hosted list before, a dry run showing
+exactly one pending, the apply, an owner-scoped proof with cleanup, and a fresh
+read showing local = remote advanced by exactly one. **Parity is still
+`202608210100` until then, and no document may say otherwise.**
+
+`2R-SERIES-*` is deliberately **not** classified by this slice. The database
+contract exists and is exercised; the semantics, the surface and the undo
+journeys are 2R.2's to prove.

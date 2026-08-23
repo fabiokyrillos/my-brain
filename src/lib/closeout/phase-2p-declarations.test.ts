@@ -200,7 +200,13 @@ describe("Phase 2P declarations", () => {
     const laterPhase2q = migrations.filter((name) => /phase[_-]?2q/i.test(name));
     expect(laterPhase2q, `Phase 2Q is allocated exactly one migration: ${laterPhase2q.join(", ")}`)
       .toEqual(["202608210100_phase_2q_slice_1_summary_citations.sql"]);
-    expect(migrations).toHaveLength(99 + laterPhase2q.length);
+    // Phase 2R spent the ONE migration ADR-132 Decision 8 allocated, named here
+    // rather than absorbed into the total, so a SECOND fails on this line and an
+    // unattributed one still fails the count below.
+    const laterPhase2r = migrations.filter((name) => /phase[_-]?2r/i.test(name));
+    expect(laterPhase2r, `Phase 2R is allocated exactly one migration: ${laterPhase2r.join(", ")}`)
+      .toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
+    expect(migrations).toHaveLength(99 + laterPhase2q.length + laterPhase2r.length);
   });
 
   it("records the second authorization, and what it still refuses", () => {

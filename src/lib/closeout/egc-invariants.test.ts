@@ -144,7 +144,11 @@ const REPO = resolve(__dirname, "../../..");
 // migration (ADR-127 Decision 7 / ADR-128 Decision 3: summaries.citations). Same
 // reasoning: this pin moves in the commit that adds the migration, and this
 // guard's claim about THIS initiative is untouched.
-const AUTHORIZED_MIGRATION_HEAD = "202608210100";
+// Chain head moved to 202608230101 by Phase 2R slice 2R.1's ONE authorized
+// migration (ADR-132 Decision 8 / ADR-133 Decision 3: the reminder recurrence
+// model). Same reasoning again: Entity Graph Completion still spent nothing, and
+// that is the only claim this constant makes.
+const AUTHORIZED_MIGRATION_HEAD = "202608230101";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

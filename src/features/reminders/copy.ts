@@ -109,6 +109,35 @@ type ReminderCopy = {
     readonly failed: string;
   };
 
+  /**
+   * `2R-SURFACE-006`/`-007` — the repeating half, in a typed block rather than
+   * in locale ternaries.
+   *
+   * Slice 2R.1 declares only what its **writer** needs: the outcome sentences,
+   * and the two scope words. The control's own labels, the human-language
+   * rendering of a rule (`2R-SURFACE-004`) and the occurrence preview land with
+   * the surface in slice 2R.3 — a key declared before anything renders it would
+   * be a string nobody measured.
+   *
+   * `scopeOccurrence` is written first because it is the default, and
+   * `OD-2R-4`'s whole point is that the narrower action is the one a control
+   * falls back to.
+   */
+  readonly series: {
+    readonly scopeOccurrence: string;
+    readonly scopeFuture: string;
+    readonly created: string;
+    readonly invalidRule: string;
+    readonly invalidAnchor: string;
+    readonly noHorizon: string;
+    readonly notFound: string;
+    readonly notActive: string;
+    readonly appliedOccurrence: string;
+    readonly appliedFuture: string;
+    readonly ended: string;
+    readonly failed: string;
+  };
+
   readonly cancelConfirmTitle: string;
   readonly cancelConfirmBody: string;
   readonly cancelConfirmAccept: string;
@@ -205,6 +234,21 @@ const COPY = {
       invalidDate: "Escolha uma data e um horário válidos.",
       unknownTask: "Essa tarefa não está disponível. Escolha outra ou deixe sem vínculo.",
       failed: "Não foi possível criar agora. Tente novamente.",
+    },
+
+    series: {
+      scopeOccurrence: "Somente esta ocorrência",
+      scopeFuture: "Esta e as futuras",
+      created: "Lembrete recorrente criado.",
+      invalidRule: "Essa repetição não é uma das que eu sei fazer. Escolha uma das opções.",
+      invalidAnchor: "Escolha uma data e um horário válidos para a repetição.",
+      noHorizon: "Não encontrei nenhuma data para essa repetição no próximo ano.",
+      notFound: "Essa repetição não está disponível.",
+      notActive: "Essa repetição já foi encerrada.",
+      appliedOccurrence: "Alterei somente esta ocorrência. A repetição continua igual.",
+      appliedFuture: "Alterei esta e as futuras. As anteriores ficaram como estavam.",
+      ended: "Repetição encerrada. O histórico continua aqui.",
+      failed: "Não foi possível alterar agora. Tente novamente.",
     },
 
     cancelConfirmTitle: "Cancelar este lembrete?",
@@ -318,6 +362,21 @@ const COPY = {
       invalidDate: "Choose a valid date and time.",
       unknownTask: "That task is not available. Pick another one or leave it unlinked.",
       failed: "Could not create it right now. Try again.",
+    },
+
+    series: {
+      scopeOccurrence: "This occurrence only",
+      scopeFuture: "This and future ones",
+      created: "Repeating reminder created.",
+      invalidRule: "That repetition is not one I can do. Pick one of the options.",
+      invalidAnchor: "Pick a valid date and time for the repetition.",
+      noHorizon: "I found no date for that repetition within the next year.",
+      notFound: "That repetition is not available.",
+      notActive: "That repetition has already ended.",
+      appliedOccurrence: "I changed this occurrence only. The repetition is unchanged.",
+      appliedFuture: "I changed this one and the future ones. Earlier ones stayed as they were.",
+      ended: "Repetition ended. The history is still here.",
+      failed: "Could not change it right now. Try again.",
     },
     historyLink: "See in history",
 
