@@ -13518,3 +13518,45 @@ discharges `2R-MOBILE-003`; `2R-CLOSE-009` refuses a record that says otherwise.
 
 **The migration budget has not moved.** One allocated, spent in 2R.1. Slices
 2R.2, 2R.3 and both corrections created none between them.
+
+## §125 — The checkpoint took three runs, and a person closed it (2026-08-24)
+
+**`2R-MOBILE-003` is DELIVERED.** Approved on the owner's own iPhone at the third
+run. Every item confirmed: the three weekdays stay ticked across opening *and*
+refreshing the preview, one recurrence saved carrying all three, the page behind
+the modal does not scroll, an outside tap closes a clean form and asks about a
+changed one, *continuar editando* preserves everything, the discard closes
+correctly, and there is no zoom and no sideways scrolling. Escape on the desktop
+followed the same rule.
+
+**Three runs, five defects — two, then three, then none.** The shape is the
+lesson. What made this work was re-running the checkpoint after every fix rather
+than reasoning that the fix must have held; the second run is the one that
+proves it, because the defect it found had been sitting under a passing first
+run's "the recurrence works".
+
+**A person with the device closed it.** No automated lane was offered as a
+substitute at any point — not jsdom, not the CI journeys, and explicitly not the
+`iphone-emulated` Playwright project, which runs WebKit and is still not an
+iPhone. `2R-CLOSE-009` asks for that distinction and the three-run history is
+what shows it was honoured rather than asserted.
+
+**Slice 2R.3 is closed.** 2R.4 is authorized and starts next; 2R.5 closes the
+phase at a further owner device checkpoint.
+
+### Carried forward, none discharged
+
+- **`2R-DRAWER-NOT-LOCKED`** — `.ux-detail` claims `aria-modal` and does not lock
+  the page; a design decision, not a defect.
+- **`2R-RECURRENCE-LANE-UNRUNNABLE`** — slice 2R.3's authenticated acceptance
+  spec cannot execute in this environment and names the wrong opener.
+- **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`** — needs DDL.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — measured, not repaired. 1 of 20 handlers.
+- **`2R-AXE-MANUAL-LANE`**, **`2R-TZ-SECOND-AUTHORITY`**, **`2R-TASK-RECURRENCE`**,
+  **`OD-2R-9`'s two defects**, the interval gap.
+- **Unchanged:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`; `RG-DEP-3`; push HTTP 403; `2P-CHAT-007-JOURNEY`; ADR-055
+  expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. Phase 2S not started.
+
+**Migration budget unmoved.** One allocated, spent in 2R.1. Slices 2R.2, 2R.3 and
+both corrections created none between them.
