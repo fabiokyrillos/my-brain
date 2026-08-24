@@ -13363,3 +13363,158 @@ Then, with no further authorization needed: record the outcome, re-classify
 
 **The migration budget has not moved.** One allocated, spent in 2R.1. Slices
 2R.2, 2R.3 and this correction created none between them.
+
+## §124 — The second checkpoint found three defects, and the first one was a write (2026-08-24)
+
+**`2R-MOBILE-003` ran again and came back partial again.** Five things the first
+run reported now hold: no zoom on a field, one recurrence accepting Monday,
+Wednesday and Friday, the right dates in the preview, one series rather than
+three, and the button still reachable.
+
+Three new defects. The checkpoint is **undelivered — awaiting a third run**, and
+slice 2R.4 is still not started.
+
+### What landed
+
+| | |
+|---|---|
+| corrective PR | #302 |
+| migrations | **zero created.** 101 = 101, parity `202608230101` |
+| gates | lint 0 errors · typecheck clean · **9315/9315** · build passes |
+| journeys | **266/266** CI e2e · **15/15** new browser lane — desktop, Pixel 7, iPhone 15 (WebKit) |
+
+### Defect 1 — reported as visual, and it was a write
+
+*"Ao selecionar segunda, quarta e sexta e tocar em 'Ver próximas datas', os dias
+ficam visualmente desmarcados. Apesar de desmarcados na interface, a prévia
+continua correta."*
+
+The round trip was instrumented before anything was changed:
+
+```
+before the preview   .checked = 1,3,5
+FormData -> preview  weekdays = [1,3,5]     <- why the preview looked right
+after the response   .checked = 1
+FormData -> save     weekdays = [1]         <- what would have been written
+```
+
+React resets a form it submitted once the action settles, returning every control
+to its `defaultChecked`. It restores a controlled **text** input afterwards; it
+does not restore a controlled `checked`. So the preview — computed from the
+`FormData` captured at submit time — was always right, and the save — computed
+from the DOM the reset had emptied — was always wrong. `deriveRecurrenceRule`
+reads an empty set as *the owner said nothing* and falls back to the anchor's own
+weekday.
+
+**The modal showed three days, promised three days, and would have saved one.**
+The same reset silently unticked *importante*.
+
+Fixed by removing the reset rather than compensating for it. This file already
+carried a `useEffect` pushing `choice` back into the `<select>` for the same
+reason; extending that to seven checkboxes would have been four more places where
+the DOM is corrected behind React's back — the duplicated authority the
+checkpoint's contract forbids in terms. `onSubmit` and a plain button hand the
+`FormData` to the dispatch directly, React only resets a form it submitted
+itself, and **the `<select>` workaround was deleted rather than joined**. The
+mutation control proves both halves: reverting the save path fails the `<select>`
+test too, so the workaround was load-bearing before and is obsolete now.
+
+`startTransition` is required with it — a dispatch React did not route reports
+`pending` only from inside one, and the suite said so the first time it was
+written without.
+
+### Defect 2 — there was no scroll lock anywhere in this repository
+
+A census of `overflow: hidden`, `body.style.overflow` and `overscroll` found
+three horizontal-scroll containers and **nothing that touched the document**.
+Every modal the product has ever shown let the page move behind it. This was
+never a Lembretes defect.
+
+`useScrollLock` takes the body **out of flow**, because `overflow: hidden` is the
+answer everyone writes first and iOS ignores it for touch. The offset rides in
+`top` and comes back; the scrollbar's width is **added to** the computed padding
+so `env(safe-area-inset-right)` survives; a module counter stops a stacked dialog
+releasing someone else's lock; release runs from cleanup, so a route change under
+an open dialog still unlocks.
+
+The command palette got it too — the contract says *"qualquer modal"* and the
+palette is one. `.ux-detail` was deliberately left alone: it declares
+`aria-modal` but is a side drawer with no backdrop, full width on a phone and a
+460px companion panel on a desktop. Which of those two it ought to be is a design
+decision, not a defect. **Carried.**
+
+### Defect 3 — the backdrop was a `<div>` with no handler
+
+Literally true, on every dialog. It means cancel now, with `pointerdown` and
+`click` **paired** so a drag beginning in a field and ending past the panel does
+not dismiss. Escape and the cancel button route through the same `requestClose`.
+A dialog holding something asks first, **inside the same panel** — no second
+backdrop — and the body is `hidden`, never unmounted, because unmounting the form
+would empty exactly what the question is about.
+
+`discard` is **required and nullable**, and it earned that in the first
+typecheck, which refused two call sites. Three consumers declare `null`; three
+carry a guard. Whether anything changed is derived **by the dialog from its own
+forms**, not by each consumer — so a focused field is not a changed one,
+reverting an edit by hand returns to clean, and the two fields that live only in
+the DOM are covered. A **seventh** close path turned up in the census: the memory
+composer's own *Cancelar* went straight past the question and now routes through
+it.
+
+### The finding that outlives the slice: a failing browser test is a claim about the harness
+
+The scroll journey failed, and I changed the product twice to chase it — a forced
+reflow before the restore, then `preventScroll` on the focus return. Both were
+speculation dressed as diagnosis, and **both are reverted**.
+
+The probe that ended it asked what the lock had actually captured:
+`body.style.top` read **`0px`**. `locator.click()` scrolls its target into view,
+and the opener sits at the top of a page the test had deliberately scrolled away
+from — so Playwright put the document back to zero before the lock ever engaged.
+The test was measuring the harness. Opening the dialog from the page instead made
+it pass against the **original** implementation.
+
+Two more the same run corrected, neither in the product:
+
+- `online-phase-2r-recurrence.spec.ts` **cannot be listed or run in this
+  development environment at all** — `createRequire(import.meta.url)` is
+  transformed to CommonJS and Node then refuses the `import.meta`. Reproduced
+  against the pristine file first. That lane also opens the composer by the
+  **save** button's label rather than the opener's, so slice 2R.3's authenticated
+  acceptance has evidently never executed. **Carried.**
+- `reminder_series` grants `authenticated` select and nothing else, so a
+  service-role read returns `42501`. Reading as the owner both works and applies
+  RLS.
+
+### Where the next session starts
+
+**With the owner, the same device, and a third run.** Nothing automated
+discharges `2R-MOBILE-003`; `2R-CLOSE-009` refuses a record that says otherwise.
+
+1. select **Monday, Wednesday and Friday**;
+2. open and refresh the preview;
+3. confirm the three **stay ticked**;
+4. save, and confirm **one** recurrence with all three days;
+5. open the modal and try to scroll the page behind it;
+6. tap outside with the form clean — it should close;
+7. tap outside with content filled — it should **ask**;
+8. choose *continuar editando* and confirm nothing was lost;
+9. tap outside again and confirm the discard;
+10. repeat with **Escape** on the desktop;
+11. confirm there is still no zoom and no sideways scrolling.
+
+### Carried forward, none discharged
+
+- **`2R-RECURRENCE-LANE-UNRUNNABLE`** *(new)* — the slice's own authenticated
+  acceptance spec cannot run here and names the wrong opener.
+- **`2R-DRAWER-NOT-LOCKED`** *(new)* — `.ux-detail` claims `aria-modal` and does
+  not lock the page; a design decision, not a defect.
+- **`2R-AXE-MANUAL-LANE`**, **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`**,
+  **`2R-UNDO-LEDGER-NOT-CLOSED`**, **`2R-TZ-SECOND-AUTHORITY`**,
+  **`2R-TASK-RECURRENCE`**, **`OD-2R-9`'s two defects**, the interval gap.
+- **Unchanged:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`; `RG-DEP-3`; push HTTP 403; `2P-CHAT-007-JOURNEY`; ADR-055
+  expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. Phase 2S not started.
+
+**The migration budget has not moved.** One allocated, spent in 2R.1. Slices
+2R.2, 2R.3 and both corrections created none between them.

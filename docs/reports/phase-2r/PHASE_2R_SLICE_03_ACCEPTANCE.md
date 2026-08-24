@@ -13,11 +13,12 @@
   exact merge SHA** and on the head `0c5f3c5` before it.
 - **Hosted writes: none. AI calls: none. BYOK credit spent: none.**
 
-> **`2R-MOBILE-003` — the checkpoint RAN, and returned partial approval with two
-> defects.** It is still **not delivered**: a checkpoint that found defects is a
-> checkpoint that has to be run again after they are fixed, and `2R-CLOSE-009`
-> refuses a record that closes it any other way. §10 records what the owner
-> tested, what passed, what failed, and what was done about it.
+> **`2R-MOBILE-003` has RUN TWICE, and is still not delivered.** The first run
+> returned two defects, the second returned three more. A checkpoint that found
+> defects is a checkpoint that has to be run again after they are fixed, and
+> `2R-CLOSE-009` refuses a record that closes it any other way. §10–§13 record
+> the first run; §14–§19 the second, including the one whose report said
+> *visual* and whose cause was a wrong write. **Awaiting a third run.**
 
 ---
 
@@ -164,7 +165,7 @@ Stated rather than implied, because the difference is the whole of
 | `2R-SURFACE-005` | **baseline** | §2 — already true by construction; asserted rather than built |
 | `2R-SURFACE-006` | **built** | the typed `copy.ts` block; no locale ternary added |
 | `2R-SURFACE-007` | **built** | `satisfies Record<Locale, …>` makes a missing key a build error; the journey renders the second locale |
-| `2R-SURFACE-008` | **built** | §3 — controlled fields plus the select reconciliation, with two mutation controls |
+| `2R-SURFACE-008` | **built — evidence corrected in §15** | §3 named "controlled fields plus the select reconciliation". That evidence was **incomplete**: the requirement was silently false for `weekdays` and `important`, which a form reset emptied while the surface still showed them. The reconciliation it cites is now **deleted**; the requirement holds because the reset no longer happens |
 | `2R-ACCESS-001` | **built** | the composer case operates the control by keyboard; the journey repeats it in a browser |
 | `2R-ACCESS-002` | **built** | the scope choice is a `fieldset`/`legend` radiogroup (slice 2R.2); the new select is labelled |
 | `2R-ACCESS-003` | **built** | both live regions render **empty before** their first sentence, asserted on an idle page |
@@ -172,7 +173,7 @@ Stated rather than implied, because the difference is the whole of
 | `2R-ACCESS-005` | **built** | no record in this phase describes any part of it as screen-reader evidence; `phase-2r-declarations.test.ts` enforces it and was not touched |
 | `2R-MOBILE-001` | **partial** | now asserted at 375px on a **rendered page in CI** for the public surfaces (§12), and in the manual lane behind auth. The remainder is the lane, not the behaviour |
 | `2R-MOBILE-002` | **built** | the dialog gained a height bound and a scroll container at every width (§3), guarded by the inverted 2R.0 assertion; the journey scrolls save into view and asserts it is in the viewport |
-| `2R-MOBILE-003` | **undelivered — awaiting a second run** | the checkpoint RAN and returned partial approval with two defects (§0). Both are fixed; a checkpoint that found defects has to be run again. **Not substituted, not claimed** |
+| `2R-MOBILE-003` | **undelivered — awaiting a THIRD run** | the checkpoint has run **twice**. The first returned two defects (§11–§12), the second three more (§14–§17). All five are fixed; a checkpoint that found defects has to be run again after they are. **Not substituted, not claimed** |
 
 **Sixteen addressed here; 47 of 73 cumulatively.** Two are `partial` with a named
 remainder and one is `undelivered` with a destination, as `2R-CLOSE-002`
@@ -320,3 +321,194 @@ with `null` meaning *the owner has not answered*; the effect and its companion
 **The field-count guard fired**, which is what it is for. Updating it was a
 deliberate act with the reason written where the count is, rather than a number
 raised to make a test pass.
+
+## 14. The second checkpoint run — three defects, and the first was not visual
+
+`2R-MOBILE-003` ran a **second** time, on the owner's iPhone, after the two
+defects of §11 and §12 were fixed. Five things it had reported now hold: no zoom
+on a field, one recurrence accepting Monday, Wednesday and Friday, a preview
+showing the right dates, one series rather than three, and the button still
+reachable.
+
+It came back with **three more**, and the checkpoint remains **undelivered —
+awaiting a third run**. `2R-CLOSE-009` refuses a record that closes it any other
+way, and slice 2R.4 is still not started.
+
+| | |
+|---|---|
+| corrective PR | #302 |
+| migrations | **zero created.** 101 = 101, parity `202608230101` |
+| gates | lint 0 errors · typecheck clean · **9315/9315** · build passes |
+| journeys | **266/266** CI e2e · **15/15** new browser lane, desktop + Pixel 7 + iPhone 15 (WebKit) |
+
+## 15. Defect 3 — the modal showed three days and would have saved one
+
+> *"Ao selecionar segunda, quarta e sexta e tocar em 'Ver próximas datas', os
+> dias ficam visualmente desmarcados. Apesar de desmarcados na interface, a
+> prévia continua correta."*
+
+Reported as a visual defect. **It was a write defect.** The round trip was
+instrumented before a line was changed:
+
+```
+before the preview   .checked = 1,3,5
+FormData -> preview  weekdays = [1,3,5]     <- why the preview looked right
+after the response   .checked = 1
+FormData -> save     weekdays = [1]         <- what would have been written
+```
+
+React resets a form it submitted once the action settles, returning every
+control to its `defaultChecked`. It restores a controlled *text* input
+afterwards; it does **not** restore a controlled `checked`. So the preview,
+computed from the `FormData` captured at submit time, was always right — and the
+save, computed from the DOM the reset had emptied, was always wrong.
+`deriveRecurrenceRule` reads an empty set as *the owner said nothing* and falls
+back to the anchor's own weekday.
+
+**The dialog showed three days, promised three days, and would have written
+one.** The same reset silently unticked *importante*. A field that lies about
+what will be saved is precisely the shape `2R-SURFACE-008` exists to prevent.
+
+### Fixed by removing the reset, not by compensating for it
+
+This file already carried a `useEffect` that pushed `choice` back into the
+`<select>` after every render, because that element had the same problem.
+Extending that shape to seven checkboxes and a tickbox would have been four more
+places where the DOM is corrected behind React's back — the *"duplicação de
+autoridade entre DOM, estado React e servidor"* the checkpoint's contract forbids
+in terms.
+
+So `onSubmit` and a plain button hand the `FormData` to `useActionState`'s
+dispatch directly. React only resets a form it submitted itself, so nothing is
+reset and nothing needs restoring, and **the `<select>` workaround was deleted
+rather than joined**. Constraint validation still runs — `onSubmit` fires only
+for a valid form. `startTransition` is required with it: a dispatch React did not
+route reports `pending` only from inside one, and the suite said so directly the
+first time it was written without.
+
+It also restored a claim this file made and did not honour. The preview button
+carried `formNoValidate` and a comment saying previewing before naming a reminder
+is reasonable — but it was a submit button, so an empty `required` title was
+refused by constraint validation and the action never ran at all.
+
+**The mutation controls**, because a test that passes beside a defect is not a
+test that detects it:
+
+| mutation | result |
+|---|---|
+| preview back to `formAction` | 3 fail |
+| save back to `action={submit}` | 2 fail — including the `<select>` case, proving the deleted workaround was load-bearing *before* and obsolete *after* |
+
+## 16. Defect 4 — nothing in this repository had ever locked the document
+
+> *"Com o modal aberto, ainda consigo rolar a página atrás dele."*
+
+A census of `overflow: hidden`, `body.style.overflow` and `overscroll` across the
+whole repository found three horizontal-scroll containers and **nothing that
+touched the document**. Every modal the product has ever shown — six
+`ConfirmDialog` consumers, the command palette, the trust panel — let the page
+move behind it. This was never a Lembretes defect.
+
+`useScrollLock` takes the body **out of flow**. `overflow: hidden` on `<body>` is
+the answer everyone writes first and iOS ignores it for touch, which is exactly
+the device the checkpoint is performed on. The rest is the half that is easiest
+to leave out:
+
+- the offset rides in `top` and is given back on release — *"ao fechar, a página
+  retorna exatamente à posição anterior"*;
+- the scrollbar's width is measured and **added to the computed padding**, not
+  assigned over it, so `env(safe-area-inset-right)` survives;
+- a module-scope counter means a stacked dialog cannot release someone else's
+  lock, and the restore uses what the **first** lock saw;
+- release runs from the effect's cleanup, so a route change under an open dialog
+  still unlocks — a lock that outlives its dialog is a page that can never
+  scroll again.
+
+Mutation control: dropping the stacking counter fails two tests.
+
+## 17. Defect 5 — the backdrop was a `<div>` with no handler
+
+> *"Tocar fora do modal não fecha o modal."*
+
+Literally true, on every dialog in the product. It now means cancel, with
+`pointerdown` and `click` **paired**: a drag that begins in a field and ends past
+the panel produces a `click` whose target is the backdrop, and acting on that
+alone interrupts someone mid-edit. Escape and the cancel button route through the
+same `requestClose`, because three copies of one rule is how two of them end up
+different.
+
+A dialog holding something asks first — **inside the same panel**, so there is no
+second backdrop and no nested dialog. The body is `hidden`, never unmounted,
+because unmounting the form would empty exactly what the question is asking
+whether to throw away.
+
+### `discard` is required and nullable, and it earned that immediately
+
+The first typecheck after the change **refused two call sites**. The census:
+
+| consumer | holds | declares |
+|---|---|---|
+| `delete-entity-control` | hidden inputs, buttons | `null` |
+| `command-console` | hidden `intent`, buttons | `null` |
+| `task-detail-controls` | hidden fields, buttons | `null` |
+| `company-panel` | a typed name, a select | guard |
+| `memory-composer` | a textarea | guard |
+| `reminder-composer` | the whole form | guard |
+
+Whether anything changed is derived **by the dialog, from its own forms** — not
+by each consumer, because every consumer that had to answer it would answer it
+slightly differently and one of them would be wrong. Two consequences are
+requirements rather than bonuses: a focused field is not a changed one, and
+reverting an edit by hand returns to clean. It also covers the two fields that
+live only in the DOM, which a check built from React state would have called
+clean while holding both.
+
+A **seventh** close path turned up during the census: the memory composer's own
+*Cancelar* called that component's `closeDialog` directly, straight past the
+question, on the one dialog whose whole content is a sentence the owner wrote. It
+is marked `data-dialog-close` now and the panel delegates it.
+
+Mutation controls: a backdrop that closes on any click fails the drag case; a
+body unmounted instead of hidden fails the content-intact case.
+
+## 18. What the browser corrected, and what it did not
+
+The new lane runs on desktop, Pixel 7 and **iPhone 15 — WebKit**, the engine
+closest to the owner's device. Three things it corrected, **none of them in the
+product**:
+
+- the pre-existing `online-phase-2r-recurrence.spec.ts` **cannot be listed or run
+  in this development environment at all**: its `createRequire(import.meta.url)`
+  is transformed to CommonJS and Node then refuses the `import.meta`. Reproduced
+  against the pristine file *before* anything was added to it. That lane also
+  opens the composer by the **save** button's label rather than the opener's — so
+  slice 2R.3's authenticated acceptance has evidently never executed;
+- `reminder_series` grants `authenticated` select and nothing else, so a
+  service-role read returns `42501`. Reading as the owner is both the only key
+  that works and the more honest one, since RLS applies;
+- `locator.click()` scrolls its target into view. The first scroll test therefore
+  put the page back to zero **before the lock engaged** and measured the harness
+  rather than the product — it read `top: 0px`. **Two speculative product changes
+  were made on that false reading and both were reverted**: the defect was
+  entirely in the test, and the lock needed neither.
+
+The last of these is the one worth carrying: *a failing browser test is a claim
+about the harness until it is measured.* The probe named the captured offset, and
+the offset was the answer.
+
+## 19. Where the next session starts
+
+**With the owner, and the same device — a third run.** Nothing here discharges
+`2R-MOBILE-003`, and a Playwright run on emulated WebKit is not an iPhone.
+
+1. open `/pt-BR/app/reminders` on the phone;
+2. select **Monday, Wednesday and Friday**, open and refresh the preview, and
+   confirm **the three stay ticked**;
+3. save, and confirm **one** recurrence carrying all three days;
+4. open the modal and try to scroll the page behind it;
+5. tap outside with the form **clean** — it should close;
+6. tap outside with content filled — it should **ask**;
+7. choose *continuar editando*, and confirm nothing was lost;
+8. tap outside again and confirm the discard;
+9. repeat with **Escape** on the desktop;
+10. confirm there is still no zoom and no sideways scrolling.
