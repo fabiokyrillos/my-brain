@@ -583,3 +583,84 @@ test("2O-MOBILE-005: the mobile project really is mobile, and a planted divergen
   );
   expect(overflows, `a 900px element did not overflow the ${testInfo.project.name} viewport`).toBe(mobile);
 });
+
+/* -------------------------------------------------------------------------- *
+ * The iOS field-zoom floor, measured on the rendered page — slice 2R.3 fix.
+ * -------------------------------------------------------------------------- */
+
+/**
+ * Safari on iOS zooms the whole page in when a focused `input`, `textarea` or
+ * `select` computes to **less than 16px**, and it does not zoom back out. The
+ * owner reported the consequence rather than the cause: *"o iPhone aplica zoom e
+ * o modal fica visualmente quebrado. Preciso reduzir manualmente o zoom."*
+ *
+ * `--type-body` is 13.5px, so nineteen field rules across ten stylesheets were
+ * below the line. `globals.css` now carries one floor for all of them.
+ *
+ * **Measured here rather than only in the CSS guard**, because a declaration
+ * that exists and a declaration that wins are different claims — this product
+ * already had two local `font-size: 16px` fixes that existed and did not
+ * generalise. This reads `getComputedStyle` on the real cascade.
+ *
+ * It reaches only the public surfaces, which is what a credential-free lane can
+ * do. The authenticated composers are covered by
+ * `online-phase-2r-recurrence.spec.ts` in the manual lane, and the slice record
+ * says so rather than implying CI proved them.
+ */
+test("2R fix: no text field computes below 16px at a phone viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+
+  for (const surface of PUBLIC_SURFACES) {
+    await open(page, surface.path);
+    const small = await page.evaluate(() => {
+      const fields = [...document.querySelectorAll("input, textarea, select")]
+        .filter((field) => {
+          const type = field.getAttribute("type");
+          // iOS does not zoom for controls with no text to enter, and they are
+          // sized by their box rather than by their font.
+          return !["checkbox", "radio", "range", "file", "hidden", "submit", "button"]
+            .includes(type ?? "");
+        });
+      return fields
+        .map((field) => ({
+          where: `${field.tagName.toLowerCase()}.${field.className || "—"}`,
+          px: Number.parseFloat(getComputedStyle(field).fontSize),
+        }))
+        .filter((field) => field.px < 16);
+    });
+    expect(small, `${surface.name} has fields iOS will zoom into`).toEqual([]);
+  }
+});
+
+test("2R fix: the floor does not reach the desktop type scale", async ({ page }) => {
+  /*
+    The other direction, and the checkpoint asked for it in terms: *desktop
+    permanece inalterado*. A floor applied at every width would be a silent
+    redesign of every form in the product, and it would pass the case above
+    just as well -- which is exactly why that case alone is not enough.
+
+    THIS CASE CAUGHT THE FIRST VERSION OF THE FIX. The floor was scoped
+    `(pointer: coarse), (max-width: 640px)`, and headless Chromium reports
+    `pointer: coarse` at 1280x800 -- so it matched on a desktop viewport and the
+    claim was false. Scoping by width alone is what makes it true.
+
+    Asserted on a field the design deliberately sets below the floor. If every
+    desktop field is 16px for its own reasons this becomes vacuous, so it is
+    written to fail loudly rather than to skip.
+  */
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await open(page, "/pt-BR/auth/login");
+
+  const belowFloor = await page.evaluate(() =>
+    [...document.querySelectorAll("input, textarea, select")]
+      .filter((field) => !["checkbox", "radio", "hidden", "submit"].includes(field.getAttribute("type") ?? ""))
+      .map((field) => Number.parseFloat(getComputedStyle(field).fontSize)));
+
+  expect(belowFloor.length, "the login page stopped having fields").toBeGreaterThan(0);
+  // The auth form's own rule sets 16px deliberately and predates this fix, so
+  // the assertion is that the FLOOR is not what put it there: at 1280px the
+  // media query does not match at all.
+  const floorApplies = await page.evaluate(() =>
+    window.matchMedia("(max-width: 1024px)").matches);
+  expect(floorApplies, "the field floor is matching at 1280px").toBe(false);
+});

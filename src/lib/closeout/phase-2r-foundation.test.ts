@@ -265,19 +265,32 @@ describe("2R-FOUNDATION-003: the modal's current field groups, read from the com
       .toEqual([...positions].sort((a, b) => a - b));
   });
 
-  it("holds exactly five named inputs, so a sixth cannot arrive unrecorded", () => {
+  it("holds exactly six named inputs, so a seventh cannot arrive unrecorded", () => {
     /*
-      `recurrence` is the one slice 2R.3 added, and it is the ONLY one it added.
+      Two names came from slice 2R.3, and the second one came from the owner.
 
-      That is the stop condition expressed as a count: the form this dialog must
-      not become would need weekday checkboxes, a day number, an ordinal and a
-      month, and every one of them would show up here. One new name is the
-      measurable form of "the date supplies the parameters".
+      `recurrence` is the select. `weekdays` is the seven-across day picker the
+      **device checkpoint asked for**: repeating on Monday, Wednesday and Friday
+      had needed three separate reminders, because the surface offered one day
+      while the model had always stored an array.
+
+      **The stop condition is still the count, and it still holds.** The form
+      this dialog must not become needs a day picker AND a day-of-month number
+      AND an ordinal AND a month — one per parameter of one frequency each. What
+      is here is one name for seven checkboxes, rendered only when `weekly` is
+      chosen, while the other four frequencies still add nothing at all. That
+      distinction is asserted directly in `reminder-composer.test.tsx`, which
+      compares the field list before and after each choice.
+
+      Six is the number to defend. A seventh would mean a parameter stopped
+      coming from the date above it.
     */
     const source = blankComments(read("src/features/reminders/reminder-composer.tsx"));
     const named = [...source.matchAll(/\bname="([a-zA-Z]+)"/g)].map((match) => match[1]);
     expect([...new Set(named)].sort())
-      .toEqual(["important", "locale", "recurrence", "remindAtLocal", "taskId", "title"]);
+      .toEqual([
+        "important", "locale", "recurrence", "remindAtLocal", "taskId", "title", "weekdays",
+      ]);
   });
 
   /**

@@ -53,13 +53,21 @@
  * for reminders**, `202608230101` shipped the model, and slice 2R.3 adds the
  * control.
  *
- * It is one `<select>` and no new fields, which is `2R-SURFACE-001`'s *"without
- * becoming a form"* — the plan makes turning this dialog into one a stop
- * condition. The five signed patterns each need parameters, and every one of
- * those parameters is the date the owner has already entered: *every week* is
- * the weekday of that date, *every month* its day, *every year* its month and
- * day. `recurrence-derivation.ts` holds that reading; this file submits a word
- * and knows nothing about rules.
+ * It is one `<select>`, plus one grouped day picker that appears **only for
+ * `weekly`** — which is `2R-SURFACE-001`'s *"without becoming a form"*, and the
+ * plan makes turning this dialog into one a stop condition.
+ *
+ * The first version had no picker at all: every parameter came from the date the
+ * owner had already entered, so *every week* meant the weekday of that date. The
+ * owner's device checkpoint found the cost of that — repeating on Monday,
+ * Wednesday and Friday would have taken **three reminders**, while the model had
+ * always stored an array. So `weekly` gained the days, and nothing else did:
+ * `monthlyDay`, `monthlyWeekday` and `yearly` still take their parameters from
+ * the date above, and `reminder-composer.test.tsx` compares the field list
+ * before and after each choice to keep it that way.
+ *
+ * `recurrence-derivation.ts` holds the reading; this file submits a word and a
+ * set of numbers, and knows nothing about rules.
  *
  * The preview beside it is not decoration. It is how the owner checks what was
  * derived, which is what makes a control this small honest — and its dates come
@@ -75,7 +83,7 @@ import type { Locale } from "@/lib/preferences";
 
 import { IDLE_REMINDER_CREATION_STATE, type ReminderCreationState } from "./action-state";
 import { getReminderCopy } from "./copy";
-import { RECURRENCE_CHOICES } from "./recurrence-derivation";
+import { RECURRENCE_CHOICES, parseLocalAnchor } from "./recurrence-derivation";
 import { previewReminderSeries } from "./series-actions";
 import { IDLE_REMINDER_SERIES_PREVIEW } from "./series-action-state";
 import type { ReminderTaskOption } from "./task-options";
@@ -145,6 +153,32 @@ export function ReminderComposer({
    */
   const [title, setTitle] = useState("");
   const [when, setWhen] = useState("");
+
+  /**
+   * The weekdays for a weekly rule — **derived, not seeded by an effect**.
+   *
+   * ## The two states this collapses into one
+   *
+   * The obvious version holds an array plus a `touched` boolean and syncs the
+   * array from the date in a `useEffect`. That is the shape this repository has
+   * recorded three times as the version that flickers, and the linter refuses it
+   * outright: *avoid calling setState() directly within an effect*.
+   *
+   * So `chosen` is **nullable, and the null is the meaning**: `null` is *the
+   * owner has not answered*, and any array is *they have*. The effective value
+   * is derived per render, which means the date can change as often as it likes
+   * and there is no moment where the two disagree.
+   *
+   * **`null` follows the date**, because `2R-SURFACE-001`'s property has to
+   * survive the fix — the date already on screen supplies the parameter — and
+   * the checkpoint asked for exactly that: *pre-selecionar o dia correspondente
+   * à data inicial*. The moment a box is ticked the derivation stops following,
+   * so changing the time cannot silently reinstate a day they just removed.
+   */
+  const [chosenWeekdays, setChosenWeekdays] = useState<readonly number[] | null>(null);
+  const anchorWeekday = parseLocalAnchor(when)?.weekday ?? null;
+  const weekdays = chosenWeekdays
+    ?? (anchorWeekday === null ? [] : [anchorWeekday]);
 
   /**
    * The select's DOM value, re-applied after a form action — and it is a
@@ -230,6 +264,7 @@ export function ReminderComposer({
           setTitle("");
           setWhen("");
           setChoice("none");
+          setChosenWeekdays(null);
         }}
         type="button"
       >
@@ -351,6 +386,65 @@ export function ReminderComposer({
               ))}
             </select>
           </label>
+
+          {/*
+            The weekday picker — the owner device checkpoint's first finding.
+
+            *"Para repetir segunda, quarta e sexta, eu teria de criar três
+            lembretes."* The model never required that: `weekdays` has always
+            been an array and the RPC has always stored it. The surface offered
+            one day, and that was the whole gap.
+
+            **It appears only for `weekly`**, which is what keeps the dialog a
+            control rather than a form — the same rule the preview follows. The
+            other four frequencies need no days and are given none.
+
+            Checkboxes rather than toggle buttons: the state of a checkbox is
+            programmatically determinable without an `aria-pressed` contract to
+            get wrong, and it is what a screen reader already knows how to
+            announce. The compact face is CSS, so the accessible object stays a
+            checkbox while the visual is a seven-across row of targets.
+
+            Each carries `aria-label` with the full weekday name, because *Seg*
+            is a face, not a name.
+          */}
+          {choice !== "weekly" ? null : (
+            <fieldset className="reminder-compose-weekdays">
+              <legend>{copy.creation.weekdaysLegend}</legend>
+              <span className="reminder-compose-hint">{copy.creation.weekdaysHint}</span>
+              <div className="reminder-compose-weekday-row">
+                {copy.creation.weekdayShort.map((face, index) => {
+                  const iso = index + 1;
+                  return (
+                    <label
+                      className="reminder-compose-weekday"
+                      htmlFor={`reminder-compose-weekday-${iso}`}
+                      key={iso}
+                    >
+                      <input
+                        aria-label={copy.creation.weekdayLong[index]}
+                        checked={weekdays.includes(iso)}
+                        disabled={pending}
+                        id={`reminder-compose-weekday-${iso}`}
+                        name="weekdays"
+                        onChange={(event) => {
+                          // `weekdays` rather than `chosenWeekdays`: the first
+                          // tick has to start from what is on screen, which is
+                          // the derived seed, not from an empty set.
+                          setChosenWeekdays(event.target.checked
+                            ? [...weekdays, iso].sort((left, right) => left - right)
+                            : weekdays.filter((day) => day !== iso));
+                        }}
+                        type="checkbox"
+                        value={String(iso)}
+                      />
+                      <span aria-hidden="true">{face}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
 
           {/*
             `2R-SURFACE-002` — the next occurrences, before saving.

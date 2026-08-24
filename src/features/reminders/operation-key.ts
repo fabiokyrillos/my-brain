@@ -105,8 +105,24 @@ export function reminderSeriesCreationKey(
   title: string,
   anchorLocal: string,
   choice: string,
+  /**
+   * The weekdays a weekly rule carries — slice 2R.3's fix.
+   *
+   * Part of the key because it is part of the request. Without it, *Monday,
+   * Wednesday, Friday* and *Tuesday, Thursday* on the same title and date mint
+   * the **same** key with different payloads, and the RPC refuses the second as
+   * *"Operation key reused with a different request"*. That is a safe refusal
+   * rather than a wrong write, but it is a refusal for a reason the owner cannot
+   * see — they changed the days, which is exactly the deliberate second action
+   * requirement (2) says must apply.
+   *
+   * Sorted before hashing, so a checkbox group's DOM order cannot mint two keys
+   * for one set.
+   */
+  weekdays: readonly number[] = [],
 ): string {
-  return `r3-create-${choice}-${shortHash([userId, title, anchorLocal].join("|"))}`;
+  const days = [...weekdays].sort((left, right) => left - right).join(",");
+  return `r3-create-${choice}-${shortHash([userId, title, anchorLocal, days].join("|"))}`;
 }
 
 export function reminderOperationKey(

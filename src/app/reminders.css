@@ -419,6 +419,99 @@
  * a scroll container inside a scroll container is how a control ends up needing
  * two gestures to reach.
  */
+/*
+ * The weekday picker — slice 2R.3's fix for the owner device checkpoint.
+ *
+ * ## Seven across, and why that is a grid rather than a flex row
+ *
+ * `repeat(7, 1fr)` gives every day the same width at every viewport, so the row
+ * cannot wrap into a ragged second line on a narrow phone and cannot leave
+ * Sunday alone under the other six. At 375px that is ~44px per column before
+ * gaps, which is the touch target this product already uses everywhere else.
+ *
+ * ## The checkbox is real, and only its face is custom
+ *
+ * `appearance: none` on the input rather than `display: none` or an off-screen
+ * clip: the control stays focusable, stays in the tab order, and keeps the
+ * `checked` state a screen reader already knows how to announce. Hiding it and
+ * painting a `<span>` instead is how a day picker ends up unusable by keyboard.
+ *
+ * ## Not colour alone
+ *
+ * A selected day differs by **background, border AND weight**. `2R-ACCESS-004`
+ * and the direction's own rule: a state carried only by hue is a state some
+ * readers do not have.
+ */
+.reminder-compose-weekdays {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+}
+
+.reminder-compose-weekdays legend {
+  padding: 0 4px;
+  font: 700 11px var(--font-mono, inherit);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.reminder-compose-weekday-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.reminder-compose-weekday {
+  display: grid;
+  place-items: center;
+  position: relative;
+  min-height: var(--touch-target, 44px);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+  font: 600 12px var(--font-ui);
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/*
+ * The input fills its label rather than sitting beside it, so the whole cell is
+ * the hit area. `opacity: 0` and not `display: none` — a display-none control is
+ * not focusable and not in the accessibility tree.
+ */
+.reminder-compose-weekday input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.reminder-compose-weekday:has(input:checked) {
+  border-color: var(--tone-information-line);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+  font-weight: 800;
+}
+
+/* Focus is on the label, because the input inside it is transparent. Without
+   this the keyboard user has no idea which day they are on. */
+.reminder-compose-weekday:has(input:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .reminder-compose-preview {
   display: grid;
   gap: 8px;

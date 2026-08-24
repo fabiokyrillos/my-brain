@@ -77,6 +77,24 @@ import {
  */
 const PREVIEW_OCCURRENCES = 3;
 
+/**
+ * The weekdays a weekly submission ticked, read from `FormData` — slice 2R.3.
+ *
+ * `getAll` because a checkbox group sends one entry per ticked box, and reading
+ * `get` would silently keep the first and drop the rest -- which is the same
+ * "one day only" defect the owner reported, moved from the surface to the
+ * boundary.
+ *
+ * No validation beyond "is it a number": `deriveRecurrenceRule` normalises the
+ * set (range, duplicates, order) in the one place that knows what the schema
+ * demands, and doing it twice would be two authorities disagreeing eventually.
+ */
+function submittedWeekdays(formData: FormData): readonly number[] {
+  return formData.getAll("weekdays")
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value));
+}
+
 function resolveLocale(value: unknown): Locale {
   return isLocale(value) ? value : "pt-BR";
 }
@@ -405,7 +423,7 @@ export async function previewReminderSeries(
   if (anchor === null) {
     return { ...IDLE_REMINDER_SERIES_PREVIEW, status: "error", message: copy.series.invalidAnchor };
   }
-  const rule = deriveRecurrenceRule(choice, anchor);
+  const rule = deriveRecurrenceRule(choice, anchor, submittedWeekdays(formData));
   if (rule === null) return IDLE_REMINDER_SERIES_PREVIEW;
 
   const [hour, minute] = anchorValue.slice(11).split(":").map(Number);
@@ -509,7 +527,7 @@ export async function createReminderOrSeries(
   if (anchor === null) {
     return { status: "error", message: copy.creation.invalidDate, reminderId: null };
   }
-  const rule = deriveRecurrenceRule(choice, anchor);
+  const rule = deriveRecurrenceRule(choice, anchor, submittedWeekdays(formData));
   if (rule === null) return createReminder(state, formData);
 
   const title = formData.get("title");
@@ -538,7 +556,9 @@ export async function createReminderOrSeries(
       deliberate second reminder differs in title or instant and so differs
       here.
     */
-    p_operation_key: reminderSeriesCreationKey(user.id, title.trim(), anchorLocal, choice),
+    p_operation_key: reminderSeriesCreationKey(
+      user.id, title.trim(), anchorLocal, choice, submittedWeekdays(formData),
+    ),
   });
 
   if (error) {

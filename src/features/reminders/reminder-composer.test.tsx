@@ -530,3 +530,123 @@ describe("2R-ACCESS-001/-003: the new control by keyboard, and a region that pre
     expect(screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false })).toBeTruthy();
   });
 });
+
+/**
+ * The owner device checkpoint's first finding, on the surface — slice 2R.3 fix.
+ *
+ * *"Para repetir segunda, quarta e sexta, eu teria de criar tres lembretes."*
+ *
+ * The model always stored an array; the surface offered one day. These assert
+ * the picker exists, that it is scoped to `weekly` so the dialog does not become
+ * a form, and that what it submits is **one** series with several days rather
+ * than several of anything.
+ */
+const weekdayBoxes = () =>
+  screen.getAllByRole("checkbox").filter((box) => box.getAttribute("name") === "weekdays");
+
+const chooseWeekly = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.selectOptions(
+    screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+    "weekly",
+  );
+};
+
+describe("2R-SURFACE-001 fix: several weekdays, one series", () => {
+  it("shows seven days, and only when weekly is chosen", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+
+    expect(weekdayBoxes(), "days are showing before weekly was chosen").toHaveLength(0);
+    await chooseWeekly(user);
+    expect(weekdayBoxes()).toHaveLength(7);
+
+    // And they leave again for a frequency that does not need them, which is
+    // what keeps the dialog a control rather than a form.
+    await user.selectOptions(
+      screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+      "monthlyDay",
+    );
+    expect(weekdayBoxes()).toHaveLength(0);
+  });
+
+  it("pre-selects the weekday of the date already entered", async () => {
+    // `2R-SURFACE-001`'s property survives the fix: the date on the screen still
+    // supplies the parameter, and the checkpoint asked for this in terms.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    // 2026-12-07 is a Monday, so the first box is the one ticked.
+    await user.type(screen.getByLabelText(copy.creation.whenLabel, { exact: false }), "2026-12-07T09:00");
+    await chooseWeekly(user);
+
+    const ticked = weekdayBoxes().filter((box) => (box as HTMLInputElement).checked);
+    expect(ticked).toHaveLength(1);
+    expect(ticked[0].getAttribute("value")).toBe("1");
+  });
+
+  it("submits one series carrying every day the owner ticked", async () => {
+    const user = userEvent.setup();
+    const { action } = mount();
+    await openDialog(user);
+    await user.type(screen.getByLabelText(copy.creation.contentLabel, { exact: false }), "Academia");
+    await user.type(screen.getByLabelText(copy.creation.whenLabel, { exact: false }), "2026-12-07T07:00");
+    await chooseWeekly(user);
+
+    // Monday is already ticked from the date; add Wednesday and Friday.
+    await user.click(screen.getByLabelText(copy.creation.weekdayLong[2], { exact: false }));
+    await user.click(screen.getByLabelText(copy.creation.weekdayLong[4], { exact: false }));
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    const formData = action.mock.calls[0]![1] as FormData;
+    // THE REPORTED CASE. One submission, three days -- not three reminders.
+    expect(formData.getAll("weekdays")).toEqual(["1", "3", "5"]);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("lets the owner drop the seeded day once they touch the control", async () => {
+    /*
+      The seed follows the date only while the owner has not chosen. Otherwise
+      changing the time would silently reinstate a day they had just unticked --
+      a control that argues with its user.
+    */
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.type(screen.getByLabelText(copy.creation.whenLabel, { exact: false }), "2026-12-07T09:00");
+    await chooseWeekly(user);
+
+    await user.click(screen.getByLabelText(copy.creation.weekdayLong[1], { exact: false }));
+    await user.click(screen.getByLabelText(copy.creation.weekdayLong[0], { exact: false }));
+
+    const ticked = weekdayBoxes()
+      .filter((box) => (box as HTMLInputElement).checked)
+      .map((box) => box.getAttribute("value"));
+    expect(ticked).toEqual(["2"]);
+  });
+
+  it("names every day for a reader who cannot see the two-letter face", async () => {
+    // `2R-ACCESS-002`. "Seg" is a face, not a name, and a control labelled by it
+    // is unreadable aloud.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await chooseWeekly(user);
+
+    for (const long of copy.creation.weekdayLong) {
+      expect(screen.getByLabelText(long, { exact: false }), `${long} has no accessible name`)
+        .toBeTruthy();
+    }
+  });
+
+  it("keeps them as real checkboxes, so their state is announced", async () => {
+    // Not `aria-pressed` buttons: a checkbox's checked state is already a thing
+    // every screen reader knows, and it stays keyboard-operable for free.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await chooseWeekly(user);
+    for (const box of weekdayBoxes()) expect(box.getAttribute("type")).toBe("checkbox");
+  });
+});
