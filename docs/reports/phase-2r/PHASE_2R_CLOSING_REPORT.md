@@ -20,8 +20,9 @@ product learned to repeat with them.
 | AI calls | none. BYOK credit spent: none |
 
 A reminder can repeat daily, weekly on any set of weekdays, monthly by date,
-monthly by ordinal weekday, or yearly. **Exactly one occurrence exists at a
-time**, materialised by a trigger when its predecessor completes, so the hourly
+monthly by ordinal weekday, or yearly. **Exactly one live occurrence exists at a
+time for each active series**, materialised by a trigger when its predecessor
+completes, so the hourly
 heartbeat — its per-user lock, quiet hours, the daily cap and the 24-hour
 cooldown — is **unchanged rather than re-implemented**. Every edit asks which
 scope it means and defaults to the narrower one. Every write goes through a

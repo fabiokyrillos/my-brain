@@ -198,6 +198,21 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     expect(line).toBeDefined();
     expect(line).toMatch(/Phase 2R/);
     expect(line, "the start must cite its authorization").toMatch(/ADR-131/);
+    /*
+     * **Moved with ADR-135, in the commit that recorded it** — the step this
+     * guard's own comment says nobody performs, and which it has twice failed
+     * to catch because it agreed with a stale line.
+     *
+     * The direction reverses again: Phase 2R is now CLOSED, and there is no
+     * authorized successor, so the line still names 2R. That is a state this
+     * assertion had not met before — every prior retarget moved from a closed
+     * phase to an authorized one — and the honest reading of its own rule is
+     * that the line cites **every** authorization the phase received, closure
+     * included. Requiring the closing ADR is what stops the line from going on
+     * describing an open phase after the owner shut it.
+     */
+    expect(line, "the closure must be cited too").toMatch(/ADR-135/);
+    expect(line, "a closed phase must say so").toMatch(/CLOSED/);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
     /*
      * The "planning" half came back at ADR-102, went again at ADR-103, came back
