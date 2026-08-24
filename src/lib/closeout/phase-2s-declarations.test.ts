@@ -488,13 +488,60 @@ describe("Phase 2S: planning contains no classification and no execution record"
       .toMatch(/\*\*It classifies nothing now\*\*/);
   });
 
-  it("ships no acceptance record, no traceability matrix and no generator", () => {
+  /*
+   * **Inverted by slice 2S.0, in the commit that made its premise false.**
+   *
+   * This assertion refused **every** acceptance record, because during planning
+   * there were none and an artifact appearing without an authorization is the
+   * thing it existed to catch. ADR-138 authorized the slices, so refusing the
+   * records outright would now force the guard to deny work the owner
+   * authorized — the mirror-image error, and the same one the milestone guard
+   * has now made in both directions eleven times.
+   *
+   * **The distinction the assertion exists for does not move**, and it is the
+   * only reason to keep it rather than delete it: a record may exist **only for
+   * a slice that has run**. So the set is closed against the slices actually
+   * delivered, an unnumbered or out-of-order record still refuses, and the
+   * closeout artifacts — the matrix and the generator — stay refused until 2S.4
+   * builds them. An absence nobody asserts is an absence nobody notices
+   * disappearing.
+   */
+  it("ships only the acceptance records of slices that have run, and no closeout artifact", () => {
+    const DELIVERED = ["PHASE_2S_SLICE_00_ACCEPTANCE.md"];
+    const records = readdirSync(join(REPO, REPORTS)).filter((name) => /ACCEPTANCE/i.test(name));
+    expect(records.sort(), "a record exists for a slice that has not run, or one is missing")
+      .toEqual(DELIVERED);
     for (const name of readdirSync(join(REPO, REPORTS))) {
-      expect(/ACCEPTANCE/i.test(name), `${name} is a slice artifact`).toBe(false);
       expect(/TRACEABILITY_MATRIX/i.test(name), `${name} is a closeout artifact`).toBe(false);
     }
     expect(existsSync(join(REPO, "scripts/generate-phase-2s-traceability.mjs")), "the generator is a 2S.4 artifact")
       .toBe(false);
+  });
+
+  it("classifies only what its own slices delivered, and never a baseline as built", () => {
+    /*
+     * `2S-CLOSE-003`, applied at the phase's FIRST slice rather than discovered
+     * at its last. Phase 2R wrote the same rule in prose before its first slice
+     * and nothing read it: five requirements were misfiled from 2R.0 onward and
+     * survived five slices, three device checkpoints and every green CI run.
+     *
+     * The kinds come from the PRD's own declaration column, so this cannot
+     * drift from what was declared.
+     */
+    const declared = new Map(rows().map(({ id, cells }) => [id, cells[3]]));
+    let classified = 0;
+    for (const name of readdirSync(join(REPO, REPORTS)).filter((n) => /ACCEPTANCE/i.test(n))) {
+      const record = read(`${REPORTS}/${name}`);
+      for (const [, id, cls] of record.matchAll(/^\| `(2S-[A-Z]+-\d{3})` \| \*\*([a-z-]+)\*\* \|/gm)) {
+        expect(declared.has(id), `${name} classifies ${id}, which the PRD never declared`).toBe(true);
+        if (declared.get(id) === "baseline") {
+          expect(cls, `${id} is declared baseline and ${name} records it as ${cls}`).toBe("baseline");
+        }
+        classified += 1;
+      }
+    }
+    // Non-vacuity: a reconciliation over zero rows agrees with everything.
+    expect(classified, "the reconciliation must have read some classifications").toBeGreaterThan(0);
   });
 
   it("declares every threat OPEN, including the five the override added", () => {
