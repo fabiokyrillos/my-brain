@@ -102,6 +102,21 @@ function rows(): { id: string; cells: string[] }[] {
     });
 }
 
+/**
+ * `2R-NOTIFY-007`'s two patterns, at module scope so the guard and its mutation
+ * control read the SAME ones.
+ *
+ * A control holding its own copy is a control that keeps passing while the
+ * guard beside it drifts — it would prove a regex catches a planted sentence
+ * and nothing about whether that regex is the one scanning the documents.
+ *
+ * `CLAIM` bounds a sentence with `[^.]*` and deliberately does **not** exclude
+ * newlines: prose wraps, and cutting a sentence at the line break loses the
+ * refusal that follows it.
+ */
+const PUSH_CLAIM = /[^.]*\bpush\b[^.]*\b(works|working|verified|confirmed|passing|passed|delivered|resumed|repaired|restored|re-enabled)\b[^.]*/gi;
+const PUSH_REFUSAL = /\b(not|never|no|nothing|none|without|cannot|refus|withheld|unresolved|still|remains|blocked|outstanding|carried)\b/i;
+
 const EXPECTED_FAMILIES = [
   "FOUNDATION",
   "MODEL",
@@ -458,13 +473,19 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
        */
       "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
+      /*
+       * Moved across in place as 2R.4 landed. Zero migrations again, so no
+       * deployment record accompanies it and parity stays `202608230101` --
+       * a `PHASE_2R_SLICE_04_DEPLOYMENT.md` would be a record of something
+       * nobody did, which is why no such entry appears on either list.
+       */
+      "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
     ]) {
       expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
     }
     for (const forbidden of [
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_05_ACCEPTANCE.md",
       "scripts/generate-phase-2r-traceability.mjs",
     ]) {
@@ -553,6 +574,97 @@ describe("Phase 2R: the inherited record is carried, not absorbed", () => {
       .not.toMatch(/VoiceOver (passed|approved|tested and passing)/i);
     expect(read(PRD), "no screen-reader claim may be made")
       .toMatch(/No screen-reader claim is made anywhere/);
+  });
+
+  /**
+   * `2R-NOTIFY-007` — the one requirement in its family that is a **rule**.
+   *
+   * *"Push is not resumed, repaired or claimed by this phase. No requirement,
+   * test or record asserts push delivery on a device."*
+   *
+   * ## Why this forbids the CLAIM and not the word
+   *
+   * These documents talk about push constantly and must keep doing so: the HTTP
+   * 403 is a carried remainder, and a remainder nobody may name is a remainder
+   * nobody can discharge. A guard that banned the word would force the records
+   * to go quiet about the exact thing they are supposed to keep visible — this
+   * repository has the lesson written down as *an authority guard must forbid
+   * the act, not the word*.
+   *
+   * So the scan looks for **push paired with a success verb**, and then removes
+   * the sentences that negate it. What is left is a document saying push works,
+   * which is the only thing `-007` actually prohibits.
+   */
+  it("never claims push delivery works anywhere in the phase's records", () => {
+    // A sentence that negates the verb is a refusal, which is what -007 wants.
+
+    for (const file of [
+      PRD,
+      PLAN,
+      "docs/reports/phase-2r/PHASE_2R_CURRENT_EXPERIENCE_AUDIT.md",
+      "docs/reports/phase-2r/PHASE_2R_THREAT_MODEL.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
+    ]) {
+      /*
+        Whitespace is collapsed FIRST, and that is a repair rather than a
+        flourish. The pattern bounds a sentence with `[^.]*`, and the first
+        version also excluded newlines -- so a sentence that wrapped, which in
+        prose is most of them, was cut at the line break and its refusal was
+        left on the next line. This guard's own slice record was the first
+        thing it accused, and it was right about the words and wrong about
+        where the sentence ended.
+      */
+      const prose = read(file).replace(/\s+/g, " ");
+      const claims = (prose.match(PUSH_CLAIM) ?? []).filter(
+        (sentence) => !PUSH_REFUSAL.test(sentence),
+      );
+      expect(claims, `${file} claims push delivery works`).toEqual([]);
+    }
+  });
+
+  /**
+   * The mutation control for the guard above, kept beside it.
+   *
+   * A regex that matches nothing passes every file, and a scan whose subject
+   * has drifted is indistinguishable from a scan that found nothing. This
+   * plants the sentence `-007` forbids and proves the pattern catches it — and
+   * plants the refusal shape and proves the pattern lets it through.
+   */
+  it("catches a planted push claim for every verb it names, and lets a refusal through", () => {
+    /*
+      Every verb, not one of them.
+
+      The first version planted a single sentence using `verified`, and a
+      mutation control run against it found the hole immediately: deleting
+      `repaired` from the pattern left this test green. A control that proves
+      the regex catches ONE forbidden sentence proves nothing about the other
+      nine, and narrowing the list is exactly how a guard stops guarding
+      without anybody noticing.
+    */
+    const VERBS = [
+      "works", "working", "verified", "confirmed", "passing",
+      "passed", "delivered", "resumed", "repaired", "restored", "re-enabled",
+    ];
+
+    for (const verb of VERBS) {
+      const planted = `Push delivery was ${verb} on the device during this slice`;
+      expect(
+        (planted.match(PUSH_CLAIM) ?? []).filter((one) => !PUSH_REFUSAL.test(one)),
+        `a push claim using "${verb}" is not caught`,
+      ).toHaveLength(1);
+    }
+
+    // And the refusal shape the records actually use goes through untouched.
+    for (const refusal of [
+      "Push delivery is not resumed and the HTTP 403 is still outstanding",
+      "Nothing about push was repaired by this slice",
+      "No assertion here may be cited as evidence that push works",
+    ]) {
+      expect(
+        (refusal.match(PUSH_CLAIM) ?? []).filter((one) => !PUSH_REFUSAL.test(one)),
+        `a refusal was mistaken for a claim: ${refusal}`,
+      ).toHaveLength(0);
+    }
   });
 
   it("keeps RG-DEP-3 uncloseable by a document, and the restore unexecuted", () => {
