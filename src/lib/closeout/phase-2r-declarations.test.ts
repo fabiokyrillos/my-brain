@@ -480,16 +480,37 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
        * nobody did, which is why no such entry appears on either list.
        */
       "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
+      /*
+       * The last four, moved across in place as slice 2R.5 landed.
+       *
+       * The list is never deleted and never shortened to nothing: what was an
+       * assertion of ABSENCE is now an assertion of PRESENCE, so the artifacts
+       * that may only exist at closeout are still pinned to closeout -- a
+       * future phase copying this file inherits the discipline rather than an
+       * empty array.
+       *
+       * The matrix is generated and the generator refuses rather than emitting
+       * a partial one, so its presence here is also the claim that a refusal
+       * did not happen.
+       */
+      "docs/reports/phase-2r/PHASE_2R_SLICE_05_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
+      "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
+      "scripts/generate-phase-2r-traceability.mjs",
     ]) {
       expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
     }
     for (const forbidden of [
-      "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
-      "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_05_ACCEPTANCE.md",
-      "scripts/generate-phase-2r-traceability.mjs",
+      /*
+       * Nothing left to forbid by name, and that is a statement rather than an
+       * omission: the phase's own closing ADR is the one artifact that may not
+       * exist yet, and it is asserted absent below against `DECISIONS.md`
+       * rather than as a file.
+       */
+      "docs/initiatives/phase-2s",
+      "docs/reports/phase-2s",
     ]) {
-      expect(existsSync(join(REPO, forbidden)), `${forbidden} exists before its slice`).toBe(false);
+      expect(existsSync(join(REPO, forbidden)), `${forbidden} exists before its phase`).toBe(false);
     }
   });
 

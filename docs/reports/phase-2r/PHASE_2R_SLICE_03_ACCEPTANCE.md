@@ -170,10 +170,10 @@ Stated rather than implied, because the difference is the whole of
 | `2R-ACCESS-002` | **built** | the scope choice is a `fieldset`/`legend` radiogroup (slice 2R.2); the new select is labelled |
 | `2R-ACCESS-003` | **built** | both live regions render **empty before** their first sentence, asserted on an idle page |
 | `2R-ACCESS-004` | **partial** | axe at `serious` is written and runs **only in the manual lane**. Remainder: **`2R-AXE-MANUAL-LANE`** — destination, the closing record's evidence list |
-| `2R-ACCESS-005` | **built** | no record in this phase describes any part of it as screen-reader evidence; `phase-2r-declarations.test.ts` enforces it and was not touched |
+| `2R-ACCESS-005` | **not-built-by-rule** | the signed rule is the requirement's own: no screen-reader claim is made anywhere in this phase. No record describes any part of it as screen-reader evidence; `phase-2r-declarations.test.ts` enforces the refusal and was not touched. Its destination is `2P-ACCESS-005`, which stays **NOT EXECUTED — OWNER WAIVED**. *(Class corrected at closeout: it read `built`, and a rule's delivery is its recorded refusal.)* |
 | `2R-MOBILE-001` | **partial** | now asserted at 375px on a **rendered page in CI** for the public surfaces (§12), and in the manual lane behind auth. The remainder is the lane, not the behaviour |
 | `2R-MOBILE-002` | **built** | the dialog gained a height bound and a scroll container at every width (§3), guarded by the inverted 2R.0 assertion; the journey scrolls save into view and asserts it is in the viewport |
-| `2R-MOBILE-003` | **delivered** | approved on the owner's own iPhone at the **third** run, 2026-08-24 (§20). Three runs, five defects, all fixed and each re-tested on hardware. **Not substituted and not claimed** — no Playwright project, including the emulated WebKit one, was ever offered as evidence for it |
+| `2R-MOBILE-003` | **built** | approved on the owner's own iPhone at the **third** run, 2026-08-24 (§20). Three runs, five defects, all fixed and each re-tested on hardware. **Not substituted and not claimed** — no Playwright project, including the emulated WebKit one, was ever offered as evidence for it |
 
 **Sixteen addressed here; 47 of 73 cumulatively.** Two are `partial` with a named
 remainder and one is `undelivered` with a destination, as `2R-CLOSE-002`

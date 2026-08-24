@@ -392,14 +392,24 @@ screen-reader evidence.
 
 ## 10. Classification
 
+> **Corrected at closeout (slice 2R.5).** Five of these six rows read **built**
+> until the traceability generator refused them. They are declared `baseline` —
+> they ask for a property to be *measured and recorded*, not for behaviour to be
+> added — and the contract's §1 is unambiguous: *"`baseline` may never be
+> recorded as `built`."* Classifying a property that already held as newly built
+> claims a change that did not happen. Only `2R-FOUNDATION-005` is declared
+> `build`, and only it stays `built`. **The evidence in each row is unchanged;
+> only the class it was filed under was wrong.**
+
+
 | Requirement | Class | Evidence |
 |---|---|---|
-| `2R-FOUNDATION-001` | **built** | §2 — three independent reads, closed column list, delegated artifact scan, non-vacuity control |
-| `2R-FOUNDATION-002` | **built** | §3 — ten clauses observed live on `pg_proc.prosrc` and re-asserted against the migration that defines the function, with three absent-clause controls |
-| `2R-FOUNDATION-003` | **built** | §4 — five groups asserted **by position**, four named inputs as a closed set, and the dialog's real height limits at both breakpoints |
-| `2R-FOUNDATION-004` | **built** | §5 — the contract named; the second authority enumerated as eight call sites; the divergence executed; reachability proved from `pg_constraint`; destination recorded |
+| `2R-FOUNDATION-001` | **baseline** | §2 — three independent reads, closed column list, delegated artifact scan, non-vacuity control |
+| `2R-FOUNDATION-002` | **baseline** | §3 — ten clauses observed live on `pg_proc.prosrc` and re-asserted against the migration that defines the function, with three absent-clause controls |
+| `2R-FOUNDATION-003` | **baseline** | §4 — five groups asserted **by position**, four named inputs as a closed set, and the dialog's real height limits at both breakpoints |
+| `2R-FOUNDATION-004` | **baseline** | §5 — the contract named; the second authority enumerated as eight call sites; the divergence executed; reachability proved from `pg_constraint`; destination recorded |
 | `2R-FOUNDATION-005` | **built** | §6 — the write path, the command union, the deployed boundary and the migration count all asserted unchanged |
-| `2R-FOUNDATION-006` | **built** | §7 — live re-read with a probe control in the same statement; audit §10.3 **confirmed** |
+| `2R-FOUNDATION-006` | **baseline** | §7 — live re-read with a probe control in the same statement; audit §10.3 **confirmed** |
 
 **Six of seventy-three classified. Zero unclassified in this slice's scope.**
 
