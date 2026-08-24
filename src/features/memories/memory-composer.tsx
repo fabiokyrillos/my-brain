@@ -197,6 +197,22 @@ export function MemoryComposer({
         cancelLabel={copy.composeClose}
         className="task-command-dialog-form"
         description={copy.composeDescription}
+        /* A write in flight neither closes the dialog nor fires its cancel. */
+        busy={pending}
+        /*
+          The one thing this dialog holds is the sentence the owner typed, and
+          `draft` is the whole of it — the review pane reads the same value, so
+          there is nothing editable it does not cover.
+
+          `trim`, so a stray space is not treated as work worth interrupting
+          someone over; emptying the box by hand goes back to clean, which is
+          what *"reverter manualmente os campos ao valor inicial"* asks for.
+        */
+        discard={{
+          confirmLabel: copy.composeDiscardConfirm,
+          prompt: copy.composeDiscardPrompt,
+          resumeLabel: copy.composeDiscardResume,
+        }}
         idPrefix="memory-compose-dialog"
         onClose={closeDialog}
         open={open}
@@ -276,11 +292,16 @@ export function MemoryComposer({
               <button className="task-command-primary" type="submit">
                 {copy.composeReviewStep}
               </button>
-              <button
-                className="task-command-secondary"
-                onClick={closeDialog}
-                type="button"
-              >
+              {/*
+                `data-dialog-close`, not `onClick={closeDialog}`.
+
+                This button used to call the composer's own close directly,
+                straight past the discard question the backdrop and Escape both
+                ask — on the one dialog whose whole content is a sentence the
+                owner wrote. The dialog delegates the click and applies the same
+                rule to all three.
+              */}
+              <button className="task-command-secondary" data-dialog-close type="button">
                 {copy.composeCancel}
               </button>
             </div>

@@ -140,6 +140,15 @@ type EntityCopy = {
   readonly companyDialogDescription: string;
   readonly companySaved: string;
   readonly companyClose: string;
+  /**
+   * The discard question — slice 2R.3's second device checkpoint.
+   *
+   * This dialog can now be dismissed by tapping outside it, and it holds a
+   * company name typed by hand. `ConfirmDialog` asks before losing it.
+   */
+  readonly companyDiscardPrompt: string;
+  readonly companyDiscardConfirm: string;
+  readonly companyDiscardResume: string;
   /** The two halves of the one flow: pick what exists, or add what does not. */
   readonly companyChooseLabel: string;
   readonly companyChooseSubmit: string;
@@ -356,6 +365,9 @@ const copy = {
       "Escolha uma empresa que você já cadastrou ou crie uma nova. O cargo não fica aqui: ele pertence a cada projeto ou tarefa.",
     companySaved: "Empresa atualizada.",
     companyClose: "Fechar",
+    companyDiscardPrompt: "Descartar o que você preencheu?",
+    companyDiscardConfirm: "Descartar",
+    companyDiscardResume: "Continuar editando",
     companyChooseLabel: "Empresa",
     companyChooseSubmit: "Salvar empresa",
     companyCreateToggle: "Criar nova empresa",
@@ -513,6 +525,9 @@ const copy = {
       "Pick a company you already have, or create a new one. A job title does not live here: it belongs to each project or task.",
     companySaved: "Company updated.",
     companyClose: "Close",
+    companyDiscardPrompt: "Discard what you filled in?",
+    companyDiscardConfirm: "Discard",
+    companyDiscardResume: "Keep editing",
     companyChooseLabel: "Company",
     companyChooseSubmit: "Save company",
     companyCreateToggle: "Create a new company",

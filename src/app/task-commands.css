@@ -284,6 +284,16 @@
   max-height: calc(100vh - 40px);
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
+  /*
+   * The scroll chain stops here — slice 2R.3's second device checkpoint.
+   *
+   * The document is already held still by `useScrollLock` while this is open,
+   * so this is the second line rather than the first: it stops a flick that
+   * reaches the end of the panel from being handed on to whatever is behind,
+   * which on iOS is the rubber-band that made the page look like it was still
+   * scrolling even once it was not.
+   */
+  overscroll-behavior: contain;
   padding: 24px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-sheet);
@@ -495,4 +505,66 @@
     grid-template-columns: 1fr;
     gap: 2px;
   }
+}
+
+/* --- discarding a draft, rather than losing it (slice 2R.3, checkpoint two) --- */
+
+/*
+  `display: contents`, so hiding the body changes nothing about the layout of
+  what it holds.
+
+  The wrapper exists only so one `hidden` can take the whole dialog body out
+  while the discard question is up — without unmounting it, which would empty
+  every uncontrolled field in the form the question is about. `contents` makes
+  the wrapper itself invisible to layout, so the three consumers whose form is
+  `display: inline` and the three whose form is a flex column all keep exactly
+  the box tree they had.
+*/
+.task-command-dialog-body {
+  display: contents;
+}
+
+/*
+  Written out rather than left to the user agent.
+
+  An author rule beats a UA rule whatever the specificity, so the
+  `display: contents` above would quietly defeat `[hidden]` and the body would
+  stay on screen underneath the question. This is the pair that makes the line
+  above safe.
+*/
+.task-command-dialog-body[hidden] {
+  display: none;
+}
+
+.task-command-dialog-discard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/*
+  Qualified by the panel, for the reason recorded above `.task-command-dialog-note`:
+  `.task-command-dialog p` is (0,1,1), so a bare class here would lose to it and
+  the margin reset would silently do nothing.
+*/
+.task-command-dialog .task-command-dialog-discard p {
+  margin: 0;
+  font: var(--type-body);
+  color: var(--text-primary);
+}
+
+.task-command-dialog-resume {
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--text-primary);
+}
+
+/*
+  The destructive answer reads as destructive. It is not the focused control and
+  not the first in the row, so nothing about it invites a reflex.
+*/
+.task-command-dialog-confirm-discard {
+  border: 1px solid var(--border-strong);
+  background: var(--background-surface);
+  color: var(--tone-risk-fg);
 }

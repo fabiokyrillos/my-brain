@@ -112,6 +112,7 @@ export function CompanyPanel({
   /** Which pane ran the last submission. Set from `onSubmit`, never from state. */
   const [submittedPane, setSubmittedPane] = useState<"link" | "create" | null>(null);
 
+
   /**
    * The round that has completed since the dialog opened, or `null`.
    *
@@ -187,6 +188,20 @@ export function CompanyPanel({
         cancelLabel={copy.companyClose}
         className="task-command-dialog-form"
         description={copy.companyDialogDescription}
+        /* A write in flight neither closes the dialog nor fires its cancel. */
+        busy={pending}
+        /*
+          The create pane holds a company name typed by hand and the link pane
+          an organisation chosen from a list, and neither lives in React state —
+          both are read straight off the form. `useFormBaseline` compares the
+          mounted pane to itself, so switching panes or putting a value back by
+          hand both read as clean.
+        */
+        discard={{
+          confirmLabel: copy.companyDiscardConfirm,
+          prompt: copy.companyDiscardPrompt,
+          resumeLabel: copy.companyDiscardResume,
+        }}
         idPrefix="entity-company-dialog"
         onClose={closeDialog}
         open={open}

@@ -145,6 +145,18 @@ type ReminderCopy = {
     readonly save: string;
     readonly saving: string;
     readonly cancel: string;
+    /**
+     * The discard question, and its two answers — slice 2R.3, checkpoint two.
+     *
+     * *"Se houver algo escrito ou alterado, fechar pelo backdrop deve pedir
+     * confirmação antes de descartar."* The dialog can now be dismissed by
+     * tapping outside it, which is only safe if a draft is worth a question
+     * first. `ConfirmDialog` takes the words rather than owning them, because it
+     * has no locale of its own.
+     */
+    readonly discardPrompt: string;
+    readonly discardConfirm: string;
+    readonly discardResume: string;
     readonly created: string;
     readonly invalid: string;
     readonly invalidDate: string;
@@ -378,6 +390,9 @@ const COPY = {
       save: "Criar lembrete",
       saving: "Criando…",
       cancel: "Cancelar",
+      discardPrompt: "Descartar este lembrete? O que você escreveu será perdido.",
+      discardConfirm: "Descartar",
+      discardResume: "Continuar editando",
       created: "Lembrete criado.",
       invalid: "Revise o texto e o horário do lembrete.",
       invalidDate: "Escolha uma data e um horário válidos.",
@@ -603,6 +618,9 @@ const COPY = {
       save: "Create reminder",
       saving: "Creating…",
       cancel: "Cancel",
+      discardPrompt: "Discard this reminder? What you wrote will be lost.",
+      discardConfirm: "Discard",
+      discardResume: "Keep editing",
       created: "Reminder created.",
       invalid: "Check the reminder's text and time.",
       invalidDate: "Choose a valid date and time.",
