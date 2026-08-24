@@ -140,11 +140,22 @@ describe("CompanyPanel", () => {
   });
 
   it("writes nothing when the dialog is cancelled", async () => {
+    /*
+      Slice 2R.3's second device checkpoint changed the middle of this, not its
+      point. Closing a dialog that holds a choice the owner made now asks before
+      throwing it away -- *"botão explícito Fechar/Cancelar segue a mesma regra
+      quando houver alterações"* -- so cancel puts the question up and the
+      discard answer is what closes it. What must not change is the ending:
+      nothing is written on the way out.
+    */
     const { createAction, linkAction } = mount();
 
     await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
     await userEvent.selectOptions(screen.getByRole("combobox", { name: "Empresa" }), ORGANIZATION_ID);
     await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
+
+    expect(screen.getByText("Descartar o que você preencheu?")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(linkAction).not.toHaveBeenCalled();

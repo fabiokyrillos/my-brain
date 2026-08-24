@@ -170,6 +170,14 @@ export function DeleteEntityControl({
         title={copy.dialogTitle[entityType]}
         description={copy.previewIntro}
         cancelLabel={copy.cancel}
+        /*
+          Nothing here for the owner to lose: the whole body is hidden inputs and
+          buttons, so a tap outside means cancel and cancel means exactly what
+          the cancel button means. Stated rather than defaulted — the prop is
+          required so that a dialog which later gains an editable field has to
+          answer this question again.
+        */
+        discard={null}
         onClose={close}
       >
         {/*

@@ -25,6 +25,8 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+
+import { useScrollLock } from "@/features/shell/use-scroll-lock";
 import { useRouter } from "next/navigation";
 
 import { UniversalStateView } from "@/features/experience/universal-state";
@@ -116,6 +118,17 @@ export function CommandPalette({ locale, canCreate = true, onActionChosen }: Com
   useEffect(() => {
     if (open) inputRef.current?.focus();
   }, [open]);
+
+  /*
+    The page behind does not move while this is up — slice 2R.3's second device
+    checkpoint, applied to the second modal rather than only to the first.
+
+    The checkpoint's contract says *"enquanto qualquer modal estiver aberto"*,
+    and this is one: a full-screen backdrop at the same z-index as
+    `ConfirmDialog`'s, declaring `aria-modal`. It had no lock for the same
+    reason nothing else did — there was no lock anywhere to have.
+  */
+  useScrollLock(open);
 
   // The active index resets where the query changes — in the change handler,
   // not in an effect. Resetting from an effect means the list renders once with

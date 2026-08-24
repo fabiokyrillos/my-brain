@@ -325,6 +325,7 @@ describe("the dialog in isolation", () => {
       <ConfirmDialog
         cancelLabel="Keep the task"
         description="d"
+        discard={null}
         onClose={vi.fn()}
         open={false}
         title="t"
@@ -339,7 +340,14 @@ describe("the dialog in isolation", () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     render(
-      <ConfirmDialog cancelLabel="Keep the task" description="d" onClose={onClose} open title="t">
+      <ConfirmDialog
+        cancelLabel="Keep the task"
+        description="d"
+        discard={null}
+        onClose={onClose}
+        open
+        title="t"
+      >
         <button type="button">Confirm</button>
       </ConfirmDialog>,
     );

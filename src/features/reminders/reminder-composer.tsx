@@ -76,7 +76,7 @@
 
 import { BellPlus, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/features/task-commands/confirm-dialog";
 import type { Locale } from "@/lib/preferences";
@@ -181,33 +181,51 @@ export function ReminderComposer({
     ?? (anchorWeekday === null ? [] : [anchorWeekday]);
 
   /**
-   * The select's DOM value, re-applied after a form action — and it is a
-   * `<select>`-specific hazard rather than a general one.
+   * The form, submitted **by this component** rather than by React — and that is
+   * the whole of the second device checkpoint's first finding.
    *
    * ## What was measured
    *
-   * After a refused save, with `title`, `remindAtLocal` and `recurrence` all
-   * controlled: the two `<input>`s kept their values and **the `<select>` did
-   * not**. React's post-action form reset put the DOM back to the first option,
-   * and because the component's own `choice` had not changed there was no
-   * re-render to re-apply `value`. A probe confirmed the asymmetry directly —
-   * the preview block was still rendered, which only happens when `choice` is
-   * not `"none"`, while the select on screen read *Não repete*.
+   * `<form action={fn}>` makes React reset the form once the action settles, and
+   * the reset returns every control to its `defaultChecked` / `defaultValue`.
+   * React restores a *controlled* text input afterwards; it does **not** restore
+   * a controlled `checked`, and it does not restore a `<select>`'s value. So the
+   * instrumented round trip read:
    *
-   * That is worse than losing the value. The surface and the state **disagree**:
-   * the owner sees "does not repeat" and the next save writes a repeating
-   * reminder. A field that lies about what will be saved is the shape
-   * `2R-SURFACE-008` exists to prevent, one step past the one it names.
+   * ```
+   * before the preview   .checked = 1,3,5
+   * FormData -> preview  weekdays = [1,3,5]     <- the preview was always right
+   * after the response   .checked = 1
+   * FormData -> save     weekdays = [1]         <- and the save was always wrong
+   * ```
    *
-   * So the DOM is reconciled to the state after every render. Cheap, and
-   * confined to the one element with the problem rather than a `key` on the form
-   * that would remount everything and take focus with it.
+   * The owner reported it as *"os dias ficam visualmente desmarcados"*. It was
+   * never only visual: the dialog showed three days, previewed three days, and
+   * the next save carried one, because `deriveRecurrenceRule` reads an empty set
+   * as *the owner said nothing* and falls back to the anchor's own weekday. A
+   * field that lies about what will be saved is exactly what `2R-SURFACE-008`
+   * exists to prevent. The same reset silently untucked `important`.
+   *
+   * ## Why the fix is one line up here rather than seven workarounds down there
+   *
+   * This file used to carry a `useEffect` that pushed `choice` back into the
+   * `<select>` after every render, because that element had the same problem.
+   * Extending that shape to seven checkboxes and a tickbox would be **four more
+   * places where the DOM is corrected behind React's back** — the *"duplicação
+   * de autoridade entre DOM, estado React e servidor"* the checkpoint's contract
+   * forbids in terms.
+   *
+   * So the reset is removed instead of being papered over. `onSubmit` gives the
+   * `FormData` to `useActionState`'s dispatch directly; React only resets a form
+   * it submitted itself, so nothing is reset and nothing needs restoring. The
+   * `<select>` workaround is **deleted** rather than joined, and constraint
+   * validation still runs — `onSubmit` fires only for a valid form.
    */
-  const recurrenceRef = useRef<HTMLSelectElement | null>(null);
-  useEffect(() => {
-    const select = recurrenceRef.current;
-    if (select !== null && select.value !== choice) select.value = choice;
-  });
+  /**
+   * The form node, for the preview — which reads the very fields this form
+   * holds rather than duplicating them into hidden inputs that could drift.
+   */
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   const changed = round !== null && state !== round ? state : null;
   const outcome = changed ?? IDLE_REMINDER_CREATION_STATE;
@@ -296,6 +314,23 @@ export function ReminderComposer({
         */
         className="task-command-dialog-form"
         description={copy.creation.description}
+        /*
+          A write in flight closes nothing and cancels nothing. The fields are
+          already disabled while `pending`; without this the cancel button and a
+          tap outside would still dismiss the dialog mid-transition, which is
+          the shape slice 2P.6 froze on.
+        */
+        busy={pending}
+        /*
+          This dialog holds a title, an instant, a rule, a tickbox and a link —
+          everything the owner has said. So an outside tap asks first, and asks
+          only when there is something to ask about.
+        */
+        discard={{
+          confirmLabel: copy.creation.discardConfirm,
+          prompt: copy.creation.discardPrompt,
+          resumeLabel: copy.creation.discardResume,
+        }}
         idPrefix="reminder-compose"
         onClose={() => setDismissed(true)}
         open={open}
@@ -314,7 +349,29 @@ export function ReminderComposer({
           {pending ? copy.creation.saving : ""}
         </div>
 
-        <form action={submit}>
+        <form
+          onSubmit={(event) => {
+            /*
+              The browser has already refused an invalid form by the time this
+              runs, so `required` is still enforced; what changes is only who
+              dispatches — and therefore that React does not reset afterwards.
+
+              `startTransition` is not decoration: a dispatch React did not
+              route through its own submission reports `pending` **only** from
+              inside one. Without it the dialog never shows *Criando…*, never
+              disables its fields, and — because `open` is derived from
+              `pending` — loses the guard that slice 2P.6 exists for. The
+              suite said so directly the first time this was written without it.
+
+              The payload is read before the transition opens, because
+              `currentTarget` is null by the time a deferred callback runs.
+            */
+            event.preventDefault();
+            const payload = new FormData(event.currentTarget);
+            startTransition(() => submit(payload));
+          }}
+          ref={formRef}
+        >
           <input name="locale" type="hidden" value={locale} />
 
           {/* 1 — content. */}
@@ -376,7 +433,6 @@ export function ReminderComposer({
               id="reminder-compose-field-recurrence"
               name="recurrence"
               onChange={(event) => setChoice(event.target.value)}
-              ref={recurrenceRef}
               value={choice}
             >
               {RECURRENCE_CHOICES.map((option) => (
@@ -449,24 +505,37 @@ export function ReminderComposer({
           {/*
             `2R-SURFACE-002` — the next occurrences, before saving.
 
-            `formAction` rather than a second `<form>`, because a form cannot
-            nest and the preview needs the very fields this one holds. React 19
-            lets a submit button redirect its own form to another action, so the
-            same `recurrence` and `remindAtLocal` reach the preview without being
-            duplicated into hidden inputs that could drift.
+            It reads the very fields this form holds, so it takes its payload
+            from the form element rather than duplicating them into hidden
+            inputs that could drift.
 
-            `formNoValidate` because the title is `required` and previewing a
-            date before naming the reminder is a reasonable thing to do; the
-            preview writes nothing, so there is nothing to guard.
+            **Not a submit button, and not `formAction`.** Both routed the
+            preview through React's own submission, which reset the form the
+            moment the preview came back — the defect the round trip above
+            measured. A plain button dispatching the action itself leaves every
+            control exactly as the owner left it.
+
+            It also restores a claim this file made and did not honour: the
+            title is `required`, so previewing before naming a reminder was
+            refused by constraint validation and the preview simply never ran.
+            Nothing here writes, so there is nothing to guard, and now nothing
+            to validate either.
           */}
           {choice === "none" ? null : (
             <div className="reminder-compose-preview">
               <button
                 className="reminder-button"
                 disabled={pending || previewPending}
-                formAction={previewAction}
-                formNoValidate
-                type="submit"
+                onClick={() => {
+                  const form = formRef.current;
+                  if (form === null) return;
+                  // Same transition rule as the save above: without it
+                  // `previewPending` never rises and the button never says
+                  // *Calculando…*.
+                  const payload = new FormData(form);
+                  startTransition(() => previewAction(payload));
+                }}
+                type="button"
               >
                 {previewPending ? copy.creation.previewPending : copy.creation.previewLabel}
               </button>

@@ -14,6 +14,34 @@ import { describe, expect, it, vi } from "vitest";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => refresh() }) }));
 
+/**
+ * The preview, stubbed — and, like the router above, an assertion target.
+ *
+ * The real one is a Server Action that reaches the database for its instants
+ * (`2R-TIME-007`), so it cannot run here. What matters below is not the dates it
+ * returns but **the payload it was handed**: the second device checkpoint found
+ * the surface and the submission disagreeing, and the only way to prove they
+ * agree is to capture what actually crossed the boundary.
+ *
+ * `vi.hoisted`, because `vi.mock` is hoisted above every `const` in this file
+ * and a factory closing over a plain one reads it in the temporal dead zone.
+ * The `ReferenceError` that follows is thrown *inside the action*, where React
+ * swallows it into a rejected transition — so the symptom is a preview that
+ * silently never arrives rather than an error anyone can see.
+ */
+const previewCalls = vi.hoisted(() => [] as FormData[]);
+vi.mock("./series-actions", () => ({
+  previewReminderSeries: async (_state: unknown, formData: FormData) => {
+    previewCalls.push(formData);
+    return {
+      status: "ready" as const,
+      message: "",
+      description: "toda semana",
+      occurrences: ["seg, 7 dez", "qua, 9 dez", "sex, 11 dez"],
+    };
+  },
+}));
+
 import { IDLE_REMINDER_CREATION_STATE, type ReminderCreationState } from "./action-state";
 import { getReminderCopy } from "./copy";
 import { ReminderComposer, type ReminderCreationHandler } from "./reminder-composer";
@@ -274,11 +302,22 @@ describe("2R-SURFACE-001: the dialog gains one control and does not become a for
 
 describe("2P-REMINDER-004: cancel closes without writing, and focus comes back", () => {
   it("writes nothing when the dialog is dismissed", async () => {
+    /*
+      Slice 2R.3's second checkpoint put a question in the middle of this, not a
+      different ending. Cancelling a dialog that holds a typed title now asks
+      before discarding it -- the checkpoint's *"botão explícito Fechar/Cancelar
+      segue a mesma regra quando houver alterações"* -- and confirming the
+      discard is what closes it. What must not change is that nothing is written
+      on the way out.
+    */
     const user = userEvent.setup();
     const { action } = mount();
     await openDialog(user);
     await user.type(screen.getByLabelText(copy.creation.contentLabel, { exact: false }), "Ligar para a clínica");
     await user.click(screen.getByRole("button", { name: copy.creation.cancel }));
+
+    expect(screen.getByText(copy.creation.discardPrompt)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: copy.creation.discardConfirm }));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(action).not.toHaveBeenCalled();
@@ -308,6 +347,9 @@ describe("2P-REMINDER-004: cancel closes without writing, and focus comes back",
     await openDialog(user);
     await user.type(screen.getByLabelText(copy.creation.contentLabel, { exact: false }), "Rascunho");
     await user.click(screen.getByRole("button", { name: copy.creation.cancel }));
+    // The draft is real, so the dialog asks; discarding is what makes this a
+    // dismissal rather than a pause.
+    await user.click(screen.getByRole("button", { name: copy.creation.discardConfirm }));
     await user.click(screen.getByRole("button", { name: copy.creation.open }));
     const field = screen.getByLabelText(copy.creation.contentLabel, { exact: false }) as HTMLInputElement;
     expect(field.value).toBe("");
@@ -648,5 +690,218 @@ describe("2R-SURFACE-001 fix: several weekdays, one series", () => {
     await openDialog(user);
     await chooseWeekly(user);
     for (const box of weekdayBoxes()) expect(box.getAttribute("type")).toBe("checkbox");
+  });
+});
+
+/**
+ * The **second** device checkpoint's finding — slice 2R.3, corrective round two.
+ *
+ * *"Ao selecionar segunda, quarta e sexta e tocar em 'Ver próximas datas', os
+ * dias ficam visualmente desmarcados. Apesar de desmarcados na interface, a
+ * prévia continua correta."*
+ *
+ * The owner reported it as a visual defect. It is not: instrumenting the round
+ * trip showed the preview receiving `[1,3,5]` and **the save that follows
+ * receiving `[1]`**. The preview is computed from the `FormData` captured at
+ * submit time, before the reset; the save is computed from the DOM the reset
+ * left behind. So the dialog showed three days, promised three days, and would
+ * have written one.
+ *
+ * These assert the contract the owner wrote: what is visible, what is previewed
+ * and what is saved are the same set — across a preview, and across a refusal.
+ */
+const ticked = () =>
+  weekdayBoxes()
+    .filter((box) => (box as HTMLInputElement).checked)
+    .map((box) => box.getAttribute("value"));
+
+const monWedFri = async (user: ReturnType<typeof userEvent.setup>) => {
+  /*
+    The title is typed first because the checkpoint was performed on a reminder
+    that had one, and because the preview reaches its action through the form:
+    `title` is `required`, so an empty one is refused by constraint validation
+    before any handler runs. Leaving it out would have made these fail on a
+    submission that never happened rather than on the defect they are for.
+  */
+  await user.type(screen.getByLabelText(copy.creation.contentLabel, { exact: false }), "Academia");
+  // 2026-12-07 is a Monday, so the date seeds day 1; the owner adds 3 and 5.
+  await user.type(screen.getByLabelText(copy.creation.whenLabel, { exact: false }), "2026-12-07T07:00");
+  await chooseWeekly(user);
+  await user.click(screen.getByLabelText(copy.creation.weekdayLong[2], { exact: false }));
+  await user.click(screen.getByLabelText(copy.creation.weekdayLong[4], { exact: false }));
+};
+
+const askForPreview = async (user: ReturnType<typeof userEvent.setup>) => {
+  await user.click(screen.getByRole("button", { name: copy.creation.previewLabel }));
+  await screen.findByText("toda semana");
+};
+
+describe("2R-SURFACE-008 fix: the preview does not unpick the days", () => {
+  it("leaves Monday, Wednesday and Friday ticked after the preview is asked for", async () => {
+    // THE REPORTED CASE, exactly as the checkpoint performed it.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await monWedFri(user);
+    expect(ticked(), "the three days were not ticked to begin with").toEqual(["1", "3", "5"]);
+
+    await askForPreview(user);
+
+    expect(ticked()).toEqual(["1", "3", "5"]);
+  });
+
+  it("saves the days that are visible, not the ones a form reset left behind", async () => {
+    /*
+      The half the checkpoint could not see. A preview that leaves the boxes
+      empty also empties what the next save submits, and `deriveRecurrenceRule`
+      reads an empty set as *the owner said nothing* and falls back to the
+      anchor's own weekday. The dialog would have shown three days and written
+      one -- a field lying about what will be saved, which is the shape
+      `2R-SURFACE-008` exists to prevent.
+    */
+    const user = userEvent.setup();
+    const { action } = mount();
+    await openDialog(user);
+    await monWedFri(user);
+    await askForPreview(user);
+
+    expect(previewCalls.at(-1)!.getAll("weekdays"), "the preview itself was already wrong")
+      .toEqual(["1", "3", "5"]);
+
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    const saved = action.mock.calls[0]![1] as FormData;
+    expect(saved.getAll("weekdays")).toEqual(["1", "3", "5"]);
+  });
+
+  it("keeps importance ticked across the preview", async () => {
+    // The same reset, on the field beside them. `important` is submitted by
+    // presence, so a silent untick is a silent change of meaning.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await monWedFri(user);
+    const important = screen.getByLabelText(copy.creation.importantLabel, { exact: false });
+    await user.click(important);
+    expect((important as HTMLInputElement).checked).toBe(true);
+
+    await askForPreview(user);
+
+    expect((important as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("previews before the reminder has been named", async () => {
+    /*
+      A claim the file made and did not honour. The preview button carried
+      `formNoValidate` and a comment saying previewing before naming is
+      reasonable -- but it was a submit button, so an empty `required` title was
+      refused by constraint validation and the action never ran at all. A button
+      that dispatches for itself has nothing to validate.
+    */
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.type(screen.getByLabelText(copy.creation.whenLabel, { exact: false }), "2026-12-07T07:00");
+    await chooseWeekly(user);
+
+    await askForPreview(user);
+
+    expect(previewCalls.at(-1)!.get("title")).toBe("");
+  });
+
+  it("keeps the days after a refused save", async () => {
+    // `2R-SURFACE-008` in terms: a refusal must not alter the rule. The days
+    // were never covered by it, because the test that named the requirement
+    // predates the picker.
+    const user = userEvent.setup();
+    const action = vi.fn(handler(async () => ({
+      status: "error" as const,
+      message: copy.creation.failed,
+      reminderId: null,
+    })));
+    mount(action);
+    await openDialog(user);
+    await monWedFri(user);
+
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    expect(screen.getByRole("dialog"), "the refusal closed the dialog").toBeTruthy();
+    expect(ticked()).toEqual(["1", "3", "5"]);
+  });
+});
+
+/**
+ * The checkpoint's third finding, on this dialog: *"Se houver algo escrito ou
+ * alterado, fechar pelo backdrop deve pedir confirmação antes de descartar."*
+ *
+ * The rule itself belongs to `ConfirmDialog` and is proved in
+ * `confirm-dialog.test.tsx`. What is proved here is the half only this component
+ * can get wrong: that its own `isDirty` reports the truth about **this** form,
+ * including the two fields that live only in the DOM.
+ */
+const backdrop = () => document.querySelector(".task-command-dialog-backdrop") as HTMLElement;
+
+describe("2P-REMINDER-004 + checkpoint two: a draft is worth a question", () => {
+  it("closes at once when nothing has been typed", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.click(backdrop());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("asks before discarding a title the owner typed", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.type(screen.getByLabelText(copy.creation.contentLabel, { exact: false }), "Academia");
+
+    await user.click(backdrop());
+    expect(screen.getByText(copy.creation.discardPrompt)).toBeTruthy();
+    expect(screen.getByRole("dialog"), "it closed instead of asking").toBeTruthy();
+  });
+
+  it("asks about importance, which lives only in the DOM", async () => {
+    // A dirty check built from this component's four state values would call
+    // the dialog clean here and throw the tick away without a word.
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.click(screen.getByLabelText(copy.creation.importantLabel, { exact: false }));
+
+    await user.click(backdrop());
+    expect(screen.getByText(copy.creation.discardPrompt)).toBeTruthy();
+  });
+
+  it("goes back to clean when the owner undoes the edit by hand", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    const title = screen.getByLabelText(copy.creation.contentLabel, { exact: false });
+    await user.type(title, "Academia");
+    await user.clear(title);
+
+    await user.click(backdrop());
+    expect(screen.queryByRole("dialog"), "it asked about an edit that was undone").toBeNull();
+  });
+
+  it("keeps the whole draft when the owner chooses to go back", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await monWedFri(user);
+    await user.click(screen.getByLabelText(copy.creation.importantLabel, { exact: false }));
+
+    await user.click(backdrop());
+    await user.click(screen.getByRole("button", { name: copy.creation.discardResume }));
+
+    expect(ticked()).toEqual(["1", "3", "5"]);
+    expect(
+      (screen.getByLabelText(copy.creation.importantLabel, { exact: false }) as HTMLInputElement).checked,
+    ).toBe(true);
+    expect(
+      (screen.getByLabelText(copy.creation.contentLabel, { exact: false }) as HTMLInputElement).value,
+    ).toBe("Academia");
   });
 });

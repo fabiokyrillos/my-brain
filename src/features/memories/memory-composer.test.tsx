@@ -129,19 +129,36 @@ describe("MemoryComposer", () => {
   });
 
   it("writes nothing when cancelled from the writing pane", async () => {
+    /*
+      This pane's own *Cancelar* is not the dialog's *Fechar*, and until slice
+      2R.3's second checkpoint it called the composer's `closeDialog` directly --
+      straight past the discard question, on the one dialog most likely to be
+      holding something. It goes through `requestClose` now, so both controls
+      behave the same way and this test proves it rather than the source does.
+    */
     const { createAction } = mount();
     await compose("Prefiro reuniões pela manhã.");
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+
+    expect(screen.getByText("Descartar esta memória? O que você escreveu será perdido.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(createAction).not.toHaveBeenCalled();
   });
 
   it("writes nothing when Escape closes the review pane", async () => {
+    // Escape follows the same rule as the backdrop and the cancel button since
+    // slice 2R.3's second checkpoint: a draft is worth a question before it is
+    // lost. The property this test exists for -- that nothing is written on the
+    // way out -- is asserted after the discard is confirmed.
     const { createAction } = mount();
     await compose("Prefiro reuniões pela manhã.");
     await userEvent.click(screen.getByRole("button", { name: "Revisar" }));
     await userEvent.keyboard("{Escape}");
+
+    expect(screen.getByText("Descartar esta memória? O que você escreveu será perdido.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Descartar" }));
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(createAction).not.toHaveBeenCalled();

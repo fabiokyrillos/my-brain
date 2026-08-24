@@ -56,6 +56,16 @@ type MemoryCopy = {
   readonly composeSubmit: string;
   readonly composeCancel: string;
   readonly composeClose: string;
+  /**
+   * The discard question — slice 2R.3's second device checkpoint.
+   *
+   * The dialog can now be dismissed by tapping outside it, and this one holds a
+   * sentence the owner wrote by hand. `ConfirmDialog` asks before losing it and
+   * takes the words from here, having no locale of its own.
+   */
+  readonly composeDiscardPrompt: string;
+  readonly composeDiscardConfirm: string;
+  readonly composeDiscardResume: string;
   readonly composeEmpty: string;
   readonly composeProvenanceNone: string;
   readonly composeUndo: string;
@@ -205,6 +215,9 @@ const copy = {
     composeSubmit: "Guardar memória",
     composeCancel: "Cancelar",
     composeClose: "Fechar",
+    composeDiscardPrompt: "Descartar esta memória? O que você escreveu será perdido.",
+    composeDiscardConfirm: "Descartar",
+    composeDiscardResume: "Continuar editando",
     composeEmpty: "Escreva a memória antes de revisar.",
     composeProvenanceNone: "Sem registro de origem: esta memória não veio de uma captura.",
     composeUndo: "Desfazer",
@@ -314,6 +327,9 @@ const copy = {
     composeSubmit: "Keep this memory",
     composeCancel: "Cancel",
     composeClose: "Close",
+    composeDiscardPrompt: "Discard this memory? What you wrote will be lost.",
+    composeDiscardConfirm: "Discard",
+    composeDiscardResume: "Keep editing",
     composeEmpty: "Write the memory before reviewing.",
     composeProvenanceNone: "No source record: this memory did not come from a capture.",
     composeUndo: "Undo",
