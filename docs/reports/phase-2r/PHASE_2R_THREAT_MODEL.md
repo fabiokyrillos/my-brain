@@ -256,3 +256,38 @@ a closed one.
 A slice ships the mitigation, its test exercises it rather than asserting it, and
 slice 2R.5 re-dispositions the threat against **what was actually built**. Until
 then, **every line in this model is a plan.**
+
+## Disposition at closeout (2026-08-24) — against what was actually built
+
+**Twelve threats. Ten CLOSED, two carried.** A threat closes only when its
+mitigation **exists and has been exercised** — the same rule the ADR-132
+disposition applied when it closed none of them.
+
+| Threat | Now | The exercise that closed it, or why it is still open |
+|---|---|---|
+| `T-2R-1` — series or occurrence crossing an owner boundary | **CLOSED** | composite FK `(user_id, series_id)`, RLS enabled **and forced**, one owner-scoped select policy, and `phase_2r_reminder_recurrence.sql`'s **second owner** — inserted, asserted present, then probed and refused. The denial is not vacuous because the owner's own row is proved visible to the same role in the same transaction first |
+| `T-2R-2` — materialisation writing for the wrong owner | **CLOSED** | the trigger reads its series `where candidate.id = new.series_id and candidate.user_id = new.user_id` and inserts with `new.user_id`; the pgTAP suite exercises it in both its on-time and long-overdue shapes. `OD-2R-3` A left exactly one unattended write path, so there is one function to audit rather than two |
+| `T-2R-3` — a rule that computes without bound | **CLOSED** | the closed set cannot express an unbounded rule — the CHECK constraint refuses anything else, proved by `[]`, `[3,1]`, `[1,1]` and an `hourly` frequency each being rejected — and the next-instant search is bounded and **raises** rather than looping |
+| `T-2R-4` — delivery amplification | **CLOSED** | `phase_2r_notify.sql` drags an occurrence **eight days** into the past and proves ONE notification, a **future** successor, still exactly one row, and zero on an immediate second run. Five due series across one owner deliver **three**, the cap. Exercised, not inherited |
+| `T-2R-5` — content leaking into a notification | **CLOSED** | the delivery audit has **no column capable of holding content** — `dedupe_hash` is CHECK-constrained to 64 hex characters — and a series delivery writes no row into it at all. The in-app surface carries the text by design, and the control asserts that too so the two are not confused |
+| `T-2R-6` — a rule string reaching a surface | **CLOSED** | there is no `RRULE` string in existence to leak, and the journey sweeps the rendered page for `monthlyweekday`, `monthlyday`, `rrule`, `"frequency"` and `version:` — none reaches it |
+| `T-2R-7` — an undo that does not restore | **CLOSED** | every series command has a registered handler exercised in pgTAP rather than asserted, including the detach undo whose **ordering bug was found by writing the test** — un-detaching before deleting the replacement violates the one-live index. **Carried alongside it:** `2R-UNDO-LEDGER-NOT-CLOSED`, a *different* defect in a Phase 2P handler |
+| `T-2R-8` — materialisation mistaken for autonomy | **CLOSED — and it was the right thing to worry about** | the migration contains **zero** occurrences of `automation_categ`; materialisation carries no policy state and appears in no automation surface. Re-read live at closeout: `automation_category_policies` holds **zero rows**, so all six categories read through the computed default. The phase did add the product's first unattended writer, and it added it **outside** the automation vocabulary entirely |
+| `T-2R-9` — the migration widening authority | **CLOSED** | `reminder_series` is **stricter** than `reminders`: select and nothing else to `authenticated`, no delete grant and no delete policy for anyone. The grant census refused the new objects by name until they were enumerated, and one of those refusals found a real naming defect |
+| `T-2R-10` — silent spend | **CLOSED** | zero AI calls and zero credentials across six slices and two corrective rounds. The model is validated, never interpreted, so no path needs one |
+| `T-2R-11` — the successor phase starting by accident | **OPEN — carried** | the generator refuses a successor requirement in this PRD and the declaration guard refuses successor directories, but **the phase is not closed yet**, and the threat is about what happens at the moment it is. It closes with the phase, not before |
+| `T-2R-12` — a hardware proof discharged by a document | **OPEN — carried, deliberately** | `2R-MOBILE-003` was closed by a **person with the device**, on the third run, after two runs found five defects. But the phase's **own** closing checkpoint is still owed, and `2R-CLOSE-012` is the requirement this threat lives inside. It cannot close while the thing it guards has not happened |
+
+### What the closeout changed about this model
+
+**Two threats are carried rather than closed, and both for the same reason:** they
+are about the act of closing the phase, which has not happened. Closing them here
+would be the exact substitution `T-2R-12` describes.
+
+**`T-2R-8` deserves a last word.** It was named the most important item in this
+model during planning, and it was right — this phase shipped the product's first
+unattended writer. What made it safe was not vigilance but a structural choice:
+`OD-2R-3` option A put materialisation in a trigger fired by a completion the
+owner or the heartbeat causes, so there is no scheduler, no horizon job, and
+nothing that decides on its own that work should happen. The automation
+vocabulary never had to be widened because the writer was never an automation.

@@ -13560,3 +13560,128 @@ phase at a further owner device checkpoint.
 
 **Migration budget unmoved.** One allocated, spent in 2R.1. Slices 2R.2, 2R.3 and
 both corrections created none between them.
+
+## §126 — Slices 2R.4 and 2R.5: the closeout generator found five requirements taking credit for work nobody did (2026-08-24)
+
+**The phase is code-complete and NOT CLOSED.** 73 of 73 classified, zero
+undelivered, ten of twelve threats closed. `2R-CLOSE-012` reserves closure for an
+owner decision recorded as an ADR after a device checkpoint, and that checkpoint
+is owed.
+
+| | |
+|---|---|
+| 2R.4 | merged `24c0217f094a61086862e1b153a7a6cd2730ccdb`, **CI green 3/3 at that exact SHA** |
+| 2R.5 | this branch |
+| migrations | **zero created by either.** 101 local = 101 hosted, parity `202608230101`, re-read live |
+| gates | lint 0 errors · typecheck clean · **9344/9344** · build passes |
+
+### 2R.4 — the heartbeat's rules re-proved, and a requirement reclassified
+
+The plan's standard was *"re-proved, not re-read"*, and it exists because 2R.1
+already re-read them by matching two substrings against `pg_proc.prosrc`. That
+guards an accidental edit and proves nothing about behaviour. So
+`phase_2r_notify.sql` **calls `run_user_heartbeat` twenty-six times** and reads
+what it did.
+
+**`2R-NOTIFY-005` was declared `build` and turned out to be `baseline`.** The
+no-burst mechanism already existed from 2R.1 — one live occurrence, and
+materialisation from `greatest(remind_at, now())`. Those are two different
+claims: a row that materialised *backwards* satisfies the first and fails the
+second. So the suite drags an occurrence eight days into the past and proves one
+notification, a **future** successor, still exactly one row, and zero on an
+immediate second run. Manufacturing a change to make the original label look
+right would have been the dishonest option.
+
+`2R-NOTIFY-004`'s failure is **forced**: `profiles.timezone` has no CHECK — the
+gap `2R-TZ-SECOND-AUTHORITY` records — so an unresolvable zone makes that user's
+heartbeat raise. CI's log carries `Heartbeat failed for user e1000003… with code
+22023` and the batch continued past it.
+
+**CI found one defect and it was informative.** *"The two over the cap are still
+scheduled"* counted **five**: marking three occurrences `sent` fires the
+materialisation trigger three times, so each of those series immediately gains a
+future successor. The assertion now says what it meant — scheduled **and still
+due** — and the surprising number is itself asserted rather than filtered out of
+view.
+
+### 2R.5 — the generator, and what it caught
+
+`scripts/generate-phase-2r-traceability.mjs` refuses or writes nothing; a matrix
+that is 72 of 73 correct reads as complete. Its first run refused six times and
+**every refusal was a real defect in the records**:
+
+- `2R-MOBILE-003` classified `**delivered**` — a class that does not exist;
+- `2R-NOTIFY-007` classified `**rule — enforced**` — the vocabulary's word is
+  `not-built-by-rule`;
+- three requirements **classified twice**, because slice 2R.3's
+  `| Requirement | Was | Now | Why |` transition table put its `Was` column where
+  the class goes. This repository already had that failure written down, and the
+  generator reproduced it exactly. The parser now reads only tables that
+  announce themselves with `| Requirement | Class | … |`.
+
+### The finding that outlives the phase
+
+Reconciling delivered classes against **declared kinds** — something no code had
+ever done — produced **57 `built` against 55 declared `build`**. The new refusal
+named six rows:
+
+```
+2R-FOUNDATION-001 … -004, -006 are declared baseline and classified built
+2R-ACCESS-005 is declared a rule and classified built
+```
+
+**Five had been wrong since slice 2R.0, the phase's first.** Those requirements
+ask for a property to be *measured and recorded*, and the contract has said since
+planning that **"`baseline` may never be recorded as `built`"** — Phase 2Q's
+ADR-129 Decision 7, because classifying a property that already held as newly
+built claims a change that did not happen.
+
+**The contract stated the rule in prose and nothing read it.** It survived five
+slices, three device checkpoints and every green CI run. The evidence in each row
+was always correct; the column it was filed under was not.
+
+The opposite direction is deliberately **not** refused — `2R-SURFACE-005` and
+`2R-NOTIFY-005` are declared `build` and delivered `baseline`, which is a phase
+discovering the property already held, and that has to stay sayable.
+
+**Final counts:** 51 `built` · 17 `baseline` · 2 `partial` · 3
+`not-built-by-rule` · **0 `undelivered`** = 73.
+
+### The threat model, re-dispositioned against what was built
+
+**Ten of twelve CLOSED.** A threat closes only when its mitigation exists **and
+has been exercised**, which is why ADR-132's disposition closed none of them.
+
+`T-2R-11` and `T-2R-12` are **carried**, and for the same reason: both are about
+the act of closing the phase, which has not happened. Closing them here would be
+the exact substitution `T-2R-12` describes.
+
+`T-2R-8` — materialisation mistaken for autonomy — was named the most important
+item in the model at planning, and it was right: this phase shipped the product's
+**first unattended writer**. What made it safe was structural rather than
+vigilant. `OD-2R-3` option A put materialisation in a trigger fired by a
+completion, so there is no scheduler and nothing that decides on its own that
+work should happen. The automation vocabulary never had to widen because the
+writer was never an automation. Re-read live at closeout:
+`automation_category_policies` holds **zero rows**.
+
+### Where the next session starts
+
+**With the owner, and the phase's own closing device checkpoint.** After it, an
+ADR. `2R-CLOSE-012` exists so that a green pipeline cannot stand in for either.
+
+### Carried forward, none discharged
+
+- **`2R-TZ-SECOND-AUTHORITY`** — used by 2R.4 to force a failure; using is not
+  fixing.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`**, **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`**,
+  **`2R-AXE-MANUAL-LANE`**, **`2R-RECURRENCE-LANE-UNRUNNABLE`**,
+  **`2R-DRAWER-NOT-LOCKED`**, **`2R-TASK-RECURRENCE`**, `OD-2R-9`'s two defects,
+  the interval gap, push HTTP 403 — now guarded against being *claimed*.
+- **Inherited, reproduced with no item dropped:** `2P-ACCESS-005` **NOT EXECUTED
+  — OWNER WAIVED**; `2P-ATTENTION-008`; `RG-DEP-3`; `2P-CHAT-007-JOURNEY`;
+  ADR-055 expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. **Phase 2S is
+  not started, not planned and not named as active.**
+
+**The migration budget never moved.** One allocated, one spent in 2R.1. Slices
+2R.2, 2R.3, 2R.4, 2R.5 and both corrective rounds created none between them.

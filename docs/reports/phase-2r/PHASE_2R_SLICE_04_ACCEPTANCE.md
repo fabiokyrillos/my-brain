@@ -134,7 +134,7 @@ as a control — the in-app notification **does** carry the reminder text.
 | `2R-NOTIFY-004` | **baseline — re-proved** | §4 — a forced failure, survived, with the next user still delivered to |
 | `2R-NOTIFY-005` | **baseline by 2R.1's design — proved here, reclassified from build** | §2. The plan expected code; the mechanism already existed. Manufacturing a change to justify the label would have been the dishonest option |
 | `2R-NOTIFY-006` | **baseline — re-proved** | §5 — no content column, no delivery row, and a control proving the in-app surface is untouched |
-| `2R-NOTIFY-007` | **rule — enforced** | a new guard in `phase-2r-declarations.test.ts` forbids a **push claim** across the phase's records, with a mutation control planting the forbidden sentence and the permitted refusal. It forbids the act, not the word, because the HTTP 403 remainder has to stay nameable |
+| `2R-NOTIFY-007` | **not-built-by-rule** | a new guard in `phase-2r-declarations.test.ts` forbids a **push claim** across the phase's records, with a mutation control planting the forbidden sentence and the permitted refusal. It forbids the act, not the word, because the HTTP 403 remainder has to stay nameable |
 
 **7 of 7 classified. 54 of 73 for the phase.**
 
