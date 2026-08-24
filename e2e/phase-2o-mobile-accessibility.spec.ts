@@ -639,6 +639,11 @@ test("2R fix: the floor does not reach the desktop type scale", async ({ page })
     redesign of every form in the product, and it would pass the case above
     just as well -- which is exactly why that case alone is not enough.
 
+    THIS CASE CAUGHT THE FIRST VERSION OF THE FIX. The floor was scoped
+    `(pointer: coarse), (max-width: 640px)`, and headless Chromium reports
+    `pointer: coarse` at 1280x800 -- so it matched on a desktop viewport and the
+    claim was false. Scoping by width alone is what makes it true.
+
     Asserted on a field the design deliberately sets below the floor. If every
     desktop field is 16px for its own reasons this becomes vacuous, so it is
     written to fail loudly rather than to skip.
@@ -656,6 +661,6 @@ test("2R fix: the floor does not reach the desktop type scale", async ({ page })
   // the assertion is that the FLOOR is not what put it there: at 1280px the
   // media query does not match at all.
   const floorApplies = await page.evaluate(() =>
-    window.matchMedia("(pointer: coarse), (max-width: 640px)").matches);
-  expect(floorApplies, "the touch floor is matching at 1280px").toBe(false);
+    window.matchMedia("(max-width: 1024px)").matches);
+  expect(floorApplies, "the field floor is matching at 1280px").toBe(false);
 });

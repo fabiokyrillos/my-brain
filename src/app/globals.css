@@ -93,10 +93,25 @@
  * It also makes the rule immune to load order, which matters because these
  * sheets are imported in an order no single file controls.
  *
- * ## Why it is scoped, and what it deliberately does not touch
+ * ## Why it is scoped by WIDTH ALONE
  *
- * `pointer: coarse` OR a narrow viewport, so the desktop type scale is
- * untouched — the checkpoint asked for that in terms.
+ * The first version was `(pointer: coarse), (max-width: 640px)`, and its own
+ * test caught it: **headless Chromium reports `pointer: coarse` at 1280×800**,
+ * so the floor matched on a desktop viewport and the claim "the desktop type
+ * scale is untouched" was false. Pointer media queries describe the *primary*
+ * input device, which a headless browser, a touchscreen laptop and a docked
+ * tablet all answer in ways that have nothing to do with whether Safari will
+ * zoom.
+ *
+ * Width is the honest proxy: it is what the device actually gives the page, it
+ * is deterministic, and it is already how this codebase scopes mobile.
+ *
+ * `1024px` rather than the dialog's own `640px`, and the difference is not
+ * carelessness — an iPhone in landscape is 844px wide and a tablet is wider
+ * still, and both zoom. A small laptop at 1024px picks up 16px fields as a
+ * consequence; that is larger and more legible rather than broken, which is the
+ * right way round for a bound whose two failure modes are "slightly bigger text"
+ * and "the page zooms and the owner cannot reach the button".
  *
  * Checkboxes, radios, ranges and file inputs are excluded: iOS does not zoom for
  * them, and they are sized by their box rather than by their font.
@@ -107,7 +122,7 @@
  */
 :root { --field-font-size-min: 16px; }
 
-@media (pointer: coarse), (max-width: 640px) {
+@media (max-width: 1024px) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
   textarea,
   select {

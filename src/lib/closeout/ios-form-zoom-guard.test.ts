@@ -173,7 +173,7 @@ describe("iOS does not zoom into a field on focus", () => {
 
     // `[\s\S]` rather than the `s` flag: this project's TypeScript target
     // predates it, and `tsc` refuses the flag outright.
-    const floor = /@media[^{]*(pointer:\s*coarse|max-width)[^{]*\{[\s\S]*?(input|textarea|select)[^{}]*\{[^}]*font-size:[^;]*var\(--field-font-size-min\)[^;]*!important/;
+    const floor = /@media[^{]*max-width[^{]*\{[\s\S]*?(input|textarea|select)[^{}]*\{[^}]*font-size:[^;]*var\(--field-font-size-min\)[^;]*!important/;
     expect(floor.test(css), "the floor is not applied to fields inside a touch/narrow query")
       .toBe(true);
 
