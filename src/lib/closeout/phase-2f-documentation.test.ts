@@ -307,8 +307,21 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * Phase 2R's ADRs stay refused: they belong to a phase that closed, and
      * `DECISIONS.md` is where they live.
      */
+    /*
+     * **Moved again with ADR-138, in the commit that recorded it — the eleventh
+     * reversal, and the rule has still not moved.**
+     *
+     * Phase 2S has now received a **third** authorization: ADR-136 authorized
+     * planning, ADR-137 signed the ten decisions and allocated one migration,
+     * ADR-138 authorizes the implementation of slices 2S.0 … 2S.4. All three are
+     * required for the same reason the previous two were — the line cites every
+     * authorization the active phase has received — and dropping any of them
+     * would lose one.
+     */
     expect(line, "Phase 2S's signatures are ADR-137 and the line must cite them")
       .toContain("ADR-137");
+    expect(line, "Phase 2S's implementation authorization is ADR-138 and the line must cite it")
+      .toContain("ADR-138");
     expect(line, "Phase 2R's signatures belong to DECISIONS.md, not to a line about Phase 2S")
       .not.toContain("ADR-132");
     /*
@@ -346,8 +359,23 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      */
     expect(line, "the ten decisions are signed, and the line must not understate them")
       .toMatch(/\bSIGNED\b/i);
-    expect(line, "implementation is NOT authorized, and the line must not overstate it")
-      .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    /*
+     * **Inverted by ADR-138**, by the same rule that inverted the signature
+     * assertion above one ADR earlier: the line states what is true of the
+     * active phase, and understating an authorization the owner has given is
+     * the mirror-image of overstating one.
+     *
+     * ADR-138 authorizes the construction of slices 2S.0 … 2S.4, so requiring
+     * the **absence** of "IMPLEMENTATION AUTHORIZED" would now force the backlog
+     * to deny an authorization that exists. What does not move is the next
+     * distinction, and it is the one this assertion has always been about:
+     * **authorized is not closed.** ADR-138 Decision 8 stops the phase at the
+     * owner twice — the `2S-MOBILE-003` device checkpoint and a closing
+     * checkpoint — so the closure half below still refuses, and it is the last
+     * overstatement left for this line to make.
+     */
+    expect(line, "implementation is authorized, and the line must not understate it")
+      .toMatch(/IMPLEMENTATION AUTHORIZED/i);
     expect(line, "closure is NOT authorized, and the line must not overstate it")
       .not.toMatch(/PHASE (2S )?CLOSED|CLOSURE AUTHORIZED/i);
     /*

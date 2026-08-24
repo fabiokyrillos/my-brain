@@ -378,6 +378,69 @@ describe("Phase 2S: the ten decisions are signed, and the override is on the rec
   });
 });
 
+/*
+ * **Added by ADR-138, in the commit that recorded it.**
+ *
+ * The block above asserts that the *plan* still names the blocker, and it keeps
+ * asserting that, because the plan is a planning artifact and is not rewritten
+ * once its blocker clears — the rule since ADR-108. What that block cannot say
+ * is whether the blocker was ever answered, and a document that goes on naming
+ * a blocker nobody cleared reads identically to one whose blocker was cleared
+ * yesterday. This block is the other half: the authorization exists, it is an
+ * accepted owner decision, it authorizes exactly the five slices, it spends the
+ * allocation in one of them, and it stops short of closure.
+ */
+describe("Phase 2S: implementation is authorized, and the authorization stops where it says", () => {
+  it("has an accepted ADR authorizing the construction of the five slices", () => {
+    const body = adrBlock("ADR-138");
+    expect(body, "the authorization must be accepted").toMatch(/\*\*Status:\*\* Accepted/);
+    expect(body, "it must be an owner decision").toMatch(/owner decision/);
+    for (const slice of ["2S.0", "2S.1", "2S.2", "2S.3", "2S.4"]) {
+      expect(body, `${slice} is not authorized by name`).toContain(slice);
+    }
+  });
+
+  it("spends the allocation in slice 2S.1 alone, and keeps a second migration a stop condition", () => {
+    const body = adrBlock("ADR-138");
+    expect(body, "the allocation must be tied to one slice")
+      .toMatch(/slice 2S\.1 and nowhere else|slice 2S\.1 alone/);
+    expect(body, "a second migration must still halt the phase")
+      .toMatch(/second migration of any kind remains a stop condition/);
+  });
+
+  it("does not authorize closure, and names the two owner checkpoints", () => {
+    const body = adrBlock("ADR-138");
+    expect(body, "closure must stay a separate owner decision")
+      .toMatch(/does not authorize the phase to close/);
+    expect(body, "the device checkpoint must be named")
+      .toContain("2S-MOBILE-003");
+    expect(body, "an automated lane must not be allowed to stand in for the device")
+      .toMatch(/no automated lane substitutes/);
+  });
+
+  it("reopens none of the signatures and names no successor", () => {
+    const body = adrBlock("ADR-138");
+    expect(body, "the signatures must stay closed")
+      .toMatch(/not one of ADR-137's signatures is reopened/);
+    expect(body, "the override must stand as signed").toMatch(/`OD-2S-3` stays \*\*B\*\*/);
+    expect(body, "the refusal the owner restated must stand").toMatch(/`OD-2S-8` stays \*\*A\*\*/);
+    expect(body, "an authorizing ADR must not name its successor")
+      .toMatch(/names no successor/);
+    expect(/2T/.test(body), "the successor letter must not appear in the authorization")
+      .toBe(false);
+  });
+
+  it("keeps ADR-136 and ADR-137 intact rather than rewritten into agreement with it", () => {
+    // The rule since ADR-108, applied a third time in this phase's own life.
+    expect(adrBlock("ADR-136"), "ADR-136 must still declare the ten decisions open")
+      .toMatch(/OPEN/);
+    expect(adrBlock("ADR-137"), "ADR-137 must still read as allocated, never as spent")
+      .toMatch(/ALLOCATED at exactly one/);
+    expect(adrBlock("ADR-137"), "ADR-137 must still say the allocation is not a file")
+      .toMatch(/Allocated is not created/);
+  });
+});
+
 describe("Phase 2S: allocated is not created, and the ceiling did not move", () => {
   it("states the budget as allocated everywhere it states it", () => {
     for (const path of [PRD, CONTRACT, COVERAGE]) {

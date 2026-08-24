@@ -3,6 +3,74 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-24 - Phase 2S: implementation is AUTHORIZED — ADR-138, and nothing is built yet
+
+**ADR-138 authorizes the construction of slices 2S.0 … 2S.4** — branches, code,
+tests, guards, documentation and acceptance records, one pull request per slice,
+each re-audited against the `main` its predecessor produced, merged only on green
+CI at its head and **verified again on the exact merge SHA**. It authorizes the
+creation and hosted application of **the one migration ADR-137 allocated, in
+slice 2S.1 and nowhere else**, and only synthetic, owner-scoped, disposable
+fixtures removed with a two-sided residue control.
+
+**Closure is not authorized.** The phase stops at the owner twice: the
+`2S-MOBILE-003` device checkpoint in slice 2S.3, which **no automated lane
+substitutes** including an emulated WebKit project, and a closing checkpoint
+before slice 2S.4's report may become an ADR. A green pipeline is neither.
+
+**Preflight, verified read-only before anything was written.** `main` local =
+`origin/main` = `b74c5b4`; worktree clean; zero open PRs; CI green 3/3 on that
+exact SHA (run `32762747099`, three completed jobs — not a queued or cancelled
+run); **101 local = 101 hosted, parity `202608230101`** read live from the
+deployed database; ADR-136 and ADR-137 present and Accepted; ten decisions
+signed with `OD-2S-3` **B** recorded as a deliberate override; **99 requirements
+across eleven families, derived from the PRD's own tables rather than read from
+its prose, none delivery-classified**; nineteen threats all OPEN; budget **1
+allocated · 0 created**; signup closed; rollout **25 pass · 3 fail · 2
+owner-signature**, re-verified by running the script; successor not started, not
+planned and not named.
+
+**`run_user_heartbeat` may change at the source** — `OD-2S-9` A — and every rule
+it already enforces is preserved and **re-proved by calling the function**, never
+by matching a substring against `prosrc`. A rule that would have to change is a
+stop condition, not a design liberty.
+
+**The inline actions reuse existing authorities and create none.** Completion
+through `WorkItemActions`' injected handler, rescheduling through
+`applyTaskDetailCommand`, *lida* and *descartar* through `markNotification`, undo
+through `undoWorkOperation`/`UndoAffordance`, eligibility through
+`isEligibleStatus`/`detailControlsFor`. A verb needing a write authority absent
+from slice 2S.0's recorded baseline halts the phase, as does a verb needing
+schema of its own — that would be a second migration, and a second migration of
+any kind is a stop condition.
+
+### Guards
+
+- `phase-2f-documentation.test.ts` — the active-milestone assertion **reverses
+  direction for the eleventh time and its rule does not move**: the line cites
+  every authorization the active phase has received and overstates none. So
+  `ADR-138` and `IMPLEMENTATION AUTHORIZED` are now **required** where the second
+  was refused yesterday, while `spent`, `created` and closure stay **refused**.
+- `phase-2s-declarations.test.ts` — five new assertions covering the other half
+  the existing block could not see: that the blocker the plan names was actually
+  answered, that the allocation is tied to slice 2S.1 alone, that closure is not
+  authorized, that no signature is reopened, and that the authorization names no
+  successor.
+- **Four mutation controls prove each new assertion can fail**, and the first was
+  itself wrong before it was right: it removed one of the milestone line's **two**
+  mentions of `ADR-138` and passed. A control that passes because it did not
+  perform the mutation it claims is a control proving nothing.
+
+### Not touched
+
+Zero product code, zero migration file, zero deploy, zero hosted write — every
+hosted statement was a `select`. No AI call, no BYOK spend, no push work, no
+remainder executed, no automation category's state changed. Signup stays closed;
+rollout stays 25 · 3 · 2; `RG-DEP-3` still cannot be closed by writing a file;
+push HTTP 403 stays not resumed, not repaired and **not claimed**;
+`2P-ATTENTION-008` and `OD-2R-9`'s two defects stay out under `OD-2S-8` A;
+`2P-ACCESS-005` stays NOT EXECUTED — OWNER WAIVED; ADR-055 still expires
+2026-10-27 and still needs a person; Phase 2R stays CLOSED.
 ## 2026-08-24 - Phase 2S: all ten decisions SIGNED — ADR-137, and one of them overrides the recommendation
 
 **ALL TEN OWNER DECISIONS ARE SIGNED — ADR-137. IMPLEMENTATION IS STILL NOT
