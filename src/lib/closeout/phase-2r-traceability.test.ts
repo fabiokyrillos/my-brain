@@ -196,9 +196,22 @@ describe("the generator refuses what the contract says it must", () => {
   });
 
   it("refuses a successor phase's requirement inside this phase's PRD", () => {
-    const prd = `${GOOD_PRD}\n| \`2S-THING-001\` | a title | a criterion | build | — |\n`;
+    // **Retargeted by ADR-136 Decision 9**, which authorized Phase 2S. This is
+    // the sixth pin on the successor's letter, and the one ADR-131's count of
+    // five did not have because this generator did not exist yet.
+    const prd = `${GOOD_PRD}\n| \`2T-THING-001\` | a title | a criterion | build | — |\n`;
     expect(refusals({ prd, coverage: GOOD_COVERAGE, records: [] }).join("\n"))
       .toContain("declares a successor phase's requirement");
+  });
+
+  it("does not refuse the authorized phase's own letter, so the pin moved rather than widened", () => {
+    // The half that makes the retarget checkable. Phase 2S is authorized, so a
+    // `2S-` row in this PRD is a misfiling for another guard to catch — not this
+    // generator's successor refusal. Without this control a pin that refused
+    // every letter would look identical from the passing side.
+    const prd = `${GOOD_PRD}\n| \`2S-THING-001\` | a title | a criterion | build | — |\n`;
+    expect(refusals({ prd, coverage: GOOD_COVERAGE, records: [] }).join("\n"))
+      .not.toContain("declares a successor phase's requirement");
   });
 });
 

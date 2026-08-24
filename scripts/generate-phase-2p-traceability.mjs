@@ -671,29 +671,39 @@ export function audit(root = REPOSITORY_ROOT) {
   // --- refusal 12: no successor before authorization -----------------------
   //
   // **Retargeted 2026-08-22 by ADR-131**, which authorized Phase 2R for
-  // planning. This is the third place in the repository that pins the
-  // successor's letter — after `phase-2f-documentation.test.ts`'s A13 detector
-  // and `phase-2o-declarations.test.ts`'s literal pin on it — and it is the one
-  // that had to be discovered by running the suite rather than by reading the
+  // planning, and again **2026-08-24 by ADR-136**, which authorized Phase 2S.
+  // This is the third place in the repository that pins the successor's letter —
+  // after `phase-2f-documentation.test.ts`'s A13 detector and
+  // `phase-2o-declarations.test.ts`'s literal pin on it — and it is the one that
+  // had to be discovered by running the suite rather than by reading the
   // governance documents, because nothing points at it from them.
   //
-  // **There are five pins, not three.** ADR-131's retarget enumerated them:
-  // the two named above, this one, `generate-phase-2q-traceability.mjs`'s
-  // successor check, and `phase-2q-declarations.test.ts`'s assertions that the
-  // ADR-125…128 series does not name the successor. `STATE.md` and ADR-130 both
-  // recorded the letter as appearing "only inside the A13 detector"; that was
-  // wrong, and the count is written here so the next retarget starts from five.
+  // **There are SIX pins now, and the count is the point.** ADR-131 enumerated
+  // five and five was right when it was written; Phase 2R then shipped a
+  // generator of its own, whose refusal 14 is the sixth. The list, in full:
+  // the A13 detector's constants and fixture root;
+  // `phase-2o-declarations.test.ts`'s literal pins;
+  // `phase-2r-declarations.test.ts`'s literal pins, its own copy of the detector
+  // family pattern and its absent-directory assertions; this refusal;
+  // `generate-phase-2q-traceability.mjs`'s successor check; and
+  // `generate-phase-2r-traceability.mjs`'s refusal 14.
+  //
+  // `STATE.md` and ADR-130 once recorded the letter as appearing "only inside
+  // the A13 detector"; that was wrong, ADR-131 corrected it to five, and ADR-136
+  // Decision 9 corrects it to six. **A count that drifts silently is the same
+  // defect one generation on**, which is why it is written down here each time
+  // rather than remembered.
   //
   // The pin is kept literal rather than derived. A derived version would move
   // itself and no author would ever have to think about it, which is the
   // opposite of what these pins are for: every retarget must consciously pass
   // through each one.
-  const successorArtifacts = existsSync(join(root, "docs/initiatives/phase-2s"))
-    || existsSync(join(root, "docs/reports/phase-2s"));
+  const successorArtifacts = existsSync(join(root, "docs/initiatives/phase-2t"))
+    || existsSync(join(root, "docs/reports/phase-2t"));
   if (successorArtifacts) {
-    refusals.push("a Phase 2S governing artifact exists before any authorization (refusal 12)");
+    refusals.push("a successor governing artifact exists before any authorization (refusal 12)");
   }
-  if (/^- \*\*2S-[A-Z]+-\d{3}:\*\*/m.test(readFile(PRD, root))) {
+  if (/^- \*\*2T-[A-Z]+-\d{3}:\*\*/m.test(readFile(PRD, root))) {
     refusals.push("a successor requirement is declared before authorization (refusal 12)");
   }
 

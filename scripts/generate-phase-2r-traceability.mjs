@@ -347,7 +347,12 @@ export function refusals({
   }
 
   // 14 — a successor phase's requirement, anywhere in this phase's own PRD.
-  if (/2S-[A-Z]+-\d{3}/.test(prd)) {
+  //
+  // **Retargeted 2026-08-24 by ADR-136**, which authorized Phase 2S. This is the
+  // sixth pin on the successor's letter, and the one ADR-131's count of five did
+  // not have because this generator did not exist yet. The enumeration lives in
+  // `generate-phase-2p-traceability.mjs`'s refusal 12.
+  if (/2T-[A-Z]+-\d{3}/.test(prd)) {
     found.push("the PRD declares a successor phase's requirement.");
   }
 

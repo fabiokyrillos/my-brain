@@ -3,6 +3,65 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-24 - Phase 2S AUTHORIZED FOR PLANNING ONLY — ADR-136, and three facts the record had wrong
+
+**PHASE 2S IS AUTHORIZED FOR PLANNING ONLY — ADR-136.** The package is written and **nothing is
+implemented**: zero product code, zero migration, zero deploy, zero hosted write, zero AI call,
+zero BYOK spend, zero push work, zero remainder executed. Every hosted statement behind it was a
+`select`.
+
+**The theme was chosen by the owner from four costed options against a measured census**, not
+from a roadmap — the published roadmap ends at Phase 2O. *Responder ao Brain*: **the product
+speaks every day and cannot be answered.** 57 notifications, **54 `task_stale`**, **0 read**,
+**0 dismissed**, **exactly 3 per day for 18 unbroken days**, about **3 tasks** last touched
+2026-07-30. Marking one read **suppresses nothing** — the heartbeat's suppression window never
+reads `status`, and the dedupe key carries the local day, so the same subject re-notifies for
+ever. `dismissed` exists in the schema and **has no reachable writer**: `markNotification`
+accepts it, its single caller always sends `"read"`, and the list filters out a state nothing in
+the product can produce. The asymmetry is in the schema itself — `pending_questions` and
+`reminders` both carry `snoozed_until` and a `snoozed` status; **`notifications` carries
+neither**. The product built *"not now"* twice and skipped the one thing that speaks daily.
+
+**74 requirements across ten families and five slices** — 0 unassigned, 0 delivery-classified;
+**52 build · 16 baseline · 6 rule**. **Ten owner decisions are OPEN and none is signed.**
+**Migration budget: 1 PROPOSED · 0 allocated · 0 created**, with a second of any kind a stop
+condition. Parity unchanged at **`202608230101`, 101 local = 101 hosted**, compared by version
+**set** rather than by count. **Fourteen threats, all OPEN.**
+
+**Three corrections to the standing record, each measured rather than argued.**
+
+- **`2P-CHAT-007-JOURNEY` is no longer "unspendable".** Three phases recorded it as needing the
+  owner's own credential. `user_ai_credentials` holds one row: `openai`, `status = active`,
+  `validated_at = 2026-08-02`. It is spendable — and chat has still had **zero** conversations.
+- **Voice with an editable transcript is BUILT and has never once run.** `voice-composer.tsx`
+  ships and is mounted at `composer.tsx:575`; `captureMode: "voice"` fired once, on 2026-08-22;
+  `ai_usage_events` holds **zero** `transcription` rows. What is owed is a proof on the owner's
+  device — or a defect report — not a build.
+- **A13's declared-requirement signal was inert.** It matched a bullet
+  (`- **2X-FAMILY-000:**`) while this repository declares requirements in **PRD table rows**, and
+  there is not one bullet-shaped declaration anywhere under `docs/`. It had therefore never once
+  matched a real declaration, and its control planted a bullet — proving the regex worked on a
+  shape nothing produces. A13 as a whole still fired through two other signals, so nothing could
+  have started silently through it. **Repaired in the same commit that retargeted it**, with a
+  control that plants a table row and asserts the old pattern would have missed it.
+
+**The successor letter is pinned in SIX places, not five.** ADR-131 counted five and five was
+right when written; Phase 2R then shipped a generator of its own, and its refusal 14 is the
+sixth. All six moved in this commit, deliberately rather than by a global replace.
+
+**Phase 2R stays CLOSED.** ADR-135 is not reopened, amended or reinterpreted, and one divergence
+in its record — `PHASE_2R_THREAT_MODEL.md` still reads ten of twelve closed, because
+`T-2R-11` and `T-2R-12` were disposed in ADR-135 rather than in the document — is **reported and
+deliberately not corrected**, because this authorization does not cover edits to a closed phase's
+record.
+
+**Added:** `docs/initiatives/phase-2s/` (PRD, implementation plan, theme options);
+`docs/reports/phase-2s/` (current-experience audit, gaps and opportunities, threat model,
+traceability contract, requirement coverage); `src/lib/closeout/phase-2s-declarations.test.ts`.
+**Changed:** ADR-136 appended to `docs/DECISIONS.md`; the A13 detector and its five sibling pins
+retargeted; `docs/STATE.md`, `docs/TODO.md` and `AUTONOMOUS_LOOP_HANDOFF.md` updated.
+**Unchanged:** every migration, every grant, every RLS policy, signup, the rollout gate, and
+every automation category's state.
 ## 2026-08-24 - Phase 2R CLOSED — ADR-135, after the owner's final checkpoint on real hardware
 
 **PHASE 2R IS CLOSED — ADR-135, by the owner, after the final checkpoint on their own iPhone.** *Rotina: o que se repete* is delivered: reminders repeat daily, weekly on any set of weekdays, monthly by date or ordinal weekday, and yearly, with **exactly one live occurrence per active series**, materialised by a trigger fired by a completion rather than by a scheduler — so the hourly heartbeat, its per-user lock, quiet hours, the daily cap and the 24-hour cooldown are **unchanged rather than re-implemented**, and slice 2R.4 proves that by calling `run_user_heartbeat` twenty-six times rather than by reading its source. **73 declared · 73 classified · 0 unclassified**, from a matrix that is **generated and refuses rather than emitting a partial one** (`scripts/generate-phase-2r-traceability.mjs`, `--check` refuses a stale file byte for byte): **51 `built` · 17 `baseline` · 2 `partial` · 3 `not-built-by-rule` · ZERO `undelivered`**. **Migration budget closes where it opened: 1 allocated · 1 spent · 1 applied** — `202608230101`, parity **`202608230101`, 101 local = 101 hosted**, re-read live at closeout; slices 2R.2, 2R.3, 2R.4, 2R.5 and **both** corrective rounds inside 2R.3 created none between them. **Twelve threats, all disposed: ten closed at slice 2R.5, and `T-2R-11` and `T-2R-12` only NOW** — both are about the *act of closing the phase*, and disposing of them earlier would have been the exact substitution `T-2R-12` names. **The owner's device checkpoint `2R-MOBILE-003` took THREE runs**: the first found two defects, the second found three more, the third confirmed every item. **Three findings outlive the phase.** Postgres's own `AT TIME ZONE` disagrees with two of the three signed daylight-saving cases, in opposite directions — measured before the migration was written. A defect reported as *visual* was a **wrong write**: the modal showed three weekdays, previewed three, and would have saved one. And **five requirements had taken credit for work nobody did** — the traceability contract had said since planning that `baseline` may never be recorded as `built`, and **nothing read it** until the closeout generator compared delivered classes against declared kinds; the misfiling survived five slices, three device checkpoints and every green CI run. **Every remainder is carried out intact and none is discharged by closure:** `2R-TZ-SECOND-AUTHORITY` (used by 2R.4 to force a real failure, which is not fixing it), `2R-UNDO-LEDGER-NOT-CLOSED`, `2R-OCCURRENCE-CANCEL-IRREVERSIBLE`, `2R-AXE-MANUAL-LANE`, `2R-RECURRENCE-LANE-UNRUNNABLE`, `2R-DRAWER-NOT-LOCKED`, `2R-TASK-RECURRENCE`, `OD-2R-9`'s two defects, the interval gap, and push HTTP 403 — now guarded against being *claimed*. **Inherited and reproduced with no item dropped:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**, `2P-ATTENTION-008`, `RG-DEP-3`, `2P-CHAT-007-JOURNEY`, ADR-055 expiring **2026-10-27**. Signup stays closed, rollout stays **25 pass · 3 fail · 2 owner-signature**. **the roadmap successor is NOT started, NOT planned and NOT named as active** — this line deliberately does not name it, because the A13 guard protects the letter — and ADR-135 authorizes no successor.

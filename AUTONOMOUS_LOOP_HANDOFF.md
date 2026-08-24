@@ -13783,3 +13783,169 @@ EXECUTED — OWNER WAIVED** · `2P-ATTENTION-008` · `RG-DEP-3` ·
 **With the owner, and an authorization.** The next phase needs its own subject
 derived from a measured census rather than from a roadmap, and its own planning
 ADR. Nothing in this repository may start it before that.
+
+## §128 — Phase 2S is authorized for PLANNING (ADR-136), the theme came from a census that found the product almost unused, and three facts the record had wrong are now right (2026-08-24)
+
+**Nothing is implemented.** Zero product code, zero migration, zero deploy, zero
+hosted write, zero AI call, zero BYOK spend, zero push work, zero remainder
+executed. Every hosted statement behind this package was a `select`.
+
+| | |
+|---|---|
+| authorization | **ADR-136**, planning only |
+| theme | *Responder ao Brain* — chosen by the owner from four costed options |
+| requirements | **74**, ten families, five slices — 0 unassigned, 0 classified |
+| kinds | **52 build · 16 baseline · 6 rule** |
+| decisions | **10 OPEN, none signed** |
+| migrations | **1 PROPOSED · 0 allocated · 0 created.** 101 = 101, parity `202608230101` |
+| threats | **14, all OPEN** |
+| estimate | 6 / 11.5 / 18.5 working days, ~10.5-day critical path, **no parallelisable slices** |
+
+### The census, and the number that decided the theme
+
+**170 `needs_attention_viewed` on home, from 2026-07-30 through today. One
+captured entry.**
+
+Zero conversations. Zero summaries. Zero attachments. Zero projects, contexts,
+organizations or tags. **Two of nine AI operations have ever fired.** **No task
+has ever reached `completed`** — the only status changes in the product's history
+are two cancellations on 2026-08-15.
+
+Eighteen lettered phases have shipped. The product is not missing capability.
+
+**So the theme was not chosen from the roadmap — which ends at Phase 2O — and not
+from preference.** It was chosen because one candidate's evidence already
+existed:
+
+| | measured |
+|---|---|
+| notifications | **57** — 54 `task_stale`, 3 `task_overdue` |
+| read · dismissed | **0 · 0** |
+| rate | **exactly 3 per day, 2026-08-17 → 2026-08-24, unbroken** |
+| subject | **3 tasks**, `inbox`, no due date, `updated_at` **2026-07-30** |
+| delivered by push | **0** |
+
+### The mechanism, and why ignoring it was the only available answer
+
+`202608040073:616-676`, confirmed against `pg_get_functiondef`:
+
+```sql
+'stale:' || task.id::text || ':' || local_date::text  as dedupe_key
+...
+and not exists (
+  select 1 from public.notifications notification
+  where notification.created_at > now() - interval '24 hours'
+    and notification.dedupe_key like 'stale:' || <task id> || ':%'
+)
+```
+
+**The dedupe key carries the local date, the window is 24 hours, and the
+suppression never reads `status`.** Marking a notification read changes nothing
+about tomorrow's copy. The surface offers two controls — *Abrir*, whose
+`action_url` is hardcoded to `/pt-BR/app/tasks` (the whole list, not the task),
+and *Lida*. **`dismissed` is unreachable**: `markNotification` accepts
+`z.enum(["read","dismissed"])`, has exactly one caller, and that caller always
+sends `"read"` — while the list filters `.neq("status","dismissed")`, guarding a
+state nothing in the product can produce.
+
+**The asymmetry is in the schema, and it is the argument.** `pending_questions`
+holds `snoozed_until` and a `snoozed` status. `reminders` holds both.
+**`notifications` holds neither.** The product built *"not now"* twice,
+deliberately, and skipped the one thing that speaks daily.
+
+### Three corrections to the standing record, each measured
+
+1. **`2P-CHAT-007-JOURNEY` is no longer "unspendable".** Three phases recorded it
+   as needing the owner's own credential. `user_ai_credentials` holds one row:
+   `openai`, `status = active`, `validated_at = 2026-08-02`, no failure. **It is
+   spendable — and chat has still had zero conversations in the twenty-two days
+   since.** The remainder is not discharged by being reclassified.
+2. **Voice with an editable transcript is BUILT and has never once run.**
+   `voice-composer.tsx` ships and is mounted at `composer.tsx:575`; its contract
+   is *record → transcribe → the composer's editable field → type more → submit*,
+   inserting at the caret — which is exactly the capability named as a future
+   priority. `captureMode: "voice"` fired **once**, on 2026-08-22, and
+   `ai_usage_events` holds **zero** `transcription` rows. **What is owed is a
+   proof on the owner's device, or a defect report — not a build.**
+3. **A13's declared-requirement signal was inert.** It matched a bullet
+   (`- **2X-FAMILY-000:**`) while this repository declares requirements in **PRD
+   table rows**, and there is **not one bullet-shaped declaration anywhere under
+   `docs/`**. It had never once matched a real declaration, and its control
+   planted a bullet — proving the regex worked on a shape nothing produces. A13
+   as a whole still fired through signal 1 and signal 3, so nothing could have
+   started silently through it. **Repaired in the same commit that retargeted
+   it**, and the repair is proved by a live mutation: planting
+   `docs/reports/phase-2t/NOTES.md` with a table row makes the detector report
+   `declared-requirement`, which the old pattern would have missed entirely.
+
+### The retarget: six pins, not five
+
+ADR-131 Decision 9 counted five and **five was right when it was written**. Phase
+2R then shipped a generator of its own, whose refusal 14 is the sixth. All six
+moved here, deliberately rather than by a global replace:
+
+1. `phase-2f-documentation.test.ts` — the detector's three constants and its
+   fixture root;
+2. `phase-2o-declarations.test.ts` — the literal pins;
+3. `phase-2r-declarations.test.ts` — the literal pins, its own copy of the
+   detector family pattern, and the absent-directory assertions;
+4. `generate-phase-2p-traceability.mjs` — refusal 12;
+5. `generate-phase-2q-traceability.mjs` — the successor check;
+6. `generate-phase-2r-traceability.mjs` — refusal 14.
+
+**A count that drifts silently is the same defect one generation on**, which is
+why it is written down each time rather than remembered.
+
+### The active-milestone guard reversed direction for the ninth time
+
+Its rule has never moved: **the line cites every authorization the active phase
+has received, and overstates none of them.** ADR-135 made it require `ADR-135`
+and `CLOSED`; ADR-136 makes it require `ADR-136` and `PLANNING`, and **refuse**
+`CLOSED`, `SIGNED`, `IMPLEMENTATION AUTHORIZED`, `allocated`, `spent` and
+`created` — because Phase 2S has one authorization and a **proposed** budget, and
+requiring the others would force the backlog to state something false.
+
+### A mistake in this session, written down rather than tidied away
+
+**A paragraph-level replacement in `DECISIONS.md` deleted 109 lines — ADR-132
+through ADR-135 — and it was caught by the guards rather than by review.** The
+script anchored on the text *"Decision 9 — the phase-start guard retargets to the
+roadmap successor"*, which ADR-131 **also** contains, and bounded the replacement
+on `"\n\n- **Decision 10"` — a boundary that could not match ADR-131's own
+CRLF-terminated text, so it ran forward to the only LF-terminated region in the
+file, inside the newly appended ADR-136.
+
+Restored from `HEAD` and redone as a pure append, verified `35 insertions, 0
+deletions`. **Every canon edit after that is line-anchored and insert-only**, and
+each one's `git diff --numstat` was read before moving on. The lesson is narrow
+and worth keeping: **in an append-only document, a unique-looking anchor is
+usually not unique — the same sentence is why the document is append-only.**
+
+### Carried out of the package, none discharged
+
+`2R-TZ-SECOND-AUTHORITY` · `2R-UNDO-LEDGER-NOT-CLOSED` ·
+`2R-OCCURRENCE-CANCEL-IRREVERSIBLE` · `2R-AXE-MANUAL-LANE` ·
+`2R-RECURRENCE-LANE-UNRUNNABLE` · `2R-DRAWER-NOT-LOCKED` · `2R-TASK-RECURRENCE` ·
+`OD-2R-9`'s two defects · the interval gap · push HTTP 403, **out by rule** and
+guarded against being *claimed*. **Inherited:** `2P-ACCESS-005` **NOT EXECUTED —
+OWNER WAIVED** · `2P-ATTENTION-008` · `RG-DEP-3` · `2P-CHAT-007-JOURNEY`
+(reclassified, not discharged) · `2P-REVIEW-CITATIONS` · `2P-MOBILE-002`'s
+keyboard half · ADR-055 expiring **2026-10-27**, whose spike tier needs 50
+qualifying commands against `task_command_applied`'s **2** — **the threshold will
+not be met**. Signup closed, rollout **25 · 3 · 2**, re-verified by running the
+script. **Phase 2R stays CLOSED.**
+
+One divergence in Phase 2R's closed record is **reported and deliberately not
+corrected**: `PHASE_2R_THREAT_MODEL.md` still reads ten of twelve closed, because
+`T-2R-11` and `T-2R-12` were disposed in ADR-135 rather than in the document.
+
+### Where the next session starts
+
+**With the owner, and ten signatures.** `OD-2S-1` … `OD-2S-10` are open, and
+four of them add or strike requirements rather than amending them, so the
+requirement set is provisional until they are answered. After the signatures, a
+**separate** implementation-authorization ADR. Until both exist, no slice may
+start, no product code may be written and no migration file may be made.
+
+**Proposed is not allocated, allocated is not created, and signed is not
+authorized.**

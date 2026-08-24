@@ -76,8 +76,18 @@ const PLAN = "docs/initiatives/phase-2r/PHASE_2R_IMPLEMENTATION_PLAN.md";
 /** A requirement's row in a PRD table: `| \`2R-FAMILY-001\` | … |`. */
 const DECLARATION = /^\| `(2R-[A-Z]+-\d{3})` \|/gm;
 
-/** The A13 detector's own family pattern, reproduced so pin 2 can be tested against it. */
-const DETECTOR_FAMILY = /^- \*\*2S-[A-Z]+-\d{3}/m;
+/**
+ * The A13 detector's own family pattern, reproduced so pin 2 can be tested
+ * against it.
+ *
+ * **Retargeted and widened by ADR-136 Decision 8.** It matched a bullet only,
+ * and this repository declares requirements in the PRD table rows this file's
+ * own `DECLARATION` parses — so the detector's signal 2 had never once matched
+ * a real declaration. The copy here is kept identical to the detector's, which
+ * is the whole reason it exists: a control holding its own private pattern is a
+ * control that keeps passing while the guard beside it drifts.
+ */
+const DETECTOR_FAMILY = /^(?:- \*\*|\| `)2T-[A-Z]+-\d{3}/m;
 
 function declarations(): string[] {
   return [...read(PRD).matchAll(DECLARATION)].map((match) => match[1]);
@@ -230,11 +240,19 @@ describe("Phase 2R: no family name is invisible to the tooling", () => {
     // recorded a check that could never fail.
     //
     // The detector's own pattern is reproduced here. `A11Y` contains digits, so
-    // `2S-A11Y-001` matches nothing, which is exactly what happened to Phase
+    // `2T-A11Y-001` matches nothing, which is exactly what happened to Phase
     // 2K's seven accessibility requirements.
-    expect(DETECTOR_FAMILY.test("- **2S-ACCESS-001:** a real declaration."), "the control is inert")
+    expect(DETECTOR_FAMILY.test("- **2T-ACCESS-001:** a real declaration."), "the control is inert")
       .toBe(true);
-    expect(DETECTOR_FAMILY.test("- **2S-A11Y-001:** invisible."), "a digit-bearing family was seen")
+    expect(DETECTOR_FAMILY.test("- **2T-A11Y-001:** invisible."), "a digit-bearing family was seen")
+      .toBe(false);
+
+    // **ADR-136 Decision 8.** The detector now also sees the shape this
+    // repository actually writes, and the digit rule holds identically there —
+    // asserted rather than assumed, because a widened pattern is a new pattern.
+    expect(DETECTOR_FAMILY.test("| `2T-ACCESS-001` | x | y | build | — |"), "the table row is seen")
+      .toBe(true);
+    expect(DETECTOR_FAMILY.test("| `2T-A11Y-001` | x | y | build | — |"), "a digit family was seen")
       .toBe(false);
 
     // And the same property on this phase's own declaration shape.
@@ -507,8 +525,8 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
        * exist yet, and it is asserted absent below against `DECISIONS.md`
        * rather than as a file.
        */
-      "docs/initiatives/phase-2s",
-      "docs/reports/phase-2s",
+      "docs/initiatives/phase-2t",
+      "docs/reports/phase-2t",
     ]) {
       expect(existsSync(join(REPO, forbidden)), `${forbidden} exists before its phase`).toBe(false);
     }
@@ -710,34 +728,54 @@ describe("Phase 2R: the inherited record is carried, not absorbed", () => {
 });
 
 describe("Phase 2R: the successor of this phase is not started", () => {
-  it("retargets every one of the five pins off Phase 2R", () => {
-    // ADR-131 Decision 9. `STATE.md` and ADR-130 both said the letter lived
-    // "only inside the A13 detector"; there are five, and three are findable
-    // only by running the suite. Each is asserted so a future retarget that
-    // misses one fails here rather than at the next authorization.
+  it("retargets every one of the SIX pins off Phase 2S", () => {
+    /*
+     * ADR-131 Decision 9 counted five and five was right when it was written.
+     * **ADR-136 Decision 9 counts six**, because Phase 2R then shipped a
+     * generator of its own whose refusal 14 is the sixth. `STATE.md` and
+     * ADR-130 once said the letter lived "only inside the A13 detector"; that
+     * was wrong, ADR-131 corrected it to five, and this corrects it to six.
+     *
+     * Three of the six are findable only by running the suite. Each is asserted
+     * so a future retarget that misses one fails here rather than at the next
+     * authorization — which is exactly how ADR-121's missed retarget was caught.
+     */
     const detector = read("src/lib/closeout/phase-2f-documentation.test.ts");
-    expect(detector).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2S_/);
-    expect(detector).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2S-/);
-    expect(detector).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2s\/i;/);
+    expect(detector).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2T_/);
+    expect(detector, "pin 2 must carry the repaired both-shapes pattern").toContain(
+      "const DECLARED_SUCCESSOR_REQUIREMENT = /^(?:- \\*\\*|\\| `)2T-[A-Z]+-\\d{3}/m;",
+    );
+    expect(detector).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2t\/i;/);
 
     const twoO = read("src/lib/closeout/phase-2o-declarations.test.ts");
-    expect(twoO, "the 2O pin did not move").toContain("PHASE_2S_");
+    expect(twoO, "the 2O pin did not move").toContain("PHASE_2T_");
     expect(twoO, "the 2O pin still names the authorized phase").not.toContain("PHASE_2R_");
 
     expect(read("scripts/generate-phase-2p-traceability.mjs"))
-      .toContain("docs/initiatives/phase-2s");
+      .toContain("docs/initiatives/phase-2t");
     expect(read("scripts/generate-phase-2q-traceability.mjs"))
-      .toMatch(/2S-\[A-Z\]\+-\\d\{3\}/);
+      .toMatch(/2T-\[A-Z\]\+-\\d\{3\}/);
+    expect(read("scripts/generate-phase-2r-traceability.mjs"), "the sixth pin did not move")
+      .toMatch(/2T-\[A-Z\]\+-\\d\{3\}/);
 
     const twoQ = read("src/lib/closeout/phase-2q-declarations.test.ts");
     expect(twoQ, "the ADR-block helper must bound the slice").toContain("function adrBlock");
     expect(twoQ, "an unbounded ADR slice returned").not.toMatch(/const body = decisions\.slice\(at\);/);
   });
 
-  it("finds no artifact for the phase after this one", () => {
-    expect(existsSync(join(REPO, "docs/initiatives/phase-2s"))).toBe(false);
-    expect(existsSync(join(REPO, "docs/reports/phase-2s"))).toBe(false);
+  it("finds no artifact for the phase after the one now authorized", () => {
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2t"))).toBe(false);
+    expect(existsSync(join(REPO, "docs/reports/phase-2t"))).toBe(false);
     expect(read(PRD), "the successor must be declared unstarted")
       .toMatch(/The phase after\s+this one is not started/);
+  });
+
+  it("records Phase 2S's start as an authorization rather than an accident", () => {
+    // The half that makes this retarget legal rather than merely mechanical.
+    // Phase 2S's artifacts exist *because* an owner decision says they may.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/## ADR-136 — The owner authorizes Phase 2S planning/);
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2s/PHASE_2S_PRD.md"))).toBe(true);
+    expect(existsSync(join(REPO, "docs/reports/phase-2s"))).toBe(true);
   });
 });
