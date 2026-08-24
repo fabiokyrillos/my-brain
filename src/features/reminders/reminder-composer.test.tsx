@@ -439,3 +439,94 @@ describe("2P-REMINDER-002: saving", () => {
     expect(screen.queryByText(copy.creation.saving)).toBeNull();
   });
 });
+
+/**
+ * `2R-SURFACE-008` and `2R-ACCESS-001`/`-003` — slice 2R.3.
+ *
+ * Three properties that are easy to believe and easy to get wrong:
+ *
+ * - a refused save keeps what the owner typed, which is a property of the action
+ *   returning early **without revalidating** -- a `revalidatePath` on the failure
+ *   path refreshes the page out from under the dialog and takes the typing with
+ *   it, the defect `updateProfile` and slice 2N.3 both already record;
+ * - the new control is reachable and operable by keyboard alone;
+ * - the preview's live region exists **before** it has anything to say.
+ */
+describe("2R-SURFACE-008: a refused save never discards what was typed", () => {
+  it("keeps the title, the instant and the repetition after a refusal", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn(handler(async () => ({
+      status: "error" as const,
+      message: copy.creation.failed,
+      reminderId: null,
+    })));
+    mount(action);
+    await openDialog(user);
+
+    const title = screen.getByLabelText(copy.creation.contentLabel, { exact: false });
+    await user.type(title, "Pagar o aluguel");
+    const when = screen.getByLabelText(copy.creation.whenLabel, { exact: false });
+    await user.type(when, "2026-12-07T09:00");
+    await user.selectOptions(
+      screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+      "monthlyDay",
+    );
+
+    await user.click(screen.getByRole("button", { name: copy.creation.save }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+
+    // The dialog is still open, because a refusal is not a success -- and every
+    // field still holds what it held.
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect((title as HTMLInputElement).value).toBe("Pagar o aluguel");
+    expect((when as HTMLInputElement).value).toBe("2026-12-07T09:00");
+    expect(
+      (screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }) as HTMLSelectElement)
+        .value,
+    ).toBe("monthlyDay");
+  });
+});
+
+describe("2R-ACCESS-001/-003: the new control by keyboard, and a region that pre-exists", () => {
+  it("reaches and operates the repetition select without a pointer", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+
+    const select = screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false });
+    // Focusable by tab order rather than by a click, and changeable by keyboard.
+    (select as HTMLSelectElement).focus();
+    expect(document.activeElement).toBe(select);
+    await user.selectOptions(select, "weekly");
+    expect((select as HTMLSelectElement).value).toBe("weekly");
+  });
+
+  it("renders the preview region empty before it has a result", async () => {
+    /*
+      A live region created together with its first sentence is a NEW element
+      rather than a changed one, and a screen reader announces nothing at all --
+      the defect `a-conditional-live-region-is-never-announced` records. So the
+      region is asserted present and EMPTY, before anything has happened in it.
+    */
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    await user.selectOptions(
+      screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false }),
+      "daily",
+    );
+
+    const region = screen.getByRole("status", { name: copy.creation.previewRegionLabel });
+    expect(region).toBeTruthy();
+    expect(region.textContent).toBe("");
+  });
+
+  it("labels the repetition control, so it has an accessible name", async () => {
+    const user = userEvent.setup();
+    mount();
+    await openDialog(user);
+    // `getByLabelText` throwing IS the assertion; the explicit check keeps the
+    // intent readable rather than relying on a query's side effect.
+    expect(screen.getByLabelText(copy.creation.recurrenceLabel, { exact: false })).toBeTruthy();
+  });
+});

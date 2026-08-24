@@ -70,6 +70,8 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     at: "2026-08-15T18:00:00.000Z",
     date: "2026-08-15",
     title: "Entregar o relatório",
+    // Slice 2R.3. The default fixture is a deadline, which never repeats.
+    repeats: null,
     sensitivity: { kind: "undetermined" },
     href: "/pt-BR/app/work/t1?from=abc",
     elapsed: false,

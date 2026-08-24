@@ -37,6 +37,8 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     at: "2026-08-15T18:00:00.000Z",
     date: "2026-08-15",
     title: "Entregar o relatório",
+    // Slice 2R.3. The default fixture is a deadline, which never repeats.
+    repeats: null,
     sensitivity: { kind: "undetermined" },
     href: "/pt-BR/app/work/t1",
     elapsed: false,
@@ -639,5 +641,55 @@ describe("2P-CALENDAR-001: the month is a grid, not a renamed list", () => {
     monthView();
     const link = screen.getByRole("link", { name: getCalendarCopy("pt-BR").orientation.options.month });
     expect(link.getAttribute("aria-current")).toBe("true");
+  });
+});
+
+/**
+ * `2R-SURFACE-003` on the rendered calendar — slice 2R.3.
+ *
+ * The projection test proves the sentence is produced. This proves it reaches
+ * the page, which is the distinction that file's own header draws: a projection
+ * that derived something correctly and a surface that dropped it would pass
+ * every assertion over there.
+ */
+describe("2R-SURFACE-003: a recurring occurrence says so on the calendar", () => {
+  it("renders the sentence beside the item's other metadata", () => {
+    render(
+      <CalendarView
+        locale="pt-BR"
+        projection={projection({
+          days: [{
+            date: "2026-08-15",
+            isToday: true,
+            items: [item({
+              id: "reminder:r1", lane: "reminder", title: "Tomar o remédio", repeats: "Todo dia",
+            })],
+          }],
+        })}
+        query={query()}
+        today={TODAY}
+      />,
+    );
+    expect(screen.getByText("Todo dia")).toBeTruthy();
+  });
+
+  it("renders nothing extra for an item that does not repeat", () => {
+    const { container } = render(
+      <CalendarView
+        locale="pt-BR"
+        projection={projection({
+          days: [{
+            date: "2026-08-15",
+            isToday: true,
+            items: [item({ id: "reminder:r1", lane: "reminder", repeats: null })],
+          }],
+        })}
+        query={query()}
+        today={TODAY}
+      />,
+    );
+    // Absent, not empty: an element rendered with no text is still an element a
+    // screen reader walks past.
+    expect(container.querySelector(".calendar-item-repeats")).toBeNull();
   });
 });

@@ -128,6 +128,53 @@ export function ReminderComposer({
     IDLE_REMINDER_SERIES_PREVIEW,
   );
 
+  /**
+   * `2R-SURFACE-008` — controlled, because React empties the rest.
+   *
+   * **React resets an uncontrolled form once a Server Action completes**, so a
+   * refused save erased everything the owner had typed: title, instant and all.
+   * This repository has the defect recorded as *"a form action resets
+   * uncontrolled input"* and `memory-composer.tsx` solved it the same way — but
+   * this surface still had it, and it took `2R-SURFACE-008` asking the question
+   * to find out. The requirement is *"after a refused save the fields still hold
+   * their values"*, and before this they held nothing.
+   *
+   * Cleared when the dialog **opens** rather than when it closes, so a dismissal
+   * still discards the draft (`2P-REMINDER-004`) while a refusal keeps it. Those
+   * two are easy to conflate and the difference is the whole requirement.
+   */
+  const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+
+  /**
+   * The select's DOM value, re-applied after a form action — and it is a
+   * `<select>`-specific hazard rather than a general one.
+   *
+   * ## What was measured
+   *
+   * After a refused save, with `title`, `remindAtLocal` and `recurrence` all
+   * controlled: the two `<input>`s kept their values and **the `<select>` did
+   * not**. React's post-action form reset put the DOM back to the first option,
+   * and because the component's own `choice` had not changed there was no
+   * re-render to re-apply `value`. A probe confirmed the asymmetry directly —
+   * the preview block was still rendered, which only happens when `choice` is
+   * not `"none"`, while the select on screen read *Não repete*.
+   *
+   * That is worse than losing the value. The surface and the state **disagree**:
+   * the owner sees "does not repeat" and the next save writes a repeating
+   * reminder. A field that lies about what will be saved is the shape
+   * `2R-SURFACE-008` exists to prevent, one step past the one it names.
+   *
+   * So the DOM is reconciled to the state after every render. Cheap, and
+   * confined to the one element with the problem rather than a `key` on the form
+   * that would remount everything and take focus with it.
+   */
+  const recurrenceRef = useRef<HTMLSelectElement | null>(null);
+  useEffect(() => {
+    const select = recurrenceRef.current;
+    if (select !== null && select.value !== choice) select.value = choice;
+  });
+
   const changed = round !== null && state !== round ? state : null;
   const outcome = changed ?? IDLE_REMINDER_CREATION_STATE;
   const created = changed?.status === "success";
@@ -172,6 +219,17 @@ export function ReminderComposer({
         onClick={() => {
           setRound(state);
           setDismissed(false);
+          /*
+            A fresh dialog is a fresh draft.
+
+            Cleared on OPEN rather than on close, and the two are not the same
+            rule: a dismissal must discard what was typed (`2P-REMINDER-004`)
+            while a refused save must keep it (`2R-SURFACE-008`). Clearing here
+            satisfies both, because a refusal never passes through this handler.
+          */
+          setTitle("");
+          setWhen("");
+          setChoice("none");
         }}
         type="button"
       >
@@ -233,8 +291,10 @@ export function ReminderComposer({
               id="reminder-compose-field-content"
               maxLength={500}
               name="title"
+              onChange={(event) => setTitle(event.target.value)}
               required
               type="text"
+              value={title}
             />
           </label>
 
@@ -252,8 +312,10 @@ export function ReminderComposer({
               disabled={pending}
               id="reminder-compose-field-when"
               name="remindAtLocal"
+              onChange={(event) => setWhen(event.target.value)}
               required
               type="datetime-local"
+              value={when}
             />
           </label>
 
@@ -279,6 +341,7 @@ export function ReminderComposer({
               id="reminder-compose-field-recurrence"
               name="recurrence"
               onChange={(event) => setChoice(event.target.value)}
+              ref={recurrenceRef}
               value={choice}
             >
               {RECURRENCE_CHOICES.map((option) => (

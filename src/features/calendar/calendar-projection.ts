@@ -15,6 +15,8 @@ import {
   localRangeBounds,
   type LocalDate,
 } from "@/lib/time/local-day";
+import { loadReminderRepeatLabels } from "@/features/reminders/repeat-labels";
+import { isLocale } from "@/lib/preferences";
 import type { createClient } from "@/lib/supabase/server";
 
 import type {
@@ -290,6 +292,23 @@ export async function loadCalendarProjection(
     ...taskRows.map((row) => row.source_entry_id),
     ...reminderRows.map((row) => row.entry_id),
   ]);
+  /*
+    `2R-SURFACE-003`. Asked in the calendar's own terms -- these reminder ids,
+    which of them repeat -- and answered in sentences.
+
+    The lookup lives in the reminders feature because ADR-132 Decision 1 lifted
+    the recurrence refusal "strictly limited to reminders -- it does not reach
+    tasks, the calendar, or any other object". Reading the rule's own columns
+    here would have put that schema in the calendar, and
+    `phase-2m-recurrence-guard.test.ts` refused exactly that. The boundary is
+    signed, so the code moved rather than the allowlist.
+  */
+  const repeatLabels = await loadReminderRepeatLabels(
+    supabase,
+    userId,
+    reminderRows.map((row) => row.id),
+    isLocale(locale) ? locale : "pt-BR",
+  );
 
   const nowMs = now.getTime();
   const items: CalendarItemView[] = [];
@@ -328,7 +347,19 @@ export async function loadCalendarProjection(
     return controls.length === 0 ? null : { taskId: row.id, controls };
   };
 
-  const push = (item: Omit<CalendarItemView, "date" | "elapsed" | "commitment">) => {
+  /*
+    `repeats` is optional to the caller and required on the view — slice 2R.3.
+
+    Five lanes push items and only one of them can repeat, so making it required
+    here would put `repeats: null` in four places that have nothing to say about
+    recurrence. Defaulted below rather than declared optional on the view type,
+    because an optional field on the view is the `undefined !== null` trap the
+    reminders projection already fell into once.
+  */
+  const push = (
+    item: Omit<CalendarItemView, "date" | "elapsed" | "commitment" | "repeats">
+      & { readonly repeats?: string | null },
+  ) => {
     const at = new Date(item.at);
     if (!Number.isFinite(at.getTime())) {
       if (!failedLanes.some((failure) => failure.lane === item.lane)) {
@@ -341,6 +372,7 @@ export async function loadCalendarProjection(
       commitment: COMMITMENT_BY_LANE[item.lane],
       date: formatLocalDate(localDateOf(at, timezone)),
       elapsed: at.getTime() < nowMs,
+      repeats: item.repeats ?? null,
     });
   };
 
@@ -381,6 +413,10 @@ export async function loadCalendarProjection(
       href: `/${locale}/app/reminders`,
       // Not a task: there is nothing here `apply_task_command` could move.
       reschedule: null,
+      // `2R-SURFACE-003`. `null` for an ordinary reminder and for one whose rule
+      // did not come back — a description this surface cannot vouch for is worse
+      // than none, and the occurrence still appears either way.
+      repeats: repeatLabels.get(row.id) ?? null,
     });
   }
 
