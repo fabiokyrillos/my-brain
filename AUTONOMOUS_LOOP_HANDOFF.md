@@ -13063,3 +13063,152 @@ Two files will have to be told the refusal was lifted, and both are already in
 the recurrence allowlist: `reminder-composer.tsx`'s docstring still says *"No
 recurrence, and no shape that could be mistaken for one"*, and
 `phase-2p-reminder-recurrence-guard.test.ts` still enforces it on that file.
+
+## §122 — Slices 2R.2 and 2R.3 closed; the loop stops at the owner's device, not at a blocker (2026-08-23)
+
+**The phase is 47 of 73 and the next step is a person, not a commit.**
+`2R-MOBILE-003` asks the owner to confirm the recurrence control on their own
+hardware; `2R-CLOSE-009` refuses a record that marks it satisfied without one,
+and a Playwright run is not a substitute. Slice 2R.4 is deliberately **not
+started** — building it on top of an open 2R.3 requirement only the owner can
+close would stack work on a pending decision, which `2R-CLOSE-012` already
+refuses at the phase level.
+
+This is a **checkpoint, not a block.** Nothing is half-done, nothing is waiting
+on infrastructure, and ADR-133 already authorizes 2R.4 and 2R.5 the moment the
+device is confirmed.
+
+### What landed
+
+| | |
+|---|---|
+| slice 2R.2 | merged `8c13c7be963889f6afadd9f145b9f3cd2b1ceadc`, **CI green 3/3 at that exact merge SHA** |
+| slice 2R.3 | merged `30df320846fe895d26d583ff46192bc9092810ad`, **CI green 3/3 at that exact merge SHA** |
+| §121 | merged `de21c97cbcf8ae07e06f283887cd76904581ea25`, CI green 3/3 |
+| records | `PHASE_2R_SLICE_02_ACCEPTANCE.md`, `PHASE_2R_SLICE_03_ACCEPTANCE.md` |
+| migrations | **zero created across both slices.** 101 = 101, parity `202608230101` |
+| classification | **47 of 73** |
+
+### The block §120 recorded is gone, and it was never the code
+
+The owner made the repository public and Actions resumed scheduling jobs. The
+same run that had aborted in ~3 s ran to completion. **Nothing in the repository
+was changed to achieve it**: no workflow edit, no self-hosted runner, no
+re-push. A rerun was enough, which is what *"the job was not started"* meant all
+along.
+
+A read-only public-exposure audit ran before the first merge, because the
+repository changed visibility mid-phase. **7098 blobs swept across the whole
+history: zero JWTs, zero Supabase secrets, zero AWS or GitHub tokens, zero PEM
+private keys.** The seven OpenAI-shaped literals are fixtures; the ten DSNs are
+`postgres:postgres@127.0.0.1`. **Zero repository secrets are configured and zero
+`secrets.*` references exist** — together a stronger statement than "we read the
+logs", because it means no log or artifact could ever have carried one. Nothing
+to rotate.
+
+**Two of that audit's own probes were defective and were repaired before
+anything was believed.** One received `--` as its *pattern* through an
+argument-order mistake and matched every markdown file; the other matched `sk-`
+inside `task-command-…` and `risk-…`. A control was run showing the "findings"
+belonged to the probes. *An audit that does not audit its instruments reports
+the instrument.*
+
+### Slice 2R.2, in one paragraph each
+
+**The re-audit turned a reading into a number.** Three controls against the
+deployed database: the first undo succeeds and leaves the ledger row
+`available`; an immediate replay is refused `55P03`, so the guard is real; and
+after the same command is applied again under a new key, **the first undo is
+consumed a second time** — two audit rows, both ledger rows open, one
+operation's compensation spent on another's change. A census bounds it to
+**exactly 1 of 20** registered handlers. Both 2R handlers close theirs, which is
+why this was not a stop condition: the slice consumes the correct path and
+offers no undo through the defective one.
+
+**The pgTAP rehearsal found a defect the suite was asserting away.** No local
+Docker, so all 26 assertions were transformed mechanically out of the file and
+run against real Postgres in a rolled-back transaction. It caught a `\gset`
+idiom no other suite uses, a wrong SQLSTATE on assertion 25, and —
+decisively — that `undo_operation` on a cancelled occurrence **does not restore
+it, it raises `23505`**. The replacement holds the one live slot, and `restore`
+is refused for the same reason. `2R-OCCURRENCE-CANCEL-IRREVERSIBLE` is new, and
+the suite's first draft asserted the opposite with total confidence. The suite
+then **passed on its first real CI run, from an empty database**.
+
+### Slice 2R.3, in one paragraph each
+
+**The stop condition was not reached, and the proof is a count.** The form this
+dialog must not become needs a frequency picker, seven weekday checkboxes, a
+day-of-month number, an ordinal and a month. Every one of those is the date the
+owner already entered, so the control is one `<select>` with no new fields.
+`phase-2r-foundation.test.ts` counts the composer's named inputs: four → **five**,
+and the new name is `recurrence`.
+
+**A signed boundary refused the obvious wiring, so the code moved.** The calendar
+must say an occurrence repeats; the obvious implementation had it read the rule's
+own columns, and `phase-2m-recurrence-guard.test.ts` refused it, because ADR-132
+Decision 1's lift is *"strictly limited to reminders"* and enumerates its files.
+Widening that list would have been the quiet act the enumeration exists to
+prevent. `repeat-labels.ts` is where the lookup went: the calendar asks *these
+reminder ids, which repeat* and receives sentences. **The boundary held.**
+
+**Three defects, two older than the slice.** A test of mine asserted `"Toda
+domingo"` and passed — `sábado` and `domingo` are masculine, and the fixture was
+written from the implementation instead of from the language. A refused save
+discarded everything typed, because React empties an uncontrolled form after a
+Server Action; the repository had that recorded and another composer had already
+solved it, but this surface still had it. And the `<select>` needed more than the
+`<input>`s: with all three controlled, only the select lost its value, and a
+probe showed the **surface and the state disagreeing** — the preview still
+rendered while the field read *Não repete*.
+
+### Two methodological findings that outlive both slices
+
+**A mutation control that does not assert the mutation landed is a control of
+nothing.** Three "passed" while changing nothing: the patterns were LF and the
+worktree is CRLF, so no replacement matched and the tests kept passing against
+unmodified source. Re-run per line with `git diff --numstat` printed first, all
+of them fired. Fourteen controls across the two slices were run this way.
+
+**An ordering guard that refuses an early record does not refuse a missing one.**
+Slice 2R.2 merged without an acceptance record and nothing caught it, because the
+count of five is asserted at closeout rather than per slice. The record is late
+and says so in its own first paragraph; the gap is named inside the guard.
+
+### Where the next session starts
+
+**With the owner, and with one question.**
+
+`2R-MOBILE-003`: open `/pt-BR/app/reminders` on the phone, create a repeating
+reminder, and confirm two things — the control is usable, and **the save button
+stays reachable with the preview expanded**. The second is the one that was
+broken until this slice: the shared dialog had no height bound on desktop and the
+primary action left the screen.
+
+Then, with no further authorization needed:
+
+1. record the checkpoint outcome and re-classify `2R-MOBILE-003`;
+2. re-audit slice 2R.4 against `main` before building — it is `2R-NOTIFY-001` …
+   `-007`, and it has **no migration**;
+3. 2R.4 → merge + CI on the merge SHA → 2R.5 → the owner's closing decision.
+
+### Carried forward, none discharged
+
+- **`2R-AXE-MANUAL-LANE`** — *new*. The axe pass and the phone-viewport
+  assertions for the composer run only in the manual lane, because the surface is
+  behind auth and the credential-free lane cannot reach it. Destination: the
+  closing record's evidence list, and the owner's decision about whether an
+  authenticated CI lane is worth its cost.
+- **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`** — needs DDL, so a future phase's
+  migration. Pinned in both directions in `phase_2r_series_scope.sql` §3.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — measured, not repaired. 1 of 20 handlers.
+- **`2R-TZ-SECOND-AUTHORITY`** — routed by ADR-134.
+- **`2R-TASK-RECURRENCE`** — out by `OD-2R-6`.
+- **`OD-2R-9`'s two defects**; **the interval gap**, refusal still pinned.
+- **Unchanged and unmoved:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`'s back-navigation half; `RG-DEP-3`; push HTTP 403, not
+  resumed; `2P-CHAT-007-JOURNEY`; ADR-055 expiring 2026-10-27. Signup closed,
+  rollout 25 · 3 · 2. Phase 2S not started.
+
+**And the migration budget has not moved.** Phase 2R allocated one and spent it
+in 2R.1. Slices 2R.2 and 2R.3 created none between them.
