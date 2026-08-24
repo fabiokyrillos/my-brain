@@ -30,7 +30,7 @@ shape the heartbeat's predicates never matched, or if materialisation quietly
 produced five due rows where one belongs.
 
 So `supabase/tests/phase_2r_notify.sql` **calls `run_user_heartbeat` and reads
-what it did**, twenty-five times.
+what it did**, twenty-six times.
 
 ## 2. `2R-NOTIFY-005` — the burst that cannot happen, proved
 
@@ -69,7 +69,7 @@ denial here is therefore preceded by its own positive control:
   silence is asserted; then the window is moved away again and the withheld
   occurrence delivers, proving it was withheld rather than lost;
 - **the cap** — three arriving is asserted before the fourth and fifth not
-  arriving, and the two over the cap are shown **still `scheduled`**;
+  arriving, and the two over the cap are shown **still scheduled and still due**, beside the three future successors the deliveries created;
 - **isolation** — the other user's notifications are **deleted first**, so the
   rows counted after the batch can only have come from the run that followed the
   failure. Without that the assertion would have passed on section 1's leftovers
@@ -129,7 +129,7 @@ as a control — the in-app notification **does** carry the reminder text.
 | Requirement | Class | Evidence |
 |---|---|---|
 | `2R-NOTIFY-001` | **baseline — re-proved** | §3 — withheld inside the window, delivered outside it, delivered again once it passed, and never marked `sent` while withheld |
-| `2R-NOTIFY-002` | **baseline — re-proved** | §3 — five due occurrences across five series deliver three; the two over the cap stay `scheduled`; a second run the same day adds nothing |
+| `2R-NOTIFY-002` | **baseline — re-proved** | §3 — five due occurrences across five series deliver three; the two over the cap stay scheduled and due; the three delivered each materialise one future successor; a second run the same day adds nothing |
 | `2R-NOTIFY-003` | **baseline — re-read, and said so** | the cooldown is scoped to `task_overdue`/`task_stale` **by name** and the heartbeat contains no series concept. Asserted on the deployed function rather than on a fixture, because the requirement is about what the rule *covers*. **This one is a read, and the record does not call it a proof** |
 | `2R-NOTIFY-004` | **baseline — re-proved** | §4 — a forced failure, survived, with the next user still delivered to |
 | `2R-NOTIFY-005` | **baseline by 2R.1's design — proved here, reclassified from build** | §2. The plan expected code; the mechanism already existed. Manufacturing a change to justify the label would have been the dishonest option |
