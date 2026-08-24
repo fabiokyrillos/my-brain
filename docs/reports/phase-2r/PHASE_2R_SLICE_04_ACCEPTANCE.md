@@ -83,6 +83,17 @@ assertion was vacuous and a content control counted one delivery where the
 fixture produces two. Both were found by reading the suite against its own
 fixtures rather than by CI.
 
+**A third was found by CI, and it is the most interesting of them.** The cap
+section asserted that after three of five deliveries the remaining two were
+"still scheduled" — and the count came back **five**. Marking three occurrences
+`sent` fires the materialisation trigger three times, so each of those series
+immediately gains its next occurrence. Those three are in the *future* and are
+not what "over the cap" means. The assertion now says what it meant — scheduled
+**and still due** — and a second one was added for the three future successors,
+so the number that surprised me is now itself asserted rather than filtered out
+of view. The suite is a better description of the system than it was before it
+failed.
+
 ## 4. `2R-NOTIFY-004` — the failure is forced, not simulated
 
 *"A failure in one series leaves other users' deliveries unaffected."*

@@ -48,7 +48,7 @@
 -- `phase_2r_reminder_recurrence.sql`.
 
 begin;
-select plan(25);
+select plan(26);
 
 set local timezone to 'UTC';
 
@@ -361,13 +361,31 @@ select is(
   '2R-NOTIFY-002: five due occurrences deliver THREE -- the cap holds across series'
 );
 
+-- Scheduled AND STILL DUE, and the qualifier is the whole assertion.
+--
+-- CI caught the first version, which counted `scheduled` alone and expected 2.
+-- It reads 5: marking three occurrences `sent` fires the materialisation
+-- trigger three times, and each of those series immediately gains its next
+-- occurrence. Those three are in the FUTURE and are not what "over the cap"
+-- means -- the rows this is about are the two that came due and were held back.
 select is(
   (select pg_catalog.count(*)::integer
    from public.reminders as occurrence
    where occurrence.user_id = 'e1000004-0000-4000-8000-000000000004'
-     and occurrence.status = 'scheduled'),
+     and occurrence.status = 'scheduled'
+     and occurrence.remind_at <= now()),
   2,
-  '2R-NOTIFY-002: the two over the cap are still scheduled, not dropped'
+  '2R-NOTIFY-002: the two over the cap are still scheduled and still due, not dropped'
+);
+
+select is(
+  (select pg_catalog.count(*)::integer
+   from public.reminders as occurrence
+   where occurrence.user_id = 'e1000004-0000-4000-8000-000000000004'
+     and occurrence.status = 'scheduled'
+     and occurrence.remind_at > now()),
+  3,
+  '2R-NOTIFY-002: and the three that WERE delivered each materialised one future successor'
 );
 
 select is(
