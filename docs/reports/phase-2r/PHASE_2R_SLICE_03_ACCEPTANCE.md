@@ -13,11 +13,28 @@
   exact merge SHA** and on the head `0c5f3c5` before it.
 - **Hosted writes: none. AI calls: none. BYOK credit spent: none.**
 
-> **`2R-MOBILE-003` IS NOT DELIVERED AND IS NOT CLAIMED.** It is an owner device
-> checkpoint, `2R-CLOSE-009` refuses a record that marks it satisfied without
-> one, and a Playwright run is not a substitute for real hardware. It is
-> classified **undelivered — awaiting the owner** in §6, and it is the reason
-> this slice stops rather than continuing to 2R.4.
+> **`2R-MOBILE-003` — the checkpoint RAN, and returned partial approval with two
+> defects.** It is still **not delivered**: a checkpoint that found defects is a
+> checkpoint that has to be run again after they are fixed, and `2R-CLOSE-009`
+> refuses a record that closes it any other way. §10 records what the owner
+> tested, what passed, what failed, and what was done about it.
+
+---
+
+## 0. The owner device checkpoint — run 1, on iPhone/PWA
+
+**Approved:** the recurrence control is usable, the preview appears, the Create
+button stays reachable, and the recurring reminder was created correctly.
+
+**Two defects, both real, both fixed without a migration:**
+
+| | reported | cause | disposition |
+|---|---|---|---|
+| 1 | *"Para repetir segunda, quarta e sexta, eu teria de criar três lembretes."* | the surface offered one day; **the model had always stored an array** | fixed — §11 |
+| 2 | *"O iPhone aplica zoom e o modal fica visualmente quebrado."* | every text field in the product was below iOS's 16px threshold | fixed — §12 |
+
+Neither was a limitation of the deployed contract, and neither needed one.
+**A second run of this checkpoint is owed and is not assumed.**
 
 ---
 
@@ -40,6 +57,13 @@ Measured rather than asserted: `phase-2r-foundation.test.ts` counts the
 composer's named inputs, and the count went from four to **five**. The one new
 name is `recurrence`. A `reminder-composer.test.tsx` case compares the field list
 before and after a repetition is chosen and requires them equal.
+
+> **Superseded in part by §11.** The owner's checkpoint found that this reading
+> was too narrow for `weekly`: the model had always stored several weekdays and
+> the surface offered one, so repeating on Monday, Wednesday and Friday would
+> have taken three reminders. A day picker was added **for `weekly` only**, the
+> count is now six, and the stop condition was re-evaluated rather than assumed.
+> The paragraph above still describes the other four frequencies exactly.
 
 That is also why the preview matters. A control this small is only honest if the
 owner can see what it derived, so the next three occurrences are shown **before
@@ -146,9 +170,9 @@ Stated rather than implied, because the difference is the whole of
 | `2R-ACCESS-003` | **built** | both live regions render **empty before** their first sentence, asserted on an idle page |
 | `2R-ACCESS-004` | **partial** | axe at `serious` is written and runs **only in the manual lane**. Remainder: **`2R-AXE-MANUAL-LANE`** — destination, the closing record's evidence list |
 | `2R-ACCESS-005` | **built** | no record in this phase describes any part of it as screen-reader evidence; `phase-2r-declarations.test.ts` enforces it and was not touched |
-| `2R-MOBILE-001` | **partial** | asserted at 375px in the manual lane, not in CI. Same remainder as `2R-ACCESS-004` |
+| `2R-MOBILE-001` | **partial** | now asserted at 375px on a **rendered page in CI** for the public surfaces (§12), and in the manual lane behind auth. The remainder is the lane, not the behaviour |
 | `2R-MOBILE-002` | **built** | the dialog gained a height bound and a scroll container at every width (§3), guarded by the inverted 2R.0 assertion; the journey scrolls save into view and asserts it is in the viewport |
-| `2R-MOBILE-003` | **undelivered — awaiting the owner** | an owner device checkpoint. **Not attempted, not substituted, not claimed** |
+| `2R-MOBILE-003` | **undelivered — awaiting a second run** | the checkpoint RAN and returned partial approval with two defects (§0). Both are fixed; a checkpoint that found defects has to be run again. **Not substituted, not claimed** |
 
 **Sixteen addressed here; 47 of 73 cumulatively.** Two are `partial` with a named
 remainder and one is `undelivered` with a destination, as `2R-CLOSE-002`
@@ -186,3 +210,113 @@ close would stack work on a pending decision.
 
 Once the checkpoint is done, 2R.4 (`2R-NOTIFY-001` … `-007`) can proceed with no
 further authorization — ADR-133 already covers it.
+
+---
+
+## 10. What the checkpoint changed in this record
+
+Three classifications moved, and one of them moved **backwards**, which is the
+point of running a checkpoint at all.
+
+| requirement | was | is | why |
+|---|---|---|---|
+| `2R-SURFACE-001` | built | **built** | the control still is not a form: named inputs went five to six, and the sixth is one name for the whole day picker, shown only for `weekly` |
+| `2R-MOBILE-001` | partial | **partial** | now proved on a **rendered page in CI** for the public surfaces, and in the manual lane behind auth. The remainder is the lane, not the behaviour |
+| `2R-MOBILE-003` | undelivered — awaiting the owner | **undelivered — awaiting a second run** | the checkpoint ran and found two defects. A checkpoint that found defects has to be run again after they are fixed |
+
+## 11. Defect 1 — several weekdays, one series
+
+### The contract was proved before the code was written
+
+The plan makes a required contract change a stop condition, so the first act was
+to ask the deployed database what it already accepts:
+
+- `create_reminder_series_v1` with `weekdays: [1,3,5]` **stores the rule
+  verbatim** and materialises **one** occurrence;
+- the live occurrence landed on the first *matching* weekday rather than the
+  anchor's own, so the multi-day rule was being honoured in full;
+- `edit_future` moved it to `[2,4]`;
+- `[]`, `[3,1]` and `[1,1]` were each refused at the CHECK constraint.
+
+**No migration. No contract change.** The gap was one line in
+`deriveRecurrenceRule`, which collapsed `weekly` to `[anchor.weekday]`.
+
+### What changed
+
+Seven checkboxes, rendered **only** for `weekly`, seeded from the date already on
+screen and abandoning that seed the moment the owner ticks anything. The
+normalisation the schema demands — range, duplicates, ascending order — lives in
+the derivation, because each one is otherwise a refusal the owner meets *after*
+pressing save. The operation key carries the days, so two different sets on one
+title and date cannot mint one key.
+
+### The stop condition, re-evaluated rather than assumed
+
+`2R-SURFACE-001` says the modal gains the control *without becoming a form*, and
+the day picker is new surface. It is still not a form, and the guard measures it
+rather than asserting it: **one** new name for seven controls, conditional on one
+frequency, while `monthlyDay`, `monthlyWeekday` and `yearly` still take every
+parameter from the date above them. `reminder-composer.test.tsx` compares the
+field list before and after **each** choice.
+
+## 12. Defect 2 — the iOS field-zoom floor
+
+### It was never this slice's surface
+
+Safari zooms into any focused `input`, `textarea` or `select` below **16px**, and
+does not zoom back out. Everything the owner saw after that is a consequence: the
+page is wider than the screen, so a centred dialog sits half off it and its
+primary action cannot be reached.
+
+`--type-body` is **13.5px**, and a census found **nineteen field rules across ten
+stylesheets** below the line — `reminders`, `settings-extended`, `operations`,
+`assistant`, `palette`, `history`, `memories`, `relations`, `globals`,
+`task-commands`. Every text field in the product did it.
+
+**And it was already known, twice.** `globals.css` carried an explicit
+`font-size: 16px` immediately after `font: var(--type-body)` on `.auth-form
+input` and on `.settings-fields input` — two surfaces where somebody met the bug
+and fixed it locally. *The fix worked and did not spread*, which is why every
+field added afterwards reintroduced it.
+
+### What changed
+
+One floor: `--field-font-size-min: 16px`, applied to text fields under
+`(pointer: coarse), (max-width: 640px)`. `!important`, because the rules it must
+beat reach `(0,2,1)` and the alternative is `:root:root:root input`, which reads
+like a typo and would be tidied away.
+
+**No `user-scalable=no` and no `maximum-scale`.** Both would remove the reader's
+ability to zoom deliberately — an accessibility regression traded for a layout
+one.
+
+Also `dvh` on the shared dialog, with `vh` **ordered before it** as the fallback.
+`100vh` on iOS is the viewport with the browser chrome hidden, so a dialog
+bounded by it is taller than the space it has — and taller still once the
+keyboard is up, which is exactly when the owner needs the button. **That unit was
+mine, introduced by this slice.**
+
+### Proved where it can be, and only there
+
+- **In CI, on a rendered page:** no field on any public surface computes below
+  16px at 375px, *and* the floor does not match at 1280px. Both directions,
+  because a floor applied everywhere would pass the first and silently redesign
+  every desktop form.
+- **In CI, on the stylesheets:** the floor exists, nothing outranks it, and the
+  dialog carries `dvh` after its `vh` fallback.
+- **Manual lane:** the authenticated composer, where the owner actually met it.
+- **Nowhere by automation:** that the zoom is gone on a real iPhone. That is the
+  second checkpoint run, and it is owed.
+
+## 13. Two corrections the repository made during the fix
+
+**The linter refused an effect that seeded state.** The picker's initial day was
+first set by a `useEffect` watching the date, and `react-hooks/set-state-in-effect`
+rejected it. It was right — that is the shape this repository has recorded three
+times as the version that flickers. The value is **derived** per render instead,
+with `null` meaning *the owner has not answered*; the effect and its companion
+`touched` flag both disappeared.
+
+**The field-count guard fired**, which is what it is for. Updating it was a
+deliberate act with the reason written where the count is, rather than a number
+raised to make a test pass.
