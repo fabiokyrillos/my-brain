@@ -64,3 +64,53 @@
 @media(max-width: 899px){.app-frame{display:block}.side-rail{display:none}.top-bar{height:var(--header-height);padding:0 var(--space-4)}.dashboard{padding:var(--space-8) var(--space-4) calc(var(--page-bottom) + env(safe-area-inset-bottom,0px))}.hero h1{font-size:31px}.hero h1 span{display:inline}.capture-card{margin-top:28px}.composer-hint{display:none}.dashboard-grid{grid-template-columns:1fr}.priority-panel{grid-row:auto;min-height:330px}.panel{min-height:166px}.bottom-nav{position:fixed;z-index:20;left:0;right:0;bottom:0;min-height:76px;border-top:1px solid var(--border-default);background:var(--background-surface);padding:8px 6px calc(12px + env(safe-area-inset-bottom,0px))}.bottom-nav>a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-1);min-height:var(--touch-target);color:var(--text-secondary);font:500 11.5px/1 var(--font-ui)}.bottom-nav .capture-fab{transform:translateY(-24px);color:var(--action-primary-text);background:var(--action-primary);width:54px;height:54px;border-radius: var(--radius-lg);display:grid;place-items:center;box-shadow:var(--elevation-undo)}.capture-fab span{position:absolute;width:1px;height:1px;overflow:hidden}}
 @media(prefers-reduced-motion:no-preference){.capture-card,.panel{animation:rise var(--motion-emphasis) var(--ease-enter) both}.panel:nth-child(2){animation-delay:.06s}.panel:nth-child(3){animation-delay:.12s}@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}
 .auth-stage{min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 10%,var(--tone-information-bg),transparent 35%),var(--background-canvas)}.auth-card{width:min(100%,450px);padding:var(--space-10);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);box-shadow:var(--elevation-3)}.auth-card h1,.settings-page>h1{font:var(--type-title-1);letter-spacing:-.01em;margin:var(--space-2) 0 var(--space-3);color:var(--text-primary)}.auth-card>p:not(.eyebrow),.settings-page>p:not(.eyebrow){color:var(--text-secondary);font:var(--type-lead)}.auth-form{display:grid;gap:16px;margin:26px 0 18px}.auth-form label{display:grid;gap:var(--space-2);font:var(--type-label);color:var(--text-secondary)}.auth-form input{min-height:44px;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:var(--space-3);background:var(--background-surface);color:var(--text-primary);font:var(--type-body);font-size:16px}.auth-form button,.secondary-button{min-height:44px;border:0;border-radius:var(--radius-md);background:var(--action-primary);color:var(--action-primary-text);padding:var(--space-3) var(--space-4);font:var(--type-label)}.secondary-button{width:100%;background:var(--background-surface);color:var(--text-primary);border:1px solid var(--border-strong)}.auth-links{display:flex;flex-wrap:wrap;justify-content:space-between;gap:var(--space-2);margin-top:var(--space-5);font:var(--type-label);color:var(--link)}.auth-links a{display:inline-flex;align-items:center;min-height:44px;padding-block:var(--space-2)}.form-alert,.form-success{padding:var(--space-3);border-radius:var(--radius-md);border:1px solid var(--tone-risk-line);font:var(--type-body);background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.form-success{background:var(--tone-success-bg);color:var(--tone-success-fg)}.settings-page{max-width:var(--width-productivity);margin:auto;padding:var(--space-16) var(--gutter) 140px}.settings-form{margin-top:var(--space-10);border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface);box-shadow:var(--elevation-2);overflow:hidden}.settings-section-heading{display:grid;grid-template-columns:42px 1fr;gap:16px;padding:28px 30px 18px;border-top:1px solid var(--border-default)}.settings-section-heading:first-child{border-top:0}.settings-section-heading>span{display:grid;place-items:center;width:34px;height:34px;border-radius:var(--radius-full);background:var(--background-subtle);color:var(--text-secondary);font:var(--type-eyebrow)}.settings-section-heading h2{margin:0;font:var(--type-title-2);font-size:20px;letter-spacing:-.01em;color:var(--text-primary)}.settings-section-heading p{margin:var(--space-1) 0 0;color:var(--text-secondary);font:var(--type-caption)}.settings-fields{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 30px 30px}.settings-fields label{display:grid;align-content:start;gap:var(--space-2);font:var(--type-label);color:var(--text-secondary)}.settings-fields input,.settings-fields select{width:100%;min-height:46px;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:var(--space-3);background:var(--background-surface);color:var(--text-primary);font:var(--type-body);font-size:16px}.settings-fields select{cursor:pointer}.settings-fields small{color:var(--text-secondary);font:var(--type-caption)}.settings-field{display:grid;align-content:start;gap:8px}.settings-save-bar{min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px 22px 16px 30px;background:var(--background-subtle);border-top:1px solid var(--border-default)}.settings-submit{display:flex;align-items:center;gap:var(--space-2);min-height:44px;border:0;border-radius:var(--radius-md);background:var(--action-primary);color:var(--action-primary-text);padding:var(--space-3) var(--space-4);font:var(--type-label);box-shadow:var(--elevation-1)}.settings-submit:hover:not(:disabled){background:var(--action-primary-hover);transform:translateY(-1px)}.settings-submit:disabled{opacity:.72}.settings-feedback{display:flex;align-items:center;gap:var(--space-2);margin:0;font:var(--type-body);font-weight:500}.settings-feedback.success{color:var(--tone-success-fg)}.settings-feedback.error{color:var(--tone-risk-fg)}.spin{animation:spin .8s linear infinite}@media(prefers-reduced-motion:reduce){.spin{animation:none}}@keyframes spin{to{transform:rotate(360deg)}}@media(max-width:600px){.auth-card{padding:28px 22px}.settings-page{padding:40px 18px 120px}.settings-section-heading{padding:24px 20px 16px}.settings-fields{grid-template-columns:1fr;padding:0 20px 24px}.settings-save-bar{align-items:stretch;flex-direction:column;padding:16px 20px}.settings-submit{justify-content:center;width:100%}}
+
+/*
+ * THE iOS FIELD-ZOOM FLOOR — slice 2R.3's owner device checkpoint.
+ *
+ * Safari on iOS zooms the whole page in when a focused `input`, `textarea` or
+ * `select` computes to **less than 16px**, and it does not zoom back out when
+ * the field is blurred. Everything after that is a consequence rather than a
+ * separate bug: the page is now wider than the screen, so a centred dialog sits
+ * half off it and its primary action cannot be reached. That is the "modal fica
+ * visualmente quebrado" in the report.
+ *
+ * This product's `--type-body` is 13.5px, so nineteen field rules across ten
+ * stylesheets were below the threshold — every text field in the app, not the
+ * reminder composer. Two surfaces had already met it and fixed it locally
+ * (`.auth-form input`, `.settings-fields input` above), which is precisely how
+ * a defect survives: the fix worked and did not spread.
+ *
+ * ## Why `!important`, and why that is the honest choice here
+ *
+ * The rules this has to beat reach `(0,2,1)` — `.reminder-panel
+ * input[type="text"]`. Winning on specificity would take something like
+ * `:root:root:root input`, which reads like a typo and would be tidied away by
+ * the next person through. `!important` states the actual relationship: the
+ * platform's minimum outranks the design's type scale, on the platform that
+ * enforces it.
+ *
+ * It also makes the rule immune to load order, which matters because these
+ * sheets are imported in an order no single file controls.
+ *
+ * ## Why it is scoped, and what it deliberately does not touch
+ *
+ * `pointer: coarse` OR a narrow viewport, so the desktop type scale is
+ * untouched — the checkpoint asked for that in terms.
+ *
+ * Checkboxes, radios, ranges and file inputs are excluded: iOS does not zoom for
+ * them, and they are sized by their box rather than by their font.
+ *
+ * **No `user-scalable=no`, no `maximum-scale`.** Both would "fix" the symptom by
+ * removing the reader's ability to zoom deliberately, which is an accessibility
+ * regression traded for a layout one.
+ */
+:root { --field-font-size-min: 16px; }
+
+@media (pointer: coarse), (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  textarea,
+  select {
+    font-size: var(--field-font-size-min) !important;
+  }
+}

@@ -239,6 +239,99 @@ test.describe("slice 2R.3 — creating a routine", () => {
     expect(overflow, "the page scrolls sideways at 375px").toBeLessThanOrEqual(0);
   });
 
+  test("Monday, Wednesday and Friday is ONE series, not three reminders", async ({ page }) => {
+    /*
+      The owner device checkpoint's first finding, end to end.
+
+      *"Para repetir segunda, quarta e sexta, eu teria de criar tres lembretes."*
+      The model always stored an array; the surface offered one day. The
+      assertions that matter are the counts -- one series row, one live
+      occurrence -- because "it worked" is also true of three reminders.
+    */
+    await signInOnline(page, { email, locale: "pt-BR" });
+    await page.goto("/pt-BR/app/reminders");
+
+    await page.getByRole("button", { name: "Criar lembrete" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Titulo", { exact: false })
+      .or(dialog.getByLabel("O que", { exact: false }).first())
+      .fill("Academia");
+    // A Monday, so the picker seeds itself with Monday.
+    await dialog.getByLabel("Quando", { exact: false }).fill("2026-12-07T07:00");
+    await dialog.getByLabel("Repetir", { exact: false }).selectOption("weekly");
+
+    const days = dialog.getByRole("group", { name: "Em quais dias?" });
+    await expect(days).toBeVisible();
+    await expect(days.getByRole("checkbox", { name: "segunda-feira" })).toBeChecked();
+
+    await days.getByRole("checkbox", { name: "quarta-feira" }).check();
+    await days.getByRole("checkbox", { name: "sexta-feira" }).check();
+
+    // The preview updates before saving, from the database.
+    await dialog.getByRole("button", { name: "Ver as proximas datas" })
+      .or(dialog.getByRole("button", { name: /pr.ximas datas/ })).click();
+    await expect(dialog.getByRole("status", { name: /Pr.ximas ocorr/ })
+      .getByRole("listitem")).toHaveCount(3);
+
+    await dialog.getByRole("button", { name: "Criar lembrete", exact: true }).click();
+    await expect(page.getByText("Lembrete recorrente criado.")).toBeVisible();
+
+    // ONE series, carrying three days.
+    const series = await admin(`reminder_series?user_id=eq.${userId}&select=id,rule`);
+    expect(series, "more than one series was created").toHaveLength(1);
+    expect((series[0].rule as Json).weekdays).toEqual([1, 3, 5]);
+
+    // ONE live occurrence, not three reminders.
+    const live = await admin(
+      `reminders?user_id=eq.${userId}&status=eq.scheduled&detached_at=is.null&select=id`,
+    );
+    expect(live, "the rule produced more than one live occurrence").toHaveLength(1);
+
+    // And the list says how it repeats, in words, naming all three days.
+    await page.reload();
+    const rule = page.locator("article.reminder-row").filter({ hasText: "Academia" })
+      .locator(".reminder-series-rule");
+    await expect(rule).toContainText("segunda-feira");
+    await expect(rule).toContainText("quarta-feira");
+    await expect(rule).toContainText("sexta-feira");
+  });
+
+  test("no field on the reminders surface makes iOS zoom on focus", async ({ page }) => {
+    /*
+      The checkpoint's second finding, on an authenticated surface.
+
+      `phase-2o-mobile-accessibility.spec.ts` proves the floor on the public
+      pages in CI; this is the half behind auth, where the composer lives. The
+      dialog is opened so its own fields are measured too, since they are the
+      ones the owner was typing into when the zoom happened.
+    */
+    await page.setViewportSize({ width: 375, height: 812 });
+    await signInOnline(page, { email, locale: "pt-BR" });
+    await page.goto("/pt-BR/app/reminders");
+    await page.getByRole("button", { name: "Criar lembrete" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.getByRole("dialog").getByLabel("Repetir", { exact: false }).selectOption("weekly");
+
+    const small = await page.evaluate(() =>
+      [...document.querySelectorAll("input, textarea, select")]
+        .filter((field) => !["checkbox", "radio", "range", "file", "hidden", "submit", "button"]
+          .includes(field.getAttribute("type") ?? ""))
+        .map((field) => ({
+          where: `${field.tagName.toLowerCase()}.${field.className || "-"}`,
+          px: Number.parseFloat(getComputedStyle(field).fontSize),
+        }))
+        .filter((field) => field.px < 16));
+    expect(small, "these fields make iOS zoom, and it does not zoom back out").toEqual([]);
+
+    // And the dialog is still inside the screen with the picker expanded.
+    const save = page.getByRole("dialog").getByRole("button", { name: "Criar lembrete", exact: true });
+    await save.scrollIntoViewIfNeeded();
+    await expect(save).toBeInViewport();
+    const overflow = await page.evaluate(() =>
+      document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow, "the page scrolls sideways at 375px").toBeLessThanOrEqual(0);
+  });
+
   test("renders every new string in English too", async ({ page }) => {
     // `2R-SURFACE-007`. The type makes a missing key a build error; this proves
     // the keys that exist actually reach the page in the second locale.

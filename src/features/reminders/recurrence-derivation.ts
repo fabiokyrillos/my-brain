@@ -116,6 +116,32 @@ export function ordinalWithinMonth(anchor: LocalAnchor): RecurrenceOrdinal {
 }
 
 /**
+ * The weekly rule's day set: what the owner ticked, normalised.
+ *
+ * Three normalisations, and each one is a refusal the CHECK constraint would
+ * otherwise make **after** the owner pressed save:
+ *
+ * - **out of range removed.** ISO weekdays are 1..7; anything else is not a day
+ *   and the constraint says so;
+ * - **deduplicated.** A double-submitted checkbox group can send the same value
+ *   twice, and `weekdays: [1,1]` is refused;
+ * - **sorted ascending.** The schema demands it, and not for tidiness: one rule
+ *   gets exactly one stored spelling, so *"did the series change?"* stays
+ *   answerable by comparison — which `2R-SERIES-003` needs. A checkbox group
+ *   emits values in DOM order, so the sort belongs here rather than in every
+ *   caller.
+ *
+ * An empty result falls back to the anchor's own weekday rather than producing
+ * `weekdays: []`, which the constraint refuses. Silence means *the day I picked*,
+ * not *no days*.
+ */
+function weeklyDays(anchor: LocalAnchor, chosen?: readonly number[]): number[] {
+  const days = [...new Set((chosen ?? []).filter((day) => Number.isInteger(day) && day >= 1 && day <= 7))]
+    .sort((left, right) => left - right);
+  return days.length === 0 ? [anchor.weekday] : days;
+}
+
+/**
  * The rule the choice means, given the date already chosen.
  *
  * `null` for `"none"`, which is the composer's way of saying this reminder does
@@ -124,6 +150,31 @@ export function ordinalWithinMonth(anchor: LocalAnchor): RecurrenceOrdinal {
 export function deriveRecurrenceRule(
   choice: RecurrenceChoice,
   anchor: LocalAnchor,
+  /**
+   * The weekdays the owner ticked, for `weekly` only — slice 2R.3's fix.
+   *
+   * ## Why this argument exists
+   *
+   * The owner's device checkpoint reported that repeating on Monday, Wednesday
+   * and Friday would have taken **three reminders**. It would have: this
+   * function collapsed `weekly` to the anchor's own weekday, so the surface
+   * could express one day and the model could hold seven.
+   *
+   * The model was never the limit. `create_reminder_series_v1` with
+   * `weekdays: [1,3,5]` stores the rule verbatim, materialises **one**
+   * occurrence, and picks the first matching weekday rather than the anchor's —
+   * proved by execution against the deployed database before this argument was
+   * added. `edit_future` moves it to another set just as readily. **No
+   * migration, no contract change.**
+   *
+   * ## Why it is optional, and why the fallback is the anchor
+   *
+   * `2R-SURFACE-001`'s property is that the date already on screen supplies the
+   * parameters, and that has to survive: an owner who picks *weekly* and touches
+   * nothing still gets the weekday they chose a date on. The argument widens
+   * what they *can* say without changing what silence means.
+   */
+  chosenWeekdays?: readonly number[],
 ): RecurrenceRule | null {
   const version = RECURRENCE_RULE_VERSION as 1;
   switch (choice) {
@@ -132,7 +183,7 @@ export function deriveRecurrenceRule(
     case "daily":
       return { version, frequency: "daily" };
     case "weekly":
-      return { version, frequency: "weekly", weekdays: [anchor.weekday] };
+      return { version, frequency: "weekly", weekdays: weeklyDays(anchor, chosenWeekdays) };
     case "monthlyDay":
       return { version, frequency: "monthlyDay", day: anchor.day };
     case "monthlyWeekday":

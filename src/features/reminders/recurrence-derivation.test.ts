@@ -174,3 +174,93 @@ describe("the choice vocabulary is closed", () => {
     }
   });
 });
+
+/**
+ * The owner device checkpoint's first finding, reproduced — slice 2R.3 fix.
+ *
+ * ## What was reported
+ *
+ * *"Para repetir segunda, quarta e sexta, eu teria de criar tres lembretes."*
+ *
+ * ## What the model actually supports
+ *
+ * Everything. Proved by execution against the deployed database before a line
+ * was changed: `create_reminder_series_v1` with `weekdays: [1,3,5]` stores the
+ * rule verbatim, materialises **one** occurrence, and picks the first matching
+ * weekday rather than the anchor's own -- and `edit_future` moves it to `[2,4]`.
+ * The three malformations the schema promises to refuse (empty, descending,
+ * duplicated) are all refused at the CHECK constraint.
+ *
+ * So the gap was entirely in the surface, and specifically here: `weekly`
+ * collapsed to `[anchor.weekday]`. **No migration, no contract change.**
+ *
+ * These cases fail against that collapse and pass against a derivation that
+ * carries the days the owner chose.
+ */
+describe("weekly carries every weekday the owner chose", () => {
+  const monday = anchor("2026-12-07T09:00");
+
+  it("keeps three chosen days in one rule", () => {
+    // The reported case: Monday, Wednesday, Friday, as ONE series.
+    expect(deriveRecurrenceRule("weekly", monday, [1, 3, 5])).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1, 3, 5],
+    });
+  });
+
+  it("sorts what it is given, because one rule gets one stored spelling", () => {
+    /*
+      The schema demands strictly ascending weekdays, and the reason is not
+      tidiness: two byte-different rules meaning the same thing would make "did
+      the series change?" unanswerable by comparison, which `2R-SERIES-003`
+      needs. A checkbox group emits its values in DOM order, so the sort belongs
+      here rather than in the caller.
+    */
+    expect(deriveRecurrenceRule("weekly", monday, [5, 1, 3])).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1, 3, 5],
+    });
+  });
+
+  it("removes duplicates, which a double-submitted control can produce", () => {
+    expect(deriveRecurrenceRule("weekly", monday, [3, 1, 3])).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1, 3],
+    });
+  });
+
+  it("falls back to the anchor's own weekday when none was chosen", () => {
+    // `2R-SURFACE-001`'s property survives: the date on the screen still
+    // supplies the parameter when the owner touches nothing.
+    expect(deriveRecurrenceRule("weekly", monday, [])).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1],
+    });
+    expect(deriveRecurrenceRule("weekly", monday)).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1],
+    });
+  });
+
+  it("ignores days outside the ISO range rather than storing them", () => {
+    // The CHECK constraint would refuse them, and a refusal the owner meets
+    // after pressing save is worse than one this side never sends.
+    expect(deriveRecurrenceRule("weekly", monday, [0, 1, 8, 7])).toEqual({
+      version: 1, frequency: "weekly", weekdays: [1, 7],
+    });
+  });
+
+  it("keeps every derived multi-day rule valid at the schema the RPC uses", () => {
+    for (const chosen of [[1], [1, 3, 5], [7], [1, 2, 3, 4, 5, 6, 7], [6, 7]]) {
+      const rule = deriveRecurrenceRule("weekly", monday, chosen);
+      expect(
+        recurrenceRuleSchema.safeParse(rule).success,
+        `${chosen.join(",")} produced a rule the schema refuses`,
+      ).toBe(true);
+    }
+  });
+
+  it("leaves the other four frequencies untouched by the new argument", () => {
+    // The chosen days mean nothing to `daily`, `monthlyDay`, `monthlyWeekday`
+    // or `yearly`, and passing them must not change what those derive.
+    for (const choice of ["daily", "monthlyDay", "monthlyWeekday", "yearly"] as const) {
+      expect(deriveRecurrenceRule(choice, monday, [1, 3, 5]))
+        .toEqual(deriveRecurrenceRule(choice, monday));
+    }
+  });
+});

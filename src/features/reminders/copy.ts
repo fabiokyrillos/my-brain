@@ -109,6 +109,23 @@ type ReminderCopy = {
     readonly recurrenceLabel: string;
     readonly recurrenceHint: string;
     readonly recurrenceOption: Readonly<Record<RecurrenceChoice, string>>;
+    /**
+     * The weekday picker that appears only for `weekly` — slice 2R.3's fix.
+     *
+     * `weekdayShort` is the two- or three-letter form a compact seven-across
+     * control can hold, and `weekdayLong` is what a screen reader is given
+     * through `aria-label`. Both are needed and neither substitutes: a control
+     * labelled *S* is unreadable aloud, and a control labelled *segunda-feira*
+     * does not fit a phone.
+     *
+     * They are separate from `series.language.weekdays` on purpose. That set is
+     * built for sentences and carries grammatical gender; this one is built for
+     * a button face. Sharing them would mean one of the two uses is wrong.
+     */
+    readonly weekdaysLegend: string;
+    readonly weekdaysHint: string;
+    readonly weekdayShort: readonly [string, string, string, string, string, string, string];
+    readonly weekdayLong: readonly [string, string, string, string, string, string, string];
     readonly previewLabel: string;
     readonly previewHeading: string;
     readonly previewPending: string;
@@ -337,6 +354,18 @@ const COPY = {
         monthlyWeekday: "Todo mês, nesta posição da semana",
         yearly: "Todo ano, nesta data",
       },
+      weekdaysLegend: "Em quais dias?",
+      weekdaysHint: "Escolha um ou mais. O dia da data acima já vem marcado.",
+      /* Monday first, matching ISO 8601 and Postgres `isodow` — the order the
+         rule itself is stored in, so the control and the model count the same
+         way. `pt-BR` conventionally starts the week on Sunday in a calendar
+         grid; this is a day picker rather than a grid, and matching the stored
+         order is what keeps the mapping legible. */
+      weekdayShort: ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"],
+      weekdayLong: [
+        "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira",
+        "sexta-feira", "sábado", "domingo",
+      ],
       previewLabel: "Ver as próximas datas",
       previewHeading: "Próximas ocorrências",
       previewPending: "Calculando…",
@@ -556,6 +585,12 @@ const COPY = {
         monthlyWeekday: "Every month, in this weekday position",
         yearly: "Every year, on this date",
       },
+      weekdaysLegend: "On which days?",
+      weekdaysHint: "Pick one or more. The weekday of the date above is already ticked.",
+      weekdayShort: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+      weekdayLong: [
+        "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
+      ],
       previewLabel: "See the next dates",
       previewHeading: "Next occurrences",
       previewPending: "Calculating…",
