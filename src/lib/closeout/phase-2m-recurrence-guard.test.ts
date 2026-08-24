@@ -102,6 +102,10 @@ const REMINDER_RECURRENCE_ALLOWLIST: readonly string[] = [
   "src/features/reminders/recurrence-rule.ts",
   "src/features/reminders/recurrence-rule.test.ts",
   "src/features/reminders/recurrence-rule-parity.test.ts",
+  "src/features/reminders/recurrence-language.ts",
+  "src/features/reminders/recurrence-language.test.ts",
+  "src/features/reminders/recurrence-derivation.ts",
+  "src/features/reminders/recurrence-derivation.test.ts",
   "src/features/reminders/series-action-state.ts",
   "src/features/reminders/series-actions.ts",
   "src/features/reminders/series-actions.test.ts",
@@ -128,6 +132,23 @@ const REMINDER_RECURRENCE_ALLOWLIST: readonly string[] = [
   "src/features/reminders/projection.test.ts",
   "src/features/reminders/lifecycle.test.ts",
   "src/features/reminders/outcomes.test.ts",
+  /*
+   * Slice 2R.3's answer to this boundary, rather than a widening of it.
+   *
+   * `2R-SURFACE-003` asks EVERY surface that lists a recurring reminder to say
+   * so, and the calendar is one — but ADR-132 Decision 1's lift is *"strictly
+   * limited to reminders"* and this list deliberately excludes
+   * `src/features/calendar/**`. The first implementation had the calendar read
+   * the rule's own columns, and this guard refused it. Correctly.
+   *
+   * `repeat-labels.ts` is where that lookup went instead: the calendar asks in
+   * its own terms — *these reminder ids, which of them repeat* — and receives
+   * sentences. The recurrence vocabulary never leaves the reminders feature, so
+   * **the boundary held and the code moved**. `calendar-projection.ts` and its
+   * test carry none of these shapes, which is why neither is here.
+   */
+  "src/features/reminders/repeat-labels.ts",
+  "src/features/reminders/repeat-labels.test.ts",
   "src/lib/closeout/phase-2r-model-guard.test.ts",
   /*
    * The two guards that hold `reminders`' closed column list.
@@ -344,6 +365,10 @@ describe("2M-RECUR-001: no recurrence artifact exists anywhere the decision gove
       "src/features/reminders/recurrence-rule.ts",
       "src/features/reminders/recurrence-rule.test.ts",
       "src/features/reminders/recurrence-rule-parity.test.ts",
+      "src/features/reminders/recurrence-language.ts",
+      "src/features/reminders/recurrence-language.test.ts",
+      "src/features/reminders/recurrence-derivation.ts",
+      "src/features/reminders/recurrence-derivation.test.ts",
       "src/features/reminders/series-action-state.ts",
       "src/features/reminders/series-actions.ts",
       "src/features/reminders/series-actions.test.ts",
@@ -356,6 +381,8 @@ describe("2M-RECUR-001: no recurrence artifact exists anywhere the decision gove
       "src/features/reminders/projection.test.ts",
       "src/features/reminders/lifecycle.test.ts",
       "src/features/reminders/outcomes.test.ts",
+      "src/features/reminders/repeat-labels.ts",
+      "src/features/reminders/repeat-labels.test.ts",
       "src/lib/closeout/phase-2r-model-guard.test.ts",
       "src/lib/closeout/phase-2p-reminder-recurrence-guard.test.ts",
       "src/lib/closeout/phase-2r-foundation.test.ts",

@@ -234,20 +234,27 @@ describe("2R-FOUNDATION-002: the heartbeat's rules, as they are before anything 
  * The composer's field groups, in DOM order.
  *
  * Recorded **by position**, because the thing slice 2R.3 must not do is turn
- * this dialog into a form, and "four groups exist" is true of a form too. The
+ * this dialog into a form, and "the groups exist" is true of a form too. The
  * order is the one `2P-REMINDER-002` was corrected to require: content; date
  * and time; importance; an optional link; then save.
+ *
+ * **Slice 2R.3 inserts recurrence between date-and-time and importance**, and
+ * the position is the point rather than an arrangement: every parameter the rule
+ * needs is the date immediately above it, so the two are adjacent. The list is
+ * extended rather than replaced, so the five 2P groups keep their relative order
+ * under the same assertion.
  */
 const COMPOSER_GROUPS = [
   'id="reminder-compose-field-content"',
   'id="reminder-compose-field-when"',
+  'id="reminder-compose-field-recurrence"',
   'id="reminder-compose-field-important"',
   'id="reminder-compose-field-task"',
   'className="task-command-primary"',
 ] as const;
 
 describe("2R-FOUNDATION-003: the modal's current field groups, read from the component", () => {
-  it("holds five groups, in this order and no other", () => {
+  it("holds six groups, in this order and no other", () => {
     const source = blankComments(read("src/features/reminders/reminder-composer.tsx"));
     const positions = COMPOSER_GROUPS.map((marker) => {
       const at = source.indexOf(marker);
@@ -258,27 +265,44 @@ describe("2R-FOUNDATION-003: the modal's current field groups, read from the com
       .toEqual([...positions].sort((a, b) => a - b));
   });
 
-  it("holds exactly four named inputs, so a fifth cannot arrive unrecorded", () => {
+  it("holds exactly five named inputs, so a sixth cannot arrive unrecorded", () => {
+    /*
+      `recurrence` is the one slice 2R.3 added, and it is the ONLY one it added.
+
+      That is the stop condition expressed as a count: the form this dialog must
+      not become would need weekday checkboxes, a day number, an ordinal and a
+      month, and every one of them would show up here. One new name is the
+      measurable form of "the date supplies the parameters".
+    */
     const source = blankComments(read("src/features/reminders/reminder-composer.tsx"));
     const named = [...source.matchAll(/\bname="([a-zA-Z]+)"/g)].map((match) => match[1]);
-    expect([...new Set(named)].sort()).toEqual(["important", "locale", "remindAtLocal", "taskId", "title"]);
+    expect([...new Set(named)].sort())
+      .toEqual(["important", "locale", "recurrence", "remindAtLocal", "taskId", "title"]);
   });
 
   /**
-   * The modal's real limits, which are the constraint slice 2R.3 inherits.
+   * The modal's limits — measured as a defect in 2R.0, repaired in 2R.3.
    *
-   * The mobile half is handled: below 640px the dialog is a bottom sheet with
-   * `max-height: 92vh` and `overflow-y: auto`, so a taller body scrolls. **The
-   * desktop half is not** — `.task-command-dialog` declares a width and no
-   * height bound at all, and the backdrop centres it in a 20px-padded grid. A
-   * dialog taller than the viewport therefore has no scroll container and its
-   * primary action becomes unreachable.
+   * ## What this recorded, and what changed
    *
-   * That is measured here rather than discovered in slice 2R.3, and it is why
-   * `2R-MOBILE-002`'s *"the preview does not push save off screen"* has to be
-   * satisfied on **both** breakpoints even though only one of them is named.
+   * Slice 2R.0 measured that the mobile half was handled — below 640px the
+   * dialog is a bottom sheet with `max-height: 92vh` and `overflow-y: auto` —
+   * and that **the desktop half was not**: `.task-command-dialog` declared a
+   * width and no height bound at all, so a dialog taller than the viewport had
+   * no scroll container and its primary action became unreachable. The backdrop
+   * centres it in a 20px-padded grid, so the overflow escaped both ends.
+   *
+   * The record said *"update this record"* if the desktop rule ever gained one,
+   * and **slice 2R.3 is the body tall enough to require it**: the recurrence
+   * group plus a three-occurrence preview. `2R-MOBILE-002` asks that the preview
+   * not push save off screen, and 2R.0 is why that had to be satisfied on both
+   * breakpoints even though only one is named.
+   *
+   * So the assertion is inverted rather than deleted. Deleting it would leave
+   * the repair unguarded, and the next author to tidy the shared dialog would
+   * have nothing telling them which declaration is load-bearing.
    */
-  it("bounds the dialog's height on mobile and not on desktop, which is the constraint 2R.3 inherits", () => {
+  it("bounds the dialog's height at every width, which 2R.3 repaired", () => {
     const css = read("src/app/task-commands.css");
     const mobile = css.slice(css.indexOf("@media (max-width: 640px)"));
     expect(mobile).toContain("max-height: 92vh");
@@ -288,10 +312,10 @@ describe("2R-FOUNDATION-003: the modal's current field groups, read from the com
       css.indexOf(".task-command-dialog {"),
       css.indexOf("@media (max-width: 640px)"),
     );
-    expect(desktop, "the desktop dialog gained a height bound — update this record")
-      .not.toContain("max-height");
-    expect(desktop, "the desktop dialog gained a scroll container — update this record")
-      .not.toContain("overflow-y");
+    expect(desktop, "the desktop dialog lost its height bound — 2R-MOBILE-002 depends on it")
+      .toContain("max-height: calc(100vh - 40px)");
+    expect(desktop, "the desktop dialog lost its scroll container")
+      .toContain("overflow-y: auto");
     // Not vacuous: the slice really is the dialog's own block.
     expect(desktop).toContain("width: min(100%, 460px)");
     expect(desktop).toContain("width: min(100%, 520px)");

@@ -410,6 +410,44 @@
 }
 
 /*
+ * Slice 2R.3 — the occurrence preview inside the composer.
+ *
+ * `2R-MOBILE-002` asks that the preview not push save off screen. Two things do
+ * that together: the shared dialog now bounds its own height and scrolls at
+ * every width (`task-commands.css`), and the list below is short by
+ * construction — `PREVIEW_OCCURRENCES` is three. No `max-height` here, because
+ * a scroll container inside a scroll container is how a control ends up needing
+ * two gestures to reach.
+ */
+.reminder-compose-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.reminder-compose-preview-result {
+  /* Reserved before it has anything to say, so the first sentence is a change to
+     announce rather than a new element nothing reports. */
+  min-height: 20px;
+  display: grid;
+  gap: 4px;
+}
+
+.reminder-compose-preview-rule {
+  margin: 0;
+  font: 650 13px var(--font-ui);
+  color: var(--text-primary);
+}
+
+.reminder-compose-preview-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+  font: var(--type-body);
+  color: var(--text-secondary);
+}
+
+/*
  * Slice 2R.2 — the rule behind a row, the scope question, and the undo.
  *
  * Every rule below sits ABOVE the one media query in this file, which is not
@@ -456,6 +494,18 @@
   border: 1px solid var(--tone-information-line);
   background: var(--tone-information-bg);
   color: var(--tone-information-fg);
+}
+
+/*
+ * The rule in words, beside the badge — `2R-SURFACE-003`, slice 2R.3.
+ *
+ * Not a `.status-badge`: the badge says *that* it repeats and is a chip; this
+ * says *how* and is a phrase, sometimes a long one ("Toda última sexta-feira do
+ * mês"). Chip styling would either truncate it or stretch a pill across the row.
+ */
+.reminder-series-rule {
+  font: var(--type-body);
+  color: var(--text-secondary);
 }
 
 .reminder-series-hint {

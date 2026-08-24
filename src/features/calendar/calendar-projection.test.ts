@@ -23,6 +23,8 @@ type ItemView = {
   href: string | null;
   elapsed: boolean;
   reschedule: { taskId: string; controls: readonly { action: string }[] } | null;
+  /** Slice 2R.3 — the rule in words, for a recurring occurrence. */
+  repeats: string | null;
 };
 
 type ProjectionResult = {
@@ -471,5 +473,86 @@ describe("2M-CAL-009: what a calendar item can be rescheduled with", () => {
     const item = result.days.flatMap((day) => day.items)[0];
     expect(Object.keys(item ?? {})).not.toContain("status");
     expect(Object.keys(item?.reschedule ?? {}).sort()).toEqual(["controls", "taskId"]);
+  });
+});
+
+/**
+ * `2R-SURFACE-003`/`-005` — a recurring occurrence on the calendar. Slice 2R.3.
+ *
+ * ## Why `-005` needed proving rather than building
+ *
+ * *"Recurring occurrences appear on the calendar and the agenda"* was already
+ * true when the slice began, and true **by construction**: a materialised
+ * occurrence is an ordinary `reminders` row, this projection selects reminders
+ * by status and date window, and no predicate here excludes one. The re-audit
+ * found that before any code was written, so the work was to assert it rather
+ * than to add a path -- and an unasserted "already true" is one refactor away
+ * from being false.
+ *
+ * ## Why the label lookup is mocked rather than driven
+ *
+ * ADR-132 Decision 1's lift is "strictly limited to reminders", and
+ * `phase-2m-recurrence-guard.test.ts` enforces that by refusing the recurrence
+ * vocabulary anywhere under `src/features/calendar/`. That applies to this file
+ * as much as to the module it tests: driving the lookup from here would mean
+ * writing the rule's own column names into a calendar test, which is the same
+ * boundary crossing one step removed.
+ *
+ * So the calendar is tested for exactly its own responsibility -- that it asks
+ * the reminders feature and renders what it is told -- and the lookup itself is
+ * proved in `src/features/reminders/repeat-labels.test.ts`, where it belongs.
+ */
+vi.mock("@/features/reminders/repeat-labels", () => ({
+  loadReminderRepeatLabels: vi.fn(async () => repeatLabels),
+}));
+
+let repeatLabels: ReadonlyMap<string, string> = new Map();
+
+describe("2R-SURFACE-005: a series occurrence is on the calendar like any reminder", () => {
+  const occurrence = {
+    id: "r-occ",
+    title: "Tomar o remédio",
+    remind_at: "2026-08-15T12:00:00.000Z",
+    status: "scheduled",
+    entry_id: null,
+    task_id: null,
+  };
+
+  const found = async (labels: ReadonlyMap<string, string>) => {
+    repeatLabels = labels;
+    const result = await load(client({ reminders: { data: [occurrence], error: null } }));
+    return result.days.flatMap((day) => day.items).find((item) => item.id === "reminder:r-occ");
+  };
+
+  it("places it on its day, in the reminder lane", async () => {
+    const item = await found(new Map([["r-occ", "Todo dia"]]));
+    expect(item, "the occurrence did not reach the calendar").toBeDefined();
+    expect(item?.lane).toBe("reminder");
+    expect(item?.date).toBe("2026-08-15");
+  });
+
+  it("says how it repeats, in the owner's words", async () => {
+    const item = await found(new Map([["r-occ", "Todo sábado"]]));
+    expect(item?.repeats).toBe("Todo sábado");
+  });
+
+  it("says nothing about repeating for an ordinary reminder", async () => {
+    // The label map simply has no entry for it, which is what the reminders
+    // feature returns for a reminder that carries no rule.
+    const item = await found(new Map());
+    expect(item).toBeDefined();
+    expect(item?.repeats).toBeNull();
+  });
+
+  it("still places the occurrence when no label came back", async () => {
+    /*
+      A degradation, not a dropped item. The occurrence is a real reminder and
+      belongs on its day whether or not the label lookup answered; losing the
+      note costs the owner a label, and losing the row would cost them the
+      reminder.
+    */
+    const item = await found(new Map());
+    expect(item?.title).toBe("Tomar o remédio");
+    expect(item?.repeats).toBeNull();
   });
 });

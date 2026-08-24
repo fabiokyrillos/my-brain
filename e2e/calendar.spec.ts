@@ -106,6 +106,8 @@ function itemMarkup(options: {
   readonly masked?: boolean;
   readonly reschedulable?: boolean;
   readonly elapsed?: boolean;
+  /** Slice 2R.3: the rule in words, for a recurring occurrence. */
+  readonly repeats?: string;
   readonly locale: Locale;
 }): string {
   const copy = COPY[options.locale];
@@ -145,6 +147,7 @@ function itemMarkup(options: {
       <span class="calendar-item-commitment">${options.commitment}</span>
       <time class="calendar-item-time" datetime="2026-08-15T18:00:00.000Z">15:00</time>
       ${options.elapsed ? '<span class="calendar-item-elapsed">Já passou</span>' : ""}
+      ${options.repeats ? `<span class="calendar-item-repeats">${options.repeats}</span>` : ""}
     </span>
     <span class="calendar-item-body">${body}</span>
     ${controls}
@@ -307,6 +310,39 @@ for (const locale of ["pt-BR", "en"] as const) {
       await expect(target.locator(".calendar-item")).toHaveAttribute("data-elapsed", "true");
       await expect(target.locator(".calendar-item-elapsed")).toBeVisible();
       await expect(target.locator("details.calendar-reschedule")).toHaveCount(1);
+    });
+
+    test("a recurring occurrence says how it repeats, in text and with contrast", async ({ page: target }) => {
+      /*
+        `2R-SURFACE-003` and `2R-ACCESS-004`, slice 2R.3.
+
+        Text rather than an icon, for the same reason the elapsed marker above
+        is text: a mark whose meaning is only its shape is a mark half the
+        readers do not get. Measured on the RENDERED page with the real
+        stylesheet, because a fixture lane that inlines CSS by hand measures
+        something the product does not do -- which is how Phase 2Q's signed
+        premise turned out to be false.
+      */
+      await open(target, locale, [
+        itemMarkup({
+          lane: "reminder",
+          commitment: "committed",
+          title: "Tomar o remédio",
+          repeats: locale === "pt-BR" ? "Todo dia" : "Every day",
+          locale,
+        }),
+      ]);
+      const badge = target.locator(".calendar-item-repeats");
+      await expect(badge).toBeVisible();
+      await expect(badge).toHaveText(locale === "pt-BR" ? "Todo dia" : "Every day");
+      // It is drawn by a rule rather than by the user-agent default: a class
+      // matching nothing renders, passes and looks finished in a diff.
+      const drawn = await badge.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { border: style.borderTopWidth, background: style.backgroundColor };
+      });
+      expect(drawn.border).not.toBe("0px");
+      expect(drawn.background).not.toBe("rgba(0, 0, 0, 0)");
     });
 
     test("a highly sensitive item withholds its title and keeps its date controls", async ({ page: target }) => {

@@ -115,6 +115,21 @@ export function ReminderSeriesControls({
         <span className="status-badge reminder-series-badge">
           <Repeat aria-hidden="true" size={12} /> {copy.badge}
         </span>
+        {/*
+          `2R-SURFACE-003` asks for two things — that it repeats, **and how** —
+          and the second is the half a badge alone cannot carry. The sentence
+          arrives already built: `projection.ts` parses the rule and describes it
+          server-side, so this component is never handed a rule it could print by
+          accident (`2R-SURFACE-004`).
+
+          Absent rather than blank when the description is `null`, which means
+          the stored rule did not parse. Saying "this repeats" without claiming
+          to know how is the honest half; a wrong description is worse than a
+          missing one.
+        */}
+        {series.description === null ? null : (
+          <span className="reminder-series-rule">{series.description}</span>
+        )}
         {series.detached ? (
           <span className="status-badge reminder-series-detached">{copy.detachedBadge}</span>
         ) : null}

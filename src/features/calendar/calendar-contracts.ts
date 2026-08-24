@@ -90,6 +90,20 @@ export type CalendarItemView = {
    * Deliberately **not** `readonly status: string`: see `CalendarRescheduleTarget`.
    */
   readonly reschedule: CalendarRescheduleTarget | null;
+  /**
+   * `2R-SURFACE-003` — that this occurrence repeats, and how. Slice 2R.3.
+   *
+   * **A sentence, never a rule.** It is produced by
+   * `describeRecurrenceRule`, the reminders feature's single formatter, and the
+   * calendar imports that rather than describing a rule itself. Two surfaces
+   * phrasing one rule differently is `2R-TZ-SECOND-AUTHORITY`'s shape one level
+   * down, and the requirement asks *every* surface that lists a recurring
+   * reminder to say the same thing.
+   *
+   * `null` for everything that is not a repeating reminder's occurrence, which
+   * is every other lane and most reminders.
+   */
+  readonly repeats: string | null;
 };
 
 /** One day column, whether or not anything is in it. */

@@ -467,6 +467,24 @@
    piece set at full ink. */
 .calendar-item-time { color: var(--text-secondary); }
 
+/*
+ * `2R-SURFACE-003` — the rule, on the calendar. Slice 2R.3.
+ *
+ * Inside `.calendar-item-meta`, which already wraps, so a long sentence
+ * ("Toda última sexta-feira do mês") moves to its own line rather than
+ * stretching the cell. `--tone-information-*` matches the badge the reminders
+ * list uses for the same fact, because two surfaces saying one thing should look
+ * like it — and it is deliberately not `attention`, the amber this product
+ * reserves for "precisa de você".
+ */
+.calendar-item-repeats {
+  padding: 0 6px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--tone-information-line);
+  background: var(--tone-information-bg);
+  color: var(--tone-information-fg);
+}
+
 .calendar-item-body {
   overflow-wrap: anywhere;
 }

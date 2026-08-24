@@ -299,7 +299,7 @@ describe("cancelling an occurrence that carries a rule", () => {
 
   const withSeries = (overrides: Partial<ReminderViewModel["series"]> = {}) =>
     reminder({
-      series: { id: SERIES_ID, active: true, detached: false, sequence: 2, ...overrides },
+      series: { id: SERIES_ID, active: true, detached: false, sequence: 2, description: "Todo dia", ...overrides },
     });
 
   const openCancel = async () => {

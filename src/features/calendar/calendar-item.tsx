@@ -90,6 +90,18 @@ export function CalendarItem({
         <span className="calendar-item-commitment">{commitment}</span>
         <time className="calendar-item-time" dateTime={item.at}>{time}</time>
         {item.elapsed ? <span className="calendar-item-elapsed">{copy.item.elapsed}</span> : null}
+        {/*
+          `2R-SURFACE-003`, slice 2R.3 — that it repeats, and how.
+
+          Text rather than an icon, for the reason the line above this one gives:
+          a mark carrying meaning only in its shape is a mark half the readers do
+          not get. The sentence arrives already built by the reminders feature's
+          one formatter, so this surface and the reminders list cannot phrase the
+          same rule differently.
+        */}
+        {item.repeats === null ? null : (
+          <span className="calendar-item-repeats">{item.repeats}</span>
+        )}
       </span>
       <span className="calendar-item-body">
         {item.title === null ? (

@@ -54,3 +54,38 @@ export const IDLE_REMINDER_SERIES_STATE: ReminderSeriesActionState = {
   scope: null,
   undoId: null,
 };
+
+/**
+ * `2R-SURFACE-002` — the next occurrences, before saving.
+ *
+ * ## Why the dates are strings and not instants
+ *
+ * They arrive from `public.reminder_series_preview`, which resolves the rule in
+ * the **owner's** profile zone, and they are formatted on the server by the same
+ * `Intl` instance bound to that zone. Handing a component an ISO string and a
+ * formatter would put a second zone decision in the browser, which is the whole
+ * of what `2R-TIME-006` forbids — and the browser's zone is very often right,
+ * which is what makes the mistake survive review.
+ *
+ * ## Why an empty list is a state rather than an error
+ *
+ * `2R-TRUST-006`: a horizon the rule never reaches produces no row and no guess.
+ * A yearly rule anchored beyond the RPC's scan simply has nothing to show, and
+ * saying so is different from failing.
+ */
+export type ReminderSeriesPreviewState = {
+  readonly status: "idle" | "ready" | "error";
+  /** Already formatted in the owner's zone and locale. Never an ISO instant. */
+  readonly occurrences: readonly string[];
+  /** A sentence for the owner when the preview could not be produced. */
+  readonly message: string;
+  /** The rule in words, so the preview can be checked against what was derived. */
+  readonly description: string | null;
+};
+
+export const IDLE_REMINDER_SERIES_PREVIEW: ReminderSeriesPreviewState = {
+  status: "idle",
+  occurrences: [],
+  message: "",
+  description: null,
+};
