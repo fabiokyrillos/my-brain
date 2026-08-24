@@ -13212,3 +13212,154 @@ Then, with no further authorization needed:
 
 **And the migration budget has not moved.** Phase 2R allocated one and spent it
 in 2R.1. Slices 2R.2 and 2R.3 created none between them.
+
+## §123 — The device checkpoint found two defects, and neither needed a migration (2026-08-24)
+
+**`2R-MOBILE-003` ran and came back partial.** The owner tested slice 2R.3 on an
+iPhone PWA: the recurrence control is usable, the preview appears, the Create
+button stays reachable, the recurring reminder was created correctly — **and two
+real defects, both of which had been sitting in the product longer than this
+slice.**
+
+The checkpoint is **not discharged**. A checkpoint that found defects has to be
+run again after they are fixed, and `2R-CLOSE-009` refuses a record that closes
+it any other way. It is classified **undelivered — awaiting a second run**, and
+slice 2R.4 is still not started.
+
+### What landed
+
+| | |
+|---|---|
+| corrective PR | #300, merged `f9062f06b809ae8a43553af0e91834e0e12ed9d5` |
+| migrations | **zero created.** 101 = 101, parity `202608230101` |
+| gates | lint 0 errors · typecheck clean · **9276/9276** · build passes |
+
+### Defect 1 — the model always held seven days; the surface offered one
+
+*"Para repetir segunda, quarta e sexta, eu teria de criar três lembretes."*
+
+**The contract was proved before a line was written**, because the plan makes a
+required contract change a stop condition. Against the deployed database:
+`create_reminder_series_v1` with `weekdays: [1,3,5]` **stores the rule verbatim**
+and materialises **one** occurrence; the live occurrence landed on the first
+*matching* weekday rather than the anchor's own; `edit_future` moved it to
+`[2,4]`; and `[]`, `[3,1]`, `[1,1]` were each refused at the CHECK constraint.
+
+**No migration. No contract change.** The gap was one line in
+`deriveRecurrenceRule`, which collapsed `weekly` to `[anchor.weekday]`.
+
+Seven checkboxes now, rendered **only** for `weekly`. Normalisation — range,
+duplicates, ascending order — lives in the derivation, because each one is
+otherwise a refusal the owner meets *after* pressing save. The operation key
+carries the days, so two different sets on one title and date cannot mint one
+key.
+
+**The stop condition was re-evaluated rather than assumed.** The day picker is
+new surface, and `2R-SURFACE-001` says the modal gains the control *without
+becoming a form*. It is still not one, and the guard measures it: named inputs
+five → **six**, one name for seven controls, conditional on one frequency, while
+`monthlyDay`, `monthlyWeekday` and `yearly` still take every parameter from the
+date above them.
+
+### Defect 2 — the zoom was never this slice's surface
+
+*"O iPhone aplica zoom e o modal fica visualmente quebrado."*
+
+Safari zooms into any focused field below **16px** and does not zoom back out.
+Everything after that is consequence: the page is wider than the screen, so a
+centred dialog sits half off it and its primary action cannot be reached. **The
+"modal quebrado" was a symptom, not a second bug.**
+
+`--type-body` is 13.5px, and a census found **nineteen field rules across ten
+stylesheets** below the line. Every text field in the product did it.
+
+**And it was already known, twice.** `globals.css` carried an explicit
+`font-size: 16px` right after `font: var(--type-body)` on `.auth-form input` and
+`.settings-fields input` — two surfaces where somebody met the bug and fixed it
+locally. *The fix worked and did not spread*, which is exactly why every field
+added afterwards reintroduced it.
+
+One floor now, in the sheet every page loads. No `user-scalable=no` and no
+`maximum-scale`: both would remove the reader's ability to zoom deliberately, an
+accessibility regression traded for a layout one.
+
+Also `dvh` on the shared dialog with `vh` **ordered before it** as the fallback.
+`100vh` on iOS is the viewport with the browser chrome hidden, so a dialog
+bounded by it is taller than the space it has — and taller still once the
+keyboard is up, which is precisely when the button is needed. **That unit was
+mine, introduced by slice 2R.3.**
+
+### The finding that outlives both: a pointer query is not a device
+
+The floor was first scoped `(pointer: coarse), (max-width: 640px)`, and the
+rendered-page case written to prove *"the desktop type scale is untouched"*
+**failed in CI**:
+
+> `Error: the touch floor is matching at 1280px` — Expected `false`, received
+> `true`.
+
+**Headless Chromium reports `pointer: coarse` at 1280×800.** A pointer media
+query describes the *primary input device*, which a headless browser, a
+touchscreen laptop and a docked tablet each answer in ways that have nothing to
+do with whether Safari will zoom. My scoping was broader than my claim, and my
+own test is what said so.
+
+Scoped by **width alone** now — `max-width: 1024px`, chosen over the dialog's
+`640px` because an iPhone in landscape is 844px and a tablet is wider still, and
+both zoom. A small laptop picks up 16px fields as a consequence: larger and more
+legible rather than broken, which is the right way round when the two failure
+modes are *slightly bigger text* and *the page zooms and the owner cannot reach
+the button*.
+
+**And the lesson underneath it:** I pushed the first version without running the
+lane in a real browser, and CI had to tell me. The second version was verified
+locally first — 40 tests, the whole mobile lane — before it was pushed. *A test
+that asserts a claim about a browser has to be run in one.*
+
+### Two corrections the repository made during the fix
+
+**The linter refused an effect that seeded state.** The picker's initial day was
+first set by a `useEffect` watching the date, and `react-hooks/set-state-in-effect`
+rejected it outright. It was right — that is the shape this repository has
+recorded three times as the version that flickers. The value is **derived** per
+render instead, with `null` meaning *the owner has not answered*; the effect and
+its companion `touched` flag both disappeared.
+
+**The field-count guard fired** on `weekdays`, which is what it is for. Updating
+it was a deliberate act with the reason written where the count is, rather than a
+number raised until a test went quiet.
+
+### Where the next session starts
+
+**With the owner, and with the same device.** The checkpoint is owed a second
+run:
+
+1. open `/pt-BR/app/reminders` on the phone;
+2. create a reminder repeating on **Monday, Wednesday and Friday** — one
+   reminder, three days;
+3. confirm that **tapping a field no longer zooms**, and that the page is not
+   left magnified afterwards;
+4. confirm the Create button is still reachable with the day picker and the
+   preview both open.
+
+Then, with no further authorization needed: record the outcome, re-classify
+`2R-MOBILE-003`, re-audit slice 2R.4 against `main` — it is `2R-NOTIFY-001` …
+`-007` and has **no migration** — and continue 2R.4 → 2R.5.
+
+### Carried forward, none discharged
+
+- **`2R-AXE-MANUAL-LANE`** — the axe pass and the authenticated phone-viewport
+  assertions run only in the manual lane. The **public** surfaces now have a
+  rendered-page field-size assertion in CI, which narrows this remainder without
+  closing it.
+- **`2R-OCCURRENCE-CANCEL-IRREVERSIBLE`** — needs DDL.
+- **`2R-UNDO-LEDGER-NOT-CLOSED`** — measured, not repaired. 1 of 20 handlers.
+- **`2R-TZ-SECOND-AUTHORITY`** — routed by ADR-134.
+- **`2R-TASK-RECURRENCE`** — out by `OD-2R-6`.
+- **`OD-2R-9`'s two defects**; **the interval gap**, refusal still pinned.
+- **Unchanged:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**;
+  `2P-ATTENTION-008`; `RG-DEP-3`; push HTTP 403; `2P-CHAT-007-JOURNEY`; ADR-055
+  expiring 2026-10-27. Signup closed, rollout 25 · 3 · 2. Phase 2S not started.
+
+**The migration budget has not moved.** One allocated, spent in 2R.1. Slices
+2R.2, 2R.3 and this correction created none between them.
