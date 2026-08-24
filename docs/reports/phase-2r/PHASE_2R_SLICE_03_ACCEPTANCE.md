@@ -13,12 +13,12 @@
   exact merge SHA** and on the head `0c5f3c5` before it.
 - **Hosted writes: none. AI calls: none. BYOK credit spent: none.**
 
-> **`2R-MOBILE-003` has RUN TWICE, and is still not delivered.** The first run
-> returned two defects, the second returned three more. A checkpoint that found
-> defects is a checkpoint that has to be run again after they are fixed, and
-> `2R-CLOSE-009` refuses a record that closes it any other way. §10–§13 record
-> the first run; §14–§19 the second, including the one whose report said
-> *visual* and whose cause was a wrong write. **Awaiting a third run.**
+> **`2R-MOBILE-003` IS DELIVERED — approved on the owner's own iPhone at the
+> THIRD run (2026-08-24).** It took three: the first returned two defects, the
+> second three more, and the third confirmed every item. §10–§13 record the first
+> run, §14–§19 the second — including the one whose report said *visual* and
+> whose cause was a wrong write — and §20 the approval. Nothing automated closed
+> it, which is what `2R-CLOSE-009` exists to require.
 
 ---
 
@@ -173,7 +173,7 @@ Stated rather than implied, because the difference is the whole of
 | `2R-ACCESS-005` | **built** | no record in this phase describes any part of it as screen-reader evidence; `phase-2r-declarations.test.ts` enforces it and was not touched |
 | `2R-MOBILE-001` | **partial** | now asserted at 375px on a **rendered page in CI** for the public surfaces (§12), and in the manual lane behind auth. The remainder is the lane, not the behaviour |
 | `2R-MOBILE-002` | **built** | the dialog gained a height bound and a scroll container at every width (§3), guarded by the inverted 2R.0 assertion; the journey scrolls save into view and asserts it is in the viewport |
-| `2R-MOBILE-003` | **undelivered — awaiting a THIRD run** | the checkpoint has run **twice**. The first returned two defects (§11–§12), the second three more (§14–§17). All five are fixed; a checkpoint that found defects has to be run again after they are. **Not substituted, not claimed** |
+| `2R-MOBILE-003` | **delivered** | approved on the owner's own iPhone at the **third** run, 2026-08-24 (§20). Three runs, five defects, all fixed and each re-tested on hardware. **Not substituted and not claimed** — no Playwright project, including the emulated WebKit one, was ever offered as evidence for it |
 
 **Sixteen addressed here; 47 of 73 cumulatively.** Two are `partial` with a named
 remainder and one is `undelivered` with a destination, as `2R-CLOSE-002`
@@ -512,3 +512,35 @@ the offset was the answer.
 8. tap outside again and confirm the discard;
 9. repeat with **Escape** on the desktop;
 10. confirm there is still no zoom and no sideways scrolling.
+
+## 20. The third run — approved
+
+`2R-MOBILE-003` **ran a third time on the owner's own iPhone and passed.** Every
+item on the list came back confirmed:
+
+| Checked on hardware | Result |
+|---|---|
+| Monday, Wednesday and Friday stay ticked after opening **and refreshing** the preview | pass |
+| one recurrence saved, carrying all three days | pass |
+| the page behind the modal does not scroll | pass |
+| tapping outside a **clean** form closes immediately | pass |
+| tapping outside a **changed** form asks first | pass |
+| *continuar editando* preserves the whole content | pass |
+| confirming the discard closes correctly | pass |
+| no zoom, no sideways scrolling | pass |
+| Escape on the desktop follows the same clean/changed rule | pass |
+
+**Three runs, five defects.** Two found by the first run, three by the second,
+and none by the third. The record is worth keeping in that shape rather than
+flattened into "the checkpoint passed", because the thing that made it work was
+re-running it after every fix instead of reasoning that the fix must have held.
+
+**What closed it was a person with the device.** No automated lane was offered as
+a substitute at any point — not the jsdom suite, not the CI journeys, and
+explicitly not the `iphone-emulated` Playwright project, which runs on WebKit and
+is still not an iPhone. `2R-CLOSE-009` asks for exactly that distinction, and
+the three-run history is the evidence that it was honoured rather than asserted.
+
+**Slice 2R.3 is closed.** Every requirement it carries is classified, and the
+remainders it carries forward are unchanged and undischarged:
+`2R-AXE-MANUAL-LANE`, `2R-RECURRENCE-LANE-UNRUNNABLE`, `2R-DRAWER-NOT-LOCKED`.
