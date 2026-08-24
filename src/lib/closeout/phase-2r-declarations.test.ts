@@ -440,14 +440,30 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
        * remaining entries below still cannot appear early.
        */
       "docs/reports/phase-2r/PHASE_2R_SLICE_01_DEPLOYMENT.md",
+      /*
+       * Two more, moved across in place as their slices landed.
+       *
+       * 2R.2 merged as `8c13c7b` with CI green 3/3 at that exact merge SHA;
+       * 2R.3 merged as `30df320`. Both created zero migrations, so neither
+       * brings a deployment record with it — parity stays `202608230101` and
+       * `PHASE_2R_SLICE_02_DEPLOYMENT.md` would be a record of something nobody
+       * did, which is why no such entry appears on either list.
+       *
+       * **2R.2's record is late and says so in its own first paragraph.** The
+       * slice merged without one, which this assertion could not catch: it
+       * refuses a record that arrives EARLY, and nothing here refused one that
+       * never arrived. The traceability contract requires five, and the count is
+       * asserted at closeout rather than per slice — a gap worth naming, since
+       * the next author will meet it in the same order.
+       */
+      "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
+      "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
     ]) {
       expect(existsSync(join(REPO, present)), `${present} is missing`).toBe(true);
     }
     for (const forbidden of [
       "docs/reports/phase-2r/PHASE_2R_TRACEABILITY_MATRIX.md",
       "docs/reports/phase-2r/PHASE_2R_CLOSING_REPORT.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_02_ACCEPTANCE.md",
-      "docs/reports/phase-2r/PHASE_2R_SLICE_03_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_04_ACCEPTANCE.md",
       "docs/reports/phase-2r/PHASE_2R_SLICE_05_ACCEPTANCE.md",
       "scripts/generate-phase-2r-traceability.mjs",
