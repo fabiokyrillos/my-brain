@@ -14,7 +14,7 @@ built in slice 2S.4, by `2S-CLOSE-001`.
 ## 1. The vocabulary
 
 Exactly five classes. A requirement gets **exactly one**, and every one of the
-**74** must get one.
+**99** must get one.
 
 | class | means | requires |
 |---|---|---|
@@ -105,7 +105,9 @@ requirement in PRD §3.
 | 17 | an inherited remainder from PRD §7.1 is **absent** from the closing record | `2S-CLOSE-008` |
 | 18 | a document produced by this phase **claims push works** | `2S-TRUST-008` |
 | 19 | the closing record does not state what `2S-CLOSE-012`'s re-measurement found | `2S-CLOSE-012` |
-| 20 | the matrix on disk **differs** from a fresh generation | `2S-CLOSE-001` |
+| 20 | an inline verb dispatches to a **writer that did not exist at slice 2S.0's baseline** | `2S-TRUST-010`, `2S-CLOSE-013` |
+| 21 | the closing record does not name the Server Action **each** inline verb dispatched to | `2S-CLOSE-013` |
+| 22 | the matrix on disk **differs** from a fresh generation | `2S-CLOSE-001` |
 
 ---
 
@@ -130,6 +132,35 @@ must be able to say so without either lying or manufacturing a change.
 to `built` must make the generator exit non-zero, and restoring it must make the
 generator exit zero. A refusal nobody has seen fire is a refusal nobody has
 tested.
+
+---
+
+## 4b. Refusal 20, and why `OD-2S-3` B needs a refusal of its own
+
+**The owner signed `OD-2S-3` B against this package's recommendation.** The
+recommendation's objection was that inline task controls risk a **second
+authority** over a task's status. That objection is not discarded and it is not
+an argument any more — it is refusal 20.
+
+**The mechanism.** Slice 2S.0 records every Server Action, RPC and mutation path
+that exists at the phase's baseline (`2S-FOUNDATION-003`, `-004`). At closeout,
+the generator reads the set each inline verb dispatched to and **refuses if any
+of them is not in that baseline**. A writer added in slice 2S.2 and then
+described as pre-existing fails, because the baseline is a recorded artifact
+taken before the writing started, not a claim made after it.
+
+**Why it is a refusal rather than a review note.** A reuse claim nobody can fail
+is a reuse claim nobody checked. This repository has the finding written down
+from Phase 2R: *a contract stated in prose is not a contract anybody enforces*,
+and it cost five misfiled requirements across five slices.
+
+**Its mutation control:** naming a writer absent from the 2S.0 baseline must make
+the generator exit non-zero, and restoring the real set must make it exit zero.
+
+**The stop condition is upstream of the refusal.** `2S-TRUST-010` halts the phase
+the moment an inline verb *needs* a new writer, which is meant to happen in slice
+2S.2 rather than at closeout. Refusal 20 is the backstop for the case where
+nobody noticed.
 
 ---
 
@@ -163,7 +194,7 @@ this package.
 1. **No classification.** No requirement in this package carries a delivery
    class, and no document here states one.
 2. **No acceptance record**, and no execution matrix. Both are slice artifacts.
-3. **No created migration.** The budget is **1 proposed · 0 allocated**, and the
+3. **No created migration.** The budget is **1 allocated · 0 created**, and the
    migration file count attributable to this phase is asserted at **zero**.
 4. **No signed decision that no ADR names.** Every `OD-2S-*` is OPEN until an
    accepted ADR names it, and a recommendation is not a signature.
@@ -173,8 +204,14 @@ this package.
 6. **No count typed in prose that the tables do not support.** Phase 2R's PRD
    said *"fifty-two across nine families"* while the tables held 73 across ten.
    The sentence is asserted **against the derived count**, in both directions.
-7. **No family name containing a digit.** Two-sided: the ten declared families
+7. **No family name containing a digit.** Two-sided: the eleven declared families
    pass, and a digit-bearing family is proved invisible to the same pattern.
+8. **No identifier renumbered, reused or removed by a signature.** ADR-137 added
+   25 requirements, all **appended** — `2S-ACT` as a new family and thirteen at
+   the ends of seven existing ones. Every pre-signature identifier is still
+   present and still means what it meant, so a reference written before the
+   signature still resolves. The declarations guard asserts this by listing the
+   pre-signature set by name.
 
 ---
 
@@ -182,11 +219,11 @@ this package.
 
 | moment | statement |
 |---|---|
-| **now** | **1 proposed · 0 allocated · 0 spent · 0 created.** 101 local = 101 hosted, parity `202608230101` |
-| **at allocation** | an accepted ADR answers `OD-2S-7`. Allocation is **not** permission to create |
+| **now** | **1 allocated · 0 spent · 0 created** — `OD-2S-7` A, signed by ADR-137. 101 local = 101 hosted, parity `202608230101` |
+| **the ceiling under `OD-2S-3` B** | unchanged at one. Every inline verb routes to an existing authority, so the surface needs no schema of its own; if one turns out to, that is a **second migration and a stop condition** |
 | **at slice 2S.1** | one file created, applied, parity **+1**, hosted proof recorded |
 | **at closeout** | allocated, spent and applied reconciled against **live** local and hosted counts. A disagreement halts closeout (refusal 13) |
 
-**Proposed is not allocated, allocated is not created, and a budget whose ceiling
+**Allocated is not created, signed is not authorized, and a budget whose ceiling
 is not also its stop condition is not a budget.** A second migration of any kind
 halts the phase and returns to the owner.

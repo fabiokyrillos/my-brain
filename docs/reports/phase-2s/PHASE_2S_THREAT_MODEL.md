@@ -238,6 +238,124 @@ and the declaration guard's forbidden successor directories.
 
 ---
 
+## The five `OD-2S-3` B added
+
+**The owner signed B against this package's recommendation, and named these risks
+in the same message.** They are modelled here because a decision taken over an
+objection needs the objection turned into controls, not dropped.
+
+### `T-2S-15` — a second authority over a task's status
+
+**What could go wrong.** The notification surface acquires its own completion or
+reschedule path — a Server Action, an RPC, or a direct write — and the product
+has two places that decide what completing a task means. They then drift: one
+learns about dependencies, undo compensation or project links and the other does
+not.
+
+**Why it is real here.** It is exactly what this package recommended against, and
+the repository has met it before: `detail-controls.ts:66-71` declares
+`RENDERED_ELSEWHERE` — `complete_task`, `reopen_task`, `set_status` — because
+rendering them again *"would put two routes to one transition on one screen."*
+The pull toward a second copy is strongest when the first one's props are
+inconvenient, and here they are: `WorkItemActions` wants a `WorkItemView` a
+notification row does not have.
+
+**Mitigation.** `2S-ACT-003` and `2S-ACT-004` name the destinations.
+`2S-TRUST-010` censuses every Server Action the surface dispatches to and
+requires each to have existed before the phase — **and makes a new writer a stop
+condition**, not a finding. `2S-CLOSE-013` re-proves it at closeout against slice
+2S.0's recorded baseline, so the census cannot be satisfied by a writer added
+halfway through and then described as pre-existing.
+
+**Disposition: OPEN — planned. The item that carries `OD-2S-3` B's whole risk.**
+
+### `T-2S-16` — one action applied twice
+
+**What could go wrong.** A double tap on a phone, a retried dispatch, or a row
+re-rendered under a pending action completes a task twice, reschedules twice, or
+writes two suppressions.
+
+**Why it is real here.** The inline row is denser than any surface that already
+carries these verbs, and a compact menu invites repeat taps. The existing guard
+is real but subtle: `work-item-actions.tsx:62-84` mints an operation key **per
+(row, action) pair, in a ref, lazily** — never in the render body, because
+`useActionState`'s pending→settled transition is itself a re-render and
+StrictMode double-renders in development. A reimplementation that mints in render
+would defeat it silently.
+
+**Mitigation.** `2S-ACT-007` disables the control while pending **and** asserts a
+forced double dispatch produces one write, by reading rows rather than by reading
+the disabled attribute. `2S-TRUST-011` reuses and exercises the existing
+idempotency refusal from this surface.
+
+**Disposition: OPEN — planned.**
+
+### `T-2S-17` — a stale control writing anyway
+
+**What could go wrong.** The notice was rendered when the task was `inbox`; by
+the time the owner taps *concluir* it is `cancelled`, or already completed, or
+its due date moved. The control writes against a state that no longer exists.
+
+**Why it is real here.** This surface's rows are **projections**, and the
+projection is read at render time. `WorkItemActions` needs a `WorkItemView` the
+notification row must build, so the gap between what the control believes and
+what the row is can be arbitrarily long — a notification page left open is the
+normal case, not the edge one.
+
+**Mitigation.** The refusal already exists: `applyTaskDetailCommand` returns
+`stale_pre_state` with `refreshable: true` (`detail-actions.ts:199`).
+`2S-TRUST-012` requires it to be reached **from this surface**, with a row changed
+underneath a rendered control — an existing guard that has never been fired from
+a new caller is an assumption, not a control. `2S-ACT-005` narrows the window by
+deriving eligibility from `isEligibleStatus`, and `2S-ACT-008` requires the
+refusal to carry the reload it needs.
+
+**Disposition: OPEN — planned.**
+
+### `T-2S-18` — an undo that reports success and restores nothing
+
+**What could go wrong.** The row offers *desfazer*, the affordance reports
+success, and the task is not restored — or the ledger row is never marked
+`undone`, so the operation stays replayable.
+
+**Why it is real here.** This is not hypothetical in this repository.
+**`2R-UNDO-LEDGER-NOT-CLOSED` is a live example**: `private.undo_apply_reminder_command_v1`
+never sets `status = 'undone'`, so a Phase 2P reminder-command undo stays
+replayable for 24 hours and the router's idempotent branch is unreachable for it.
+It shipped because `undo_operation_routing.sql` asserted nothing about `status`.
+Offering an undo from a new surface multiplies the number of places that defect
+can hide.
+
+**Mitigation.** `2S-ACT-009` requires the affordance to be the one the Work
+surfaces already mount, exercised against the database. `2S-TRUST-013` requires
+every undo to be followed by a read of **the ledger row and the restored
+subject** — a control reporting success with no ledger row is a defect, not a
+finding.
+
+**Disposition: OPEN — planned.**
+
+### `T-2S-19` — the two surfaces diverging
+
+**What could go wrong.** `/app/notifications` and *Precisa de você* offer
+different verbs, or the same verb with different meanings, or one reflects an
+action the other does not. The owner learns two products.
+
+**Why it is real here.** `OD-2S-3` B and `OD-2S-5` B were signed together, so the
+same six verbs must exist in two places — and the cheapest way to build the
+second is to copy the first. The owner named this risk directly: *"mesma
+semântica na página de Notificações e dentro de 'Precisa de você'"* and *"não
+duplicar o mesmo assunto nas duas fontes da projeção de atenção."*
+
+**Mitigation.** `2S-ACT-011` reads the verb set and its copy from **one** source
+and asserts equality across both surfaces — a verb present in one and absent from
+the other fails. `2S-ATTENTION-008` requires an action taken in one to be
+readable from the other. `2S-ATTENTION-002` keeps a subject arriving from two
+sources from being shown twice, with a control that **plants both**.
+
+**Disposition: OPEN — planned.**
+
+---
+
 ## Inherited properties this phase must not weaken
 
 Named so that a regression is a **failure**, not a discovery.
@@ -258,8 +376,13 @@ Named so that a regression is a **failure**, not a discovery.
 
 ## Summary
 
-**Fourteen threats, all OPEN — planned. Zero closed, and none may be reported as
+**Nineteen threats, all OPEN — planned. Zero closed, and none may be reported as
 closed before slice 2S.4 re-dispositions each against what was actually built.**
+
+**Five of the nineteen exist because the owner overrode a recommendation.**
+`OD-2S-3` B was signed deliberately, and the objection it overrode is not
+discarded — it is `T-2S-15` … `T-2S-19`, each with a requirement and, in one
+case, a stop condition.
 
 | threat | one line |
 |---|---|
@@ -277,6 +400,11 @@ closed before slice 2S.4 re-dispositions each against what was actually built.**
 | `T-2S-12` | push reported as working |
 | `T-2S-13` | a hardware proof discharged by a document |
 | `T-2S-14` | the successor phase starting by accident |
+| `T-2S-15` | **a second authority over a task's status — the item that carries `OD-2S-3` B's whole risk** |
+| `T-2S-16` | one action applied twice |
+| `T-2S-17` | a stale control writing anyway |
+| `T-2S-18` | an undo that reports success and restores nothing |
+| `T-2S-19` | the two surfaces diverging |
 
 **What would have to happen for any of these to close:** its mitigation must
 exist in merged code, and a test or a person must have **exercised** it. Slice

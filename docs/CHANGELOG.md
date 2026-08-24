@@ -3,6 +3,94 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-24 - Phase 2S: all ten decisions SIGNED — ADR-137, and one of them overrides the recommendation
+
+**ALL TEN OWNER DECISIONS ARE SIGNED — ADR-137. IMPLEMENTATION IS STILL NOT
+AUTHORIZED.** `OD-2S-1` A · `OD-2S-2` A · **`OD-2S-3` B** · `OD-2S-4` B ·
+`OD-2S-5` B · `OD-2S-6` A · `OD-2S-7` A · `OD-2S-8` A · `OD-2S-9` A · `OD-2S-10`
+A. Nine took the recommendation. **Signed is not authorized:** no slice may
+start, no product code may be written and no migration file may be made until a
+separate ADR exists.
+
+**`OD-2S-3` was signed B against the package's recommendation, deliberately.**
+The package recommended A — fix the notice's destination and let the existing
+task detail do the acting — because inline controls risk a second authority over
+a task's status. The owner overrode it and gave the reason: the theme requires
+acting on the notice itself, and a corrected link alone does not deliver it.
+
+**The recommendation is preserved verbatim rather than rewritten into
+agreement.** A package that revises its advice once the answer arrives is a
+package whose advice carries no information, and the next disagreement would be
+unreadable. What changed is the requirement set, not the record of what was
+proposed.
+
+**The objection was converted rather than discarded.** It is now `2S-TRUST-010` —
+**no new write authority, and needing one is a stop condition** — plus
+`2S-ACT-003` and `-004`, which name the Server Actions the task verbs must
+dispatch to, and `2S-CLOSE-013`, which re-proves the reuse at closeout against
+slice 2S.0's recorded baseline. The traceability contract gained **refusal 20**
+for the same property: an inline verb dispatching to a writer absent from that
+baseline refuses.
+
+**The set grew 74 → 99, and every addition was APPENDED.** `2S-ACT` is a new
+family of twelve; thirteen went to the ends of `2S-SILENCE`, `2S-ANSWER`,
+`2S-ATTENTION`, `2S-TRUST`, `2S-ACCESS`, `2S-MOBILE` and `2S-CLOSE`. **No
+identifier was renumbered, reused or removed**, so a reference written against
+the pre-signature package still resolves — asserted by listing the pre-signature
+set by name, so the tidy-looking change that would sort `2S-ACT` into reading
+order fails rather than passing quietly. **99 requirements across eleven
+families and five slices: 75 build · 18 baseline · 6 rule, none classified.**
+
+**Five threats were added, and they are the overridden objection in executable
+form.** `T-2S-15` a second authority over a task's status — the item carrying the
+override's whole risk; `T-2S-16` one action applied twice; `T-2S-17` a stale
+control writing anyway; `T-2S-18` an undo that reports success and restores
+nothing; `T-2S-19` the two surfaces diverging. **Nineteen threats, all OPEN.**
+
+**The reuse is proved rather than asserted**, each authority read from the source
+with its file and line: `work-item-actions.tsx:38` — already mounted **twice** —
+`detail-actions.ts:208`, `agent/actions.ts:501`, `undo-affordance.tsx:54`, and
+`detail-controls.ts:113`. The repository already carries the discipline:
+`detail-controls.ts:66` declares `RENDERED_ELSEWHERE` so one transition never has
+two routes on one screen, and the notification row is a **third mount of a shared
+component**, not a fourth implementation. **The named cost:** `WorkItemActions`
+takes a `WorkItemView` a notification row must project, which is exactly
+`T-2S-17`'s stale-state risk — so `2S-TRUST-012` requires the existing
+`stale_pre_state` refusal to be reached **from this surface**.
+
+**The migration ceiling did not move.** `OD-2S-7` A allocated one; the override
+raises nothing because every inline verb routes to an existing authority. **If an
+inline action turns out to need schema of its own, that is a second migration and
+therefore a stop condition** — not a budget revision. Parity unchanged at
+**`202608230101`, 101 local = 101 hosted**.
+
+**The estimate was recomputed, not adjusted: 7.5 / 15 / 24 working days**,
+~13.5-day critical path, no parallelisable slices. The override cost **+25
+requirements and +3.5 probable days**; slice 2S.2 grew from 8 requirements to 23.
+The pre-signature figure offered *+2 to +3 days*, and the difference is the four
+trust requirements the owner's own contract asked for.
+
+**One count in this package's own first draft was wrong, and it is recorded
+rather than quietly fixed.** Slice 2S.2 was written as *"thirty-one requirements
+— almost a third of the phase"*; re-deriving from the PRD's tables gave **23**. It
+is the exact defect the contract exists to catch, found by the method the
+contract prescribes, in the document that prescribes it.
+
+**`OD-2S-8` stays A, restated by the owner after the override.** Slice 2S.3 now
+does more work in `needs-attention-list.tsx` than the pre-signature plan
+intended, so the temptation to absorb the defect living in that file is stronger.
+Filter preservation on navigation and a linkable search stay in a short separate
+initiative; `2P-ATTENTION-008` and `OD-2R-9`'s two defects are **not** discharged
+by this phase editing their file.
+
+**Changed:** ADR-137 appended to `docs/DECISIONS.md`; PRD, implementation plan,
+threat model, gaps report, traceability contract and requirement coverage all
+updated; `src/lib/closeout/phase-2s-declarations.test.ts` extended to 37 tests
+including the append property and the override record; the active-milestone guard
+inverted for the tenth time, by the same rule it has always held.
+**Unchanged:** every migration, every grant, every RLS policy, signup, the
+rollout gate, every automation category's state, and Phase 2R's closure.
+
 ## 2026-08-24 - Phase 2S AUTHORIZED FOR PLANNING ONLY — ADR-136, and three facts the record had wrong
 
 **PHASE 2S IS AUTHORIZED FOR PLANNING ONLY — ADR-136.** The package is written and **nothing is

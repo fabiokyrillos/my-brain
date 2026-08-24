@@ -181,6 +181,27 @@ phase.
 
 ---
 
+## 4b. What the signatures changed here
+
+**ADR-137 signed all ten decisions on 2026-08-24.** Nine took the recommendation.
+**`OD-2S-3` was signed B against it**, so §2.5's uncomfortable exclusion is now
+both confirmed and sharpened.
+
+**§2.5 stays excluded, and the owner restated it after the override.** Slice
+2S.3 will now do *more* work in `needs-attention-list.tsx` than the pre-signature
+plan intended, and the owner's instruction was explicit: *"Mesmo que o arquivo de
+'Precisa de você' seja alterado, não absorva agora."* Filter preservation and a
+linkable search stay in a short separate initiative. **`2P-ATTENTION-008` and
+`OD-2R-9`'s two defects are not discharged by this phase editing their file** —
+and the temptation to absorb them is now stronger, which is exactly why the
+exclusion is restated rather than assumed.
+
+**§2.1 and §2.6 are unchanged by the signatures.** Chat and review citations stay
+out on the same measured grounds: `conversations` and `summaries` both hold zero
+rows. The credential correction stands independently of any decision.
+
+---
+
 ## 5. The shape of the recommendation
 
 | | |
@@ -188,7 +209,7 @@ phase.
 | **Build** | the answer to what the product says — §1 |
 | **Do not build yet** | chat and citations (§2.1, §2.6), recurring tasks (§2.3) |
 | **Route out** | search continuity (§2.4) → `OD-2S-8` |
-| **Decide, do not build** | the *Precisa de você* filter (§2.5) → `OD-2S-8`, **a close call** |
+| **Decide, do not build** | the *Precisa de você* filter (§2.5) → `OD-2S-8`, **a close call — decided OUT, and restated by the owner after `OD-2S-3` B widened the work on that very file** |
 | **Leave alone** | push, Android, `RG-DEP-3`, `RG-DEP-1`, `RG-QUO-3`, VoiceOver — §3 |
 | **Owner action with a date** | ADR-055, 2026-10-27 — §3.1 |
 | **Prove, do not build** | voice end to end — audit §5.2 |

@@ -5,9 +5,11 @@
 [`PHASE_2S_PRD.md`](./PHASE_2S_PRD.md); nothing here declares a requirement, and
 nothing here allocates a migration.
 
-**Ten decisions are open** and **none is signed**. Requirements depending on an
-unsigned decision are not buildable, and the pull request carrying this package
-stays a **draft** until they are answered.
+**ALL TEN DECISIONS ARE SIGNED — ADR-137, 2026-08-24.** `OD-2S-3` was signed
+**B** against this plan's recommendation, deliberately, and the estimate below is
+**recomputed from the new requirement set** rather than adjusted upward from the
+old one. **Signed is not authorized:** implementation still needs a separate
+owner decision, and until it exists no slice may start.
 
 ---
 
@@ -86,9 +88,11 @@ registered undo, exercised rather than asserted. The cadence rule chosen by
 `OD-2S-4`, bounded and terminating. The notice's destination fixed to its subject
 by `OD-2S-3`.
 
-**This is where the one migration is spent, if the owner allocates it.**
+**This is where the one allocated migration is spent** — `OD-2S-7` A, signed by
+ADR-137. Allocated is still not created: the file may be written only once
+implementation is separately authorized.
 
-- **Migration:** **the one proposed**, if allocated. **Dependencies:** 2S.0.
+- **Migration:** **the one allocated.** **Dependencies:** 2S.0.
 - **Closes on:** the hosted proof — parity advances by exactly one, the new
   object is readable only by its owner, and a two-sided residue control passes.
 - **Stop conditions:** a second migration is needed; the cadence rule cannot be
@@ -102,24 +106,47 @@ by `OD-2S-3`.
 column that a surface reads before a writer fills it is a column whose emptiness
 looks like a product decision.
 
-### Slice 2S.2 — the verbs the owner can say
+### Slice 2S.2 — the verbs the owner can say, and the actions they can take
 
-**Delivers** `2S-SILENCE-007`, `-008`; `2S-ANSWER-001` … `-006`.
+**Delivers** `2S-SILENCE-007`, `-008`, `-011`; `2S-ANSWER-001` … `-008`;
+**`2S-ACT-001` … `-012`.** Twenty-three requirements — the slice grew from 8 to
+23, nearly tripling, and that is `OD-2S-3` B's cost stated rather than absorbed.
 
-The two verbs chosen by `OD-2S-2`, on `/app/notifications` and reachable from the
-attention surface. `dismissed` gains a writer and the copy that says what it
-means — checked against what it does, in both locales. Read and dismiss become
-two controls with two outcomes and two sentences.
+The two silencing verbs from `OD-2S-2`, the two message verbs from `2S-ANSWER`,
+and the two **task** verbs `OD-2S-3` B adds — on `/app/notifications` and with
+the same meanings on the attention surface.
+
+**It stays one slice.** Splitting it would put the message verbs and the task
+verbs in different pull requests, and `2S-SILENCE-011` — the four scopes leaving
+one another untouched — can only be proved once all four exist.
+
+**The count in this heading is derived, not typed.** It was written as
+"thirty-one" first, and re-deriving it from the PRD's own tables gave 23. The
+rule this repository paid for in Phase 2R applies to its own planning documents
+too: a number in prose that nothing recomputes is a number that will be wrong.
+
+**The four scopes, which is the whole of what this slice must not blur:**
+
+| verb | what it changes | what it must leave alone |
+|---|---|---|
+| *Lida* | this message's `status` | the subject, and every other message about it |
+| *Descartar* | this message's presence in the experience | the subject, and the cadence — the next notice still arrives when the rule permits |
+| *Silenciar por um tempo* | equivalent notices about this subject, until an instant | the subject, and this message |
+| *Silenciar este assunto* | equivalent notices about this subject | the subject, and this message |
+| *Concluir* · *Reagendar* | **the task**, and it says so | every message |
 
 - **Migration:** none. **Dependencies:** 2S.1.
-- **Closes on:** both locales; the undo exercised against the database; a
+- **Closes on:** both locales; the undo **exercised** against the database; a
   dismissal proved not to re-create the same subject-day notice by **calling**
-  the function again.
-- **Stop conditions:** a verb cannot be expressed without a second authority over
-  the task's status; the copy for a disposition cannot be made to match its
-  behaviour without changing the behaviour — in which case the behaviour changes
-  and the record says so.
-- **Excludes:** any task status control on the notification surface.
+  the function again; and **the reuse census in `2S-TRUST-010`**, which is the
+  gate that makes `OD-2S-3` B safe rather than merely delivered.
+- **Stop conditions:** an inline verb cannot be expressed without a **new write
+  authority** — halt, the ceiling is the existing Server Actions; an inline verb
+  needs schema of its own — halt, that is a second migration; the copy for a
+  disposition cannot be made to match its behaviour without changing the
+  behaviour, in which case the behaviour changes and the record says so.
+- **Excludes:** any *reimplementation* of a task transition. Dispatching to one
+  is the requirement; owning one is the stop condition.
 
 **Read the product's own copy before assigning meaning to a word.** `dismissed`
 already has a sentence elsewhere in this product; `2S-ANSWER-002` exists because
@@ -127,8 +154,15 @@ a disposition whose copy and behaviour disagree is worse than one with no copy.
 
 ### Slice 2S.3 — where it appears, and on what
 
-**Delivers** `2S-ATTENTION-001` … `-007`; `2S-ACCESS-001` … `-005`;
-`2S-MOBILE-001` … `-005`.
+**Delivers** `2S-ATTENTION-001` … `-008`; `2S-ACCESS-001` … `-007`;
+`2S-MOBILE-001` … `-007`. Twenty-two requirements.
+
+**`OD-2S-3` B lands here too.** The compact menu must be operable by keyboard
+with focus returning to its trigger (`2S-ACCESS-006`), its result announced
+through a region that exists before the result does (`2S-ACCESS-007`), its
+trigger and primary action both reachable with one thumb (`2S-MOBILE-006`), and
+the open menu must not cover the row it acts on (`2S-MOBILE-007`). Acting in
+either surface must be readable from the other (`2S-ATTENTION-008`).
 
 The unanswered notices appear inside *Precisa de você* per `OD-2S-5`, without
 double-counting a subject the list already holds from its own source. Accessible
@@ -150,8 +184,13 @@ viewport — **not against a media query**, because headless Chromium reports
 
 ### Slice 2S.4 — closeout
 
-**Delivers** `2S-CLOSE-001` … `-012`, and the `2S-TRUST` family's final
-disposition.
+**Delivers** `2S-CLOSE-001` … `-013`, and the `2S-TRUST` family's final
+disposition. Twenty-six requirements.
+
+**`2S-CLOSE-013` is `OD-2S-3` B's closing gate:** the record names every Server
+Action each inline verb dispatched to, and the generator **refuses** if the phase
+introduced a writer that did not exist at slice 2S.0's baseline. A reuse claim
+nobody can fail is a reuse claim nobody checked.
 
 The traceability generator — which **refuses rather than emitting a partial
 matrix**, with `--check` proving the committed file byte for byte and a mutation
@@ -173,13 +212,43 @@ removed. Its siblings carry none.
 
 ---
 
+## 2b. What `OD-2S-3` B reuses, measured before the plan claimed it
+
+**The owner's contract requires this to be proved, not asserted.** Every row was
+read from the source on 2026-08-24, at `885f7f7`.
+
+| the owner's verb | the authority it dispatches to | where it already lives | what comes with it, free |
+|---|---|---|---|
+| **concluir a tarefa** | `WorkItemActions`' injected handler (`WorkItemActionHandler`) | `src/features/operations/work-item-actions.tsx:38`, already mounted **twice** — `operations/task-list.tsx:364` and `daily-cycle/task-detail-surface.tsx:99` | per-(row, action) operation keys minted in a ref, the `2E_IDEMPOTENCY_MISMATCH` refusal, the pending state, the outcome rendering |
+| **adiar / reagendar** | `applyTaskDetailCommand` with `reschedule_due` | `src/features/task-commands/detail-actions.ts:208` | boundary validation, the owner's timezone through **one** contract (`resolveOwnerTimeZone`), the `stale_pre_state` refusal with `refreshable: true`, and the destructive/confirmation pairing |
+| **marcar como lida** · **descartar** | `markNotification` | `src/features/agent/actions.ts:501`, already accepting `z.enum(["read","dismissed"])` | the owner check, `assertActiveAccount`, and the route-pattern revalidation Phase 2P repaired |
+| **undo** | `undoWorkOperation` through `UndoAffordance` | `src/features/operations/undo-affordance.tsx:54`, supplied at four call sites today | the expiry boundary, the ledger read, the real compensation |
+| **which verbs a row may offer** | `isEligibleStatus` / `detailControlsFor` | `src/features/task-commands/detail-controls.ts:113` | a control can only exist for a transition the command path would also accept — `2F-SURFACE-009` |
+| **silenciar** (both) | **new**, and the only new authority in the phase | `2S-SILENCE`, on the one allocated migration | — |
+
+**One existing guard already states this slice's central rule.**
+`detail-controls.ts:66-71` declares `RENDERED_ELSEWHERE` — `complete_task`,
+`reopen_task`, `set_status` — with the comment that rendering them again *"would
+put two routes to one transition on one screen."* The notification row is a
+**third mount of the shared component**, not a fourth implementation, and that
+distinction is what `2S-TRUST-010` measures.
+
+**The cost this reuse carries, named rather than discovered.** `WorkItemActions`
+takes a `WorkItemView`. A notification row does not have one, so the slice must
+**project** it — and a projection read at render time is exactly the stale-state
+risk `T-2S-17` describes. `2S-TRUST-012` requires the existing `stale_pre_state`
+refusal to be reached **from this surface**, with a row changed underneath a
+rendered control. That is the assertion that turns a reused guard into a proved
+one.
+
+---
+
 ## 3. Estimate
 
-**Derived for this phase from its own 74 requirements and 5 slices.** No prior
-phase's numbers are recycled: Phase 2R's 6.5 / 13.5 / 21.5 covered 73
-requirements across a migration-heavy recurrence model with three signed
-daylight-saving edge cases, and reusing it would be a guess wearing a number's
-clothes.
+**Recomputed from the signed requirement set — 99 requirements and 5 slices.** It
+is a recomputation, not an adjustment: `OD-2S-3` B added a family and thirteen
+appended requirements, so the per-slice numbers are re-derived rather than nudged
+upward. No prior phase's numbers are recycled.
 
 Working days.
 
@@ -187,15 +256,23 @@ Working days.
 |---|---|---|---|---|
 | 2S.0 — measure | 7 | 0.5 | 1 | 1.5 |
 | 2S.1 — model, cadence, destination | 21 | 2 | 3.5 | 5.5 |
-| 2S.2 — the verbs | 8 | 1 | 2 | 3 |
-| 2S.3 — where it appears | 17 | 1.5 | 3 | 5 |
-| 2S.4 — closeout | 12 + 9 | 1 | 2 | 3.5 |
-| **total** | **74** | **6** | **11.5** | **18.5** |
+| 2S.2 — **the verbs and the actions** | **23** | 2 | 4.5 | 7 |
+| 2S.3 — where it appears | 22 | 2 | 4 | 6.5 |
+| 2S.4 — closeout | 13 + 13 | 1 | 2 | 3.5 |
+| **total** | **99** | **7.5** | **15** | **24** |
 
-**Critical path: ~10.5 working days.** Every slice depends on its predecessor and
+**Critical path: ~13.5 working days.** Every slice depends on its predecessor and
 **no two are parallelisable** — 2S.2 reads what 2S.1 writes, and 2S.3 places what
 2S.2 built. Parallelism is not claimed because the condition for it does not
 hold.
+
+**What `OD-2S-3` B cost, stated against the pre-signature package:** **+25
+requirements and +3.5 probable days** (11.5 → 15), of which +2.5 fall in slice
+2S.2 and +1 in 2S.3. The estimate offered before the signature was *+2 to +3
+days*; the recomputation lands at **+3.5**, and the difference is the four
+trust requirements the owner's own contract asked for — duplicated authority,
+double action, stale state and false undo — which the pre-signature estimate had
+not priced because it had not been asked to model them.
 
 **What moves the estimate, by open decision:**
 
@@ -239,17 +316,21 @@ closing checkpoint; decide closure.
 | **double-counting on the attention surface** | the same task can arrive from its own source and from a notice | `2S-ATTENTION-002`, with a control that **plants both** |
 | **a fixture measuring what the product does not do** | ADR-129's whole finding, and Phase 2O's repeated one | `2S-ATTENTION-005` and `2S-ACCESS-004` assert against **rendered routes** |
 | **a control that cannot fail** | Phase 2R found three "passing" controls that changed nothing | every mutation control proves its guard fails when the property is broken |
+| **a second authority over a task's status** | `OD-2S-3` B puts task verbs on a surface that does not own them; `detail-controls.ts:66` shows the product has met this before and chose sharing over copying | `2S-ACT-003`/`-004` name the destinations; `2S-TRUST-010` censuses them and makes a new writer a **stop condition** |
+| **a stale projection writing anyway** | `WorkItemActions` needs a `WorkItemView` the notification row must project, read at render time | `2S-TRUST-012` reaches the existing `stale_pre_state` refusal **from this surface**, with the row changed underneath |
+| **an undo that reports success and restores nothing** | `2R-UNDO-LEDGER-NOT-CLOSED` is a live example of a handler that never marks itself undone | `2S-TRUST-013` reads the ledger row **and** the restored subject after every undo |
+| **the two surfaces drifting apart** | the same verb, maintained twice, is the defect the owner named directly | `2S-ACT-011` reads the verb set from **one** source and asserts equality across both surfaces |
 | **the phase closing on green CI** | every gate green is when a wrong claim is easiest | `2S-CLOSE-010` — closure needs the owner and a device |
 
 ---
 
-## 4. The blockers
+## 4. The blocker
 
-**Two, in order, and neither is optional.**
+**One, and it is not optional.**
 
-1. **Sign the ten open decisions.** `OD-2S-1` … `OD-2S-10`. Until then the
-   requirement set is provisional: `OD-2S-1`, `OD-2S-4`, `OD-2S-5` and `OD-2S-9`
-   each **add or strike requirements** rather than amending them.
+1. ~~**Sign the ten open decisions.**~~ **Done — ADR-137, 2026-08-24.** The
+   requirement set is no longer provisional: `OD-2S-3` B added `2S-ACT` and
+   thirteen appended requirements, and the other nine took their recommendation.
 2. **Record an implementation authorization ADR.** Separate from the signatures.
    Until it exists:
    - **no slice may start**, including 2S.0;
@@ -276,7 +357,9 @@ finds in time. Each halts the phase and returns to the owner.
 | 4 | **The live ledger contradicts PRD §1 in direction** — stop and tell the owner rather than adjusting the record | `2S-FOUNDATION-001`, `-006` |
 | 5 | **The cadence rule cannot be proved to terminate** | `2S-CADENCE-002` |
 | 6 | **A rule `2S-CADENCE-004` protects would have to change** — quiet hours, the cap, the cooldown or the per-user lock | `OD-2S-9` |
-| 7 | **A verb needs a second authority over a task's status** | `OD-2S-2` |
+| 7 | **An inline verb needs a NEW WRITE AUTHORITY** — a Server Action, RPC or mutation path that did not exist at slice 2S.0's baseline | `OD-2S-3` B · `2S-TRUST-010` |
+| 7b | **An inline verb needs schema of its own** — that is a second migration, and condition 1 applies | `OD-2S-3` B · `OD-2S-7` |
+| 7c | **The two surfaces cannot be made to offer the same verbs from one source** — a divergence maintained by hand is the defect `2S-ACT-011` exists to refuse | `OD-2S-3` B · `OD-2S-5` |
 | 8 | **Polymorphic ownership cannot be proved by trigger** — a relationship row's own `user_id` is never sufficient proof | `2S-TRUST-004` |
 | 9 | **Any half can only be proved by spending the owner's AI credential** — recorded **unspendable**, never a pass | `2S-TRUST-007` |
 | 10 | **Push would have to be resumed, repaired or claimed** to complete a requirement | `OD-2S-6`, `2S-TRUST-008` |

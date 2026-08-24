@@ -13949,3 +13949,128 @@ start, no product code may be written and no migration file may be made.
 
 **Proposed is not allocated, allocated is not created, and signed is not
 authorized.**
+
+## §129 — All ten Phase 2S decisions are SIGNED (ADR-137), and one of them overrides the recommendation on purpose (2026-08-24)
+
+**Implementation is still not authorized.** No slice may start, no product code
+may be written, no migration file may be made. Zero deploy, zero hosted write,
+zero AI call, zero BYOK spend, zero push work, zero remainder executed.
+
+| | |
+|---|---|
+| signatures | **ADR-137**, all ten |
+| the override | **`OD-2S-3` B**, against the recommendation of A |
+| requirements | **74 → 99**, ten families → eleven, **all additions appended** |
+| kinds | **75 build · 18 baseline · 6 rule**, none classified |
+| threats | **14 → 19**, all OPEN |
+| migrations | **1 ALLOCATED · 0 created.** 101 = 101, parity `202608230101` |
+| estimate | **7.5 / 15 / 24** working days, ~13.5-day critical path |
+
+### The override, and why it is written down this way
+
+The package recommended **A** — fix the notice's destination and let the existing
+task detail do the acting — because inline controls risk a **second authority
+over a task's status**. The owner signed **B** and gave the reason:
+
+> *"O tema 'Responder ao Brain' precisa permitir agir no próprio aviso. Apenas
+> corrigir o link para a tarefa não entrega o objetivo que escolhi."*
+
+**The recommendation is preserved verbatim.** PRD §2's `OD-2S-3` keeps its text,
+its options and its recommendation exactly as they stood before the answer, and
+the decision table marks the row **NO — the owner's deliberate override**. A
+package that quietly revises its advice once the answer arrives is a package
+whose advice carries no information, and the next disagreement would be
+unreadable. `phase-2s-declarations.test.ts` asserts both halves: the ADR must
+name the contradiction, and the PRD must still contain the sentence it lost.
+
+**The objection was converted, not discarded.** It is now:
+
+- **`2S-TRUST-010`** — no new write authority, and needing one is a **stop
+  condition** rather than a review note;
+- **`2S-ACT-003` / `-004`** — the Server Actions the task verbs must dispatch to,
+  named;
+- **`2S-CLOSE-013`** and the contract's **refusal 20** — an inline verb
+  dispatching to a writer absent from slice 2S.0's recorded baseline refuses at
+  closeout;
+- **`T-2S-15`** — modelled as the threat that carries the override's whole risk.
+
+**An objection that loses a decision and then vanishes is an objection nobody
+ever has to answer.** This is where it survives.
+
+### The reuse was measured before the plan claimed it
+
+Read from the source at `885f7f7`, and this is the part that makes B safe rather
+than merely delivered:
+
+| verb | authority | where |
+|---|---|---|
+| concluir | `WorkItemActions`' injected handler | `operations/work-item-actions.tsx:38` — **already mounted twice** |
+| adiar / reagendar | `applyTaskDetailCommand` (`reschedule_due`) | `task-commands/detail-actions.ts:208` |
+| lida · descartar | `markNotification` | `agent/actions.ts:501`, already accepting both dispositions |
+| undo | `undoWorkOperation` via `UndoAffordance` | `operations/undo-affordance.tsx:54`, four call sites today |
+| which verbs a row may offer | `isEligibleStatus` / `detailControlsFor` | `task-commands/detail-controls.ts:113` |
+| silenciar (both) | **new** — the phase's one allocated migration | `2S-SILENCE` |
+
+**The repository already declares this slice's central rule.**
+`detail-controls.ts:66-71` carries `RENDERED_ELSEWHERE` with the comment that
+rendering those verbs again *"would put two routes to one transition on one
+screen."* The notification row is a **third mount of a shared component**, not a
+fourth implementation.
+
+**The cost, named rather than discovered:** `WorkItemActions` takes a
+`WorkItemView` a notification row does not have, so the slice must **project**
+one — and a projection read at render time is exactly `T-2S-17`. `2S-TRUST-012`
+therefore requires the existing `stale_pre_state` refusal to be reached **from
+this surface**, with a row changed underneath a rendered control. **An existing
+guard that has never fired from a new caller is an assumption, not a control.**
+
+### Twenty-five requirements, every one appended
+
+`2S-ACT` is a new family of twelve; thirteen went to the ends of `2S-SILENCE`,
+`2S-ANSWER`, `2S-ATTENTION`, `2S-TRUST`, `2S-ACCESS`, `2S-MOBILE` and
+`2S-CLOSE`. **No identifier was renumbered, reused or removed.**
+
+The guard asserts this by **listing the pre-signature 74 by name**, so the
+tidy-looking change — sorting `2S-ACT` into reading order — fails rather than
+silently changing what a reference written yesterday resolves to. The mutation
+control renumbers `2S-ANSWER-006` and the guard names it.
+
+### A count in this package's own draft was wrong
+
+Slice 2S.2 was written as *"thirty-one requirements — almost a third of the
+phase."* Re-deriving from the PRD's tables gave **23**.
+
+It is corrected and **recorded rather than quietly fixed**, in the coverage
+report, in ADR-137 Decision 10 and in the plan itself. It is the exact defect the
+traceability contract exists to catch, found by the method the contract
+prescribes, in the document that prescribes it — which is the whole argument for
+deriving counts instead of typing them.
+
+### The active-milestone guard reversed for the tenth time
+
+Its rule has never moved: **the line cites every authorization the active phase
+has received, and overstates none of them.** ADR-136 made it require `PLANNING`
+and **refuse** `SIGNED`, `allocated`, `spent` and `created`. ADR-137 gives the
+phase a second authorization and an allocation, so `SIGNED` and `allocated` are
+now **required** and `spent`/`created` are still refused — the same rule, applied
+to facts that moved, pointing in opposite directions inside one assertion.
+
+### What is still refused
+
+`OD-2S-8` stays **A**, and the owner restated it *after* the override widened the
+work in `needs-attention-list.tsx`: *"Mesmo que o arquivo de 'Precisa de você'
+seja alterado, não absorva agora."* Filter preservation and a linkable search
+stay in a separate short initiative. `2P-ATTENTION-008` and `OD-2R-9`'s two
+defects are **not** discharged by this phase editing their file.
+
+Push stays out by rule and unclaimed. Signup closed. Rollout **25 · 3 · 2**.
+`2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**. ADR-055 expires **2026-10-27**
+and needs a person. **Phase 2R stays CLOSED.**
+
+### Where the next session starts
+
+**With the owner, and one authorization.** The ten signatures are done; what
+remains is the separate implementation-authorization ADR. Until it exists,
+nothing may be built.
+
+**Allocated is not created, and signed is not authorized.**

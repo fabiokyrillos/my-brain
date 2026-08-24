@@ -293,7 +293,23 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * would lose the planning authorization; omitting ADR-132 would leave the
      * backlog describing a phase with nine open questions it no longer has.
      */
-    expect(line, "Phase 2S has no signed decisions, and the line must not import Phase 2R's")
+    /*
+     * **Moved again with ADR-137, in the commit that recorded it — the tenth
+     * reversal of this assertion, and the rule has still not moved.**
+     *
+     * Phase 2S has now received a **second** authorization: ADR-136 authorized
+     * planning, ADR-137 signed the ten decisions and allocated one migration.
+     * The rule has always been that the line cites **every** authorization the
+     * active phase has received, not only the newest — so dropping ADR-136 here
+     * would lose the planning authorization, and omitting ADR-137 would leave
+     * the backlog describing a phase with ten open questions it no longer has.
+     *
+     * Phase 2R's ADRs stay refused: they belong to a phase that closed, and
+     * `DECISIONS.md` is where they live.
+     */
+    expect(line, "Phase 2S's signatures are ADR-137 and the line must cite them")
+      .toContain("ADR-137");
+    expect(line, "Phase 2R's signatures belong to DECISIONS.md, not to a line about Phase 2S")
       .not.toContain("ADR-132");
     /*
      * **Moved again with ADR-133**, in the commit that recorded it, and the
@@ -318,8 +334,18 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
       .not.toContain("ADR-133");
     expect(line, "the authorization is planning only, and the line must say so")
       .toMatch(/PLANNING/i);
-    expect(line, "Phase 2S's ten decisions are OPEN, and the line must not claim signatures")
-      .not.toMatch(/\bSIGNED\b/i);
+    /*
+     * **Inverted by ADR-137**, and by the same rule that inverted it the other
+     * way at ADR-136: the line states what is true of the active phase.
+     *
+     * The ten decisions were OPEN and are now SIGNED, so requiring their absence
+     * would force the backlog to understate an answer the owner has given —
+     * which is the mirror-image of the overstatement this assertion refused
+     * yesterday. What does **not** move is the next distinction: signed is not
+     * authorized, and the implementation assertion below still refuses.
+     */
+    expect(line, "the ten decisions are signed, and the line must not understate them")
+      .toMatch(/\bSIGNED\b/i);
     expect(line, "implementation is NOT authorized, and the line must not overstate it")
       .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
     expect(line, "closure is NOT authorized, and the line must not overstate it")
@@ -356,10 +382,18 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * So "proposed" is required and the other two are refused, in the same
      * assertion, pointing in opposite directions.
      */
-    expect(line, "the line must state that the migration is proposed")
-      .toMatch(/proposed/i);
-    expect(line, "nothing is allocated yet, and the line must not claim it is")
-      .not.toMatch(/\ballocated\b/i);
+    /*
+     * **Inverted again by ADR-137.** `OD-2S-7` A allocated the one migration, so
+     * requiring "proposed" would now understate it and forbidding "allocated"
+     * would make the line state something false.
+     *
+     * The distinction the assertion exists for does not move: **allocated is not
+     * created**, and the file count is still zero. So "allocated" is required
+     * and "spent" and "created" are still refused, in the same assertion,
+     * pointing in opposite directions.
+     */
+    expect(line, "the line must state the allocation")
+      .toMatch(/\ballocated\b/i);
     expect(line, "nothing is created, and the line must not claim it is")
       .not.toMatch(/\b(spent|created)\b/i);
     expect(line, "parity must be named, not merely counted")
