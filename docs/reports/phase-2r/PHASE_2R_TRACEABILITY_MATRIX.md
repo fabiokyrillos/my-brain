@@ -48,7 +48,7 @@ correct reads as complete, which is why a refusal produces no file at all.
 | `2R-SERIES-007` | 2R.2 | built | `phase_2r_series_scope.sql` §2 — pressed twice, `status = 'undone'`, second press idempotent with `affected: 0` |
 | `2R-SERIES-008` | 2R.2 | built | §2 — occurrence cancellation names its consequence before it asks, and is offered no undo it cannot honour |
 | `2R-SERIES-009` | 2R.2 | built | §3 — the applied scope is read from the RPC, driven apart from the request in a test |
-| `2R-SURFACE-001` | 2R.3 | built | §1 — one select, field count four → five, no new field when a repetition is chosen |
+| `2R-SURFACE-001` | 2R.3 | built | §11 — the delivered contract: **one frequency select plus one conditional weekday group shown only for `weekly`**, named inputs five → **six** where the sixth is a single name for all seven day controls, and `monthlyDay`, `monthlyWeekday` and `yearly` still add no field at all. The requirement's property — *the modal gains the control without becoming a form* — is asserted by comparing the field list before and after each choice. *(§1 recorded "one select, four → five" and that was true of the first version; the device checkpoint superseded it when Monday/Wednesday/Friday would otherwise have taken three reminders. The earlier reading is kept in §1 and §11 rather than rewritten.)* |
 | `2R-SURFACE-002` | 2R.3 | built | §1 — three occurrences before saving, from the RPC, in the owner's zone |
 | `2R-SURFACE-003` | 2R.3 | built | §2 — the list and the calendar both say it repeats and how, from one formatter |
 | `2R-SURFACE-004` | 2R.3 | built | §4 — the rule never leaves the server; the sweep asserts what cannot appear |

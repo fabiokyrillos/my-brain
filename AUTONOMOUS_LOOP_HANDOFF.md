@@ -13685,3 +13685,101 @@ ADR. `2R-CLOSE-012` exists so that a green pipeline cannot stand in for either.
 
 **The migration budget never moved.** One allocated, one spent in 2R.1. Slices
 2R.2, 2R.3, 2R.4, 2R.5 and both corrective rounds created none between them.
+
+## §127 — Phase 2R is CLOSED by ADR-135, after the owner's final checkpoint on real hardware (2026-08-24)
+
+**The phase is closed.** The owner ran the closing device checkpoint on their own
+iPhone and approved every item: daily, weekly with Monday/Wednesday/Friday in a
+**single series**, monthly, the preview before saving, **one live occurrence per
+active series**, *somente esta*, *esta e as futuras*, cancelling one occurrence
+without ending the series, ending a series while preserving history, the undo the
+series offers, list/calendar/agenda, and no zoom, no page scrolling behind the
+modal, no content loss.
+
+| | |
+|---|---|
+| closure | **ADR-135**, accepted |
+| requirements | **73 declared · 73 classified · 0 unclassified** |
+| classes | 51 `built` · 17 `baseline` · 2 `partial` · 3 `not-built-by-rule` · **0 `undelivered`** |
+| migrations | **1 allocated · 1 spent · 1 applied.** 101 = 101, parity `202608230101` |
+| threats | **12 of 12 disposed** — ten at 2R.5, the last two only now |
+
+### The two documentary corrections the owner asked for, and nothing else
+
+**No product code, no migration, no deploy, no BYOK, no push, no remainder
+repair.** Two documents were wrong and are now right:
+
+- **`2R-SURFACE-001`'s evidence** still described the *first* version — *"one
+  select, field count four → five"* — which the device checkpoint superseded when
+  Monday, Wednesday and Friday would otherwise have taken three reminders. The
+  final evidence names the delivered contract: one frequency select **plus one
+  conditional weekday group shown only for `weekly`**, named inputs five → **six**
+  where the sixth is one name for all seven day controls, and no new field for
+  `monthlyDay`, `monthlyWeekday` or `yearly`. **The earlier reading is kept**, in
+  §1 and in the transition table, rather than rewritten.
+- **The closing report's invariant** widened from *"exactly one occurrence exists
+  at a time"* to **"exactly one live occurrence exists at a time for each active
+  series"**, which is what the partial unique index actually enforces. The broad
+  claim would have been false the moment an owner held two series.
+
+The matrix was regenerated from the corrected record and `--check` proves it byte
+for byte — **with its own mutation control**: editing one count by hand makes
+`--check` exit 1, and restoring the file makes it exit 0 again.
+
+### `T-2R-11` and `T-2R-12` are disposed only now, and could not have been earlier
+
+Ten threats closed at slice 2R.5. These two were carried because **both are about
+the act of closing the phase** — a successor starting by accident, and a hardware
+proof discharged by a document. Disposing of them before ADR-135 existed would
+have been the exact substitution `T-2R-12` describes. They close on the same
+evidence that closes the phase: a person with the device, and the ADR.
+
+### Two guards moved, and neither weakened
+
+**`docs/TODO.md`'s active-milestone guard.** Its own comment says the failure mode
+is *nobody moving it with the ADR*, and it records having missed the drift twice
+by agreeing with a stale line. Phase 2R closing with **no authorized successor** is
+a state it had never met — every prior retarget went from a closed phase to an
+authorized one. It now also requires the line to cite **ADR-135** and to say
+**CLOSED**, so a line cannot go on describing an open phase after the owner shut
+it. A mutation stripping both tokens fails it with the exact reason.
+
+The line names Phase 2R and **does not name the successor at all** — the guard
+forbids the letter on that line, which is the convention every previous entry
+followed.
+
+### One defect this closeout removed rather than added
+
+The traceability generator shipped with a `#!/usr/bin/env node` shebang, which the
+local Rolldown transform **refuses** — the same cause as the three test files that
+have failed locally for months. Its sibling generators carry no shebang, and the
+one script that does is exactly the one whose test cannot load here. Removing it
+made the new 27-test suite runnable locally instead of adding a **fourth**
+permanent local failure. It had passed earlier only because a stale transform
+cache was answering.
+
+### The Phase 2S re-audit — read only, and it found nothing
+
+No `docs/initiatives/phase-2s`, no `docs/reports/phase-2s`, no successor
+migration, and every `2S-*` identifier in the repository is a **planted fixture
+inside a guard's own control**, not a declaration. **Phase 2S is not started, not
+planned and not named as active**, and ADR-135 authorizes no successor.
+
+### Carried out of the phase, none discharged by closure
+
+`2R-TZ-SECOND-AUTHORITY` · `2R-UNDO-LEDGER-NOT-CLOSED` ·
+`2R-OCCURRENCE-CANCEL-IRREVERSIBLE` · `2R-AXE-MANUAL-LANE` ·
+`2R-RECURRENCE-LANE-UNRUNNABLE` · `2R-DRAWER-NOT-LOCKED` · `2R-TASK-RECURRENCE` ·
+`OD-2R-9`'s two defects · the interval gap · push HTTP 403, guarded against being
+*claimed*. **Inherited, reproduced with no item dropped:** `2P-ACCESS-005` **NOT
+EXECUTED — OWNER WAIVED** · `2P-ATTENTION-008` · `RG-DEP-3` ·
+`2P-CHAT-007-JOURNEY` · ADR-055 expiring **2026-10-27**. Signup closed, rollout
+25 · 3 · 2.
+
+**Closing a phase does not close what it carried.**
+
+### Where the next session starts
+
+**With the owner, and an authorization.** The next phase needs its own subject
+derived from a measured census rather than from a roadmap, and its own planning
+ADR. Nothing in this repository may start it before that.

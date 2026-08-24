@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * Phase 2R's delivery matrix — generated, never typed.
  *
