@@ -778,9 +778,21 @@ describe("Phase 2O: A13 has moved off this phase, in this same commit", () => {
     // missed it.
     const guard = read("src/lib/closeout/phase-2f-documentation.test.ts");
     expect(guard).not.toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2O_/);
-    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2S_/);
-    expect(guard).toMatch(/const DECLARED_SUCCESSOR_REQUIREMENT = \/\^- \\\*\\\*2S-/);
-    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2s\/i;/);
+    expect(guard).toMatch(/const GOVERNING_ARTIFACT_ROLE = \/\^PHASE_2T_/);
+    /*
+     * **The declared-requirement pin changes shape here, not only letter.**
+     *
+     * ADR-136 Decision 8: this signal matched a bullet only, and this repository
+     * declares requirements in PRD table rows — so it had never matched a real
+     * declaration. The repaired constant matches both, and this pin asserts the
+     * table shape is present rather than merely that the letter moved, because a
+     * pin that only checked the letter would have passed for four retargets
+     * while the signal did nothing.
+     */
+    expect(guard).toContain(
+      "const DECLARED_SUCCESSOR_REQUIREMENT = /^(?:- \\*\\*|\\| `)2T-[A-Z]+-\\d{3}/m;",
+    );
+    expect(guard).toMatch(/const IMPLEMENTATION_MARKED_FILE = \/phase\[_-\]\?2t\/i;/);
   });
 
   it("records Phase 2O's start as an authorization rather than an accident", () => {

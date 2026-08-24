@@ -196,8 +196,8 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
     // index over, and because this guard's scope is deliberately one line.
     const line = read("docs/TODO.md").split("\n").find((l) => l.startsWith("Active milestone:"));
     expect(line).toBeDefined();
-    expect(line).toMatch(/Phase 2R/);
-    expect(line, "the start must cite its authorization").toMatch(/ADR-131/);
+    expect(line).toMatch(/Phase 2S/);
+    expect(line, "the start must cite its authorization").toMatch(/ADR-136/);
     /*
      * **Moved with ADR-135, in the commit that recorded it** — the step this
      * guard's own comment says nobody performs, and which it has twice failed
@@ -211,8 +211,27 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * included. Requiring the closing ADR is what stops the line from going on
      * describing an open phase after the owner shut it.
      */
-    expect(line, "the closure must be cited too").toMatch(/ADR-135/);
-    expect(line, "a closed phase must say so").toMatch(/CLOSED/);
+    /*
+     * **Moved again with ADR-136, in the commit that recorded it.** ADR-135's
+     * assertions above were about Phase 2R, which is closed; the line now names
+     * Phase 2S, which is authorized for **planning only**.
+     *
+     * The direction reverses for the ninth time, and the rule does not move:
+     * **the line cites every authorization the active phase has received and
+     * overstates none of them.** Phase 2S has received exactly one — ADR-136 —
+     * so requiring a closing ADR here, or the word CLOSED, would force the
+     * backlog to claim a closure the owner has not decided. That is the same
+     * overstatement this assertion has existed to catch since ADR-102, pointing
+     * the other way.
+     *
+     * Phase 2R's closure is not lost by this move. It lives in `DECISIONS.md`,
+     * which is append-only, and in `STATE.md`. The rule has always been that
+     * the line cites what the **active** phase received, not the repository's
+     * whole history — keeping ADR-131 … ADR-135 here would make the line
+     * describe a phase that has closed.
+     */
+    expect(line, "Phase 2S is not closed, and the line must not claim it is")
+      .not.toMatch(/CLOSED/i);
     expect(line, "Phase 2E is released, not awaiting authorization").not.toMatch(/awaits authorization/);
     /*
      * The "planning" half came back at ADR-102, went again at ADR-103, came back
@@ -264,8 +283,8 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * every authorization in the repository's history; keeping ADR-126, ADR-127
      * and ADR-128 here would make the line describe a phase that has closed.
      */
-    expect(line, "Phase 2R's authorization is ADR-131 and the line must cite it")
-      .toContain("ADR-131");
+    expect(line, "Phase 2R's authorizations belong to DECISIONS.md, not to a line about Phase 2S")
+      .not.toContain("ADR-131");
     /*
      * **Moved again with ADR-132**, in the commit that recorded it. Phase 2R has
      * now received a *second* decision — the nine signatures — and the rule this
@@ -274,8 +293,24 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * would lose the planning authorization; omitting ADR-132 would leave the
      * backlog describing a phase with nine open questions it no longer has.
      */
-    expect(line, "Phase 2R has received a second decision and the line must cite it")
-      .toContain("ADR-132");
+    /*
+     * **Moved again with ADR-137, in the commit that recorded it — the tenth
+     * reversal of this assertion, and the rule has still not moved.**
+     *
+     * Phase 2S has now received a **second** authorization: ADR-136 authorized
+     * planning, ADR-137 signed the ten decisions and allocated one migration.
+     * The rule has always been that the line cites **every** authorization the
+     * active phase has received, not only the newest — so dropping ADR-136 here
+     * would lose the planning authorization, and omitting ADR-137 would leave
+     * the backlog describing a phase with ten open questions it no longer has.
+     *
+     * Phase 2R's ADRs stay refused: they belong to a phase that closed, and
+     * `DECISIONS.md` is where they live.
+     */
+    expect(line, "Phase 2S's signatures are ADR-137 and the line must cite them")
+      .toContain("ADR-137");
+    expect(line, "Phase 2R's signatures belong to DECISIONS.md, not to a line about Phase 2S")
+      .not.toContain("ADR-132");
     /*
      * **Moved again with ADR-133**, in the commit that recorded it, and the
      * direction reverses for the eighth time in this assertion's life. ADR-133
@@ -295,16 +330,26 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * overstatement this assertion has always existed to catch, and
      * `phase-2r-declarations.test.ts` holds that half against the ADR itself.
      */
-    expect(line, "Phase 2R's implementation authorization is ADR-133 and the line must cite it")
-      .toContain("ADR-133");
-    expect(line, "the planning authorization is still one of the three and must not be dropped")
+    expect(line, "no implementation is authorized for Phase 2S, and the line must not import one")
+      .not.toContain("ADR-133");
+    expect(line, "the authorization is planning only, and the line must say so")
       .toMatch(/PLANNING/i);
-    expect(line, "the signatures must be recorded, not implied")
-      .toMatch(/SIGNED/i);
-    expect(line, "implementation is authorized, and the line must not understate it")
-      .toMatch(/IMPLEMENTATION AUTHORIZED/i);
+    /*
+     * **Inverted by ADR-137**, and by the same rule that inverted it the other
+     * way at ADR-136: the line states what is true of the active phase.
+     *
+     * The ten decisions were OPEN and are now SIGNED, so requiring their absence
+     * would force the backlog to understate an answer the owner has given —
+     * which is the mirror-image of the overstatement this assertion refused
+     * yesterday. What does **not** move is the next distinction: signed is not
+     * authorized, and the implementation assertion below still refuses.
+     */
+    expect(line, "the ten decisions are signed, and the line must not understate them")
+      .toMatch(/\bSIGNED\b/i);
+    expect(line, "implementation is NOT authorized, and the line must not overstate it")
+      .not.toMatch(/IMPLEMENTATION AUTHORIZED/i);
     expect(line, "closure is NOT authorized, and the line must not overstate it")
-      .not.toMatch(/PHASE (2R )?CLOSED|CLOSURE AUTHORIZED/i);
+      .not.toMatch(/PHASE (2S )?CLOSED|CLOSURE AUTHORIZED/i);
     /*
      * **Inverted by slice 2R.1, in the commit that spent the allocation.**
      *
@@ -321,18 +366,42 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * ceiling itself is asserted where it belongs, on the tree, by four guards
      * that count the files.
      */
+    /*
+     * **Inverted again by ADR-136**, and by the same rule that inverted it at
+     * slice 2R.1: the line states what is true of the **active** phase.
+     *
+     * Phase 2R's budget was allocated, spent and created, and all three were
+     * required here so a line saying only "one migration" could not hide
+     * whether the ceiling had been reached. Phase 2S's budget is **1 proposed ·
+     * 0 allocated · 0 spent · 0 created**, so requiring "spent" or "created"
+     * would force the backlog to state something false — the mirror-image error.
+     *
+     * What does not move is the distinction the assertion exists for. Three
+     * words now mean three different things — **proposed**, **allocated**,
+     * **created** — and a line that blurs them is a line a reader cannot use.
+     * So "proposed" is required and the other two are refused, in the same
+     * assertion, pointing in opposite directions.
+     */
+    /*
+     * **Inverted again by ADR-137.** `OD-2S-7` A allocated the one migration, so
+     * requiring "proposed" would now understate it and forbidding "allocated"
+     * would make the line state something false.
+     *
+     * The distinction the assertion exists for does not move: **allocated is not
+     * created**, and the file count is still zero. So "allocated" is required
+     * and "spent" and "created" are still refused, in the same assertion,
+     * pointing in opposite directions.
+     */
     expect(line, "the line must state the allocation")
-      .toMatch(/allocated/i);
-    expect(line, "the line must state that the allocation was spent")
-      .toMatch(/spent/i);
-    expect(line, "the line must state that the file exists, and name it")
-      .toMatch(/created/i);
-    expect(line, "the migration must be named, not merely counted")
+      .toMatch(/\ballocated\b/i);
+    expect(line, "nothing is created, and the line must not claim it is")
+      .not.toMatch(/\b(spent|created)\b/i);
+    expect(line, "parity must be named, not merely counted")
       .toContain("202608230101");
     expect(line, "a second must still be a stop condition on the record")
       .toMatch(/stop condition/i);
     expect(line, "the successor is not authorized, and the backlog must not imply one")
-      .not.toMatch(/Phase 2S/i);
+      .not.toMatch(/Phase 2T/i);
   });
 });
 
@@ -456,7 +525,7 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  * `2L-ACCESS`, Phase 2M `2M-ACCESS` and Phase 2N `2N-ACCESS`, for exactly this
  * reason.
  * The pattern is deliberately left as it is: loosening it to admit digits inside
- * a family name would make `2S-2026-001`-shaped noise a start signal. The
+ * a family name would make `2T-2026-001`-shaped noise a start signal. The
  * property is instead asserted where it belongs — in the phase's own
  * traceability contract.
  *
@@ -475,9 +544,11 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  *
  *   1. a governing artifact **by role** — a PRD, an implementation plan or a
  *      requirements document, whatever it is named;
- *   2. a **declared** requirement family, in this repository's declaration shape
- *      (`- **2S-XXXX-000:**`) — the same shape the traceability generator's
- *      attribution guard uses;
+ *   2. a **declared** requirement family, in either of this repository's
+ *      declaration shapes — the PRD table row (`` | `2T-XXXX-000` | ``), which
+ *      is what every phase since 2F has actually written, or the bullet
+ *      (`- **2T-XXXX-000:**`). ADR-136 Decision 8 added the first; it had been
+ *      missing since this signal was written;
  *   3. an **accepted** successor ADR — a recorded decision to proceed, as
  *      opposed to an ADR that merely mentions the phase while deferring it;
  *   4. a migration or source file marked as successor implementation.
@@ -489,15 +560,40 @@ describe("A6, A7, A8, A9: the measurement claims stay exactly as measured", () =
  */
 type SuccessorStartSignal = { readonly kind: string; readonly where: string };
 
-const GOVERNING_ARTIFACT_ROLE = /^PHASE_2S_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
-/** A *declared* requirement, not a mention. Matches the traceability generator's own shape. */
-const DECLARED_SUCCESSOR_REQUIREMENT = /^- \*\*2S-[A-Z]+-\d{3}/m;
+const GOVERNING_ARTIFACT_ROLE = /^PHASE_2T_.*(PRD|IMPLEMENTATION_PLAN|REQUIREMENTS)/i;
+/**
+ * A *declared* requirement, not a mention.
+ *
+ * **This signal was inert for its whole life, and ADR-136 Decision 8 repairs it
+ * in the commit that retargets it.** It matched only a bullet —
+ * `- **2X-FAMILY-000:**` — while this repository declares requirements in **PRD
+ * tables**: `` | `2X-FAMILY-001` | … | ``. `phase-2r-declarations.test.ts` says
+ * so in its own parser, and there is **not one bullet-shaped declaration
+ * anywhere under `docs/`**. So this pattern had never once matched a real
+ * declaration, and the control below it planted a bullet — proving the regex
+ * worked on a shape nothing produces.
+ *
+ * A13 as a whole still fired, through signal 1 (the governing artifact's
+ * filename) and signal 3 (an accepted ADR heading), so no phase could have
+ * started silently through this gap. It was a signal carried, dead, through
+ * four retargets.
+ *
+ * **Both shapes are matched now**, and the bullet is kept rather than replaced:
+ * a declaration is a declaration wherever it is written, and narrowing to the
+ * table shape would repeat the mistake in the other direction. The two-sided
+ * control below plants a table row and asserts the old pattern would have
+ * missed it.
+ */
+const DECLARED_SUCCESSOR_REQUIREMENT = /^(?:- \*\*|\| `)2T-[A-Z]+-\d{3}/m;
+
+/** The shape this signal used to match, kept so the repair's control can prove it was inert. */
+const BULLET_ONLY_DECLARATION = /^- \*\*2T-[A-Z]+-\d{3}/m;
 /**
  * Kept for the historical assertion below: the Phase 2F proposal may mention
  * Phase 2G as future work but must never have declared a requirement for it.
  */
 const DECLARED_2G_REQUIREMENT = /^- \*\*2G-[A-Z]+-\d{3}/m;
-const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2s/i;
+const IMPLEMENTATION_MARKED_FILE = /phase[_-]?2t/i;
 
 /**
  * Every markdown file at or below `dir`, named relative to `dir`. The walk is
@@ -554,7 +650,7 @@ function successorStartSignals(root: string): SuccessorStartSignal[] {
     for (const block of blocks) {
       const heading = block.split("\n", 1)[0] ?? "";
       const accepted = /^[-*]?\s*\*\*Status:?\*\*:?\s*Accepted/im.test(block);
-      if (/phase 2s/i.test(heading) && accepted) {
+      if (/phase 2t/i.test(heading) && accepted) {
         signals.push({ kind: "accepted-adr", where: `ADR heading: ${heading.trim()}` });
       }
     }
@@ -574,7 +670,7 @@ function successorStartSignals(root: string): SuccessorStartSignal[] {
 /** A throwaway repository root carrying only what the detector reads. */
 function makeDetectorRoot(): string {
   const root = mkdtempSync(join(tmpdir(), "a13-"));
-  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2s", "supabase/migrations", "src/features", "src/lib"]) {
+  for (const dir of ["docs", "docs/reports", "docs/reports/phase-2t", "supabase/migrations", "src/features", "src/lib"]) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   writeFileSync(join(root, "docs/DECISIONS.md"), "# Decisions\n\n## ADR-001 — something else\n\n- **Status:** Accepted\n");
@@ -718,7 +814,19 @@ describe("A13: the roadmap successor is not started", () => {
     expect(existsSync(join(REPO, "docs/initiatives/phase-2q/PHASE_2Q_IMPLEMENTATION_PLAN.md"))).toBe(true);
   });
 
-  it("keeps ADR-131's heading free of the successor's name, which would itself be a start signal", () => {
+  it("keeps Phase 2S's start recorded as an authorization, not an accident", () => {
+    // The same property, one phase on, and the reason *this* retarget is
+    // legitimate. Phase 2S's governing artifacts exist and its requirement
+    // namespace is declarable; what makes that legitimate is ADR-136, an owner
+    // decision. If ADR-136 were ever removed while the PRD and the plan
+    // remained, the repository would be carrying an unexplained phase start.
+    const decisions = read("docs/DECISIONS.md");
+    expect(decisions).toMatch(/ADR-136 — The owner authorizes Phase 2S planning/);
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2s/PHASE_2S_PRD.md"))).toBe(true);
+    expect(existsSync(join(REPO, "docs/initiatives/phase-2s/PHASE_2S_IMPLEMENTATION_PLAN.md"))).toBe(true);
+  });
+
+  it("keeps ADR-136's heading free of the successor's name, which would itself be a start signal", () => {
     // Signal 3 is an *accepted ADR whose heading names the phase*. An
     // authorizing ADR that named its successor in the heading would start the
     // next phase in the act of authorizing this one. ADR-092's first draft hit
@@ -728,9 +836,9 @@ describe("A13: the roadmap successor is not started", () => {
     const decisions = read("docs/DECISIONS.md");
     const heading = decisions
       .split("\n")
-      .find((line) => line.startsWith("## ADR-131")) ?? "";
+      .find((line) => line.startsWith("## ADR-136")) ?? "";
     expect(heading).toMatch(/roadmap successor/);
-    expect(heading).not.toMatch(/2S/i);
+    expect(heading).not.toMatch(/2T/i);
   });
 
   it("keeps every previous authorizing heading free of its own successor too", () => {
@@ -752,6 +860,7 @@ describe("A13: the roadmap successor is not started", () => {
       ["ADR-121", /2Q/i],
       ["ADR-126", /2R/i],
       ["ADR-131", /2S/i],
+      ["ADR-136", /2T/i],
     ] as const) {
       const heading = headingFor(adr);
       expect(heading, `${adr} heading not found`).not.toBe("");
@@ -762,7 +871,7 @@ describe("A13: the roadmap successor is not started", () => {
   it("permits a definition study, future-work labels and an unauthorized-status amendment", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2s/SUCCESSOR_NOTES.md"),
+      join(root, "docs/reports/phase-2t/SUCCESSOR_NOTES.md"),
       [
         "# Successor notes",
         "",
@@ -796,11 +905,32 @@ describe("A13: the roadmap successor is not started", () => {
     writeFileSync(join(root, "docs/PHASE_2Q_PRD.md"), "# Phase 2Q PRD\n\n- **2Q-CITE-001:** one column.\n");
     writeFileSync(join(root, "docs/PHASE_2R_PRD.md"), "# Phase 2R PRD\n\n- **2R-MODEL-001:** a rule.\n");
     expect(successorStartSignals(root)).toEqual([]);
-    writeFileSync(join(root, "docs/PHASE_2S_PRD.md"), "# Successor PRD\n");
+    writeFileSync(join(root, "docs/PHASE_2T_PRD.md"), "# Successor PRD\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2S_PRD.md",
+      where: "docs/PHASE_2T_PRD.md",
     });
+  });
+
+  it("permits Phase 2S's own governing artifacts, which are authorized", () => {
+    // The same both-halves property, one phase on. Phase 2S's PRD is permitted
+    // because ADR-136 authorized it — including its **table-row** declarations,
+    // which is what makes the repaired signal 2 worth asserting here: a pattern
+    // that saw only bullets would have permitted this file for the wrong reason.
+    const root = detectorRoot();
+    writeFileSync(
+      join(root, "docs/PHASE_2S_PRD.md"),
+      "# Phase 2S PRD\n\n| ID | Requirement |\n|---|---|\n| `2S-SILENCE-001` | a suppression |\n",
+    );
+    expect(successorStartSignals(root)).toEqual([]);
+    writeFileSync(
+      join(root, "docs/PHASE_2T_PRD.md"),
+      "# Successor PRD\n\n| ID | Requirement |\n|---|---|\n| `2T-SILENCE-001` | a suppression |\n",
+    );
+    const signals = successorStartSignals(root);
+    expect(signals).toContainEqual({ kind: "governing-artifact", where: "docs/PHASE_2T_PRD.md" });
+    expect(signals, "the repaired signal 2 must see the table row too")
+      .toContainEqual({ kind: "declared-requirement", where: "docs/PHASE_2T_PRD.md" });
   });
 
   it("permits Phase 2Q's own governing artifacts, which are authorized", () => {
@@ -816,28 +946,28 @@ describe("A13: the roadmap successor is not started", () => {
     writeFileSync(join(root, "docs/PHASE_2P_PRD.md"), "# Phase 2P PRD\n\n- **2P-CAPTURE-001:** one surface.\n");
     writeFileSync(join(root, "docs/PHASE_2Q_PRD.md"), "# Phase 2Q PRD\n\n- **2Q-CITE-001:** one column.\n");
     expect(successorStartSignals(root)).toEqual([]);
-    writeFileSync(join(root, "docs/PHASE_2S_PRD.md"), "# Successor PRD\n");
+    writeFileSync(join(root, "docs/PHASE_2T_PRD.md"), "# Successor PRD\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2S_PRD.md",
+      where: "docs/PHASE_2T_PRD.md",
     });
   });
 
   it("fails when a successor PRD exists at the docs root", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2S_PRD.md"), "# Successor PRD\n");
+    writeFileSync(join(root, "docs/PHASE_2T_PRD.md"), "# Successor PRD\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2S_PRD.md",
+      where: "docs/PHASE_2T_PRD.md",
     });
   });
 
   it("fails when a successor implementation plan exists at the docs root", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2S_IMPLEMENTATION_PLAN.md"), "# Plan\n");
+    writeFileSync(join(root, "docs/PHASE_2T_IMPLEMENTATION_PLAN.md"), "# Plan\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2S_IMPLEMENTATION_PLAN.md",
+      where: "docs/PHASE_2T_IMPLEMENTATION_PLAN.md",
     });
   });
 
@@ -851,22 +981,22 @@ describe("A13: the roadmap successor is not started", () => {
     // deliberately removed. Asserted here so a future retarget cannot "fix" the
     // regex by loosening it.
     const root = detectorRoot();
-    writeFileSync(join(root, "docs/PHASE_2S_2T_MASTER_IMPLEMENTATION_PLAN.md"), "# Roadmap only\n");
+    writeFileSync(join(root, "docs/PHASE_2T_2U_MASTER_IMPLEMENTATION_PLAN.md"), "# Roadmap only\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "governing-artifact",
-      where: "docs/PHASE_2S_2T_MASTER_IMPLEMENTATION_PLAN.md",
+      where: "docs/PHASE_2T_2U_MASTER_IMPLEMENTATION_PLAN.md",
     });
   });
 
   it("fails when a successor requirement is declared, whatever the file is called", () => {
     const root = detectorRoot();
     writeFileSync(
-      join(root, "docs/reports/phase-2s/SUCCESSOR_NOTES.md"),
-      "# Notes\n\n- **2S-READINESS-001:** something ships here.\n",
+      join(root, "docs/reports/phase-2t/SUCCESSOR_NOTES.md"),
+      "# Notes\n\n- **2T-READINESS-001:** something ships here.\n",
     );
     expect(successorStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
-      where: "docs/reports/phase-2s/SUCCESSOR_NOTES.md",
+      where: "docs/reports/phase-2t/SUCCESSOR_NOTES.md",
     });
   });
 
@@ -874,7 +1004,7 @@ describe("A13: the roadmap successor is not started", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
-      "# Decisions\n\n## ADR-199 — Phase 2S is accepted as the next phase\n\n- **Status:** Accepted\n",
+      "# Decisions\n\n## ADR-199 — Phase 2T is accepted as the next phase\n\n- **Status:** Accepted\n",
     );
     const signals = successorStartSignals(root);
     expect(signals.map((signal) => signal.kind)).toContain("accepted-adr");
@@ -885,17 +1015,17 @@ describe("A13: the roadmap successor is not started", () => {
     writeFileSync(
       join(root, "docs/DECISIONS.md"),
       "# Decisions\n\n## ADR-199 — The roadmap order after Phase 2N\n\n"
-        + "- **Status:** Accepted\n- Phase 2S remains unauthorized and unstarted.\n",
+        + "- **Status:** Accepted\n- Phase 2T remains unauthorized and unstarted.\n",
     );
     expect(successorStartSignals(root)).toEqual([]);
   });
 
   it("fails when a migration is marked as successor implementation", () => {
     const root = detectorRoot();
-    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2s_something.sql"), "-- x\n");
+    writeFileSync(join(root, "supabase/migrations/202610010001_phase_2t_something.sql"), "-- x\n");
     expect(successorStartSignals(root)).toContainEqual({
       kind: "implementation-file",
-      where: "supabase/migrations/202610010001_phase_2s_something.sql",
+      where: "supabase/migrations/202610010001_phase_2t_something.sql",
     });
   });
 
@@ -905,7 +1035,7 @@ describe("A13: the roadmap successor is not started", () => {
     const root = detectorRoot();
     writeFileSync(
       join(root, "docs/ROADMAP_NOTES.md"),
-      "# Notes\n\n- **2S-DEPLOY-001:** the deploy runbook ships here.\n",
+      "# Notes\n\n- **2T-DEPLOY-001:** the deploy runbook ships here.\n",
     );
     expect(successorStartSignals(root)).toContainEqual({
       kind: "declared-requirement",
@@ -913,11 +1043,54 @@ describe("A13: the roadmap successor is not started", () => {
     });
   });
 
+  /**
+   * **ADR-136 Decision 8's repair, with its two-sided control.**
+   *
+   * The positive half plants the shape this repository actually writes — a PRD
+   * table row — and requires the detector to see it. The negative half asserts
+   * that the pattern this signal carried until now would have **missed** it,
+   * because a repair whose control cannot distinguish the old behaviour from
+   * the new one proves nothing about what was repaired.
+   */
+  it("detects a requirement declared as a PRD table row, the shape this repository actually writes", () => {
+    const root = detectorRoot();
+    const tableRow = "| `2T-SILENCE-001` | A thing | An observable criterion | build | — |";
+    writeFileSync(
+      join(root, "docs/reports/phase-2t/SUCCESSOR_NOTES.md"),
+      `# Notes\n\n| ID | Requirement | Observable criterion | Kind | Depends on |\n|---|---|---|---|---|\n${tableRow}\n`,
+    );
+    expect(successorStartSignals(root)).toContainEqual({
+      kind: "declared-requirement",
+      where: "docs/reports/phase-2t/SUCCESSOR_NOTES.md",
+    });
+
+    // The half that makes this a repair rather than a claim.
+    expect(BULLET_ONLY_DECLARATION.test(tableRow), "the old pattern would have missed it")
+      .toBe(false);
+    expect(DECLARED_SUCCESSOR_REQUIREMENT.test(tableRow), "the repaired pattern sees it")
+      .toBe(true);
+  });
+
+  it("still detects the bullet shape, so the repair widened the signal rather than moving it", () => {
+    const bullet = "- **2T-SILENCE-001:** a thing.";
+    expect(BULLET_ONLY_DECLARATION.test(bullet)).toBe(true);
+    expect(DECLARED_SUCCESSOR_REQUIREMENT.test(bullet)).toBe(true);
+  });
+
+  it("does not treat a mention or a differently-lettered row as a declaration", () => {
+    // The property that keeps the widened pattern from becoming noise: a table
+    // row belonging to *this* phase, and prose naming the successor, are both
+    // legal and neither is a start signal.
+    expect(DECLARED_SUCCESSOR_REQUIREMENT.test("| `2S-SILENCE-001` | x | y | build | — |")).toBe(false);
+    expect(DECLARED_SUCCESSOR_REQUIREMENT.test("The successor phase is not started.")).toBe(false);
+    expect(DECLARED_SUCCESSOR_REQUIREMENT.test("see `2T-SILENCE-001` in a later phase")).toBe(false);
+  });
+
   it("is fail-closed: a listed markdown file that cannot be read throws rather than reporting clean", () => {
     const root = detectorRoot();
     // A path that `readdirSync` reports and `readFileSync` cannot open: on both
     // platforms, replacing the file with a directory of the same name does it.
-    const listed = join(root, "docs/reports/phase-2s/SUCCESSOR_NOTES.md");
+    const listed = join(root, "docs/reports/phase-2t/SUCCESSOR_NOTES.md");
     writeFileSync(listed, "# Notes\n");
     expect(successorStartSignals(root)).toEqual([]);
     rmSync(listed);

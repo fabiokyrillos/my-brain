@@ -3,6 +3,153 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-24 - Phase 2S: all ten decisions SIGNED — ADR-137, and one of them overrides the recommendation
+
+**ALL TEN OWNER DECISIONS ARE SIGNED — ADR-137. IMPLEMENTATION IS STILL NOT
+AUTHORIZED.** `OD-2S-1` A · `OD-2S-2` A · **`OD-2S-3` B** · `OD-2S-4` B ·
+`OD-2S-5` B · `OD-2S-6` A · `OD-2S-7` A · `OD-2S-8` A · `OD-2S-9` A · `OD-2S-10`
+A. Nine took the recommendation. **Signed is not authorized:** no slice may
+start, no product code may be written and no migration file may be made until a
+separate ADR exists.
+
+**`OD-2S-3` was signed B against the package's recommendation, deliberately.**
+The package recommended A — fix the notice's destination and let the existing
+task detail do the acting — because inline controls risk a second authority over
+a task's status. The owner overrode it and gave the reason: the theme requires
+acting on the notice itself, and a corrected link alone does not deliver it.
+
+**The recommendation is preserved verbatim rather than rewritten into
+agreement.** A package that revises its advice once the answer arrives is a
+package whose advice carries no information, and the next disagreement would be
+unreadable. What changed is the requirement set, not the record of what was
+proposed.
+
+**The objection was converted rather than discarded.** It is now `2S-TRUST-010` —
+**no new write authority, and needing one is a stop condition** — plus
+`2S-ACT-003` and `-004`, which name the Server Actions the task verbs must
+dispatch to, and `2S-CLOSE-013`, which re-proves the reuse at closeout against
+slice 2S.0's recorded baseline. The traceability contract gained **refusal 20**
+for the same property: an inline verb dispatching to a writer absent from that
+baseline refuses.
+
+**The set grew 74 → 99, and every addition was APPENDED.** `2S-ACT` is a new
+family of twelve; thirteen went to the ends of `2S-SILENCE`, `2S-ANSWER`,
+`2S-ATTENTION`, `2S-TRUST`, `2S-ACCESS`, `2S-MOBILE` and `2S-CLOSE`. **No
+identifier was renumbered, reused or removed**, so a reference written against
+the pre-signature package still resolves — asserted by listing the pre-signature
+set by name, so the tidy-looking change that would sort `2S-ACT` into reading
+order fails rather than passing quietly. **99 requirements across eleven
+families and five slices: 75 build · 18 baseline · 6 rule, none classified.**
+
+**Five threats were added, and they are the overridden objection in executable
+form.** `T-2S-15` a second authority over a task's status — the item carrying the
+override's whole risk; `T-2S-16` one action applied twice; `T-2S-17` a stale
+control writing anyway; `T-2S-18` an undo that reports success and restores
+nothing; `T-2S-19` the two surfaces diverging. **Nineteen threats, all OPEN.**
+
+**The reuse is proved rather than asserted**, each authority read from the source
+with its file and line: `work-item-actions.tsx:38` — already mounted **twice** —
+`detail-actions.ts:208`, `agent/actions.ts:501`, `undo-affordance.tsx:54`, and
+`detail-controls.ts:113`. The repository already carries the discipline:
+`detail-controls.ts:66` declares `RENDERED_ELSEWHERE` so one transition never has
+two routes on one screen, and the notification row is a **third mount of a shared
+component**, not a fourth implementation. **The named cost:** `WorkItemActions`
+takes a `WorkItemView` a notification row must project, which is exactly
+`T-2S-17`'s stale-state risk — so `2S-TRUST-012` requires the existing
+`stale_pre_state` refusal to be reached **from this surface**.
+
+**The migration ceiling did not move.** `OD-2S-7` A allocated one; the override
+raises nothing because every inline verb routes to an existing authority. **If an
+inline action turns out to need schema of its own, that is a second migration and
+therefore a stop condition** — not a budget revision. Parity unchanged at
+**`202608230101`, 101 local = 101 hosted**.
+
+**The estimate was recomputed, not adjusted: 7.5 / 15 / 24 working days**,
+~13.5-day critical path, no parallelisable slices. The override cost **+25
+requirements and +3.5 probable days**; slice 2S.2 grew from 8 requirements to 23.
+The pre-signature figure offered *+2 to +3 days*, and the difference is the four
+trust requirements the owner's own contract asked for.
+
+**One count in this package's own first draft was wrong, and it is recorded
+rather than quietly fixed.** Slice 2S.2 was written as *"thirty-one requirements
+— almost a third of the phase"*; re-deriving from the PRD's tables gave **23**. It
+is the exact defect the contract exists to catch, found by the method the
+contract prescribes, in the document that prescribes it.
+
+**`OD-2S-8` stays A, restated by the owner after the override.** Slice 2S.3 now
+does more work in `needs-attention-list.tsx` than the pre-signature plan
+intended, so the temptation to absorb the defect living in that file is stronger.
+Filter preservation on navigation and a linkable search stay in a short separate
+initiative; `2P-ATTENTION-008` and `OD-2R-9`'s two defects are **not** discharged
+by this phase editing their file.
+
+**Changed:** ADR-137 appended to `docs/DECISIONS.md`; PRD, implementation plan,
+threat model, gaps report, traceability contract and requirement coverage all
+updated; `src/lib/closeout/phase-2s-declarations.test.ts` extended to 37 tests
+including the append property and the override record; the active-milestone guard
+inverted for the tenth time, by the same rule it has always held.
+**Unchanged:** every migration, every grant, every RLS policy, signup, the
+rollout gate, every automation category's state, and Phase 2R's closure.
+
+## 2026-08-24 - Phase 2S AUTHORIZED FOR PLANNING ONLY — ADR-136, and three facts the record had wrong
+
+**PHASE 2S IS AUTHORIZED FOR PLANNING ONLY — ADR-136.** The package is written and **nothing is
+implemented**: zero product code, zero migration, zero deploy, zero hosted write, zero AI call,
+zero BYOK spend, zero push work, zero remainder executed. Every hosted statement behind it was a
+`select`.
+
+**The theme was chosen by the owner from four costed options against a measured census**, not
+from a roadmap — the published roadmap ends at Phase 2O. *Responder ao Brain*: **the product
+speaks every day and cannot be answered.** 57 notifications, **54 `task_stale`**, **0 read**,
+**0 dismissed**, **exactly 3 per day for 18 unbroken days**, about **3 tasks** last touched
+2026-07-30. Marking one read **suppresses nothing** — the heartbeat's suppression window never
+reads `status`, and the dedupe key carries the local day, so the same subject re-notifies for
+ever. `dismissed` exists in the schema and **has no reachable writer**: `markNotification`
+accepts it, its single caller always sends `"read"`, and the list filters out a state nothing in
+the product can produce. The asymmetry is in the schema itself — `pending_questions` and
+`reminders` both carry `snoozed_until` and a `snoozed` status; **`notifications` carries
+neither**. The product built *"not now"* twice and skipped the one thing that speaks daily.
+
+**74 requirements across ten families and five slices** — 0 unassigned, 0 delivery-classified;
+**52 build · 16 baseline · 6 rule**. **Ten owner decisions are OPEN and none is signed.**
+**Migration budget: 1 PROPOSED · 0 allocated · 0 created**, with a second of any kind a stop
+condition. Parity unchanged at **`202608230101`, 101 local = 101 hosted**, compared by version
+**set** rather than by count. **Fourteen threats, all OPEN.**
+
+**Three corrections to the standing record, each measured rather than argued.**
+
+- **`2P-CHAT-007-JOURNEY` is no longer "unspendable".** Three phases recorded it as needing the
+  owner's own credential. `user_ai_credentials` holds one row: `openai`, `status = active`,
+  `validated_at = 2026-08-02`. It is spendable — and chat has still had **zero** conversations.
+- **Voice with an editable transcript is BUILT and has never once run.** `voice-composer.tsx`
+  ships and is mounted at `composer.tsx:575`; `captureMode: "voice"` fired once, on 2026-08-22;
+  `ai_usage_events` holds **zero** `transcription` rows. What is owed is a proof on the owner's
+  device — or a defect report — not a build.
+- **A13's declared-requirement signal was inert.** It matched a bullet
+  (`- **2X-FAMILY-000:**`) while this repository declares requirements in **PRD table rows**, and
+  there is not one bullet-shaped declaration anywhere under `docs/`. It had therefore never once
+  matched a real declaration, and its control planted a bullet — proving the regex worked on a
+  shape nothing produces. A13 as a whole still fired through two other signals, so nothing could
+  have started silently through it. **Repaired in the same commit that retargeted it**, with a
+  control that plants a table row and asserts the old pattern would have missed it.
+
+**The successor letter is pinned in SIX places, not five.** ADR-131 counted five and five was
+right when written; Phase 2R then shipped a generator of its own, and its refusal 14 is the
+sixth. All six moved in this commit, deliberately rather than by a global replace.
+
+**Phase 2R stays CLOSED.** ADR-135 is not reopened, amended or reinterpreted, and one divergence
+in its record — `PHASE_2R_THREAT_MODEL.md` still reads ten of twelve closed, because
+`T-2R-11` and `T-2R-12` were disposed in ADR-135 rather than in the document — is **reported and
+deliberately not corrected**, because this authorization does not cover edits to a closed phase's
+record.
+
+**Added:** `docs/initiatives/phase-2s/` (PRD, implementation plan, theme options);
+`docs/reports/phase-2s/` (current-experience audit, gaps and opportunities, threat model,
+traceability contract, requirement coverage); `src/lib/closeout/phase-2s-declarations.test.ts`.
+**Changed:** ADR-136 appended to `docs/DECISIONS.md`; the A13 detector and its five sibling pins
+retargeted; `docs/STATE.md`, `docs/TODO.md` and `AUTONOMOUS_LOOP_HANDOFF.md` updated.
+**Unchanged:** every migration, every grant, every RLS policy, signup, the rollout gate, and
+every automation category's state.
 ## 2026-08-24 - Phase 2R CLOSED — ADR-135, after the owner's final checkpoint on real hardware
 
 **PHASE 2R IS CLOSED — ADR-135, by the owner, after the final checkpoint on their own iPhone.** *Rotina: o que se repete* is delivered: reminders repeat daily, weekly on any set of weekdays, monthly by date or ordinal weekday, and yearly, with **exactly one live occurrence per active series**, materialised by a trigger fired by a completion rather than by a scheduler — so the hourly heartbeat, its per-user lock, quiet hours, the daily cap and the 24-hour cooldown are **unchanged rather than re-implemented**, and slice 2R.4 proves that by calling `run_user_heartbeat` twenty-six times rather than by reading its source. **73 declared · 73 classified · 0 unclassified**, from a matrix that is **generated and refuses rather than emitting a partial one** (`scripts/generate-phase-2r-traceability.mjs`, `--check` refuses a stale file byte for byte): **51 `built` · 17 `baseline` · 2 `partial` · 3 `not-built-by-rule` · ZERO `undelivered`**. **Migration budget closes where it opened: 1 allocated · 1 spent · 1 applied** — `202608230101`, parity **`202608230101`, 101 local = 101 hosted**, re-read live at closeout; slices 2R.2, 2R.3, 2R.4, 2R.5 and **both** corrective rounds inside 2R.3 created none between them. **Twelve threats, all disposed: ten closed at slice 2R.5, and `T-2R-11` and `T-2R-12` only NOW** — both are about the *act of closing the phase*, and disposing of them earlier would have been the exact substitution `T-2R-12` names. **The owner's device checkpoint `2R-MOBILE-003` took THREE runs**: the first found two defects, the second found three more, the third confirmed every item. **Three findings outlive the phase.** Postgres's own `AT TIME ZONE` disagrees with two of the three signed daylight-saving cases, in opposite directions — measured before the migration was written. A defect reported as *visual* was a **wrong write**: the modal showed three weekdays, previewed three, and would have saved one. And **five requirements had taken credit for work nobody did** — the traceability contract had said since planning that `baseline` may never be recorded as `built`, and **nothing read it** until the closeout generator compared delivered classes against declared kinds; the misfiling survived five slices, three device checkpoints and every green CI run. **Every remainder is carried out intact and none is discharged by closure:** `2R-TZ-SECOND-AUTHORITY` (used by 2R.4 to force a real failure, which is not fixing it), `2R-UNDO-LEDGER-NOT-CLOSED`, `2R-OCCURRENCE-CANCEL-IRREVERSIBLE`, `2R-AXE-MANUAL-LANE`, `2R-RECURRENCE-LANE-UNRUNNABLE`, `2R-DRAWER-NOT-LOCKED`, `2R-TASK-RECURRENCE`, `OD-2R-9`'s two defects, the interval gap, and push HTTP 403 — now guarded against being *claimed*. **Inherited and reproduced with no item dropped:** `2P-ACCESS-005` **NOT EXECUTED — OWNER WAIVED**, `2P-ATTENTION-008`, `RG-DEP-3`, `2P-CHAT-007-JOURNEY`, ADR-055 expiring **2026-10-27**. Signup stays closed, rollout stays **25 pass · 3 fail · 2 owner-signature**. **the roadmap successor is NOT started, NOT planned and NOT named as active** — this line deliberately does not name it, because the A13 guard protects the letter — and ADR-135 authorizes no successor.

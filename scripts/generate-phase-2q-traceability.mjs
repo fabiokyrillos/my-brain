@@ -227,12 +227,13 @@ export function refusals({ prd = read(PRD), records = RECORDS.map(read) } = {}) 
 
   // 12 — a successor governing artifact before authorization.
   //
-  // **Retargeted 2026-08-22 by ADR-131**, which authorized Phase 2R. This is the
-  // fourth of the five places pinning the successor's letter; the enumeration is
-  // in `generate-phase-2p-traceability.mjs`'s refusal 12. The scope is this
-  // phase's own PRD, so Phase 2R's requirements never reach it — but the pin
-  // moves anyway, because every retarget must consciously pass through each one.
-  if (/2S-[A-Z]+-\d{3}/.test(prd)) {
+  // **Retargeted 2026-08-22 by ADR-131**, which authorized Phase 2R, and again
+  // **2026-08-24 by ADR-136**, which authorized Phase 2S. This is one of the six
+  // places pinning the successor's letter; the enumeration is in
+  // `generate-phase-2p-traceability.mjs`'s refusal 12. The scope is this phase's
+  // own PRD, so a later phase's requirements never reach it — but the pin moves
+  // anyway, because every retarget must consciously pass through each one.
+  if (/2T-[A-Z]+-\d{3}/.test(prd)) {
     found.push("the PRD declares a successor phase's requirement.");
   }
 
