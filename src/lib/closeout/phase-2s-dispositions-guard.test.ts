@@ -92,7 +92,6 @@ describe("the plan matches the assertions, because CI is the first thing to run 
   });
 
   it("is pure ASCII, like every suite before it", () => {
-    // eslint-disable-next-line no-control-regex
     const offenders = [...suite()].filter((character) => character.charCodeAt(0) > 127);
     expect(offenders).toEqual([]);
   });

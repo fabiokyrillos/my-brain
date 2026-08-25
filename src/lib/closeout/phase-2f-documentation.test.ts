@@ -420,12 +420,39 @@ describe("2F-OPERATIONS-006: the plan and the backlog point at the governing rev
      * and "spent" and "created" are still refused, in the same assertion,
      * pointing in opposite directions.
      */
-    expect(line, "the line must state the allocation")
-      .toMatch(/\ballocated\b/i);
-    expect(line, "nothing is created, and the line must not claim it is")
-      .not.toMatch(/\b(spent|created)\b/i);
+    /*
+     * **Inverted again after slice 2S.1 merged and applied its migration, and
+     * this time the guard had gone stale on the OTHER side.**
+     *
+     * The allocation was spent on 2026-08-25: `202608240102` is created, merged
+     * and applied, and parity moved `202608230101` to `202608240102`. This
+     * assertion still refused the words "spent" and "created" and still required
+     * the OLD parity string -- so it was not merely out of date, it was
+     * **enforcing a falsehood**: the backlog line kept saying `101 local = 101
+     * hosted` for as long as the guard demanded it.
+     *
+     * That is this assertion's own documented failure mode, quoted from the
+     * comment twenty lines above: *"A guard that agrees with a stale document is
+     * indistinguishable from a guard that is correct, right up until the
+     * document is fixed."* It agreed for the whole of slice 2S.2's baseline.
+     *
+     * The rule does not move, for the twelfth time: **the line states what is
+     * true of the active phase and overstates nothing.** So the three words that
+     * mean three different things all point the same way now -- allocated, spent
+     * and created are each required, because each is true -- and what stays
+     * refused is the one thing still untrue: a closure nobody decided, and a
+     * successor nobody authorized.
+     */
+    for (const word of ["allocated", "spent", "created"]) {
+      expect(line, `the line must state that the allocation is ${word}`)
+        .toMatch(new RegExp(`\\b${word}\\b`, "i"));
+    }
+    expect(line, "the phase is not closed, and the backlog must not imply it is")
+      .not.toMatch(/\bCLOSED\b/);
     expect(line, "parity must be named, not merely counted")
-      .toContain("202608230101");
+      .toContain("202608240102");
+    expect(line, "the superseded parity must not linger beside the current one")
+      .not.toContain("202608230101");
     expect(line, "a second must still be a stop condition on the record")
       .toMatch(/stop condition/i);
     expect(line, "the successor is not authorized, and the backlog must not imply one")

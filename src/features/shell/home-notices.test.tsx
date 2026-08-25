@@ -121,6 +121,52 @@ describe("2S-SILENCE-008: the verbs are reachable from the attention surface", (
     expect(within(section).getByText(getNotificationActionCopy("pt-BR").attentionEyebrow)).toBeTruthy();
   });
 
+  it("renders DIFFERENT primaries for two subjects in different states, in the same list", () => {
+    /*
+     * `2S-ACT-001` in its own words: *"the primary action is derived from the
+     * subject's own state, not fixed in the component; two subjects in
+     * different states render different primaries IN THE SAME LIST."*
+     *
+     * Two separate renders cannot show that — a component with a hard-coded
+     * primary would pass them both as long as the fixture changed between them.
+     * One render, two rows, two primaries.
+     */
+    const live = noticeRow({
+      source: {
+        id: "aaaaaaaa-1111-4111-8111-111111111111",
+        dedupe_key: "overdue:11111111-1111-4111-8111-111111111111:2026-08-24",
+        body: "Pagar o aluguel",
+      },
+      subjectStatus: "todo",
+      subjectLabel: "Pagar o aluguel",
+    });
+    const settled = noticeRow({
+      source: {
+        id: "bbbbbbbb-2222-4222-8222-222222222222",
+        dedupe_key: "overdue:22222222-2222-4222-8222-222222222222:2026-08-24",
+        body: "Enviar o contrato",
+      },
+      subjectStatus: "completed",
+      subjectLabel: "Enviar o contrato",
+    });
+    renderHome({ notices: [live, settled] });
+
+    const section = attentionSection();
+    const verbCopy = getVerbCopy("pt-BR");
+
+    expect(live.primaryVerb?.id).toBe("complete_task");
+    expect(settled.primaryVerb?.id).toBe("mark_read");
+    expect(
+      within(section).getByRole("button", { name: verbCopy.complete_task.accessibleName("Pagar o aluguel") }),
+    ).toBeTruthy();
+    expect(
+      within(section).queryByRole("button", { name: verbCopy.complete_task.accessibleName("Enviar o contrato") }),
+    ).toBeNull();
+    expect(
+      within(section).getByRole("button", { name: verbCopy.mark_read.accessibleName("Enviar o contrato") }),
+    ).toBeTruthy();
+  });
+
   it("mounts nothing when there is no notice — the control that makes the above mean something", () => {
     renderHome({ attention: [attentionItem()] });
     expect(

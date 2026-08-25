@@ -3,6 +3,59 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-25 - Phase 2S slice 2S.2: the verbs, on both surfaces, through one authority
+
+**Zero migrations.** The phase's one migration was spent and applied by slice
+2S.1; parity is untouched at `202608240102`, 102 local = 102 hosted. A second of
+any kind remains a stop condition and none was reached.
+
+**Delivered:** twenty-three requirements — `2S-SILENCE-007`, `-008`, `-011`;
+`2S-ANSWER-001` … `-008`; `2S-ACT-001` … `-012`. Six verbs on a notice, from
+`/app/notifications` **and** from *Precisa de você*: complete and reschedule the
+task, mark the notice read, dismiss it, silence the subject for a while, silence
+it outright. One primary action derived from the subject's own state plus one
+compact menu; only dismissal asks first, because it is the one verb with no way
+back.
+
+**Convergence is structural rather than asserted.** One shared vocabulary is
+necessary and not sufficient: two surfaces could each mount the row component
+and pass different verb sets into it, and `verbs.ts` would be intact while the
+rendered rows disagreed — which the notifications page did for one commit of
+this slice. Neither surface builds those props now. Both hand over the whole
+projected row to `NotificationVerbs`, and both dispatch through one
+`NOTIFICATION_VERB_HANDLERS` bundle naming five authorities that all predate the
+phase. `phase-2s-verb-authority.test.ts` is the census `2S-ACT-011` and
+`2S-TRUST-010` ask for, and its surface list is **derived** from the tree and
+asserted non-empty, because every other clause in it is a negative that an empty
+set would satisfy.
+
+**Three requirements needed a database, and a new pgTAP suite performs them.**
+`2S-ANSWER-004`, `-008` and `2S-SILENCE-011` each contain a verb no component
+test can execute. `phase_2s_slice_2_dispositions.sql` — 42 assertions, no
+migration — calls `run_user_heartbeat` after a dismissal and reads the rows. The
+two dismissal requirements are each other's control: the same dismissal blocks a
+duplicate under today's key and produces a new notice under a past one, so
+neither can pass by accident.
+
+**A guard must forbid the act, not the word.** The census's own first run failed
+on two files that were doing the right thing — prose describing
+`isEligibleStatus`, and a JSX comment naming `<NotificationRowActions>`. A guard
+that fails on an accurate comment teaches the next author to delete it. Every
+scan now runs over comment-stripped source.
+
+**Two of the pgTAP guard's six mutation controls failed to fail, and both were
+the guard's fault.** "At least five readings of the task" still passed after one
+was deleted — a threshold with slack passes the defect it exists to catch — and
+the scope check was satisfied by the section header comment naming its own
+subject. Both repaired, both re-run.
+
+**Twenty mutation controls, twenty failures**, every file restored and
+re-verified. Five baseline guards retargeted, none weakened; both discovery
+sweeps caught the new files themselves.
+
+**Record:** `docs/reports/phase-2s/PHASE_2S_SLICE_02_ACCEPTANCE.md`.
+
+
 ## 2026-08-25 - Phase 2S slice 2S.1: the one migration is merged and APPLIED
 
 **Budget closes where it opened: 1 allocated · 1 spent · 1 created · 1 applied.**
