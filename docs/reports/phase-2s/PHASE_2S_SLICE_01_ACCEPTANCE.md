@@ -19,10 +19,14 @@ forever, and a notice points at its subject.**
 - **AI calls: none. BYOK credit spent: none. Push: not resumed, not repaired,
   not claimed.**
 
-Executed by `supabase/tests/phase_2s_notification_suppressions.sql` (53
-assertions, all of which **call** `run_user_heartbeat`) and
-`src/lib/closeout/phase-2s-suppression-guard.test.ts` (15 assertions about the
-source).
+Executed by `supabase/tests/phase_2s_notification_suppressions.sql` (**59**
+assertions, every cadence one of which **calls** `run_user_heartbeat`) and
+`src/lib/closeout/phase-2s-suppression-guard.test.ts` (**17** assertions about
+the source).
+
+**The first CI run failed with seven failures across three suites, every one
+real.** §8b records each with its cause; one was a **security defect** in this
+slice's own migration.
 
 **No stop condition was reached.**
 
@@ -122,8 +126,10 @@ constraint violation is not a sentence an owner can act on.
 - RLS **enabled and forced**; four policies, **every one naming `authenticated`**
   — a policy with no role list is PUBLIC, and a definer writer passes FORCE RLS
   through it.
-- `anon`: **nothing**. `service_role`: **SELECT only** — the heartbeat reads
-  suppressions and nothing unattended may create one.
+- `anon`: **nothing**. `service_role`: **nothing**, by an explicit revoke — the
+  heartbeat reads suppressions as a definer running as its owner, so it never
+  needed a role grant. See §8b: omitting a grant would have left four privileges
+  in place, one of them `TRUNCATE`.
 - `2S-TRUST-006` **structurally**: no `title`, `body`, `content` or `message`
   column exists, asserted from `information_schema`.
 
@@ -303,13 +309,74 @@ edited on every later spend stops meaning anything:
 
 ---
 
+## 8b. What CI found that nothing local could, and one of it was a security defect
+
+The `database and journey` job is the only place in this environment that applies
+the chain to an empty database and runs pgTAP — there is no local Docker. It
+failed on the first attempt with **seven failures across three suites**, and
+every one was real. None was a flake and none was worked around.
+
+**1 — the undo handler was `SECURITY DEFINER`, and that is a security defect.**
+`undo_operation_routing.sql` refuses a definer handler by name: the router is
+already definer, so a definer handler gains **nothing** and turns any accidental
+grant on it into a cross-tenant write. All twenty existing handlers are invoker
+with an empty `search_path`; this is the twenty-first and it now matches. The
+guard for it now lives in **two** places — the routing suite that caught it, and
+this slice's own guard, so the next handler is caught by the file that
+introduces it.
+
+**2 — omitting a grant is not the same as withholding one.** The migration
+granted `service_role` only `SELECT`; the deployed posture came back
+`REFERENCES, SELECT, TRIGGER, TRUNCATE`. `alter default privileges` in this
+schema hands those four to `service_role` on **every** new table, and one of them
+is destructive. The migration now **revokes explicitly**, and `service_role` holds
+**nothing** — the heartbeat reads suppressions as a definer running as its owner
+and never needed a role grant. This is the posture `public.reminder_series`, the
+newest table in the chain, already holds.
+
+**3 — a fixture of mine silenced the subject a later assertion needed.** Section
+2 plants a permanent suppression on the **stranger's** task to prove the
+ownership boundary. It was still live in section 7, so `2S-CADENCE-006` asked the
+stranger's heartbeat to speak about a subject this suite had itself silenced —
+and failed for that reason rather than the one it was written to test. **A
+fixture that survives into a later section is a fixture answering a question
+nobody asked.** It is now lifted, in the open, where it stops being needed.
+
+**4 — `2S-CADENCE-007` was testing the wrong thing, and the way it failed is
+worth keeping.** It called the heartbeat for a **non-existent** user and expected
+`P0002`. CI answered `23503 heartbeat_runs_user_id_fkey`. The function *does*
+raise `P0002`; its own `exception when others` handler catches it; and the
+handler's insert into `heartbeat_runs` then violates the foreign key — so what
+the caller sees comes from the **failure logger**, not from the check. Harmless
+in production, because `run_all_heartbeats` only iterates rows of `auth.users` —
+but it means an absent user is **not a model** of the failure this requirement is
+about. The test now does what slice 2R.4 did: gives a **real** owner an
+unresolvable timezone, runs the whole batch through `run_all_heartbeats()`, and
+asserts the batch survives, the failure is **recorded**, and the failing owner
+produced nothing.
+
+**5 — the account-deletion cascade drill demanded a row.** Its populator must
+plant one row in **every** runtime-enumerated user-owned table, by design, so
+that a table added later fails by name. It did. The populator now plants a
+suppression — reusing the task it already created for that owner, because the
+subject is polymorphic and a fabricated uuid would be refused by the trigger,
+making the drill fail while claiming to own something it did not.
+
+**One correction to this record's own earlier claim.** §2 previously said
+`service_role` holds `SELECT`. It holds **nothing**, and the sentence is
+corrected forward rather than left standing.
+
+---
+
 ## 9. Controls
 
-**Six mutation controls on the new guard, six failures:**
+**Eight mutation controls on the new guard, eight failures:**
 
 | control | result |
 |---|---|
 | widen the 24-hour cooldown to 48 hours | **fails** |
+| remove the explicit `service_role` revoke | **fails** |
+| make the undo handler `security definer` | **fails** |
 | introduce a top-level disjunction in `pending` | **fails** |
 | delete the ladder's terminal case | **fails** — after the comment-stripping fix; it passed before |
 | point a task branch back at the list | **fails** |

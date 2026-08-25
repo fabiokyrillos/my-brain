@@ -154,9 +154,15 @@ create policy notification_suppressions_delete_own on public.notification_suppre
 -- gets exactly what the owner's own reads and the undo's compensation need.
 -- `service_role` is granted SELECT alone: the heartbeat runs as a definer and
 -- reads suppressions, and nothing unattended may ever create one.
-revoke all on table public.notification_suppressions from public, anon;
+-- `service_role` is granted NOTHING, and the explicit revoke is required rather
+-- than assumed: `alter default privileges` in this schema hands every new table
+-- REFERENCES, SELECT, TRIGGER and TRUNCATE to that role, so a table that merely
+-- omits a grant still carries four -- including TRUNCATE, which is destructive.
+-- The heartbeat reads suppressions as a SECURITY DEFINER function running as its
+-- owner, so it needs no grant at all. `public.reminder_series`, the newest table
+-- in the chain, holds exactly this posture.
+revoke all on table public.notification_suppressions from public, anon, service_role;
 grant select, insert, update, delete on table public.notification_suppressions to authenticated;
-grant select on table public.notification_suppressions to service_role;
 
 -- Ownership is proved by TRIGGER, reusing the validator that already exists.
 create trigger notification_suppressions_validate_owner
@@ -317,13 +323,18 @@ grant execute on function public.suppress_notification_subject(text, uuid, text,
 -- looks available forever. This handler sets it, writes the audit row, and
 -- returns a result the router will not accept as null.
 
+-- SECURITY INVOKER, and the omission of `security definer` is the decision.
+-- `undo_operation_routing.sql` refuses a definer handler by name: the router is
+-- already definer, so a handler that is definer TOO gains nothing and turns any
+-- accidental grant on it into a cross-tenant write. Every one of the twenty
+-- registered handlers is invoker with an empty search_path, and this is the
+-- twenty-first. Written definer in the first draft and caught by that guard.
 create or replace function private.undo_suppress_notification_subject_v1(
   p_user_id uuid,
   p_undo_id uuid
 )
 returns jsonb
 language plpgsql
-security definer
 set search_path = ''
 as $$
 declare

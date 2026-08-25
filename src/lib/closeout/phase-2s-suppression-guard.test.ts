@@ -235,6 +235,42 @@ describe("2S-TRUST: the new authority is bounded and the reuse is real", () => {
     expect(read(MINE)).toContain("check (actor in ('user', 'agent', 'system'))");
   });
 
+  it("revokes from service_role EXPLICITLY rather than merely not granting", () => {
+    /*
+     * `alter default privileges` in this schema hands every new table
+     * REFERENCES, SELECT, TRIGGER and TRUNCATE to `service_role`. CI proved it:
+     * the first version of this migration granted only SELECT, and the deployed
+     * posture came back with four privileges — one of them TRUNCATE, which is
+     * destructive.
+     *
+     * **Omitting a grant is not the same as withholding one.** This asserts the
+     * revoke that actually withholds.
+     */
+    expect(read(MINE)).toContain(
+      "revoke all on table public.notification_suppressions from public, anon, service_role;",
+    );
+  });
+
+  it("registers an undo handler that is SECURITY INVOKER", () => {
+    /*
+     * `undo_operation_routing.sql` refuses a definer handler by name, and it
+     * refused this one. The router is already `security definer`, so a handler
+     * that is definer too gains nothing and turns any accidental grant on it
+     * into a cross-tenant write.
+     *
+     * Asserted here as well as there, so the defect is caught by the file that
+     * would introduce it rather than by the suite that inherits it.
+     */
+    const migration = read(MINE);
+    const start = migration.indexOf(
+      "create or replace function private.undo_suppress_notification_subject_v1",
+    );
+    expect(start, "the handler is missing").toBeGreaterThan(-1);
+    const header = migration.slice(start, migration.indexOf("as $$", start));
+    expect(header, "an undo handler must not be security definer").not.toContain("security definer");
+    expect(header, "an undo handler must pin an empty search_path").toContain("set search_path = ''");
+  });
+
   it("creates exactly one new write authority, and it is the suppression", () => {
     const migration = read(MINE);
     const created = [...migration.matchAll(/^create or replace function (public\.\w+)/gm)]

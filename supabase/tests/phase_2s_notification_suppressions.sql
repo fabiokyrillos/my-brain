@@ -42,7 +42,7 @@
 -- Written in pure ASCII.
 
 begin;
-select plan(57);
+select plan(59);
 
 set local timezone to 'UTC';
 
@@ -243,13 +243,18 @@ select is(
   '2S-TRUST-003: anon holds no privilege on the suppression store'
 );
 
+-- The first version of this asserted 'SELECT' and CI answered
+-- 'REFERENCES,SELECT,TRIGGER,TRUNCATE': `alter default privileges` in this
+-- schema hands those four to service_role on EVERY new table, so omitting a
+-- grant is not the same as withholding one -- and one of the four is TRUNCATE.
+-- The migration now revokes explicitly and this asserts the result.
 select is(
-  (select pg_catalog.string_agg(distinct privilege_type, ',' order by privilege_type)
+  (select pg_catalog.count(*)::integer
    from information_schema.role_table_grants
    where table_schema = 'public' and table_name = 'notification_suppressions'
      and grantee = 'service_role'),
-  'SELECT',
-  '2S-TRUST-003: service_role may read suppressions and may never create one'
+  0,
+  '2S-TRUST-003: service_role holds NOTHING -- the heartbeat reads as a definer, not as a role'
 );
 
 select is(
@@ -563,6 +568,17 @@ delete from public.notifications
 where user_id = 'f1000001-0000-4000-8000-000000000001';
 
 -- One owner's suppression never affects another owner's batch.
+--
+-- THE STRANGER'S OWN SUPPRESSION IS LIFTED FIRST, and that is not tidying up.
+-- Section 2 planted a permanent suppression on the STRANGER'S task to prove the
+-- ownership boundary. It was still live here, so the first version of this
+-- assertion asked the stranger's heartbeat to speak about a subject this suite
+-- had itself silenced -- and it failed for that reason rather than for the one
+-- it was written to test. A fixture that survives into a later section is a
+-- fixture that answers a question nobody asked.
+delete from public.notification_suppressions
+where user_id = 'f1000002-0000-4000-8000-000000000002';
+
 insert into public.notification_suppressions
   (user_id, entity_type, entity_id, scope, suppressed_until, reason)
 values ('f1000001-0000-4000-8000-000000000001', 'task',
@@ -579,12 +595,53 @@ select ok(
   '2S-CADENCE-006: and the suppressed owner is still suppressed in the same batch'
 );
 
-select throws_ok(
-  $probe$select public.run_user_heartbeat('f9000009-0000-4000-8000-000000000009')$probe$,
-  'P0002',
-  null,
-  '2S-CADENCE-007: an unknown user raises, which is the failure the batch must absorb'
+-- 2S-CADENCE-007, and the first version of this tested the wrong thing.
+--
+-- It called the heartbeat for a NON-EXISTENT user and expected P0002. CI
+-- answered `23503 heartbeat_runs_user_id_fkey`, and the reason is worth keeping:
+-- the function DOES raise P0002, its own `exception when others` handler catches
+-- it, and the handler's insert into `heartbeat_runs` then violates the foreign
+-- key -- so the failure the caller sees comes from the failure LOGGER, not from
+-- the check. That is real behaviour and it is harmless, because
+-- `run_all_heartbeats` only ever iterates rows of `auth.users`; but it means an
+-- absent user is not a model of the failure this requirement is about.
+--
+-- What the requirement is actually about is slice 2R.4's case: one REAL owner
+-- whose data makes their own heartbeat fail, and a batch that carries on. So the
+-- stranger is given an unresolvable timezone -- `profiles.timezone` carries no
+-- CHECK, which is `2R-TZ-SECOND-AUTHORITY` and is used here rather than repaired
+-- -- and the whole batch is run through `run_all_heartbeats()`.
+delete from public.notifications
+where user_id = 'f1000002-0000-4000-8000-000000000002';
+update public.profiles set timezone = 'Not/AZone'
+  where user_id = 'f1000002-0000-4000-8000-000000000002';
+
+select lives_ok(
+  $probe$select public.run_all_heartbeats()$probe$,
+  '2S-CADENCE-007: one owner''s broken data does not raise out of the batch'
 );
+
+-- `exists`, not `order by created_at desc limit 1`: now() is fixed inside a
+-- transaction, so every heartbeat_runs row this suite produces carries the SAME
+-- created_at and "the latest one" is not a thing the ordering can decide.
+select ok(
+  exists (
+    select 1 from public.heartbeat_runs as run
+    where run.user_id = 'f1000002-0000-4000-8000-000000000002'
+      and run.status = 'failed'
+  ),
+  '2S-CADENCE-007: the failing owner''s run is RECORDED as failed rather than lost'
+);
+
+select is(
+  (select pg_catalog.count(*)::integer from public.notifications
+   where user_id = 'f1000002-0000-4000-8000-000000000002'),
+  0,
+  'CONTROL: the failing owner really did produce nothing, so the batch had something to survive'
+);
+
+update public.profiles set timezone = 'UTC'
+  where user_id = 'f1000002-0000-4000-8000-000000000002';
 
 delete from public.notification_suppressions
 where user_id = 'f1000001-0000-4000-8000-000000000001';
