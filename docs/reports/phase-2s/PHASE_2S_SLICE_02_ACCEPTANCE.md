@@ -306,6 +306,25 @@ the axe run belong to slice 2S.3, whose requirements they are.
 | a hosted proof | **not performed, and not needed** — this slice writes no schema. |
 | a screen-reader run | **not performed.** The announcement contract is asserted in the accessibility tree, which is not the same thing and is not claimed to be. |
 
+### One inconsistency this slice introduces, named rather than buried
+
+Home's attention count now includes the notices, because the heading, the
+"view all" link and the quiet state all read the same number and a surface that
+says *"Nada precisa de você agora."* above an unanswered notice is making a
+claim. **But the destination that link points at — `/app/inbox?view=needs-you` —
+does not show them.** So a day with one entry item and one notice reads **2** on
+Home and lists **1** on the queue.
+
+Choosing the other side would have been worse: a count that excluded the rows
+below it is a count that contradicts what the reader can see on the same screen.
+
+**It is not fixed here on purpose.** The needs-you queue carries filter chips
+whose interaction with a third kind of row is a **product decision**, and taking
+it would be scope this slice was not given. It is `2S-ATTENTION`'s to close —
+`2S-ATTENTION-002` and `-003` are exactly about what that surface counts and
+shows — and slice 2S.3 must either mount the notices there or change what the
+link says.
+
 ### One ordering tension in the plan, recorded rather than resolved silently
 
 `2S-SILENCE-008` (*"the same action is reachable from home"*) and `2S-ACT-011`

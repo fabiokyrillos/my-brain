@@ -68,10 +68,17 @@ Previously the active milestone read, retained rather than deleted: **Phase 2N -
 
 Successor status: **the roadmap successor — the phase after Phase 2S — is NOT STARTED, not scoped and not authorized.** No successor requirement or artifact exists anywhere in the repository. Its planning needs its own owner authorization. **The published roadmap ends at Phase 2O**, so there is no roadmap entry after it — Phase 2P, 2Q, 2R and now 2S each derived their subject from a measured census, and what A13 guards is the next name the lettered series would take, protected in advance precisely because nothing has scoped it. **The letter is pinned in SIX places, not one**, enumerated by ADR-136 Decision 9: the A13 detector's three constants and its fixture root, `phase-2o-declarations.test.ts`, `phase-2r-declarations.test.ts`, and refusal checks inside all three of the `generate-phase-2*-traceability.mjs` generators. ADR-131 counted five and five was right when written; Phase 2R then shipped a generator of its own, and its refusal 14 is the sixth. **A13's declared-requirement signal was also inert** — it matched a bullet while this repository declares requirements in PRD table rows — and ADR-136 Decision 8 repaired it in the same commit that moved it.
 
-## Phase 2S — Responder ao Brain — IN IMPLEMENTATION (ADR-138); SLICES 2S.0 AND 2S.1 MERGED, THE ONE MIGRATION IS APPLIED
+## Phase 2S — Responder ao Brain — IN IMPLEMENTATION (ADR-138); SLICES 2S.0, 2S.1 AND 2S.2 DELIVERED, THE ONE MIGRATION IS APPLIED
 
 - **Budget CLOSED: 1 allocated · 1 spent · 1 created · 1 APPLIED.** Parity `202608230101` → **`202608240102`**, **102 local = 102 hosted**, read live after the apply. Merge SHA `7457d82` (PR #311), CI green 3/3 on that exact SHA. **A second migration of any kind remains a stop condition.**
-- **NEXT: slice 2S.2**, re-audited against the `main` slice 2S.1 produced. Closure is **not** authorized; the phase stops at the owner twice — `2S-MOBILE-003` in slice 2S.3, and a closing checkpoint before 2S.4's report may become an ADR.
+- **Slice 2S.2 delivered 23 requirements with ZERO migrations** — `2S-SILENCE-007`, `-008`, `-011`; `2S-ANSWER-001` … `-008`; `2S-ACT-001` … `-012`, bringing the phase to **44 of 99**. Six verbs on a notice, on `/app/notifications` and on *Precisa de você*, through one vocabulary, one mount and one bundle of five pre-existing authorities, with an executable census refusing a sixth. Record: `docs/reports/phase-2s/PHASE_2S_SLICE_02_ACCEPTANCE.md`.
+- **NEXT: slice 2S.3**, re-audited against the `main` slice 2S.2 produced. Closure is **not** authorized; the phase stops at the owner twice — `2S-MOBILE-003` in slice 2S.3, and a closing checkpoint before 2S.4's report may become an ADR.
+
+### Raised by slice 2S.2 — one inconsistency it introduces, for slice 2S.3 to close
+
+- **Home counts the notices; `/app/inbox?view=needs-you` does not show them.** A day with one entry item and one notice reads **2** on Home and lists **1** on the queue the *ver tudo* link points at. Counting them on Home is the lesser evil — a count that excluded the rows under it would contradict what the reader sees on the same screen, and the quiet state would say *"Nada precisa de você agora."* above an unanswered notice.
+  - **Not fixed in 2S.2 on purpose.** The needs-you queue carries filter chips whose interaction with a third kind of row is a **product decision**, and taking it would have been scope slice 2S.2 was not given.
+  - **It is `2S-ATTENTION-002` and `-003`'s to close.** Slice 2S.3 must either mount the notices on that queue or change what the link promises. **This does not block anything else.**
 
 ### Raised by slice 2S.1's hosted deployment — OWNER DECIDED, now a separate priority initiative
 
