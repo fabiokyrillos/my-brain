@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { markNotification } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
+import { applyWorkItemAction } from "@/features/operations/actions";
+import { suppressNotificationSubject } from "@/features/notifications/actions";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
+import { NotificationRowActions } from "@/features/notifications/notification-row-actions";
+import { projectNotificationRows } from "@/features/notifications/row-projection";
+import { undoWorkOperation } from "@/features/task-commands/actions";
+import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
 import { settingsSectionHref } from "@/features/settings/sections";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -70,10 +76,28 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const formatCreatedAt = instantFormatter("dayAndTime", locale, timezone);
 
   const agentName = await getAgentName();
-  const result = await supabase.from("notifications").select("id,type,title,body,action_url,priority,status,created_at").neq("status", "dismissed").order("created_at", { ascending: false }).range(from, to);
+  /*
+    `dedupe_key` joins the select in slice 2S.2.
+
+    It is not decoration: `notifications` has no column naming the subject a
+    notice is about, and `2S-ACT-001` needs one to derive the primary action
+    from the subject's own state. The key carries it — `overdue:{task}:{date}` —
+    and `run_user_heartbeat` already recovers it the same way. Reading it here
+    is what makes the row's verbs answerable without a second migration.
+  */
+  const result = await supabase.from("notifications").select("id,type,title,body,action_url,priority,status,created_at,dedupe_key").neq("status", "dismissed").order("created_at", { ascending: false }).range(from, to);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load notifications") ?? []);
   const copy = getNotificationSettingsCopy(locale);
   const unread = items.filter((item) => item.status === "unread").length;
+  /*
+    ONE resolution for the whole page, not one per row.
+
+    `projectNotificationRows` reads every subject this page names in a single
+    query per kind, owner-scoped, and returns each row already carrying its
+    verbs. Rendering `<NotificationRowActions>` therefore costs no query at all.
+  */
+  const projected = await projectNotificationRows(supabase, { rows: items, userId: user.id, locale });
+  const rowsById = new Map(projected.map((row) => [row.notification.id, row]));
 
   return <div className="content-page">{/*
     `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
@@ -118,13 +142,17 @@ export default async function NotificationsPage({ params, searchParams }: { para
     the timestamp because "unread, two hours ago" is the order a reader wants
     the two facts in.
   */}<span className="notification-status-badge" data-status={item.status}>{item.status === "unread" ? copy.unreadBadge : copy.readBadge}</span><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link aria-label={`${copy.openDestination}: ${item.title}`} className="row-action" href={item.action_url}>{copy.openDestination}</Link>}{/*
-    Offered only where it changes something. A row that is already read has
-    nothing to mark, and a control that does nothing is what `R-24` refuses.
+    Slice 2S.2 — the verbs, replacing the single inline "Lida" form.
 
-    The accessible name carries the alert's own title, because twenty buttons
-    all reading "Marcar como lida" are twenty buttons a screen-reader user
-    cannot tell apart — and voice control needs the visible label to stay the
-    short one, which is why this is `aria-label` on the button rather than a
-    longer word inside it.
-  */}{item.status === "unread" ? <form action={markNotification}><input type="hidden" name="locale" value={locale} /><input type="hidden" name="notificationId" value={item.id} /><input type="hidden" name="status" value="read" /><button aria-label={`${copy.markRead}: ${item.title}`} className="row-action" type="submit">{pt ? "Lida" : "Read"}</button></form> : null}</div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+    What was here was one control, offered only while a row was unread. It
+    stays reachable, but it is now one member of a set the OWNER chooses from:
+    the primary action derived from the subject's own state, plus one compact
+    menu holding the rest. The set and its copy come from `verbs.ts`, which the
+    attention surface reads too, so the two cannot drift.
+
+    `2S-ACT-003`/`-004`: every task write dispatches to the authority that
+    already owns it. Those actions are injected as props because this file is a
+    Server Component and the row is a Client Component — the same boundary
+    `TaskDetailSurface` crosses when it mounts `WorkItemActions`.
+  */}<NotificationRowActions detailAction={applyTaskDetailCommand} locale={locale} markAction={markNotification} menuVerbs={rowsById.get(item.id)?.menuVerbs ?? []} notificationId={item.id} primaryVerb={rowsById.get(item.id)?.primaryVerb ?? null} subject={rowsById.get(item.id)?.subject ?? null} subjectLabel={rowsById.get(item.id)?.subjectLabel ?? item.body} suppressAction={suppressNotificationSubject} undoAction={undoWorkOperation} workAction={applyWorkItemAction} /></div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

@@ -135,6 +135,9 @@ export async function projectNotificationRows(
       // so `2S-REACH-004` and an unreadable key converge on the same behaviour.
       subjectType: resolved ? (subject?.subjectType ?? null) : null,
       subjectStatus,
+      // `R-24`, carried from the page this projection replaced: a notice that is
+      // already read has nothing to mark.
+      noticeStatus: row.status,
     });
     return {
       notification: row,

@@ -51,10 +51,32 @@ export type VerbDefinition = {
   readonly id: VerbId;
   readonly scope: VerbScope;
   /**
-   * Whether the verb can be undone by the product's existing undo affordance
-   * (`2S-ACT-009`), or must ask first because it cannot (`2S-ACT-010`).
+   * Whether a **real** undo exists for this verb — `2S-ACT-009`, whose wording
+   * is that the undo is *exercised* against the database rather than asserted.
+   *
+   * True only where a compensation genuinely exists and this slice can reach
+   * it: the two task verbs through `undoWorkOperation`, and the two silencing
+   * verbs through the `undo_id` that `suppress_notification_subject` returns
+   * and `undo_suppress_notification_subject_v1` honours (proved against the
+   * deployed database in slice 2S.1's deployment record).
+   *
+   * **`markNotification` writes no `undo_operations` row**, so the two message
+   * dispositions have no undo to offer. Claiming one would be the defect
+   * `2S-TRUST-013` exists to refuse — an undo that reports success and restores
+   * nothing.
    */
-  readonly reversible: boolean;
+  readonly undoable: boolean;
+  /**
+   * Whether the verb must ask before acting — `2S-ACT-010`.
+   *
+   * **This is not the negation of `undoable`.** Marking a notice read is not
+   * undoable either, and asking about it would be a dialog for an act that
+   * loses nothing: the notice stays in the list, wearing a different badge.
+   * Dismissal is the one verb here that removes something from the experience
+   * with no way back — the list filters `dismissed` out — so it is the one that
+   * asks, and the question names what is lost.
+   */
+  readonly confirm: boolean;
   /** Only meaningful for `scope: "task"` — the subject kinds that admit it. */
   readonly appliesTo: readonly ("task" | "reminder")[];
 };
@@ -64,12 +86,12 @@ export type VerbDefinition = {
  * two surfaces cannot disagree about that either.
  */
 export const VERBS: readonly VerbDefinition[] = [
-  { id: "complete_task", scope: "task", reversible: true, appliesTo: ["task"] },
-  { id: "reschedule_task", scope: "task", reversible: true, appliesTo: ["task"] },
-  { id: "mark_read", scope: "message", reversible: false, appliesTo: ["task", "reminder"] },
-  { id: "dismiss", scope: "message", reversible: false, appliesTo: ["task", "reminder"] },
-  { id: "silence_until", scope: "cadence", reversible: true, appliesTo: ["task", "reminder"] },
-  { id: "silence_subject", scope: "cadence", reversible: true, appliesTo: ["task", "reminder"] },
+  { id: "complete_task", scope: "task", undoable: true, confirm: false, appliesTo: ["task"] },
+  { id: "reschedule_task", scope: "task", undoable: true, confirm: false, appliesTo: ["task"] },
+  { id: "mark_read", scope: "message", undoable: false, confirm: false, appliesTo: ["task", "reminder"] },
+  { id: "dismiss", scope: "message", undoable: false, confirm: true, appliesTo: ["task", "reminder"] },
+  { id: "silence_until", scope: "cadence", undoable: true, confirm: false, appliesTo: ["task", "reminder"] },
+  { id: "silence_subject", scope: "cadence", undoable: true, confirm: false, appliesTo: ["task", "reminder"] },
 ];
 
 export type VerbCopy = {
@@ -192,9 +214,24 @@ export function verbsForRow(options: {
   readonly subjectType: "task" | "reminder" | null;
   /** The subject's own status, or `null` when there is no resolvable subject. */
   readonly subjectStatus: string | null;
+  /**
+   * The **notice's** own status — a different question from the subject's.
+   *
+   * `R-24`: a control that cannot change anything is not rendered. A notice
+   * that is already read has nothing to mark, and the page said so with
+   * `item.status === "unread" ? …` long before this slice existed. Moving the
+   * verbs into one shared list is exactly the kind of change that quietly drops
+   * a rule like that, so it is carried here rather than lost.
+   *
+   * Defaults to `unread` so a caller that does not know stays permissive —
+   * the attention surface projects rows that are unread by construction.
+   */
+  readonly noticeStatus?: string;
 }): readonly VerbDefinition[] {
-  const { subjectType, subjectStatus } = options;
+  const { subjectType, subjectStatus, noticeStatus = "unread" } = options;
   return VERBS.filter((verb) => {
+    // Nothing to mark on a notice that is already read.
+    if (verb.id === "mark_read" && noticeStatus !== "unread") return false;
     if (subjectType === null) return verb.scope === "message";
     if (!verb.appliesTo.includes(subjectType)) return false;
 

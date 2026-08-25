@@ -37,6 +37,7 @@ import { assertActiveAccount, requireUser } from "@/lib/auth/require-user";
 import { resolveLocale } from "@/lib/preferences";
 import { createClient } from "@/lib/supabase/server";
 import { recordProductEvent } from "@/features/product-analytics/server";
+import type { TaskUndoOffer } from "@/features/task-commands/task-undo-state";
 
 import { notificationConsentStates, type NotificationConsentState } from "./consent-contract";
 import {
@@ -282,7 +283,12 @@ export type SuppressSubjectResult =
   | Readonly<{
       ok: true;
       suppressionId: string | null;
-      undoId: string | null;
+      /**
+       * The real offer, read from `undo_operations` rather than computed here.
+       * Null when there is none to make — `2S-ACT-009` offers an undo only
+       * where one exists.
+       */
+      undo: TaskUndoOffer | null;
       replaced: boolean;
     }>
   | Readonly<{ ok: false; code: "unauthenticated" | "invalid" | "failed" | SuppressionRefusal }>;
@@ -407,10 +413,39 @@ export async function suppressNotificationSubject(
   revalidatePath("/[locale]/app/notifications", "page");
   revalidatePath(`/${session.locale}/app`);
 
+  /*
+   * THE UNDO OFFER, AND WHY IT IS READ RATHER THAN CONSTRUCTED.
+   *
+   * `UndoAffordance` takes a `TaskUndoOffer`, which is `{ undoId, expiresAt }`.
+   * The RPC returns the id and **not** the expiry, and `undo_operations` is
+   * where the expiry actually lives.
+   *
+   * So it is read from the ledger. The alternative — computing "now plus the
+   * window" on this side — would be **minting a retention value**: a second
+   * authority on when an undo dies, guaranteed to disagree with the router the
+   * moment either changes, and wrong on screen the whole time in between.
+   *
+   * `2S-ACT-009` says the undo is offered only where a real one exists, so a
+   * missing or unreadable row yields `undo: null` and the surface offers no
+   * control. Best-effort by design: a failed read here must never turn a
+   * successful suppression into a reported failure.
+   */
+  const undoId = readString(data, "undo_id");
+  let undo: TaskUndoOffer | null = null;
+  if (undoId) {
+    const { data: row } = await session.supabase
+      .from("undo_operations")
+      .select("id,expires_at")
+      .eq("id", undoId)
+      .maybeSingle();
+    const expiresAt = readString(row, "expires_at");
+    if (expiresAt) undo = { undoId, expiresAt };
+  }
+
   return Object.freeze({
     ok: true as const,
     suppressionId: readString(data, "suppression_id"),
-    undoId: readString(data, "undo_id"),
+    undo,
     replaced: readBoolean(data, "replaced"),
   });
 }

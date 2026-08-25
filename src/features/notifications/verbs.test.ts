@@ -169,10 +169,15 @@ describe("2S-ACT-002: everything that is not primary lives in one compact menu",
   });
 });
 
-describe("2S-ACT-009 / -010: reversibility is declared, not assumed", () => {
-  it("marks the two message dispositions irreversible and the rest reversible", () => {
-    const reversible = Object.fromEntries(VERBS.map((verb) => [verb.id, verb.reversible]));
-    expect(reversible).toEqual({
+describe("2S-ACT-009: an undo is offered only where a real one exists", () => {
+  it("offers undo for the task and silencing verbs, and for neither message disposition", () => {
+    /*
+     * `markNotification` writes no `undo_operations` row, so read and dismiss
+     * have nothing to undo. Offering one anyway would be the defect
+     * `2S-TRUST-013` exists to refuse: an undo that reports success and
+     * restores nothing.
+     */
+    expect(Object.fromEntries(VERBS.map((verb) => [verb.id, verb.undoable]))).toEqual({
       complete_task: true,
       reschedule_task: true,
       mark_read: false,
@@ -180,5 +185,61 @@ describe("2S-ACT-009 / -010: reversibility is declared, not assumed", () => {
       silence_until: true,
       silence_subject: true,
     });
+  });
+});
+
+describe("2S-ACT-010: confirmation is asked only where something is really lost", () => {
+  it("asks for dismissal alone", () => {
+    expect(VERBS.filter((verb) => verb.confirm).map((verb) => verb.id)).toEqual(["dismiss"]);
+  });
+
+  it("does NOT treat 'not undoable' as 'must confirm'", () => {
+    /*
+     * The two are independent, and conflating them is the easy mistake here.
+     * Marking a notice read is not undoable either — but nothing is lost, the
+     * notice stays in the list wearing a different badge, and a dialog for it
+     * would be a question about nothing.
+     */
+    const markRead = VERBS.find((verb) => verb.id === "mark_read");
+    expect(markRead?.undoable).toBe(false);
+    expect(markRead?.confirm).toBe(false);
+  });
+
+  it("never asks for a verb that can simply be undone", () => {
+    for (const verb of VERBS.filter((candidate) => candidate.undoable)) {
+      expect(verb.confirm, `${verb.id} both asks and offers undo`).toBe(false);
+    }
+  });
+});
+
+describe("R-24: a control that cannot change anything is not rendered", () => {
+  /*
+   * Carried from the page this slice replaced, where it read
+   * `item.status === "unread" ? <form …>`. Moving the verbs into one shared
+   * list is exactly the kind of change that quietly drops a rule like this —
+   * and the page's own outline test caught it doing so, which is why this
+   * exists here now.
+   */
+  it("offers no 'mark read' on a notice that is already read", () => {
+    const ids = verbsForRow({ subjectType: "task", subjectStatus: "todo", noticeStatus: "read" })
+      .map((verb) => verb.id);
+    expect(ids).not.toContain("mark_read");
+  });
+
+  it("still offers it on an unread notice", () => {
+    const ids = verbsForRow({ subjectType: "task", subjectStatus: "todo", noticeStatus: "unread" })
+      .map((verb) => verb.id);
+    expect(ids).toContain("mark_read");
+  });
+
+  it("still offers dismissal on a read notice, because that does change something", () => {
+    const ids = verbsForRow({ subjectType: "task", subjectStatus: "todo", noticeStatus: "read" })
+      .map((verb) => verb.id);
+    expect(ids).toContain("dismiss");
+  });
+
+  it("leaves a read notice with no message verb it cannot act on", () => {
+    const verbs = verbsForRow({ subjectType: null, subjectStatus: null, noticeStatus: "read" });
+    expect(verbs.map((verb) => verb.id)).toEqual(["dismiss"]);
   });
 });

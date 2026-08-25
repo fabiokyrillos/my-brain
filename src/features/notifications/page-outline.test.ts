@@ -186,14 +186,44 @@ describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () =
   });
 
   it("offers `mark as read` only where it changes something", () => {
-    // A row that is already read has nothing to mark, and a control that does
-    // nothing is what `R-24` refuses.
-    expect(code).toContain('item.status === "unread" ? <form action={markNotification}>');
+    /*
+     * `R-24`, and the rule survived a rewrite that could easily have dropped it.
+     *
+     * Slice 2S.2 replaced the single inline `item.status === "unread" ? <form …>`
+     * with a shared verb list, and the first version of that list offered
+     * *marcar como lido* on every row — including rows already read, which is a
+     * control that cannot change anything. **This test caught it.**
+     *
+     * The rule now lives in `verbsForRow`, which is where both surfaces read it
+     * from, and `verbs.test.ts` asserts the behaviour directly. What is checked
+     * here is that the page still HANDS IT the fact it needs: a projection that
+     * stopped passing the notice's status would silently restore the defect.
+     */
+    expect(code).toContain("projectNotificationRows");
+    const projection = readFileSync(
+      join(__dirname, "row-projection.ts"),
+      "utf8",
+    );
+    expect(projection).toContain("noticeStatus: row.status");
   });
 
   it("names each row's controls after the row, so twenty are distinguishable", () => {
-    expect(code).toContain("aria-label={`${copy.markRead}: ${item.title}`}");
+    // The destination link still carries its own name here.
     expect(code).toContain("aria-label={`${copy.openDestination}: ${item.title}`}");
+    /*
+     * The verb controls moved into `NotificationRowActions`, and their names are
+     * built from the shared copy — `accessibleName(subject)` — rather than
+     * assembled at this call site. The requirement is unchanged and the
+     * assertion follows it: every verb's accessible name carries the subject,
+     * proved by name in `verbs.test.ts`, and the row is handed the subject's own
+     * title to put in it.
+     */
+    expect(code).toContain("subjectLabel=");
+    const row = readFileSync(
+      join(__dirname, "notification-row-actions.tsx"),
+      "utf8",
+    );
+    expect(row).toContain("accessibleName(subjectLabel)");
   });
 
   it("has both locales for every one of the new strings", () => {
