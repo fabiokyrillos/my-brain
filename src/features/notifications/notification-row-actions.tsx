@@ -246,11 +246,11 @@ export function NotificationRowActions({
         if (next.status === "applied") {
           return {
             status: "applied",
-            // The authority.s own sentence. `announcement` and `detail` differ there
+            // The authority's own sentence. `announcement` and `detail` differ there
             // because it has two nodes; here there is one, so the visible
             // sentence is the announced one and cannot drift from it.
             message: next.detail || next.announcement,
-            // Straight from the database.s own answer, never constructed here.
+            // Straight from the database's own answer, never constructed here.
             undo: next.undo,
           };
         }

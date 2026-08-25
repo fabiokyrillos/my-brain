@@ -88,11 +88,19 @@ function setup(options: {
   return { markAction, suppressAction, workAction, detailAction, undoAction };
 }
 
-/** The VISIBLE outcome, not the live region.
+/**
+ * The outcome sentence, read by class.
  *
- * Both carry the same sentence deliberately — one for the eye, one for a screen
- * reader — so a bare `getByText` matches twice. Reading the outcome element by
- * name keeps the assertions about what the owner SEES.
+ * **This comment used to argue with the code below it.** It described the row's
+ * first design — an `sr-only` region and a separate visible paragraph, "one for
+ * the eye, one for a screen reader" — and said a bare `getByText` therefore
+ * matched twice. That design was removed in the same slice: there is now ONE
+ * node, and it is both. The assertion three blocks down proves the sentence
+ * appears exactly once.
+ *
+ * A corrected design does not correct the comments for you. Reading by class is
+ * kept anyway, because it names the element the assertions are about instead of
+ * relying on the text being unique.
  */
 function outcomeText(): string {
   return document.querySelector(".notification-row-outcome")?.textContent ?? "";
