@@ -354,3 +354,163 @@ describe("the live region exists before the result does", () => {
     expect(region?.textContent).toBe("");
   });
 });
+
+describe("accessibility contract: one announceable source, announced once", () => {
+  it("has EXACTLY ONE announceable region in the row", () => {
+    /*
+     * The first version had two nodes carrying the same sentence: an `sr-only`
+     * `role="status"` and a separate visible paragraph. That did not produce
+     * two announcements — the paragraph had no role and no `aria-live` — but it
+     * did put the same text in the accessibility tree twice. They are one node
+     * now, and this is the assertion that keeps them one.
+     */
+    setup();
+    const live = document.querySelectorAll('[aria-live], [role="status"], [role="alert"], [role="log"]');
+    expect(live).toHaveLength(1);
+  });
+
+  it("keeps the response visible — the live region IS the visible message", () => {
+    setup();
+    const region = document.querySelector('[role="status"]');
+    expect(region?.className).toContain("notification-row-outcome");
+    // Not the screen-reader-only treatment: this is the sentence the eye reads.
+    expect(region?.className).not.toContain("sr-only");
+  });
+
+  it("renders the region before any result exists, and empty", () => {
+    setup();
+    const region = document.querySelector('[role="status"]');
+    expect(region).not.toBeNull();
+    expect(region?.textContent).toBe("");
+  });
+
+  it("never carries the same text in a second announceable node", async () => {
+    const { markAction } = setup();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
+    await user.click(screen.getByRole("button", { name: /Marcar aviso como lido/ }));
+    await waitFor(() => expect(outcomeText()).toBe(copy.applied.mark_read));
+
+    expect(markAction).toHaveBeenCalledTimes(1);
+    // The sentence appears exactly once in the whole row.
+    const occurrences = screen.getAllByText(copy.applied.mark_read);
+    expect(occurrences).toHaveLength(1);
+  });
+
+  it("announces pending while in flight, and never announces success early", async () => {
+    const gate: { release: (() => void) | null } = { release: null };
+    const workAction = vi.fn(
+      (): Promise<unknown> =>
+        new Promise((resolve) => {
+          gate.release = () =>
+            resolve({ ...idleWorkState(), status: "applied", detail: "Tarefa concluída.", announcement: "x" });
+        }),
+    );
+    setup({ handlers: { workAction: workAction as never } });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+
+    const region = document.querySelector('[role="status"]');
+    await waitFor(() => expect(region?.getAttribute("aria-busy")).toBe("true"));
+    expect(region?.textContent).toBe(copy.pendingAnnouncement);
+    // The success sentence is NOT present yet.
+    expect(region?.textContent).not.toBe("Tarefa concluída.");
+
+    gate.release?.();
+    await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
+    expect(region?.getAttribute("aria-busy")).toBe("false");
+  });
+
+  it("REPLACES the previous announcement when a second action runs", async () => {
+    const suppressAction = vi.fn(async () => ({ ok: false as const, code: "SUPPRESSION_REASON_MISSING" }));
+    setup({ handlers: { suppressAction: suppressAction as never } });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
+    await user.click(screen.getByRole("button", { name: /Silenciar este assunto/ }));
+    await user.click(screen.getByRole("button", { name: copy.applyAction }));
+    await waitFor(() =>
+      expect(outcomeText()).toBe(refusalMessage("pt-BR", "SUPPRESSION_REASON_MISSING")),
+    );
+
+    // A second, different round: the region holds the NEW sentence only.
+    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
+    expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(screen.queryByText(refusalMessage("pt-BR", "SUPPRESSION_REASON_MISSING"))).toBeNull();
+  });
+
+  it("does not move focus when a round settles", async () => {
+    setup();
+    const user = userEvent.setup();
+    const primary = screen.getByRole("button", { name: /Concluir tarefa/ });
+
+    await user.click(primary);
+    await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
+
+    // Focus stays where the owner left it, rather than jumping to the outcome.
+    expect(document.activeElement).toBe(primary);
+  });
+});
+
+describe("accessibility contract: the dismissal question holds focus and gives it back", () => {
+  it("moves focus into the question when it opens", async () => {
+    setup();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
+    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+
+    await waitFor(() => {
+      const panel = document.querySelector(".notification-verb-panel");
+      expect(panel?.contains(document.activeElement)).toBe(true);
+    });
+  });
+
+  it("keeps Tab inside the question", async () => {
+    setup();
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
+    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    const panel = document.querySelector(".notification-verb-panel");
+    await waitFor(() => expect(panel?.contains(document.activeElement)).toBe(true));
+
+    // Round the whole cycle: focus must never leave the panel.
+    for (let step = 0; step < 6; step += 1) {
+      await user.tab();
+      expect(panel?.contains(document.activeElement), `escaped on tab ${step}`).toBe(true);
+    }
+  });
+
+  it("returns focus to the menu trigger when cancelled", async () => {
+    setup();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await user.click(screen.getByRole("button", { name: copy.cancelAction }));
+
+    // Back on the trigger — NOT on the menu item, which no longer exists.
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("returns focus to the menu trigger when Escape closes the question", async () => {
+    setup();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await waitFor(() => {
+      expect(document.querySelector(".notification-verb-panel")).not.toBeNull();
+    });
+    await user.keyboard("{Escape}");
+
+    expect(document.querySelector(".notification-verb-panel")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+});

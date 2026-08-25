@@ -24,7 +24,7 @@
  * there is no fall-through that could print raw text.
  */
 
-import { useActionState, useId, useRef, useState } from "react";
+import React, { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import { UndoAffordance, type TaskUndoHandler } from "@/features/operations/undo-affordance";
 import type { WorkItemActionState } from "@/features/operations/work-action-state";
@@ -45,15 +45,31 @@ export type SuppressHandler = (input: unknown, locale?: unknown) => Promise<
   | Readonly<{ ok: false; code: string }>
 >;
 
-/** What one round comes to rest at. Flat, and carrying no database text. */
+/**
+ * What one round comes to rest at. Flat, and carrying no database text.
+ *
+ * ONE sentence, not a visible one and an announced one. The two nodes were
+ * merged into a single live region, so two fields here would be two things that
+ * could disagree about what just happened -- and only one of them would ever be
+ * heard.
+ */
 type RowState = {
   readonly status: "idle" | "applied" | "failed";
   readonly message: string;
-  readonly announcement: string;
   readonly undo: TaskUndoOffer | null;
 };
 
-const IDLE: RowState = { status: "idle", message: "", announcement: "", undo: null };
+const IDLE: RowState = { status: "idle", message: "", undo: null };
+
+/**
+ * What can actually take focus inside the panel.
+ *
+ * `input:not([type="hidden"])` is the whole point, and it cost two wrong
+ * diagnoses to find: the panel carries a hidden input naming the verb, a plain
+ * `input` selector matched THAT first, and a hidden input cannot be focused --
+ * so focus silently stayed on the body while everything else looked correct.
+ */
+const FOCUSABLE = 'button, input:not([type="hidden"]), select, textarea, [href]';
 
 export function NotificationRowActions({
   locale,
@@ -109,7 +125,7 @@ export function NotificationRowActions({
 
   function refused(code: ActionRefusal): RowState {
     const message = refusalMessage(locale, code);
-    return { status: "failed", message, announcement: message, undo: null };
+    return { status: "failed", message, undo: null };
   }
 
   async function submit(_previous: RowState, formData: FormData): Promise<RowState> {
@@ -128,7 +144,7 @@ export function NotificationRowActions({
         // No undo offered: `markNotification` writes no compensation row, and a
         // control that reported success while restoring nothing is exactly what
         // `2S-TRUST-013` refuses.
-        return { status: "applied", message, announcement: message, undo: null };
+        return { status: "applied", message, undo: null };
       }
 
       if (verb.scope === "cadence") {
@@ -146,7 +162,7 @@ export function NotificationRowActions({
         );
         if (!result.ok) return refused(result.code as ActionRefusal);
         const message = copy.applied[verb.id];
-        return { status: "applied", message, announcement: message, undo: result.undo };
+        return { status: "applied", message, undo: result.undo };
       }
 
       // scope === "task": dispatch to the authority that already owns the
@@ -167,9 +183,11 @@ export function NotificationRowActions({
         if (next.status === "applied") {
           return {
             status: "applied",
-            message: next.detail,
-            announcement: next.announcement,
-            // Straight from the database's own answer, never constructed here.
+            // The authority.s own sentence. `announcement` and `detail` differ there
+            // because it has two nodes; here there is one, so the visible
+            // sentence is the announced one and cannot drift from it.
+            message: next.detail || next.announcement,
+            // Straight from the database.s own answer, never constructed here.
             undo: next.undo,
           };
         }
@@ -188,7 +206,7 @@ export function NotificationRowActions({
       const next = await detailAction(idleDetail(), payload);
       if (next.status !== "idle") keys.current.delete(verb.id);
       if (next.status === "applied") {
-        return { status: "applied", message: next.detail, announcement: next.announcement, undo: next.undo ?? null };
+        return { status: "applied", message: next.detail || next.announcement, undo: next.undo ?? null };
       }
       return refused(next.refreshable ? "stale" : "failed");
     } catch {
@@ -203,13 +221,63 @@ export function NotificationRowActions({
 
   const [state, formAction, pending] = useActionState(submit, IDLE);
 
-  /*
-   * The live region EXISTS BEFORE the result does, and is never conditionally
-   * rendered. A region mounted at the same moment its text arrives is a region
-   * screen readers do not announce — the defect this repository has already
-   * paid for once.
+  /**
+   * Focus enters the question once it is really on the page.
+   *
+   * Three attempts, and the way each failed is worth keeping:
+   *
+   * 1. `queueMicrotask` from the click handler — the panel did not exist yet,
+   *    because React had not rendered it when the handler returned.
+   * 2. A **callback ref** on the form — it fired, and focus still did not land.
+   *    A parent's ref runs before the node is connected to the document, and an
+   *    element outside the document cannot take focus.
+   * 3. An effect with a plain `input` selector — it ran, the node was
+   *    connected, and focus *still* did not land: the panel's first `input` is
+   *    the **hidden** field naming the verb, and a hidden input cannot be
+   *    focused. Hence `FOCUSABLE`.
+   *
+   * An effect sets no state, so it cannot cascade; it depends on the panel's
+   * identity, so a re-render while the question is open does not steal focus
+   * back from wherever the owner has tabbed to.
    */
-  const announcement = pending ? copy.pendingAnnouncement : state.announcement;
+  const openPanelId = panelVerb && state.status !== "applied" ? panelVerb.id : null;
+  useEffect(() => {
+    if (!openPanelId) return;
+    panel.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus({ preventScroll: true });
+  }, [openPanelId]);
+
+  /*
+   * ONE ANNOUNCEABLE NODE, AND IT IS THE VISIBLE ONE.
+   *
+   * The first version of this component had two: an `sr-only` `role="status"`
+   * carrying the announcement, and a separate visible `<p>` carrying the same
+   * sentence. That did **not** produce two announcements — the visible `<p>`
+   * had no `role` and no `aria-live`, so nothing announced it — but it did put
+   * the same text in the accessibility tree twice, where a reader navigating
+   * the row meets it once as a status and again as ordinary content.
+   *
+   * So the visible paragraph **is** the live region now. One node, one source:
+   *
+   * - **It exists before the result does.** Always rendered, empty at rest. A
+   *   region mounted at the same moment its text arrives is a region screen
+   *   readers do not announce — a defect this repository has already paid for.
+   *   `:empty` collapses it to zero height in CSS, which keeps it out of the
+   *   layout without `display:none` or `visibility:hidden`, either of which
+   *   would take it out of the accessibility tree and break the announcement.
+   * - **Pending never announces success.** While a round is in flight the text
+   *   is the pending phrase and `aria-busy` is true; the outcome replaces it
+   *   when it settles.
+   * - **Each outcome is announced once.** `aria-atomic` means the region is
+   *   read as a whole on change, and there is exactly one change per round.
+   * - **A new action replaces the previous announcement** rather than appending
+   *   to it, because the node's whole content is the current sentence.
+   *
+   * Focus is deliberately NOT moved on settle. `WorkItemActions` moves it to
+   * its outcome; here the outcome is beside controls the owner may want to use
+   * again, and a row that grabs focus on every round would be a row that
+   * fights the keyboard.
+   */
+  const announcement = pending ? copy.pendingAnnouncement : state.message;
 
   /*
    * OPENNESS IS DERIVED, NOT SET FROM AN EFFECT.
@@ -233,6 +301,60 @@ export function NotificationRowActions({
     menuTrigger.current?.focus({ preventScroll: true });
   }
 
+  /**
+   * Focus, for the panel that asks before dismissing.
+   *
+   * The contract is narrow and worth stating: while the question is open, Tab
+   * stays inside it, and closing it — by answering, by cancelling, or with
+   * Escape — puts focus back on the control that opened it. That control is the
+   * **menu trigger**, not the menu item: the item was inside a menu this panel
+   * closed, so returning focus there would return it to something no longer on
+   * screen.
+   */
+  const panel = useRef<HTMLFormElement | null>(null);
+
+  function focusables(): HTMLElement[] {
+    if (!panel.current) return [];
+    return [...panel.current.querySelectorAll<HTMLElement>(FOCUSABLE)]
+      .filter((element) => !element.hasAttribute("disabled"));
+  }
+
+  function openPanel(verb: VerbDefinition) {
+    setPanelVerb(verb);
+    setMenuOpen(false);
+    // Focus is moved by the effect below, not here: the panel does not exist in
+    // the DOM until React has rendered it, so a `queueMicrotask` scheduled from
+    // this handler finds `panel.current` still null. Measured, not assumed —
+    // the first version did exactly that and the focus test caught it.
+  }
+
+  function closePanel() {
+    setPanelVerb(null);
+    menuTrigger.current?.focus({ preventScroll: true });
+  }
+
+  /** Keeps Tab inside the open question, and lets Escape cancel it. */
+  function trapFocus(event: React.KeyboardEvent<HTMLFormElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePanel();
+      return;
+    }
+    if (event.key !== "Tab") return;
+    const elements = focusables();
+    if (elements.length === 0) return;
+    const first = elements[0];
+    const last = elements[elements.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey && active === first) {
+      event.preventDefault();
+      last.focus({ preventScroll: true });
+    } else if (!event.shiftKey && active === last) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  }
+
   function renderVerbButton(verb: VerbDefinition, className: string) {
     const needsPanel = verb.confirm || verb.id === "silence_until" || verb.id === "silence_subject" || verb.id === "reschedule_task";
     if (needsPanel) {
@@ -242,7 +364,7 @@ export function NotificationRowActions({
           className={className}
           disabled={pending}
           key={verb.id}
-          onClick={() => { setPanelVerb(verb); closeMenu(); }}
+          onClick={() => openPanel(verb)}
           type="button"
         >
           {verbCopy[verb.id].label}
@@ -269,9 +391,6 @@ export function NotificationRowActions({
 
   return (
     <div className="notification-row-actions">
-      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-        {announcement}
-      </div>
 
       {primaryVerb ? renderVerbButton(primaryVerb, "row-action notification-primary-action") : null}
 
@@ -311,7 +430,7 @@ export function NotificationRowActions({
       ) : null}
 
       {activePanel ? (
-        <form action={formAction} className="notification-verb-panel">
+        <form action={formAction} className="notification-verb-panel" onKeyDown={trapFocus} ref={panel}>
           <input name="verb" type="hidden" value={activePanel.id} />
           <p className="notification-verb-panel-meaning">{verbCopy[activePanel.id].meaning}</p>
 
@@ -350,7 +469,7 @@ export function NotificationRowActions({
             <button
               className="row-action"
               disabled={pending}
-              onClick={() => setPanelVerb(null)}
+              onClick={closePanel}
               type="button"
             >
               {copy.cancelAction}
@@ -364,9 +483,16 @@ export function NotificationRowActions({
         its menu exactly where they were — `2S-ACT-008` — so this is a message
         beside the controls rather than a replacement for them.
       */}
-      {state.status !== "idle" ? (
-        <p className="notification-row-outcome" data-status={state.status}>{state.message}</p>
-      ) : null}
+      <p
+        aria-atomic="true"
+        aria-busy={pending}
+        aria-live="polite"
+        className="notification-row-outcome"
+        data-status={pending ? "pending" : state.status}
+        role="status"
+      >
+        {announcement}
+      </p>
 
       {/*
         `2S-ACT-009`: offered only where the database returned a real
