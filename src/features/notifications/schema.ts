@@ -54,3 +54,31 @@ export const notificationPreferencesSchema = z.object({
 });
 
 export type NotificationPreferencesInput = z.infer<typeof notificationPreferencesSchema>;
+
+/**
+ * `2S-SILENCE-007` — the shape the silencing controls submit.
+ *
+ * It mirrors `public.suppress_notification_subject`'s parameters rather than
+ * inventing a second vocabulary, and every refusal the RPC names is reachable
+ * from a value this schema admits. **The schema does not decide anything**: it
+ * bounds the untrusted form input so a malformed submission is refused before a
+ * round trip, and the RPC remains the one authority on whether a suppression is
+ * legitimate — including ownership of the subject, which nothing on this side
+ * can prove.
+ *
+ * `suppressedUntil` is optional and validated for shape only. Whether it agrees
+ * with the scope is the RPC's `SUPPRESSION_UNBOUNDED` / `SUPPRESSION_PAST_DATED`
+ * / `SUPPRESSION_MALFORMED` triple, which says which of the three is wrong —
+ * duplicating that judgement here would be a second authority disagreeing with
+ * the first the moment either changed.
+ */
+export const suppressSubjectSchema = z.object({
+  entityType: z.enum(["task", "reminder"]),
+  entityId: z.string().uuid(),
+  scope: z.enum(["until", "forever"]),
+  suppressedUntil: z.string().datetime({ offset: true }).optional(),
+  noticeType: z.enum(["task_overdue", "task_stale", "reminder"]).optional(),
+  reason: z.string().trim().min(1).max(400),
+});
+
+export type SuppressSubjectInput = z.infer<typeof suppressSubjectSchema>;

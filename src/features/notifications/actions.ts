@@ -48,6 +48,7 @@ import {
   notificationPreferencesSchema,
   pushSubscriptionSchema,
   reportableConsentStateSchema,
+  suppressSubjectSchema,
 } from "./schema";
 
 export type NotificationActionResult =
@@ -248,4 +249,151 @@ export async function dismissNotificationInvitation(formData: FormData): Promise
     inviteCookieOptions(),
   );
   revalidatePath(`/${locale}/app/reminders`);
+}
+
+/* ------------------------------------------------------------------------- */
+/* Slice 2S.2 — the silencing verb's delivery half                            */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * The six refusals `public.suppress_notification_subject` names, plus the two
+ * this side can reach on its own.
+ *
+ * Frozen as a list rather than matched loosely, so a refusal the RPC adds later
+ * arrives here as `failed` — an honest "something was refused" — instead of
+ * being silently absorbed by a `startsWith("SUPPRESSION_")` that would claim to
+ * understand it.
+ */
+const SUPPRESSION_REFUSALS = [
+  "SUPPRESSION_SUBJECT_UNSUPPORTED",
+  "SUPPRESSION_SUBJECT_MISSING",
+  "SUPPRESSION_SCOPE_UNSUPPORTED",
+  "SUPPRESSION_NOTICE_TYPE_UNSUPPORTED",
+  "SUPPRESSION_UNBOUNDED",
+  "SUPPRESSION_PAST_DATED",
+  "SUPPRESSION_MALFORMED",
+  "SUPPRESSION_REASON_MISSING",
+  "SUPPRESSION_SUBJECT_NOT_OWNED",
+] as const;
+
+export type SuppressionRefusal = (typeof SUPPRESSION_REFUSALS)[number];
+
+export type SuppressSubjectResult =
+  | Readonly<{
+      ok: true;
+      suppressionId: string | null;
+      undoId: string | null;
+      replaced: boolean;
+    }>
+  | Readonly<{ ok: false; code: "unauthenticated" | "invalid" | "failed" | SuppressionRefusal }>;
+
+const SUPPRESS_FAILED: SuppressSubjectResult = Object.freeze({ ok: false, code: "failed" });
+const SUPPRESS_INVALID: SuppressSubjectResult = Object.freeze({ ok: false, code: "invalid" });
+const SUPPRESS_UNAUTHENTICATED: SuppressSubjectResult = Object.freeze({ ok: false, code: "unauthenticated" });
+
+/**
+ * The RPC returns `jsonb`, which arrives typed as `Json`. These read one field
+ * without asserting a shape the database is free to extend — an added key must
+ * never break this path, and a missing one must read as absent rather than
+ * throw.
+ */
+function readString(payload: unknown, key: string): string | null {
+  if (typeof payload !== "object" || payload === null) return null;
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function readBoolean(payload: unknown, key: string): boolean {
+  if (typeof payload !== "object" || payload === null) return false;
+  return (payload as Record<string, unknown>)[key] === true;
+}
+
+/**
+ * `2S-SILENCE-007` — the owner telling the Brain to stop speaking about one
+ * subject, from the notice itself.
+ *
+ * ## Why this is not the stop condition `2S-TRUST-010` names
+ *
+ * `2S-TRUST-010` forbids a **new write authority** and makes one a stop
+ * condition. It is worth being explicit about why this function is not one,
+ * because a literal reading of *"each already existed before this phase"* would
+ * catch it.
+ *
+ * The requirement's own context says what it is about: the objection it came
+ * from is *"a second authority over a task's status"*, and `2S-ACT-003`/`-004`
+ * name the existing Server Actions the **task** verbs must route to. The rule is
+ * that this surface may dispatch to the task lifecycle and may not reimplement
+ * it.
+ *
+ * This function creates no authority. `public.suppress_notification_subject` is
+ * the authority, it is `SECURITY DEFINER`, it takes its owner from `auth.uid()`
+ * rather than from a parameter, and **slice 2S.1 created it under the one
+ * migration ADR-137 allocated** — which is the whole reason Phase 2S was given a
+ * migration at all. Slice 2S.1's hosted deployment found it had no caller;
+ * this is that caller.
+ *
+ * A reading that made this a stop condition would make `2S-SILENCE-007` — *"the
+ * control exists on `/app/notifications`"* — impossible to satisfy, and a
+ * reading that voids a signed requirement is the wrong reading. Recorded in the
+ * slice acceptance record rather than settled quietly here.
+ *
+ * ## Nothing here decides anything
+ *
+ * Same posture as the four writes above it: authenticate, parse the untrusted
+ * input, call one validated RPC, map named refusals to typed copy. Ownership of
+ * the subject is proved by a trigger inside the database, not by this file.
+ */
+export async function suppressNotificationSubject(
+  input: unknown,
+  locale?: unknown,
+): Promise<SuppressSubjectResult> {
+  const parsed = suppressSubjectSchema.safeParse(input);
+  if (!parsed.success) return SUPPRESS_INVALID;
+  const session = await authenticate(locale);
+  if (!session) return SUPPRESS_UNAUTHENTICATED;
+
+  const { data, error } = await session.supabase.rpc("suppress_notification_subject", {
+    p_entity_type: parsed.data.entityType,
+    p_entity_id: parsed.data.entityId,
+    p_scope: parsed.data.scope,
+    p_suppressed_until: parsed.data.suppressedUntil ?? undefined,
+    p_notice_type: parsed.data.noticeType ?? undefined,
+    p_reason: parsed.data.reason,
+  });
+
+  if (error) {
+    /*
+     * The RPC refuses by NAME, in `detail`, so the owner gets a sentence about
+     * the thing they did rather than a constraint violation. Slice 2S.1's
+     * acceptance record §2 lists all six and asserts none of them reaches
+     * storage; this maps each to copy without re-deciding any of them.
+     *
+     * An unrecognised code is `failed` rather than a guess: inventing a
+     * sentence for a refusal this build does not know about would tell the
+     * owner something that might not be true.
+     */
+    const detail = typeof error.details === "string" ? error.details : "";
+    const known = SUPPRESSION_REFUSALS.find((code) => detail.includes(code));
+    return known ? Object.freeze({ ok: false as const, code: known }) : SUPPRESS_FAILED;
+  }
+
+  /*
+   * THE ROUTE PATTERN, not the resolved path.
+   *
+   * `/app/notifications` sits under a dynamic `[locale]` segment, and Next 16
+   * needs the `type` argument for such a path or the invalidation matches
+   * nothing — the exact failure slice 2P.4 measured on `/app/settings` and that
+   * `markNotification` above already carries the fix for. The attention surface
+   * is revalidated too, because `2S-ATTENTION-008` requires acting in one
+   * surface to be readable from the other.
+   */
+  revalidatePath("/[locale]/app/notifications", "page");
+  revalidatePath(`/${session.locale}/app`);
+
+  return Object.freeze({
+    ok: true as const,
+    suppressionId: readString(data, "suppression_id"),
+    undoId: readString(data, "undo_id"),
+    replaced: readBoolean(data, "replaced"),
+  });
 }
