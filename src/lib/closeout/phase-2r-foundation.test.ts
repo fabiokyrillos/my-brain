@@ -129,7 +129,8 @@ describe("2R-FOUNDATION-001: recurrence is absent, re-proved rather than inherit
     const migrations = readdirSync(join(REPO, "supabase/migrations"));
     expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)))
       .toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
-    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(101);
+        // Chain head moved to 102 by Phase 2S slice 2S.1's ONE authorized migration (ADR-137 OD-2S-7 A / ADR-138 Decision 3: the suppression model, the cadence rule and the notice destination). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2S migration is a stop condition and fails here.
+expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(102);
   });
 
   it("is not vacuous: the column reader really reads, and the closed list really closes", () => {
@@ -202,9 +203,22 @@ const HEARTBEAT_ABSENT: ReadonlyArray<readonly [string, string]> = [
 ];
 
 describe("2R-FOUNDATION-002: the heartbeat's rules, as they are before anything touches them", () => {
+  /*
+   * **Moved by Phase 2S slice 2S.1, in the commit that redefines the function.**
+   *
+   * `run_user_heartbeat` had been untouched since Phase 2M, and this pin was
+   * how that was known. `202608240102` recreates it for OD-2S-9 A, so the pin
+   * moves -- and it moves rather than being deleted, because everything below
+   * it is the point: the ten preserved clauses are now asserted against the
+   * NEW definition, which is exactly what makes "the rules did not change" a
+   * check rather than a claim. A rewrite that dropped the advisory lock, the
+   * cap, the 24-hour cooldown or the reminder key fails here.
+   */
   it("defines the function last in the migration the chain actually applies last", () => {
     const { file } = latestHeartbeatDefinition();
-    expect(file).toBe("supabase/migrations/202608040073_account_lifecycle_admin.sql");
+    expect(file).toBe(
+      "supabase/migrations/202608240102_phase_2s_slice_1_notification_suppressions.sql",
+    );
   });
 
   it.each(HEARTBEAT_CLAUSES)("carries %s", (_label, clause) => {

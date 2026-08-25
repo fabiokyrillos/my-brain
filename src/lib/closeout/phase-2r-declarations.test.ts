@@ -402,7 +402,8 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
       migrations.filter((name) => /phase[_-]?2r/i.test(name)),
       "a SECOND Phase 2R migration is a stop condition",
     ).toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
-    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(101);
+        // Chain head moved to 102 by Phase 2S slice 2S.1's ONE authorized migration (ADR-137 OD-2S-7 A / ADR-138 Decision 3: the suppression model, the cadence rule and the notice destination). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2S migration is a stop condition and fails here.
+expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(102);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {

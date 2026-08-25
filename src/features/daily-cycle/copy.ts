@@ -98,6 +98,50 @@ export function getConflictSectionCopy(locale: DailyCycleLocale): ConflictSectio
   return conflictSectionCopy[locale];
 }
 
+/**
+ * `2S-REACH-004` — what a task detail says when there is no task to show.
+ *
+ * **This stopped being hypothetical at slice 2S.0.** Three `task_overdue`
+ * notices in the deployed database name subjects that no longer exist. They
+ * were harmless while every notice pointed at the Work *list*; slice 2S.1
+ * points a notice at its **subject**, so those three become links to a task
+ * that is not there — and a 404 is a dead end with no way back to the product.
+ *
+ * **The wording says nothing about why.** A task owned by someone else and a
+ * task that never existed produce the same sentence, because that is the only
+ * answer that does not confirm a task's existence to someone guessing ids. The
+ * `notFound()` this replaces held the same property and the replacement keeps
+ * it — the improvement is the way out, not the disclosure.
+ *
+ * The state is `empty` rather than `error_terminal`: nothing failed, and
+ * nothing of the reader's was lost. `error_terminal` carries the `risk` tone
+ * and an assertive announcement, so using it here would tell the reader
+ * something had gone wrong when the honest answer is that the thing is simply
+ * not there.
+ */
+export type MissingTaskCopy = {
+  readonly title: string;
+  readonly description: string;
+  readonly action: string;
+};
+
+const missingTaskCopy: Record<DailyCycleLocale, MissingTaskCopy> = {
+  "pt-BR": {
+    title: "Esta tarefa não está mais aqui",
+    description: "O aviso que trouxe você até aqui continua válido, mas o assunto dele saiu da sua lista. Nada seu foi perdido.",
+    action: "Ver seu trabalho",
+  },
+  en: {
+    title: "This task is no longer here",
+    description: "The notice that brought you here is still valid, but its subject has left your list. Nothing of yours was lost.",
+    action: "See your work",
+  },
+};
+
+export function getMissingTaskCopy(locale: DailyCycleLocale): MissingTaskCopy {
+  return missingTaskCopy[locale];
+}
+
 export const dailyCycleCopy = {
   "pt-BR": {
     productStates: {

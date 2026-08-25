@@ -459,14 +459,39 @@ describe("Phase 2S: allocated is not created, and the ceiling did not move", () 
       .toMatch(/that is a second migration and therefore a stop\s+condition/);
   });
 
-  it("creates no migration file, and parity is unchanged", () => {
+  /*
+   * **Inverted by slice 2S.1, in the commit that spends the allocation.**
+   *
+   * This asserted ZERO Phase 2S migrations and a chain of 101, because during
+   * planning the distinction that mattered was *allocated is not created*.
+   * Slice 2S.1 created it under ADR-138 Decision 3, so keeping the old form
+   * would force the guard to deny a file the owner authorized.
+   *
+   * The distinction the assertion exists for does not go away -- it moves to
+   * the next one. The ceiling is now what is pinned: EXACTLY ONE Phase 2S
+   * migration, named, so a second of any kind fails here rather than merely
+   * being disapproved of in prose. That is the stop condition, expressed as a
+   * check.
+   */
+  it("creates exactly the one migration allocated, by name", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((name) =>
       name.endsWith(".sql"),
     );
-    expect(migrations.length, "this package must create no migration").toBe(101);
-    expect(migrations.some((name) => /phase[_-]?2s/i.test(name)), "a Phase 2S migration exists")
-      .toBe(false);
-    expect(read(PRD)).toContain("parity `202608230101`");
+    const mine = migrations.filter((name) => /phase[_-]?2s/i.test(name));
+    expect(mine, "a SECOND Phase 2S migration is a stop condition").toEqual([
+      "202608240102_phase_2s_slice_1_notification_suppressions.sql",
+    ]);
+    expect(migrations.length, "an unattributed migration arrived beside the allocated one")
+      .toBe(102);
+    // The migration names the allocation it consumes, so a budget line nobody
+    // can trace back to a signature cannot exist.
+    const header = read(`supabase/migrations/${mine[0]}`).slice(0, 4000);
+    expect(header, "the migration does not name the decision that allocated it")
+      .toMatch(/OD-2S-7 is signed as option A/);
+    expect(header, "the migration does not carry its own stop condition")
+      // `[\s-]+` rather than `\s+`: the sentence wraps across two SQL comment
+      // lines, so what separates STOP from CONDITION is a newline AND a `--`.
+      .toMatch(/SECOND MIGRATION OF ANY KIND IS A STOP[\s-]+CONDITION/);
   });
 
   it("keeps a second migration a stop condition rather than a ceiling alone", () => {
@@ -507,7 +532,10 @@ describe("Phase 2S: planning contains no classification and no execution record"
    * disappearing.
    */
   it("ships only the acceptance records of slices that have run, and no closeout artifact", () => {
-    const DELIVERED = ["PHASE_2S_SLICE_00_ACCEPTANCE.md"];
+    const DELIVERED = [
+      "PHASE_2S_SLICE_00_ACCEPTANCE.md",
+      "PHASE_2S_SLICE_01_ACCEPTANCE.md",
+    ];
     const records = readdirSync(join(REPO, REPORTS)).filter((name) => /ACCEPTANCE/i.test(name));
     expect(records.sort(), "a record exists for a slice that has not run, or one is missing")
       .toEqual(DELIVERED);
@@ -534,8 +562,19 @@ describe("Phase 2S: planning contains no classification and no execution record"
       const record = read(`${REPORTS}/${name}`);
       for (const [, id, cls] of record.matchAll(/^\| `(2S-[A-Z]+-\d{3})` \| \*\*([a-z-]+)\*\* \|/gm)) {
         expect(declared.has(id), `${name} classifies ${id}, which the PRD never declared`).toBe(true);
+        /*
+         * The contract's refusal 10 is narrow on purpose and this mirrors it
+         * exactly: a declared `baseline` may never be recorded as **`built`**.
+         * It may still be `partial`, `not-built-by-rule` or `undelivered` —
+         * those say the property was NOT re-proved, which is an admission
+         * rather than a claim, and refusing them would push a phase toward
+         * over-claiming to satisfy a guard.
+         *
+         * An earlier version of this line demanded `toBe("baseline")` and would
+         * have refused an honest `partial`.
+         */
         if (declared.get(id) === "baseline") {
-          expect(cls, `${id} is declared baseline and ${name} records it as ${cls}`).toBe("baseline");
+          expect(cls, `${id} is declared baseline and ${name} records it as built`).not.toBe("built");
         }
         classified += 1;
       }

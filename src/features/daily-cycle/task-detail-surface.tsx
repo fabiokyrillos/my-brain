@@ -24,8 +24,6 @@ import "server-only";
  * will not use them is three round trips for nothing.
  */
 
-import { notFound } from "next/navigation";
-
 import { getAgentName } from "@/features/profile/agent-identity";
 import { applyWorkItemAction } from "@/features/operations/actions";
 import { WorkItemActions } from "@/features/operations/work-item-actions";
@@ -34,11 +32,12 @@ import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions"
 import { dateBounds, detailControlsFor } from "@/features/task-commands/detail-controls";
 import { TaskDetailControls } from "@/features/task-commands/task-detail-controls";
 import { loadCandidateRelationOptions } from "@/features/tasks/relation-options";
+import { UniversalStateView } from "@/features/experience/universal-state";
 import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 
+import { getMissingTaskCopy } from "./copy";
 import { resolveTaskBackTarget } from "./task-return";
-
 import { loadTaskDetailProjection } from "./task-detail-projection";
 import { TaskDetailView } from "./task-detail-view";
 
@@ -71,7 +70,31 @@ export async function TaskDetailSurface({
   const detail = await loadTaskDetailProjection(supabase, { taskId, userId: user.id, locale });
   // A task owned by someone else is indistinguishable from one that does not
   // exist, which is the only answer that does not confirm its existence.
-  if (!detail) notFound();
+  //
+  // `2S-REACH-004`. This used to be `notFound()`, and the property above is the
+  // reason it is not simply deleted: the replacement returns the SAME thing in
+  // both cases, so nothing is disclosed that the 404 kept back. What changes is
+  // that the reader is no longer at a dead end.
+  //
+  // It stopped being hypothetical at slice 2S.0: three `task_overdue` notices
+  // in the deployed database name subjects that no longer exist. They were
+  // harmless while every notice pointed at the Work list, and slice 2S.1 points
+  // a notice at its subject — so the fallback ships in the same change that
+  // creates the need for it rather than after it.
+  if (!detail) {
+    const missing = getMissingTaskCopy(locale);
+    return (
+      <UniversalStateView
+        actionHref={`/${locale}/app/work`}
+        actionLabel={missing.action}
+        description={missing.description}
+        locale={locale}
+        state="empty"
+        title={missing.title}
+        titleAs={panel ? "p" : "h1"}
+      />
+    );
+  }
 
   // `2M-CAL-008`. One parameter, two vocabularies, one decision — extracted so
   // it is testable without an authenticated request. See `task-return.ts`.
