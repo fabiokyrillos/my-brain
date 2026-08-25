@@ -3,6 +3,61 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-25 - Phase 2S slice 2S.1: the one migration is merged and APPLIED
+
+**Budget closes where it opened: 1 allocated · 1 spent · 1 created · 1 applied.**
+`202608240102_phase_2s_slice_1_notification_suppressions.sql`, merged as `7457d82`
+(PR #311) with CI green 3/3 on that exact merge SHA, then applied. Parity
+`202608230101` → **`202608240102`**, **102 local = 102 hosted**. A second
+migration of any kind remains a stop condition.
+
+**Delivered:** `notification_suppressions` — the owner telling the agent to stop
+speaking about one subject, until an instant or permanently; a backoff ladder
+that terminates; and a notice that points at its subject rather than at a list.
+The 24-hour cooldown floor is byte-identical to the definition it replaces, so no
+input exists on which the product speaks *more* than before.
+
+**Two CI runs failed for different kinds of reason, and both are recorded.**
+
+The first found **seven real defects, all inside the slice**. One was a security
+defect: the undo handler was `SECURITY DEFINER` where all twenty existing
+handlers are INVOKER with an empty `search_path`. One was the lesson that
+**omitting a grant is not withholding one** — `alter default privileges` hands
+every new table `REFERENCES, SELECT, TRIGGER, TRUNCATE` to `service_role`, so the
+migration must revoke explicitly.
+
+The second found nothing wrong with the slice and failed anyway, on a file the
+slice never opened. `signup_hardening_grant_census.sql` asserts *exactly the
+thirteen RPC-closed tables carry zero `service_role` grants* — and the first
+run's correct fix had legitimately made this table the **fourteenth**.
+**`13 → 14` was refused as an edit:** the set was proved by name first, including
+that no earlier table had left. The census now enumerates row by row and derives
+its tally with `count(*)`, because a numeral written beside a list is a second
+place the truth has to be maintained. The assertion stays exact equality in both
+directions. Membership is now also asserted by a guard that reads the census file
+on every `npm test`, since Property 3 runs only under pgTAP.
+
+**The hosted proof found one more defect:** the generated types carried the new
+table and not the new RPC. Nothing would have failed until slice 2S.2 called it.
+Fixed surgically rather than by regenerating the file, which would have deleted
+type coverage for the RPC-closed tables the generator cannot see.
+
+**Hosted proof:** ran against the two real owners already in the project, created
+no user, task or reminder, and was rolled back by an unconditional `RAISE` rather
+than cleaned up — residue zero by construction, all three probes sighted at
+`1, 1, 1` inside the block before reading `0, 0, 0` after. It proved isolation,
+refusal rather than concealment (`42501`), and a real undo.
+
+**Recorded but deliberately not done:** the cascade is proved structurally
+(`confdeltype = 'c'`), not behaviourally — executing it means deleting a real
+user from production, and a rollback does not recall a network call. And
+`authenticated` holds TRUNCATE on **38 of 59** public base tables, which is
+pre-existing schema policy rather than this slice's doing; logged in `TODO.md` as
+`2S-TRUNCATE-AUTHENTICATED` for an owner decision.
+
+Records: `docs/reports/phase-2s/PHASE_2S_SLICE_01_ACCEPTANCE.md` and
+`PHASE_2S_SLICE_01_DEPLOYMENT.md`.
+
 ## 2026-08-24 - Phase 2S: implementation is AUTHORIZED — ADR-138, and nothing is built yet
 
 **ADR-138 authorizes the construction of slices 2S.0 … 2S.4** — branches, code,

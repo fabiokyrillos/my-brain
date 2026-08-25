@@ -68,7 +68,20 @@ Previously the active milestone read, retained rather than deleted: **Phase 2N -
 
 Successor status: **the roadmap successor — the phase after Phase 2S — is NOT STARTED, not scoped and not authorized.** No successor requirement or artifact exists anywhere in the repository. Its planning needs its own owner authorization. **The published roadmap ends at Phase 2O**, so there is no roadmap entry after it — Phase 2P, 2Q, 2R and now 2S each derived their subject from a measured census, and what A13 guards is the next name the lettered series would take, protected in advance precisely because nothing has scoped it. **The letter is pinned in SIX places, not one**, enumerated by ADR-136 Decision 9: the A13 detector's three constants and its fixture root, `phase-2o-declarations.test.ts`, `phase-2r-declarations.test.ts`, and refusal checks inside all three of the `generate-phase-2*-traceability.mjs` generators. ADR-131 counted five and five was right when written; Phase 2R then shipped a generator of its own, and its refusal 14 is the sixth. **A13's declared-requirement signal was also inert** — it matched a bullet while this repository declares requirements in PRD table rows — and ADR-136 Decision 8 repaired it in the same commit that moved it.
 
-## Phase 2S — Responder ao Brain — ALL TEN DECISIONS SIGNED (2026-08-24, ADR-137); IMPLEMENTATION NOT AUTHORIZED
+## Phase 2S — Responder ao Brain — IN IMPLEMENTATION (ADR-138); SLICES 2S.0 AND 2S.1 MERGED, THE ONE MIGRATION IS APPLIED
+
+- **Budget CLOSED: 1 allocated · 1 spent · 1 created · 1 APPLIED.** Parity `202608230101` → **`202608240102`**, **102 local = 102 hosted**, read live after the apply. Merge SHA `7457d82` (PR #311), CI green 3/3 on that exact SHA. **A second migration of any kind remains a stop condition.**
+- **NEXT: slice 2S.2**, re-audited against the `main` slice 2S.1 produced. Closure is **not** authorized; the phase stops at the owner twice — `2S-MOBILE-003` in slice 2S.3, and a closing checkpoint before 2S.4's report may become an ADR.
+
+### Open item raised by slice 2S.1's hosted deployment — needs an owner decision
+
+- **`2S-TRUNCATE-AUTHENTICATED` — `authenticated` holds TRUNCATE on 38 of 59 public base tables, and TRUNCATE does not respect RLS.** Measured on the deployed project 2026-08-25. It comes from `alter default privileges` in this schema, not from any one migration: a table that merely omits a grant still carries `REFERENCES, SELECT, TRIGGER, TRUNCATE`. The **21** that do not carry it are exactly the ones whose migrations revoked from `authenticated` explicitly — `reminder_series`, `push_subscriptions`, `notification_consents`, the fourteen RPC-closed tables, and a few others.
+  - **Included:** `entries`, `memories`, `tasks`, `reminders` and `notification_suppressions` — the owner's own core data.
+  - **Why it is narrow:** PostgREST never emits TRUNCATE, so exploiting it needs some other path that runs arbitrary SQL as `authenticated`.
+  - **Why it was not fixed in 2S.1:** the slice had already spent Phase 2S's only migration; the condition is the schema's **majority** posture rather than one table's anomaly; and narrowing it is a decision about **38 tables**, which is the owner's to make, not a deployment record's.
+  - **Recorded in** `docs/reports/phase-2s/PHASE_2S_SLICE_01_DEPLOYMENT.md` §5.
+
+### Planning record, retained
 
 - **ALL TEN SIGNED — ADR-137, 2026-08-24.** `OD-2S-1` A · `OD-2S-2` A · **`OD-2S-3` B** · `OD-2S-4` B · `OD-2S-5` B · `OD-2S-6` A · `OD-2S-7` A · `OD-2S-8` A · `OD-2S-9` A · `OD-2S-10` A. Nine took the recommendation.
 - **`OD-2S-3` B CONTRADICTS the recommendation, deliberately.** The owner requires acting on the notice itself: *concluir · adiar/reagendar · silenciar por um tempo · silenciar este assunto · lida · descartar*, with four scopes that must not blur and no action that merely hides an item. **The recommendation is preserved verbatim rather than rewritten**, and its objection is now `2S-TRUST-010` — no new write authority, and one is a **stop condition**.
