@@ -368,6 +368,84 @@ corrected forward rather than left standing.
 
 ---
 
+## 8c. What the SECOND CI found: a central integration this slice never made
+
+The first CI run found seven defects **in this slice**. The second found none —
+and failed anyway, on a file this slice never opened.
+
+Run `32810864199`: `application` **green**, `edge worker` **green**, `database
+and journey` **red** on `Run the pgTAP suite (post-revocation posture)`. Files=73,
+Tests=2819, and **exactly one** assertion failed:
+
+> `Failed test 4: "exactly the thirteen RPC-closed tables carry zero
+> service_role grants -- the chain's revoke carve-out can neither shrink nor
+> grow silently"`
+
+The log named the whole set in both directions, which is why this was diagnosed
+rather than guessed at:
+
+- `have` — fourteen names, including `notification_suppressions`.
+- `want` — the same fourteen **minus** `notification_suppressions`.
+
+**Nothing left the set. Exactly one thing entered it, and it was supposed to.**
+
+### The defect is not in the migration — it is that the migration was correct
+
+`supabase/tests/signup_hardening_grant_census.sql`, Property 3, derives its set
+at run time: every `public` BASE TABLE carrying **zero** `service_role` entries in
+`role_table_grants`. Membership is a **consequence** of what a migration revoked,
+never a declaration. Fix #2 of §8b made this slice revoke every `service_role`
+privilege on `notification_suppressions` — and that fix, correctly applied, moved
+the table into a closed set whose one census in this repository was still pinned
+at thirteen.
+
+Four things were checked by name before a single character was edited, because
+`13 → 14` is exactly the edit that would have hidden a real regression:
+
+| question | answer |
+|---|---|
+| how is the set derived? | at run time from `role_table_grants`; never declared |
+| is `notification_suppressions` legitimately the fourteenth? | yes — the migration revokes **all** from `public, anon, service_role` |
+| does it belong to the same RPC-closure contract? | yes — its only writer is `suppress_notification_subject`; the heartbeat reads it as a definer running as its owner and needs no grant. This is `reminder_series`'s posture exactly, which the migration cites by name |
+| did any earlier table leave the set? | **no** — proved twice: `want ⊂ have` in the CI log, and the branch diff adds grants/revokes for **only** the new table and its two functions, touching no pre-existing grant |
+
+### The repair, and why it is not `13 → 14`
+
+The census now enumerates the set **row by row** in a `rpc_closed` CTE, and the
+tally in the description is `count(*)` over those rows, interpolated by `format`.
+The pre-joined literal and the hand-written numeral were **two places holding one
+truth**, and they disagreed for a whole CI run without either being wrong on its
+own terms. A new table now needs one edit — its own name — and the number follows.
+
+The assertion is still **exact equality in both directions**. "At least fourteen"
+would pass while a historical table quietly lost its closure, which is the precise
+failure this census exists to catch.
+
+### The census only runs where this machine cannot reach
+
+Property 3 runs under pgTAP, which needs a Postgres that no local Docker exists to
+start. So the same membership is now also asserted by
+`phase-2s-suppression-guard.test.ts`, which reads the census file itself and runs
+on every `npm test` — by name, in both directions, with the thirteen frozen
+verbatim from this run's `want` line. The next slice that closes a table to
+`service_role` is told to update the census **before** a CI cycle tells it.
+
+The syntax of the new CTE was executed against a real Postgres before being
+committed — read-only, against the hosted project's `information_schema`. It
+returned the derived description `exactly the 14 RPC-closed tables …` and, from
+the hosted database, the **thirteen**: independent confirmation that the migration
+is not applied there.
+
+**A second correction to this record's own subject.** §8b corrected this record's
+claim that `service_role` holds `SELECT`. The migration's **own comment** still
+carried the superseded sentence — "`service_role` is granted SELECT alone" — two
+lines above the sentence saying it is granted nothing, and four above the revoke
+that grants it nothing. The code was right and the comment argued with itself.
+The stale sentence is removed. It changes no behaviour, and it is the kind of
+line a future reader would have believed.
+
+---
+
 ## 9. Controls
 
 **Eight mutation controls on the new guard, eight failures:**
@@ -387,6 +465,22 @@ Two earlier attempts at these controls **did not perform their mutation** — a
 scratch path that does not exist on Windows, and `\r\n` replacements against a
 file that `.gitattributes` pins to `eol=lf`. Both reported "15 passed", which
 proved nothing. Recorded rather than quietly redone.
+
+**Five further controls on the census guard added in §8c, five failures.** Each
+mutation was verified to have changed the file on disk before the suite was run,
+because a control that does not perform its mutation reports a pass and proves
+nothing:
+
+| control | result |
+|---|---|
+| remove `notification_suppressions` from the closed list | **fails** — *"the table this slice closed to service_role is missing from the census"* |
+| remove a historical table (`reminder_series`) from the list | **fails** — *"a table left the RPC-closed set without a slice arguing for it: `reminder_series`"* |
+| add an unexpected table (`entries`) to the list | **fails** — *"an unexpected table entered the RPC-closed set: `entries`"* |
+| plant `grant select … to service_role` in the migration | **fails** — *"a service_role grant would remove this table from the census set"* |
+| restate the tally as a hand-written numeral | **fails** — the regression that caused §8c, now refused |
+
+Each failed on the **intended** assertion and named its subject; each file was
+restored and re-verified byte-identical afterwards.
 
 ---
 

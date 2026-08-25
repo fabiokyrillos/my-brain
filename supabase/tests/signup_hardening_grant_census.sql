@@ -166,20 +166,15 @@ select is(
 -- shrinks the set (named failure), and a future RPC-only table must join the
 -- expected list by name in its own slice.
 
-select is(
-  (
-    select coalesce(string_agg(tables.table_name, ', ' order by tables.table_name), '')
-    from information_schema.tables as tables
-    where tables.table_schema = 'public'
-      and tables.table_type = 'BASE TABLE'
-      and not exists (
-        select 1
-        from information_schema.role_table_grants as grants
-        where grants.table_schema = 'public'
-          and grants.table_name = tables.table_name
-          and grants.grantee = 'service_role'
-      )
-  ),
+-- The expected set is enumerated ROW BY ROW rather than written as one
+-- pre-joined string, and the tally in the description is counted from those
+-- rows rather than typed. Slice 2S.1 is why: the fourteenth table arrived, the
+-- literal still read `thirteen`, and a numeral written by hand is a second
+-- place the truth has to be maintained -- one that can disagree with the list
+-- beside it without anything noticing. Now it cannot: add a row and the
+-- description counts it; the only edit a new table needs is its own name.
+with rpc_closed (table_name) as (
+  values
   -- `auth_event_attempts` joins in SH.5 (`202608040075`): it is RPC-only in the
   -- strictest sense in this chain -- no role holds ANY table privilege on it,
   -- not even the two that can execute its functions -- and `service_role` is
@@ -230,9 +225,61 @@ select is(
   -- something, with no undo row and no audit row to show for it. If a later
   -- slice genuinely needs service-side access, the grant is not the answer; a
   -- validated function is, and this line is where that argument has to be had.
-  'account_deletion_attempts, account_deletion_log, auth_event_attempts, credential_validation_attempts, entity_deletion_confirmations, entry_person_candidate_resolutions, error_events, product_events, rate_limit_events, reminder_series, scheduled_job_health, task_command_confirmations, user_ai_credentials',
-  'exactly the thirteen RPC-closed tables carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently'
-);
+  -- `notification_suppressions` joins in Phase 2S slice 2S.1 (`202608240102`,
+  -- 2S-TRUST-003). It is the second member of this list that is not a ledger,
+  -- and it holds `reminder_series`'s posture for a reason sharper than either:
+  -- the row IS the silence. A `service_role` that could DELETE one would make
+  -- the product start speaking again about a subject its owner told it to drop;
+  -- a `service_role` that could INSERT one would silence a subject the owner
+  -- never silenced. Both directions, with no undo row and no audit row to show
+  -- for it, because the row's own writer is the only thing that records either.
+  -- `alter default privileges` in this schema would otherwise have handed the
+  -- role four privileges including TRUNCATE, so the migration revokes
+  -- explicitly rather than merely declining to grant. The heartbeat reads
+  -- suppressions as a SECURITY DEFINER function running as its owner, and so
+  -- needs no grant at all.
+  ('account_deletion_attempts'),
+  ('account_deletion_log'),
+  ('auth_event_attempts'),
+  ('credential_validation_attempts'),
+  ('entity_deletion_confirmations'),
+  ('entry_person_candidate_resolutions'),
+  ('error_events'),
+  ('notification_suppressions'),
+  ('product_events'),
+  ('rate_limit_events'),
+  ('reminder_series'),
+  ('scheduled_job_health'),
+  ('task_command_confirmations'),
+  ('user_ai_credentials')
+),
+expected as (
+  select
+    string_agg(table_name, ', ' order by table_name) as names,
+    count(*) as tally
+  from rpc_closed
+)
+select is(
+  (
+    select coalesce(string_agg(tables.table_name, ', ' order by tables.table_name), '')
+    from information_schema.tables as tables
+    where tables.table_schema = 'public'
+      and tables.table_type = 'BASE TABLE'
+      and not exists (
+        select 1
+        from information_schema.role_table_grants as grants
+        where grants.table_schema = 'public'
+          and grants.table_name = tables.table_name
+          and grants.grantee = 'service_role'
+      )
+  ),
+  expected.names,
+  format(
+    'exactly the %s RPC-closed tables carry zero service_role grants -- the chain''s revoke carve-out can neither shrink nor grow silently',
+    expected.tally
+  )
+)
+from expected;
 
 -- The two RPC-only ledgers, denied by explicit revoke in their own
 -- migrations. Locally this is indistinguishable from never-granted; on the

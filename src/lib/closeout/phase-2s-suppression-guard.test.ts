@@ -287,3 +287,126 @@ describe("2S-TRUST: the new authority is bounded and the reuse is real", () => {
       .toContain('{ table: "notification_suppressions" }');
   });
 });
+
+/**
+ * The census is a CENTRAL file, and this slice had to join it.
+ *
+ * The second CI run found nothing wrong with the migration and nothing wrong
+ * with the slice's own suite. It found a table that had legitimately become the
+ * fourteenth member of a closed set while the repository's one census of that
+ * set was still pinned at thirteen — `signup_hardening_grant_census.sql`,
+ * Property 3. The CI log named it in full: `have` carried
+ * `notification_suppressions`, `want` did not, and no other name moved in
+ * either direction.
+ *
+ * These assertions exist because that census only runs under pgTAP, which needs
+ * a Postgres this machine has no Docker to start. A guard that reads the same
+ * file runs here, on every `npm test`, so the next slice that closes a table to
+ * `service_role` is told to update the census BEFORE a CI run tells it.
+ *
+ * The membership is asserted BY NAME in both directions. "At least fourteen"
+ * would pass while a historical table quietly left, which is the failure this
+ * census was built to catch in the first place.
+ */
+describe("2S-TRUST-003: the central grant census knows about the fourteenth table", () => {
+  const CENSUS = "supabase/tests/signup_hardening_grant_census.sql";
+
+  /**
+   * The `values` rows of the `rpc_closed` CTE, **with SQL comments removed.**
+   *
+   * The stripping is the same discipline as `pendingClause` above: the prose
+   * around this list names most of these tables in backticks, so a guard that
+   * matched raw text could be satisfied by the list's own description rather
+   * than by the list.
+   */
+  function rpcClosedTables(): string[] {
+    const source = read(CENSUS);
+    const start = source.indexOf("with rpc_closed (table_name) as (");
+    expect(start, `${CENSUS} no longer enumerates the RPC-closed set`).toBeGreaterThan(-1);
+    const end = source.indexOf("\nexpected as (", start);
+    expect(end, "the rpc_closed CTE is unterminated").toBeGreaterThan(start);
+    const withoutComments = source.slice(start, end).replace(/--[^\n]*/g, "");
+    return [...withoutComments.matchAll(/\('([a-z_]+)'\)/g)].map((match) => match[1]);
+  }
+
+  /**
+   * The thirteen that were already closed when slice 2S.1 opened, verbatim from
+   * the `want` line of run 32810864199. Frozen here so that removing one is a
+   * failure that names it, rather than a count that silently slides down.
+   */
+  const THIRTEEN_BEFORE_2S = [
+    "account_deletion_attempts",
+    "account_deletion_log",
+    "auth_event_attempts",
+    "credential_validation_attempts",
+    "entity_deletion_confirmations",
+    "entry_person_candidate_resolutions",
+    "error_events",
+    "product_events",
+    "rate_limit_events",
+    "reminder_series",
+    "scheduled_job_health",
+    "task_command_confirmations",
+    "user_ai_credentials",
+  ];
+
+  it("names notification_suppressions in the closed list", () => {
+    expect(
+      rpcClosedTables(),
+      "the table this slice closed to service_role is missing from the census",
+    ).toContain("notification_suppressions");
+  });
+
+  it("did not drop any of the thirteen that were closed before this slice", () => {
+    const present = rpcClosedTables();
+    const missing = THIRTEEN_BEFORE_2S.filter((table) => !present.includes(table));
+    expect(missing, "a table left the RPC-closed set without a slice arguing for it").toEqual([]);
+  });
+
+  it("admits nothing beyond those thirteen and this slice's one addition", () => {
+    const unexpected = rpcClosedTables().filter(
+      (table) => !THIRTEEN_BEFORE_2S.includes(table) && table !== "notification_suppressions",
+    );
+    expect(unexpected, "an unexpected table entered the RPC-closed set").toEqual([]);
+  });
+
+  it("counts the tally from the rows instead of restating it as a numeral", () => {
+    /*
+     * This is the defect's actual shape. The list and the number were two
+     * separate places holding one truth, and they disagreed for a whole CI run
+     * without either being wrong on its own terms. The description is now
+     * built by `format` from `count(*)`, so the number cannot lag the list.
+     */
+    const census = read(CENSUS).replace(/--[^\n]*/g, "");
+    expect(census, "the tally is no longer derived from the rows").toContain("count(*) as tally");
+    expect(census, "the description no longer interpolates the derived tally")
+      .toContain("expected.tally");
+    expect(
+      census,
+      "a hand-written numeral is back in the census description",
+    ).not.toMatch(/exactly the (thirteen|fourteen|fifteen|\d+) RPC-closed tables/);
+  });
+
+  it("is the same table the migration actually withholds every privilege from", () => {
+    /*
+     * Membership in that list is a CONSEQUENCE, not a declaration: the census
+     * derives the set from `role_table_grants` at run time. Naming the table in
+     * the list while the migration granted it something would not make the test
+     * pass — it would make it fail the other way. This ties the two together so
+     * that a re-grant is caught by the file that would introduce it.
+     */
+    const migration = read(MINE);
+    expect(migration).toContain(
+      "revoke all on table public.notification_suppressions from public, anon, service_role;",
+    );
+    // No `s` flag: `[^;]` already crosses newlines, and dotAll needs es2018.
+    const grants = [...migration.matchAll(/^grant [^;]*?on table public\.(\w+) to ([^;]+);/gm)];
+    const serviceRoleGrants = grants.filter(
+      ([, table, roles]) => table === "notification_suppressions" && roles.includes("service_role"),
+    );
+    expect(
+      serviceRoleGrants,
+      "a service_role grant would remove this table from the census set",
+    ).toEqual([]);
+  });
+});

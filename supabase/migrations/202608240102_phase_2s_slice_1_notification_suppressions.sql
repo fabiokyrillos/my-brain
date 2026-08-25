@@ -152,8 +152,6 @@ create policy notification_suppressions_delete_own on public.notification_suppre
 
 -- 2S-TRUST-003: least privilege, enumerated. `anon` gets nothing. `authenticated`
 -- gets exactly what the owner's own reads and the undo's compensation need.
--- `service_role` is granted SELECT alone: the heartbeat runs as a definer and
--- reads suppressions, and nothing unattended may ever create one.
 -- `service_role` is granted NOTHING, and the explicit revoke is required rather
 -- than assumed: `alter default privileges` in this schema hands every new table
 -- REFERENCES, SELECT, TRIGGER and TRUNCATE to that role, so a table that merely
