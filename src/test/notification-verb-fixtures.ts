@@ -61,7 +61,7 @@ export function noticeSource(overrides: Partial<NotificationRowSource> = {}): No
     type: "task_overdue",
     title: "Uma tarefa passou do prazo",
     body: "Pagar o aluguel",
-    action_url: null,
+    action_url: `/pt-BR/app/work/${TASK_ID}`,
     status: "unread",
     created_at: "2026-08-24T12:00:00.000Z",
     dedupe_key: `overdue:${TASK_ID}:2026-08-24`,

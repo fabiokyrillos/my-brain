@@ -230,6 +230,12 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * controls, and the primary among them can be a real task transition.
      */
     "src/features/notifications/attention-notice-row.tsx",
+    /*
+     * Slice 2S.3, and the discovery assertion caught it for the SEVENTH time.
+     * *Abrir* marks the notice seen on its way out, so a gesture that reached
+     * it would change state the owner never asked to change.
+     */
+    "src/features/notifications/notice-open-control.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

@@ -27,6 +27,7 @@ import { formatInstant } from "@/lib/time/instant-format";
 import type { Locale } from "@/lib/preferences";
 
 import { getNotificationActionCopy } from "./action-copy";
+import { NoticeOpenControl } from "./notice-open-control";
 import { NotificationVerbs, type NotificationVerbHandlers } from "./notification-row-actions";
 import type { NotificationRowView } from "./row-projection";
 
@@ -63,6 +64,26 @@ export function AttentionNoticeRow({
       </div>
       <div className="list-meta">
         {stamp ? <span>{stamp}</span> : null}
+        {/*
+          `2S-ATTENTION-006`. Rendered only where the notice has somewhere to
+          go: `notifications.action_url` is nullable, and a control that
+          navigated to nothing would be the "controle falso" the direction
+          forbids.
+
+          It takes `markAction` out of the same bundle the verbs dispatch
+          through, so opening writes through the authority `2S-TRUST-010`
+          enumerates rather than through one of its own.
+        */}
+        {row.notification.action_url ? (
+          <NoticeOpenControl
+            alreadySeen={row.notification.status !== "unread"}
+            href={row.notification.action_url}
+            locale={locale}
+            markAction={handlers.markAction}
+            notificationId={row.notification.id}
+            subjectLabel={row.subjectLabel}
+          />
+        ) : null}
         <NotificationVerbs handlers={handlers} locale={locale} row={row} />
       </div>
     </article>

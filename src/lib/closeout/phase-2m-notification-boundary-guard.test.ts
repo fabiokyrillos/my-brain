@@ -136,6 +136,11 @@ const DELIVERY_MODULES = [
   "src/features/notifications/attention-notices.ts",
   "src/features/notifications/attention-notice-row.tsx",
   "src/features/notifications/verb-handlers.ts",
+  /*
+   * Slice 2S.3. The row's *Abrir* control: it writes through the `markAction`
+   * it is HANDED, navigates with the router, and reaches no client of its own.
+   */
+  "src/features/notifications/notice-open-control.tsx",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));

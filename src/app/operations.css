@@ -473,6 +473,15 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  */
 .notice-attention-row{align-items:start}
 .notice-attention-eyebrow{margin:0 0 4px;color:var(--text-secondary)}
+/*
+ * `2S-ATTENTION-006`. *Abrir* is a submit button here and a link on the history
+ * page, because on this surface it WRITES before it navigates -- so it is
+ * styled to read like the link it replaces rather than like a second verb
+ * competing with the row's primary action.
+ */
+.notice-open-form{display:contents}
+.notice-open-control{min-height:44px;color:var(--link);font-weight:700;background:none;border:0;padding:0}
+.notice-open-control:disabled{opacity:.6}
 .notice-attention-row .list-meta{align-items:flex-start;row-gap:6px}
 @media(max-width:600px){.notice-attention-row .list-meta{width:100%}}
 

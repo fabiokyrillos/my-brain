@@ -24,7 +24,10 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+const pushed: string[] = [];
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {}, push: (href: string) => { pushed.push(href); } }),
+}));
 
 import { noticeHandlerSpies, noticeRow } from "@/test/notification-verb-fixtures";
 import type { Locale } from "@/lib/preferences";
@@ -35,7 +38,10 @@ import { getVerbCopy, verbsForRow } from "./verbs";
 
 const OWNER_ZONE = "America/Sao_Paulo";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  pushed.length = 0;
+});
 
 function renderRow(options: Parameters<typeof noticeRow>[0] & { locale?: Locale } = {}) {
   const { locale = "pt-BR", ...rowOptions } = options;
@@ -67,11 +73,40 @@ describe("2S-ACT-011: the attention row offers exactly the verbs the authority d
       });
       expect(row.verbs.map((verb) => verb.id)).toEqual(expected.map((verb) => verb.id));
 
-      // The row shows one primary plus one menu trigger — `2S-ACT-002`.
+      /*
+       * `2S-ACT-002` — one primary VERB plus one menu trigger, and the row's
+       * whole control set enumerated as a closed set beside them.
+       *
+       * RETARGETED IN 2S.3, and the reason is in this repository's own
+       * baseline. `2S-FOUNDATION-003` measured this surface as offering **two
+       * controls, *Abrir* and *Lida***: the destination was always a control of
+       * its own, sitting beside whatever the row's verb was. `2S-ACT-002` is
+       * about what replaced *Lida* — every other ACTION in one menu — not about
+       * removing the destination.
+       *
+       * On `/app/notifications` that distinction is carried by element type:
+       * *Abrir* is an `<a>`, so it never entered a button count. On the
+       * attention row it cannot be, because `2S-ATTENTION-006` requires opening
+       * to WRITE before it navigates, and a link that raced its own write would
+       * leave the owner looking at a notice they just opened, still unread.
+       *
+       * So the set is enumerated instead of counted — which is stricter, not
+       * looser: a fourth control of any kind fails here.
+       */
       const names = controlNames();
       expect(names).toContain(verbCopy[expected[0].id].accessibleName(row.subjectLabel));
       expect(names).toContain(copy.menuLabel(row.subjectLabel));
-      expect(names).toHaveLength(2);
+      expect(names.slice().sort()).toEqual(
+        [
+          verbCopy[expected[0].id].accessibleName(row.subjectLabel),
+          copy.menuLabel(row.subjectLabel),
+          copy.openLabel(row.subjectLabel),
+        ].sort(),
+      );
+
+      // And the verbs themselves are still exactly two controls.
+      expect(document.querySelectorAll(".notification-primary-action")).toHaveLength(1);
+      expect(document.querySelectorAll(".notification-menu-trigger")).toHaveLength(1);
 
       // And the rest are behind that one trigger.
       await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
@@ -91,6 +126,64 @@ describe("2S-ACT-011: the attention row offers exactly the verbs the authority d
       expect(name, `a control does not name its row: ${name}`).toContain("Pagar o aluguel");
     }
     expect(row.subjectLabel).toBe("Pagar o aluguel");
+  });
+});
+
+describe("2S-ATTENTION-006: opening a notice from home marks it seen", () => {
+  it("writes through the SAME authority the *Lida* verb uses, then navigates", async () => {
+    const { row, spies } = renderRow();
+    const copy = getNotificationActionCopy("pt-BR");
+
+    await userEvent.click(screen.getByRole("button", { name: copy.openLabel(row.subjectLabel) }));
+
+    /*
+     * The write, and what it sent. `2S-TRUST-010`: the destination is
+     * `markNotification`, out of the same bundle the verbs dispatch through, and
+     * the value is the one *Lida* sends. Opening chooses WHEN, never WHAT.
+     */
+    expect(spies.markAction).toHaveBeenCalledTimes(1);
+    const sent = spies.markAction.mock.calls[0][0] as FormData;
+    expect(sent.get("status")).toBe("read");
+    expect(sent.get("notificationId")).toBe(row.notification.id);
+
+    // And only then the navigation.
+    expect(pushed).toEqual([row.notification.action_url]);
+  });
+
+  it("navigates a notice that was already seen WITHOUT writing", async () => {
+    /*
+     * `R-24` again: a control whose only possible outcome is a no-op should not
+     * perform it. The control that makes this mean something is the test above,
+     * which proves the write happens when the notice IS unread.
+     */
+    const { row, spies } = renderRow({ source: { status: "read" } });
+    const copy = getNotificationActionCopy("pt-BR");
+
+    await userEvent.click(screen.getByRole("button", { name: copy.openLabel(row.subjectLabel) }));
+
+    expect(spies.markAction).not.toHaveBeenCalled();
+    expect(pushed).toEqual([row.notification.action_url]);
+  });
+
+  it("renders no open control for a notice with nowhere to go", () => {
+    /*
+     * `notifications.action_url` is nullable. A control that navigated to
+     * nothing would be a false affordance, so the row offers none -- and the
+     * verbs are untouched, because having no destination says nothing about
+     * what the owner may do to the notice.
+     */
+    const { row } = renderRow({ source: { action_url: null } });
+    const copy = getNotificationActionCopy("pt-BR");
+    expect(screen.queryByRole("button", { name: copy.openLabel(row.subjectLabel) })).toBeNull();
+    expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+  });
+
+  it("names the row in the open control, like every other control on it", () => {
+    const { row } = renderRow({ subjectLabel: "Pagar o aluguel" });
+    for (const name of controlNames()) {
+      expect(name, `a control does not name its row: ${name}`).toContain("Pagar o aluguel");
+    }
+    expect(row.notification.action_url).not.toBeNull();
   });
 });
 
