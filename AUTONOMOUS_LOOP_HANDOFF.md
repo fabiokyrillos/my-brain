@@ -14217,3 +14217,161 @@ stopping at the owner's `2S-MOBILE-003` device checkpoint, which no automated
 lane substitutes.
 
 **A green suite with fewer assertions is not the same green suite.**
+
+## §131 — Slice 2S.2: the verbs on both surfaces, and three defects that only appeared when something finally tested them (2026-08-25)
+
+### What exists
+
+**Slice 2S.2 — merged as `ec466695569aacc5b6ba0bece4301dad3dc7d62f` (PR #314).**
+CI green **3/3 on the PR head** `e40c8c0` (run `32900049825`) **and green 3/3
+again on that exact merge SHA** (run `32900958069`) — three completed jobs each
+time, not a queued or cancelled run. Twenty-three requirements — `2S-SILENCE-007`, `-008`, `-011`;
+`2S-ANSWER-001` … `-008`; `2S-ACT-001` … `-012` — bringing Phase 2S to **44 of
+99**.
+
+**Zero migrations.** The phase's one migration was spent and applied by slice
+2S.1; parity is untouched at `202608240102`, **102 local = 102 hosted**, read
+live before anything was written. A second of any kind stays a stop condition.
+
+Six verbs on a notice, on `/app/notifications` **and** on *Precisa de você*:
+*concluir* and *reagendar* the task, *marcar como lido*, *descartar*, *silenciar
+por um tempo*, *silenciar este assunto*. One primary action derived from the
+subject's own state plus one compact menu; only dismissal asks first.
+
+### One shared vocabulary was not enough, and that is the slice's central lesson
+
+`2S-ACT-011` asks that the verb set and its copy be read from one source and be
+**equal** across the two surfaces. A shared `verbs.ts` satisfies the first half
+and not the second: **two surfaces can each mount the same row component and
+pass different things into `primaryVerb` and `menuVerbs`** — one filtered, one
+re-ordered, one assembled by hand — and the vocabulary stays intact while the
+rendered rows disagree.
+
+The notifications page did exactly that for one commit of this slice, spelling
+out four props at the call site.
+
+Neither surface builds them now. Both hand over the whole `NotificationRowView`
+the projection produced; `NotificationVerbs` derives the controls once; and both
+dispatch through **one** `NOTIFICATION_VERB_HANDLERS` bundle naming five
+authorities that all predate the phase.
+
+**A shared vocabulary is a claim about names. A shared mount is a claim about
+what renders.**
+
+### Three defects, and each one appeared the moment something first tested it
+
+1. **Escape did not close the compact menu, and four green focus tests did not
+   notice.** The handler sat on the `<ul role="menu">`; opening the menu leaves
+   focus on the **trigger**, which is that list's *sibling*, so the keydown never
+   reached it. It shipped for three commits while every panel focus test passed
+   — **they test the panel**. Found only because the slice's control list
+   demanded a proof that closing returns focus, and writing the missing test
+   failed the product.
+
+2. **The test written for that fix was itself vacuous**, and its mutation control
+   said so: deleting the `focus()` call still passed, because the reader was
+   standing on the trigger when Escape arrived. **Focus has to LEAVE before
+   "returns focus" means anything.**
+
+3. **The active-milestone guard had gone stale on the other side and was
+   enforcing a falsehood.** It forbade the words "spent" and "created" and
+   *required* the parity string `202608230101` — values true before slice 2S.1
+   applied its migration. So `docs/TODO.md` had been saying `101 local = 101
+   hosted` ever since, and **the document could not be corrected while the guard
+   demanded the old value.** That is the failure mode written in the guard's own
+   comment twenty lines above the failing line.
+
+### The rules this slice paid for
+
+- **A guard must forbid the act, not the word.** The new verb-authority census
+  failed on two files that were doing the right thing — prose describing
+  `isEligibleStatus`, and a JSX comment naming `<NotificationRowActions>`. A
+  guard that fails on an accurate comment teaches the next author to delete it.
+  Every scan now runs over comment-stripped source.
+- **A threshold with slack passes the defect it exists to catch.** "At least
+  five readings of the task" still passed after one was deleted. The guard now
+  derives the four scope blocks from the suite's own section markers.
+- **A check can pass by containing its own subject.** The scope check was
+  satisfied by the section header comment naming the scope, so renaming the
+  assertion's own message left it green.
+- **A fixture whose status the authority does not recognise tests the wrong
+  thing.** `subjectStatus` defaulted to `"pending"`, which is not a member of the
+  task status vocabulary, so every default row silently exercised the
+  unresolvable-subject branch.
+
+### The pgTAP suite was written blind and CI ran it first
+
+Three requirements contain a verb no component test can perform:
+`2S-ANSWER-004`, `-008` and `2S-SILENCE-011`.
+`supabase/tests/phase_2s_slice_2_dispositions.sql` — **42 assertions, no
+migration** — calls `run_user_heartbeat` after a dismissal and reads the rows.
+
+**The two dismissal requirements are each other's control.** The same dismissal
+carrying today's key blocks a duplicate under the exact-key clause, and carrying
+a key five days old produces a new notice — so a dismissal is proved to be
+neither a reset nor a suppression, and neither section can pass by accident.
+
+**It passed on the first CI run, and the assertion count was read rather than the
+word PASS.** `Files=73, Tests=2819` → `Files=74, Tests=2861`: **exactly +42**. A
+corrected assertion and a deleted assertion both turn a suite green; the
+unchanged total is the only thing that tells them apart.
+
+Two drafting errors were caught by reading rather than by CI:
+`reset_state() + plant(...)` relies on an evaluation order SQL does not
+guarantee, and "the task is unchanged" cannot be proved by touching a task whose
+`BEFORE UPDATE` trigger rewrites `updated_at`.
+
+### One inconsistency this slice introduces, named rather than buried
+
+Home's attention count now includes the notices — a surface that says *"Nada
+precisa de você agora."* above an unanswered notice is making a claim — but the
+*ver tudo* link points at `/app/inbox?view=needs-you`, which does **not** show
+them. A day with one entry item and one notice reads **2** on Home and lists
+**1** on the queue.
+
+Counting them is the lesser evil: a count excluding the rows under it would
+contradict what the reader sees on the same screen. **It is not fixed here on
+purpose** — the needs-you queue carries filter chips whose interaction with a
+third kind of row is a **product decision**. It is `2S-ATTENTION-002` and
+`-003`'s to close in slice 2S.3, and it is logged in `docs/TODO.md`.
+
+### One ordering tension in the plan, recorded rather than resolved silently
+
+`2S-SILENCE-008` and `2S-ACT-011` are assigned to 2S.2 while `2S-ATTENTION-001`
+is assigned to 2S.3, and measured against the tree the first two cannot be
+satisfied without the third: before this slice the attention queue held only
+entry-derived and memory-derived rows, and `notification_suppressions` accepts
+only `task` and `reminder` subjects.
+
+So this slice delivers the **mount and the shared authority** on `/app` and
+**claims no `2S-ATTENTION`, `2S-ACCESS` or `2S-MOBILE` requirement at all** —
+those have a rendered-route evidence bar that belongs to 2S.3.
+
+### Controls
+
+**Twenty-three mutation controls, twenty-three failures**, every mutation
+verified performed on disk and every file restored and re-verified. Five
+baseline guards retargeted, none weakened. Both discovery sweeps — the
+notification boundary and the no-gesture ban — caught the new files themselves;
+the gesture sweep for the **sixth** time.
+
+### What was NOT done, recorded rather than skipped
+
+- **No hosted write of any kind**, and none was needed: this slice touches no
+  schema. Every hosted statement was the read that confirmed parity.
+- **No screen-reader run.** The announcement contract is asserted in the
+  accessibility tree, which is not the same thing.
+- **No rendered-route or axe proof, and no device measurement.** Those are
+  2S.3's requirements with 2S.3's evidence bar.
+- **No AI call, no BYOK spend, no push work, no deploy, no rollout change,
+  signup still closed.**
+
+### Where the next session starts
+
+**Slice 2S.3**, re-audited against the `main` this slice produced. It owns
+`2S-ATTENTION-001` … `-008`, `2S-ACCESS-001` … `-007` and `2S-MOBILE-001` …
+`-007`, and it **stops at the owner's `2S-MOBILE-003` device checkpoint**, which
+no automated lane substitutes — including an emulated WebKit project, because a
+pointer query is not a device.
+
+**Four green focus tests can all be about the same half of the thing.**
