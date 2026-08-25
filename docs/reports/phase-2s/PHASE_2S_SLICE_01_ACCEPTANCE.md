@@ -498,16 +498,30 @@ restored and re-verified byte-identical afterwards.
 
 ## 11. Hosted application
 
-**Not yet performed.** The migration is created and merged only after CI is green
-on the exact merge SHA. The remaining gates, in order, are ADR-138 Decision 3's
-and none may be skipped:
+**PERFORMED — 2026-08-25.** Every gate in ADR-138 Decision 3's chain returned
+what it had to, in order, and none was skipped. Parity advanced by **exactly
+one**: `202608230101` → `202608240102`, with **102 local = 102 hosted**.
 
-bytes proved identical to `main` → hosted migration list read *before* → dry run
-showing **exactly one** pending → apply → owner-scoped hosted proofs → cleanup
-with a two-sided residue control → a fresh read showing local = hosted with
-parity advanced by **exactly one**.
+The owner-scoped proof ran against the two real owners already in the project,
+created no user, task or reminder, and was **rolled back by an unconditional
+`RAISE` rather than cleaned up** — so residue is zero by construction. All three
+residue probes were sighted at `1, 1, 1` inside the block before reading
+`0, 0, 0` after it.
 
-This section is completed in `PHASE_2S_SLICE_01_DEPLOYMENT.md`.
+It proved isolation (`B_sees=0`), refusal rather than concealment
+(`B_cross_tenant=REFUSED(42501)`), and a real undo
+(`{"undone": true, "affected": 1}`, `rows_after_undo=0`).
+
+**It also found one defect in this slice.** The generated types carried the new
+**table** and not the new **RPC** — nothing had failed, and nothing would have
+until 2S.2 called it. Fixed surgically rather than by regenerating the file,
+which would have deleted type coverage for the RPC-closed tables the generator
+cannot see.
+
+Two things this deployment deliberately did **not** do — the behavioural cascade
+proof, and narrowing `authenticated`'s TRUNCATE — are recorded with their reasons.
+
+Full record: `PHASE_2S_SLICE_01_DEPLOYMENT.md`.
 
 ---
 

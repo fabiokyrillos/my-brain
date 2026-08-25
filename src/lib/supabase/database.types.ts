@@ -4013,6 +4013,17 @@ export type Database = {
         Args: { p_category: string; p_operation_key: string; p_state: string }
         Returns: Json
       }
+      suppress_notification_subject: {
+        Args: {
+          p_entity_id: string
+          p_entity_type: string
+          p_notice_type?: string
+          p_reason?: string
+          p_scope: string
+          p_suppressed_until?: string
+        }
+        Returns: Json
+      }
       suspend_account: {
         Args: { p_reason_code: string; p_user_id: string }
         Returns: Json

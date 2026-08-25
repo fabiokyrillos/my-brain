@@ -14163,3 +14163,57 @@ dry-run showing exactly one migration, apply, owner-scoped hosted proofs, and
 Then slice 2S.2, then 2S.3, stopping at the owner's 2S.3 checkpoint.
 
 **A fix that is correct can still break a file it never opened.**
+
+### Addendum — the slice is merged and the migration is APPLIED (2026-08-25)
+
+Both CI runs came back green after the census repair. Merge SHA
+`7457d82705c00a28713a8a0f66a43b408f8ba4bf`, CI green 3/3 on that exact SHA
+(run `32850011856`), migration applied. **Parity `202608230101` →
+`202608240102`, 102 local = 102 hosted.** The budget is now fully spent, and a
+second migration of any kind stays a stop condition.
+
+**One gate is worth keeping for its own sake.** The pgTAP suite reported
+`Files=73, Tests=2819` on the green run — **the identical assertion count to the
+red one**. A corrected assertion and a deleted assertion both turn a suite green;
+the unchanged total is the only thing that tells them apart, and it should be
+read on every repair of this kind.
+
+**The hosted proof found a defect that neither CI run could.** The generated
+types carried the new **table** and not the new **RPC**. Nothing had failed and
+nothing would have until slice 2S.2 called it — **a producer with no consumer is
+invisible, including to a type checker**. The fix was surgical: regenerating
+`database.types.ts` wholesale would have *deleted* type coverage for the
+RPC-closed tables the generator's role cannot see, which is the same visibility
+boundary §8c is about, seen from the other side.
+
+**Two things were deliberately not done, and both are recorded rather than
+quietly skipped.**
+
+1. **The cascade is proved structurally (`confdeltype = 'c'`), not
+   behaviourally.** Executing it means deleting a real user from the production
+   project; even inside a rolled-back block, that path touches triggers that can
+   reach outside the transaction, and **a rollback does not recall a network
+   call**. The behavioural proof stays in CI's cascade drill, which this slice
+   extended to plant a suppression row.
+2. **`authenticated` holds TRUNCATE on this table, and TRUNCATE does not respect
+   RLS.** Measured on the deployed project: **38 of 59** public base tables grant
+   it, including `entries`, `memories`, `tasks` and `reminders`. The **21** that
+   do not are the ones whose migrations revoked from `authenticated` explicitly.
+   This is the schema's majority posture rather than this table's anomaly, the
+   slice had already spent the phase's only migration, and narrowing it is a
+   decision about 38 tables. Logged as `2S-TRUNCATE-AUTHENTICATED` in
+   `docs/TODO.md`. **It needs the owner.**
+
+**Residue is zero by construction, not by cleanup.** Every hosted write ran
+inside a `DO` block ending in an unconditional `RAISE`. All three residue probes
+were **sighted at `1, 1, 1`** inside the block before reading `0, 0, 0` after —
+including the audit counter, which would otherwise have been a probe that proves
+only that it cannot see.
+
+### Where the next session starts
+
+**Slice 2S.2**, re-audited against the `main` this slice produced. Then 2S.3,
+stopping at the owner's `2S-MOBILE-003` device checkpoint, which no automated
+lane substitutes.
+
+**A green suite with fewer assertions is not the same green suite.**
