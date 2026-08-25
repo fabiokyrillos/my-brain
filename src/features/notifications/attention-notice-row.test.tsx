@@ -1,0 +1,236 @@
+/**
+ * The notice row on **the attention surface** — `2S-SILENCE-008`, `2S-ACT-011`.
+ *
+ * What these tests are for, and what they deliberately leave to their
+ * neighbours:
+ *
+ * - `notification-row-actions.test.tsx` proves the controls' **behaviour**:
+ *   what each verb dispatches, the single live region, the focus contract, the
+ *   refusals. Repeating it here would be a second copy of the same assertions
+ *   against the same component.
+ * - `phase-2s-verb-authority.test.ts` proves the **import graph**: one
+ *   vocabulary, one mount, one handler bundle, five pre-existing destinations.
+ * - This file proves the third thing neither of those can: that the row the
+ *   attention surface renders offers **exactly the verbs the one authority
+ *   decided for it**, in both locales, and that the surface adds nothing and
+ *   removes nothing on the way.
+ *
+ * Every expected verb set is computed by calling `verbsForRow` — the real
+ * predicate — rather than typed out. A fixture that listed the verbs by hand
+ * would be a second vocabulary hiding inside a test.
+ */
+
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+
+import { noticeHandlerSpies, noticeRow } from "@/test/notification-verb-fixtures";
+import type { Locale } from "@/lib/preferences";
+
+import { getNotificationActionCopy } from "./action-copy";
+import { AttentionNoticeRow } from "./attention-notice-row";
+import { getVerbCopy, verbsForRow } from "./verbs";
+
+const OWNER_ZONE = "America/Sao_Paulo";
+
+afterEach(cleanup);
+
+function renderRow(options: Parameters<typeof noticeRow>[0] & { locale?: Locale } = {}) {
+  const { locale = "pt-BR", ...rowOptions } = options;
+  const row = noticeRow(rowOptions);
+  const spies = noticeHandlerSpies();
+  render(<AttentionNoticeRow handlers={spies.handlers} locale={locale} row={row} timeZone={OWNER_ZONE} />);
+  return { row, spies };
+}
+
+/** Every control the row rendered, by accessible name. */
+function controlNames(): string[] {
+  return screen.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent ?? "");
+}
+
+describe("2S-ACT-011: the attention row offers exactly the verbs the authority decided", () => {
+  for (const locale of ["pt-BR", "en"] as const) {
+    it(`renders the primary verb and the menu, and nothing else, in ${locale}`, async () => {
+      const { row } = renderRow({ locale });
+      const verbCopy = getVerbCopy(locale);
+      const copy = getNotificationActionCopy(locale);
+
+      // The set is derived from the real predicate, and from the row's OWN
+      // status rather than from a status typed twice — a second copy of the
+      // fixture's premise is a second place it can go wrong.
+      const expected = verbsForRow({
+        subjectType: row.subject?.subjectType ?? null,
+        subjectStatus: row.subjectStatus,
+        noticeStatus: row.notification.status,
+      });
+      expect(row.verbs.map((verb) => verb.id)).toEqual(expected.map((verb) => verb.id));
+
+      // The row shows one primary plus one menu trigger — `2S-ACT-002`.
+      const names = controlNames();
+      expect(names).toContain(verbCopy[expected[0].id].accessibleName(row.subjectLabel));
+      expect(names).toContain(copy.menuLabel(row.subjectLabel));
+      expect(names).toHaveLength(2);
+
+      // And the rest are behind that one trigger.
+      await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+      const menu = screen.getByRole("menu");
+      for (const verb of expected.slice(1)) {
+        expect(
+          within(menu).getByRole("button", { name: verbCopy[verb.id].accessibleName(row.subjectLabel) }),
+          `${locale}/${verb.id} is missing from the menu`,
+        ).toBeTruthy();
+      }
+    });
+  }
+
+  it("names the subject in every control, so twenty rows are distinguishable", () => {
+    const { row } = renderRow({ subjectLabel: "Pagar o aluguel" });
+    for (const name of controlNames()) {
+      expect(name, `a control does not name its row: ${name}`).toContain("Pagar o aluguel");
+    }
+    expect(row.subjectLabel).toBe("Pagar o aluguel");
+  });
+});
+
+describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no task verb", () => {
+  /*
+   * The three ways a subject fails to resolve converge on one behaviour, and
+   * each is planted rather than assumed absent.
+   */
+  it("offers only message and cadence verbs when the subject did not resolve", async () => {
+    const { row } = renderRow({ subjectStatus: null });
+    expect(row.verbs.every((verb) => verb.scope !== "task")).toBe(true);
+
+    const copy = getNotificationActionCopy("pt-BR");
+    const verbCopy = getVerbCopy("pt-BR");
+    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+
+    // The control that can fail: the task verbs must be absent from the WHOLE
+    // row, menu included, not merely absent from the primary slot.
+    for (const taskVerb of ["complete_task", "reschedule_task"] as const) {
+      expect(
+        screen.queryByRole("button", { name: verbCopy[taskVerb].accessibleName(row.subjectLabel) }),
+        `${taskVerb} is offered against an unresolvable subject`,
+      ).toBeNull();
+    }
+  });
+
+  it("offers no `concluir` for a subject whose status already refuses it", () => {
+    /*
+     * `2S-ACT-005` by name: *a completed subject offers no concluir*. Eligibility
+     * is `isEligibleStatus`'s answer, so this is the authority refusing, not the
+     * surface hiding.
+     */
+    const { row } = renderRow({ subjectStatus: "completed" });
+    const verbCopy = getVerbCopy("pt-BR");
+    expect(
+      screen.queryByRole("button", { name: verbCopy.complete_task.accessibleName(row.subjectLabel) }),
+    ).toBeNull();
+  });
+
+  it("does not reveal a foreign subject's title", () => {
+    /*
+     * The projection resolves nothing for a subject this owner does not own, so
+     * the label falls back to the notice's own body — which the heartbeat wrote
+     * for this owner. Asserted here because the row is where a leak would be
+     * visible.
+     */
+    const { row } = renderRow({ subjectStatus: null });
+    expect(row.subjectLabel).toBe(row.notification.body);
+  });
+});
+
+describe("R-24: an answered notice is offered nothing it cannot change", () => {
+  it("offers no `marcar como lido` on a notice already read", async () => {
+    const { row } = renderRow({ source: { status: "read" } });
+    const verbCopy = getVerbCopy("pt-BR");
+    const copy = getNotificationActionCopy("pt-BR");
+
+    expect(row.verbs.some((verb) => verb.id === "mark_read")).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    expect(
+      screen.queryByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }),
+    ).toBeNull();
+  });
+
+  it("still offers it on an unread one — the control that makes the above mean something", () => {
+    const { row } = renderRow();
+    expect(row.verbs.some((verb) => verb.id === "mark_read")).toBe(true);
+  });
+});
+
+describe("2S-ACT-010: only the irreversible verb asks first", () => {
+  it("asks before dismissing, names what is lost, and cancelling writes nothing", async () => {
+    const { row, spies } = renderRow();
+    const copy = getNotificationActionCopy("pt-BR");
+    const verbCopy = getVerbCopy("pt-BR");
+
+    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(screen.getByRole("button", { name: verbCopy.dismiss.accessibleName(row.subjectLabel) }));
+
+    expect(screen.getByText(copy.confirmQuestion.dismiss as string)).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: copy.cancelAction }));
+    expect(spies.markAction).not.toHaveBeenCalled();
+  });
+
+  it("does not ask before marking read — the control against a blanket dialog", async () => {
+    const { row, spies } = renderRow();
+    const verbCopy = getVerbCopy("pt-BR");
+    const copy = getNotificationActionCopy("pt-BR");
+
+    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+
+    expect(screen.queryByText(copy.confirmQuestion.dismiss as string)).toBeNull();
+    expect(spies.markAction).toHaveBeenCalledTimes(1);
+    expect(spies.markAction.mock.calls[0][0].get("status")).toBe("read");
+  });
+});
+
+describe("2S-ACCESS-007: one announceable node, and it is the visible one", () => {
+  it("mounts the live region before there is any result to announce", () => {
+    renderRow();
+    const regions = screen.getAllByRole("status");
+    expect(regions).toHaveLength(1);
+    expect(regions[0].getAttribute("aria-live")).toBe("polite");
+    expect(regions[0].textContent).toBe("");
+  });
+
+  it("keeps the outcome visible and announced by the SAME node", async () => {
+    const { row } = renderRow();
+    const copy = getNotificationActionCopy("pt-BR");
+    const verbCopy = getVerbCopy("pt-BR");
+
+    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+
+    const regions = await screen.findAllByRole("status");
+    expect(regions, "a second announceable node appeared").toHaveLength(1);
+    expect(regions[0].textContent).toBe(copy.applied.mark_read);
+    // The same node the reader sees — not an `sr-only` twin beside a visible copy.
+    expect(screen.getAllByText(copy.applied.mark_read)).toHaveLength(1);
+  });
+});
+
+describe("the row carries its own chrome, in the owner's zone", () => {
+  it("says what kind of row it is, and shows the notice's own words", () => {
+    const { row } = renderRow();
+    const copy = getNotificationActionCopy("pt-BR");
+    expect(screen.getByText(copy.attentionEyebrow)).toBeTruthy();
+    expect(screen.getByText(row.notification.title)).toBeTruthy();
+    expect(screen.getByText(row.notification.body)).toBeTruthy();
+  });
+
+  it("formats the instant in the owner's zone, not the host's", () => {
+    /*
+     * `LDC-DAILY-001`. `2026-08-24T12:00:00Z` is the 24th at 09:00 in São Paulo
+     * and the 24th at 12:00 in UTC, so a row that fell back to the host would
+     * print a different time — the defect this repository has already fixed on
+     * four other surfaces.
+     */
+    renderRow();
+    expect(screen.getByText(/09:00/)).toBeTruthy();
+  });
+});

@@ -7,6 +7,8 @@ import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection"
 import { EMPTY_HOME_AGENDA, loadHomeAgendaProjection } from "@/features/daily-cycle/home-agenda";
 import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
 import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
+import { EMPTY_ATTENTION_NOTICES, loadAttentionNotices } from "@/features/notifications/attention-notices";
+import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import type { WorkItemHumanState } from "@/features/daily-cycle/contracts";
 import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
 import { selectTodayPriorities } from "@/features/daily-cycle/today-priorities";
@@ -73,7 +75,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     findable. It just does not take the page down to say so.
   */
   const now = new Date();
-  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled, onboardingSettled] = await Promise.allSettled([
+  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled, onboardingSettled, noticesSettled] = await Promise.allSettled([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
     loadInboxProjection(supabase, { locale, page: 1 }),
@@ -96,6 +98,13 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       degrades to `unreadable`, so this slot catches only what none of them can.
     */
     loadOnboardingPath(supabase, user.id),
+    /*
+      The unanswered notices (`2S-SILENCE-008`). Its own settled slot on the
+      same section-isolation rule as every other projection above: a notice
+      query that fails must leave the cockpit standing with one fewer kind of
+      row, not take the capture box down with it.
+    */
+    loadAttentionNotices(supabase, { userId: user.id, locale, limit: NEEDS_ATTENTION_HOME_LIMIT }),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, section: string): T {
@@ -137,6 +146,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     "conflicts",
   );
   const agenda = settled(agendaSettled, EMPTY_HOME_AGENDA, "agenda");
+  const notices = settled(noticesSettled, EMPTY_ATTENTION_NOTICES, "notices");
 
   const operationalStatus = deriveHomeOperationalStatus({
     items: inboxProjection.items,
@@ -252,6 +262,8 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     priorities,
     attention: attentionProjection.items,
     attentionHasMore: attentionProjection.hasNext,
+    notices: notices.items,
+    noticesHaveMore: notices.hasMore,
     conflicts,
     today,
     todayHasMore:
@@ -274,6 +286,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       <HomeView
         agentName={agentName}
         locale={locale}
+        noticeHandlers={NOTIFICATION_VERB_HANDLERS}
         view={view}
         capture={
           /*

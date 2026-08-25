@@ -213,16 +213,27 @@ describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () =
     /*
      * The verb controls moved into `NotificationRowActions`, and their names are
      * built from the shared copy — `accessibleName(subject)` — rather than
-     * assembled at this call site. The requirement is unchanged and the
-     * assertion follows it: every verb's accessible name carries the subject,
-     * proved by name in `verbs.test.ts`, and the row is handed the subject's own
-     * title to put in it.
+     * assembled at this call site. The requirement is unchanged; what carries it
+     * moved once more in the same slice, and the assertion follows rather than
+     * relaxes.
+     *
+     * The page used to spell out `subjectLabel=` itself, alongside `menuVerbs=`,
+     * `primaryVerb=` and `subject=`. It now hands over the whole projected row
+     * and `NotificationVerbs` derives all four — which is the point of that
+     * function: `2S-ACT-011` cannot be satisfied by two surfaces that each
+     * assemble their own props, however identically they do it today.
+     *
+     * So the chain is asserted end to end instead: the page passes the row, the
+     * mount reads `subjectLabel` off it, and the control's accessible name is
+     * built from it. Weakening any link would break one of these three.
      */
-    expect(code).toContain("subjectLabel=");
+    expect(code).toContain("<NotificationVerbs");
+    expect(code).toContain("row={row}");
     const row = readFileSync(
       join(__dirname, "notification-row-actions.tsx"),
       "utf8",
     );
+    expect(row).toContain("subjectLabel={row.subjectLabel}");
     expect(row).toContain("accessibleName(subjectLabel)");
   });
 

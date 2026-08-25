@@ -1,15 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
-import { markNotification } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
-import { applyWorkItemAction } from "@/features/operations/actions";
-import { suppressNotificationSubject } from "@/features/notifications/actions";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
-import { NotificationRowActions } from "@/features/notifications/notification-row-actions";
+import { NotificationVerbs } from "@/features/notifications/notification-row-actions";
+import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import { projectNotificationRows } from "@/features/notifications/row-projection";
-import { undoWorkOperation } from "@/features/task-commands/actions";
-import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions";
 import { settingsSectionHref } from "@/features/settings/sections";
 import { requireProfileTimeZone } from "@/features/calendar/calendar-projection";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -94,7 +90,7 @@ export default async function NotificationsPage({ params, searchParams }: { para
 
     `projectNotificationRows` reads every subject this page names in a single
     query per kind, owner-scoped, and returns each row already carrying its
-    verbs. Rendering `<NotificationRowActions>` therefore costs no query at all.
+    verbs. Rendering `<NotificationVerbs>` therefore costs no query at all.
   */
   const projected = await projectNotificationRows(supabase, { rows: items, userId: user.id, locale });
   const rowsById = new Map(projected.map((row) => [row.notification.id, row]));
@@ -154,5 +150,5 @@ export default async function NotificationsPage({ params, searchParams }: { para
     already owns it. Those actions are injected as props because this file is a
     Server Component and the row is a Client Component — the same boundary
     `TaskDetailSurface` crosses when it mounts `WorkItemActions`.
-  */}<NotificationRowActions detailAction={applyTaskDetailCommand} locale={locale} markAction={markNotification} menuVerbs={rowsById.get(item.id)?.menuVerbs ?? []} notificationId={item.id} primaryVerb={rowsById.get(item.id)?.primaryVerb ?? null} subject={rowsById.get(item.id)?.subject ?? null} subjectLabel={rowsById.get(item.id)?.subjectLabel ?? item.body} suppressAction={suppressNotificationSubject} undoAction={undoWorkOperation} workAction={applyWorkItemAction} /></div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+  */}{(() => { const row = rowsById.get(item.id); return row ? <NotificationVerbs handlers={NOTIFICATION_VERB_HANDLERS} locale={locale} row={row} /> : null; })()}</div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

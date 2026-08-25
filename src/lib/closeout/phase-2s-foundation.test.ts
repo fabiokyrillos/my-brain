@@ -35,6 +35,8 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 
 const SURFACE = "src/app/[locale]/app/notifications/page.tsx";
 const AGENT_ACTIONS = "src/features/agent/actions.ts";
+/** The one bundle of authorities both surfaces dispatch through (slice 2S.2). */
+const HANDLERS = "src/features/notifications/verb-handlers.ts";
 /** The migration that defines the deployed `run_user_heartbeat`. */
 const HEARTBEAT = "supabase/migrations/202608040073_account_lifecycle_admin.sql";
 const RECORD = "docs/reports/phase-2s/PHASE_2S_SLICE_00_ACCEPTANCE.md";
@@ -82,7 +84,24 @@ describe("2S-FOUNDATION-003: the notification surface's controls, enumerated fro
     // dispositions are dispatched by the row component now.
     expect(surface, "the surface must not hand-roll a disposition form")
       .not.toContain("<form action={markNotification}>");
-    expect(surface, "the row's controls come from the shared component")
+    /*
+     * RETARGETED WITHIN 2S.2, not weakened.
+     *
+     * The page mounted `<NotificationRowActions>` directly for one commit, and
+     * spelled out `primaryVerb`, `menuVerbs`, `subject` and `subjectLabel` at
+     * the call site. Delivering `2S-ACT-011`'s *second* surface made that
+     * insufficient: two pages each assembling those four props satisfy "one
+     * vocabulary" and can still render different rows. Both now hand over the
+     * projected row and `NotificationVerbs` derives them, so the assertion
+     * follows the mechanism.
+     *
+     * The chain is asserted end to end rather than at one link — the page mounts
+     * the shared function, and that function mounts the shared component.
+     */
+    expect(surface, "the row's controls come from the shared mount")
+      .toContain("<NotificationVerbs");
+    expect(read("src/features/notifications/notification-row-actions.tsx"),
+      "the shared mount must render the shared component")
       .toContain("<NotificationRowActions");
 
     // And the set itself is closed by `verbs.ts` rather than by counting
@@ -152,7 +171,22 @@ describe("2S-FOUNDATION-004 → 2S-ANSWER-001: `dismissed` WAS unreachable, and 
     });
     // Proved to exist FIRST, so what follows is not a claim over an empty scan.
     expect(callers.length, "the caller census found nothing at all").toBeGreaterThan(0);
-    expect(callers, "the page must still be the surface that mounts it").toContain(SURFACE);
+    /*
+     * RETARGETED WITHIN 2S.2, and the reason matters more than the edit.
+     *
+     * The page named `markNotification` itself until the attention surface
+     * arrived and needed the same five authorities. Two pages each importing the
+     * same five would have been two places the set is chosen, so the set moved
+     * into `verb-handlers.ts` and both surfaces import that.
+     *
+     * The requirement — *a writer reachable FROM THE SURFACE* — is unchanged, so
+     * the census now follows the whole path instead of the first hop: the
+     * dispatcher names the action, and the page reaches the dispatcher. Asserting
+     * only the first half would let the page stop importing it and still pass.
+     */
+    expect(callers, "the dispatcher must name the writer").toContain(HANDLERS);
+    expect(read(SURFACE), "the page must reach that dispatcher")
+      .toContain('from "@/features/notifications/verb-handlers"');
 
     // The dispatcher that turns a verb into a status, and it can produce both.
     const row = read("src/features/notifications/notification-row-actions.tsx");

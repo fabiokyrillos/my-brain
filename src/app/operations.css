@@ -457,6 +457,26 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .needs-attention-error{margin-top:6px}
 
 /*
+ * Slice 2S.2 — the unanswered notices, inside "Precisa de você".
+ *
+ * The row reuses `.list-row` so it sits on the same grid as the entry rows it
+ * shares the section with; what it adds is the eyebrow that says which kind of
+ * row it is, and enough room under `.list-meta` for a primary control, a menu
+ * trigger and the outcome region that has to exist before it has anything to
+ * say. Nothing here restyles `.notification-row-actions` — those rules live in
+ * `settings-extended.css` and apply on both surfaces, which is the point.
+ *
+ * `.attention-notice` two hundred lines above is a DIFFERENT class (a notice
+ * card's tone) and cannot match this row: a class selector matches the whole
+ * token, never a prefix. The names were still made distinct on purpose, because
+ * the next author reads them before the selector engine does.
+ */
+.notice-attention-row{align-items:start}
+.notice-attention-eyebrow{margin:0 0 4px;color:var(--text-secondary)}
+.notice-attention-row .list-meta{align-items:flex-start;row-gap:6px}
+@media(max-width:600px){.notice-attention-row .list-meta{width:100%}}
+
+/*
  * The record detail — decision column and explanation column (mockup 03,
  * frame 04).
  *

@@ -222,6 +222,14 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * opens on a press rather than on a gesture.
      */
     "src/features/notifications/notification-row-actions.tsx",
+    /*
+     * Slice 2S.2's second half, and the discovery assertion caught this one too
+     * — the sixth time. It is the notice row on *Precisa de você*, which is a
+     * scrolling list on a phone: exactly the surface where a horizontal swipe
+     * would be easiest to add and worst to have. It renders the same explicit
+     * controls, and the primary among them can be a real task transition.
+     */
+    "src/features/notifications/attention-notice-row.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

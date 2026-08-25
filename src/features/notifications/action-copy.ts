@@ -15,6 +15,14 @@ import type { Locale } from "@/lib/preferences";
 import type { VerbId } from "./verbs";
 
 export type NotificationActionCopy = {
+  /**
+   * What the attention surface calls this row, above the notice's own title.
+   *
+   * "Precisa de você" holds entry-derived rows and, since slice 2S.2, notices.
+   * The two look alike and mean different things, so the row says which it is
+   * rather than leaving the reader to infer it from the verbs.
+   */
+  readonly attentionEyebrow: string;
   readonly menuTrigger: string;
   readonly menuLabel: (subject: string) => string;
   readonly untilLabel: string;
@@ -30,6 +38,7 @@ export type NotificationActionCopy = {
 };
 
 const PT: NotificationActionCopy = {
+  attentionEyebrow: "Aviso",
   menuTrigger: "Mais ações",
   menuLabel: (subject) => `Mais ações para: ${subject}`,
   untilLabel: "Silenciar até",
@@ -55,6 +64,7 @@ const PT: NotificationActionCopy = {
 };
 
 const EN: NotificationActionCopy = {
+  attentionEyebrow: "Notice",
   menuTrigger: "More actions",
   menuLabel: (subject) => `More actions for: ${subject}`,
   untilLabel: "Silence until",

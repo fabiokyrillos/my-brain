@@ -119,6 +119,23 @@ const DELIVERY_MODULES = [
    */
   "src/features/notifications/notification-row-actions.tsx",
   "src/features/notifications/row-projection.ts",
+  /*
+   * Slice 2S.2, second half — the attention surface.
+   *
+   * `attention-notices.ts` is a reader: it asks for this owner's unanswered
+   * notices through the caller's own authenticated client and hands them to the
+   * same projection the notifications page uses. `attention-notice-row.tsx`
+   * renders one of those rows and mounts the shared controls. `verb-handlers.ts`
+   * holds nothing but references to five Server Actions that already existed —
+   * it declares no action of its own, which `phase-2s-verb-authority.test.ts`
+   * asserts rather than leaving to this list.
+   *
+   * None of the three reaches a push client, and none of them can: the delivery
+   * boundary below still names the two modules that may.
+   */
+  "src/features/notifications/attention-notices.ts",
+  "src/features/notifications/attention-notice-row.tsx",
+  "src/features/notifications/verb-handlers.ts",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));

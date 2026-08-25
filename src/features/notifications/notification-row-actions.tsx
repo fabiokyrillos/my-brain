@@ -34,6 +34,7 @@ import type { Locale } from "@/lib/preferences";
 
 import { getNotificationActionCopy } from "./action-copy";
 import { refusalMessage, type ActionRefusal } from "./refusal-copy";
+import type { NotificationRowView } from "./row-projection";
 import type { NotificationSubject } from "./subject";
 import { getVerbCopy, type VerbDefinition, type VerbId } from "./verbs";
 
@@ -44,6 +45,68 @@ export type SuppressHandler = (input: unknown, locale?: unknown) => Promise<
   | Readonly<{ ok: true; suppressionId: string | null; undo: TaskUndoOffer | null; replaced: boolean }>
   | Readonly<{ ok: false; code: string }>
 >;
+
+/**
+ * The five authorities a notice's verbs dispatch to, carried as one bundle.
+ *
+ * Every one of them **existed before Phase 2S** — `2S-TRUST-010`, whose wording
+ * makes a new writer a stop condition rather than a finding. Grouping them here
+ * is not tidiness: a surface that wants the verbs has to accept exactly this
+ * set, so it cannot quietly substitute a sixth destination of its own.
+ *
+ * They arrive as props because these are Server Actions and the row is a Client
+ * Component — the same boundary `TaskDetailSurface` crosses when it mounts
+ * `WorkItemActions`.
+ */
+export type NotificationVerbHandlers = {
+  readonly markAction: MarkHandler;
+  readonly suppressAction: SuppressHandler;
+  readonly workAction: WorkHandler;
+  readonly detailAction: DetailHandler;
+  readonly undoAction: TaskUndoHandler;
+};
+
+/**
+ * **The one mount point for a notice's verbs**, taking the projection's own row.
+ *
+ * `2S-ACT-011` requires the verb set and its copy to be read from one source
+ * and to be *equal* across `/app/notifications` and the attention surface. One
+ * shared `verbs.ts` is necessary and not sufficient: two surfaces could each
+ * call `NotificationRowActions` and pass different things into `primaryVerb` and
+ * `menuVerbs` — one of them filtered, re-sorted, or assembled by hand — and the
+ * shared vocabulary would be intact while the rendered rows disagreed.
+ *
+ * So neither surface builds those props. Both hand over the whole
+ * `NotificationRowView` that `projectNotificationRows` produced, and the mapping
+ * from row to controls happens **here, once**. A surface that wanted a different
+ * verb set would have to stop using this function, which is a visible change and
+ * the thing `phase-2s-verb-authority.test.ts` looks for.
+ */
+export function NotificationVerbs({
+  row,
+  locale,
+  handlers,
+}: {
+  row: NotificationRowView;
+  locale: Locale;
+  handlers: NotificationVerbHandlers;
+}) {
+  return (
+    <NotificationRowActions
+      detailAction={handlers.detailAction}
+      locale={locale}
+      markAction={handlers.markAction}
+      menuVerbs={row.menuVerbs}
+      notificationId={row.notification.id}
+      primaryVerb={row.primaryVerb}
+      subject={row.subject}
+      subjectLabel={row.subjectLabel}
+      suppressAction={handlers.suppressAction}
+      undoAction={handlers.undoAction}
+      workAction={handlers.workAction}
+    />
+  );
+}
 
 /**
  * What one round comes to rest at. Flat, and carrying no database text.

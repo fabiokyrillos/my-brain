@@ -4,6 +4,7 @@ import type { InboxItemView, NeedsAttentionItemView } from "@/features/daily-cyc
 import type { HomeAgendaItem } from "@/features/daily-cycle/home-agenda";
 import type { Locale } from "@/lib/preferences";
 import { getWorkCopy } from "@/features/operations/copy";
+import { noticeHandlerSpies } from "@/test/notification-verb-fixtures";
 import { HomeView, type HomeViewModel } from "./home-view";
 
 // The row components report interactions through a Server Action, which reaches
@@ -69,6 +70,8 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     priorities: [],
     attention: [attentionItem()],
     attentionHasMore: false,
+    notices: [],
+    noticesHaveMore: false,
     conflicts: { items: [], bounded: false, limit: 0 },
     today: [{
       taskId: "t1",
@@ -89,7 +92,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
 }
 
 function renderHome(view: HomeViewModel, locale: Locale = "pt-BR") {
-  return render(<HomeView agentName="Brain" locale={locale} view={view} capture={<div>captura</div>} />);
+  return render(<HomeView agentName="Brain" locale={locale} view={view} capture={<div>captura</div>} noticeHandlers={noticeHandlerSpies().handlers} />);
 }
 
 describe("HomeView", () => {
