@@ -179,6 +179,20 @@ Carried from this slice's first half and re-proved on the attention surface.
   **is** the live region now: always rendered, empty at rest, `:empty`-collapsed
   in CSS rather than hidden, because `display:none` would take it out of the
   tree and break the announcement.
+- **ESCAPE DID NOT CLOSE THE COMPACT MENU, AND FOUR GREEN FOCUS TESTS DID NOT
+  NOTICE.** The handler sat on the `<ul role="menu">`. Opening the menu leaves
+  focus on the **trigger**, which is that list's *sibling* — so the keydown
+  never reached the handler and Escape did nothing. A menu a keyboard user can
+  open and cannot close is the whole of what `2S-ACCESS-006` is about, and it
+  shipped for three commits of this slice while every panel focus test passed,
+  because they test the panel. The handler is now on the container, where a
+  keydown on the trigger and a keydown on any item both reach it.
+- **The test written for that fix was itself vacuous, and a mutation control
+  said so.** Deleting the `focus()` call from `closeMenu` still passed —
+  because the reader was standing on the trigger when Escape arrived, so
+  `activeElement === trigger` was true either way. **Focus has to LEAVE before
+  "returns focus" means anything**, so the test now tabs into the menu first and
+  asserts focus really entered it.
 - **Focus into the question took three wrong diagnoses.** `queueMicrotask` fired
   before React had rendered the panel; a callback ref fired before the node was
   connected to the document; an effect with a plain `input` selector found the
@@ -212,7 +226,7 @@ author reads the name before the selector engine does.
 
 ## 6. Controls
 
-**Twenty mutation controls, twenty failures.** Every mutation was verified to
+**Twenty-three mutation controls, twenty-three failures.** Every mutation was verified to
 have changed the file on disk before the suite ran, and every file was restored
 and re-verified afterwards — because a control that does not perform its
 mutation reports a pass and proves nothing.
@@ -235,6 +249,14 @@ mutation reports a pass and proves nothing.
 | *descartar* stops asking | **fails** |
 | *marcar como lido* starts asking too | **fails** |
 | eligibility stops asking the command taxonomy | **fails** |
+
+### Three more on the compact menu, added after the defect above was found
+
+| control | result |
+|---|---|
+| the Escape handler moves back onto the list, where the trigger's keydown never reaches it | **fails** |
+| Escape closes the menu but does not give focus back | **fails** — *after* the test was repaired; it passed before |
+| the trigger stops toggling, so the menu has one way in and none out by pointer | **fails** |
 
 ### Six on the pgTAP guard — two of which found the guard, not the product
 

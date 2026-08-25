@@ -455,6 +455,55 @@ describe("accessibility contract: one announceable source, announced once", () =
   });
 });
 
+describe("accessibility contract: the compact menu closes and gives focus back", () => {
+  /*
+   * The panel's focus contract is asserted below, and the MENU's was not —
+   * which is the half a reader meets first. It has two ways out and both must
+   * put focus back where it came from, because the control that opened the menu
+   * is the only thing still on screen once the menu is gone.
+   */
+  it("closes on Escape and returns focus to its trigger", async () => {
+    setup();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+    /*
+     * TAB INTO THE MENU FIRST, and the reason is a control that did not fail.
+     *
+     * Without this the reader is still standing on the trigger when Escape
+     * arrives, so `document.activeElement === trigger` is true whether or not
+     * the component gives focus back — and a mutation that deleted the
+     * `focus()` call passed. Focus has to LEAVE before "returns focus" means
+     * anything.
+     */
+    await user.tab();
+    expect(document.activeElement, "focus never entered the menu").not.toBe(trigger);
+    expect(screen.getByRole("menu").contains(document.activeElement)).toBe(true);
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+  });
+
+  it("closes on a second press of the trigger, which is the other way out", async () => {
+    // The control that can fail: a menu that only Escape could close would pass
+    // the test above and still leave a pointer user with one way in and none out.
+    setup();
+    const user = userEvent.setup();
+    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+    await user.click(trigger);
+    expect(screen.getByRole("menu")).toBeTruthy();
+    await user.click(trigger);
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+});
+
 describe("accessibility contract: the dismissal question holds focus and gives it back", () => {
   it("moves focus into the question when it opens", async () => {
     setup();

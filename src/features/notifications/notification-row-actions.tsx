@@ -457,8 +457,29 @@ export function NotificationRowActions({
 
       {primaryVerb ? renderVerbButton(primaryVerb, "row-action notification-primary-action") : null}
 
+      {/*
+        ESCAPE IS HEARD HERE, NOT ON THE LIST, AND THE DIFFERENCE IS A REAL
+        DEFECT THIS SLICE SHIPPED FOR THREE COMMITS.
+
+        The handler used to sit on the `<ul role="menu">`. Opening the menu
+        leaves focus on the **trigger**, which is the list's SIBLING — so the
+        keydown never reached the list and Escape did nothing. A menu a
+        keyboard user can open and cannot close is the whole of what
+        `2S-ACCESS-006` is about, and every one of the panel's four focus
+        tests passed the entire time, because they test the panel.
+
+        On the container, both ways in are covered: a keydown on the trigger
+        and a keydown on any item bubble to the same place.
+      */}
       {menuVerbs.length ? (
-        <div className="notification-verb-menu">
+        <div
+          className="notification-verb-menu"
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || !isMenuOpen) return;
+            event.stopPropagation();
+            closeMenu();
+          }}
+        >
           <button
             aria-controls={menuId}
             aria-expanded={isMenuOpen}
@@ -476,7 +497,6 @@ export function NotificationRowActions({
             <ul
               className="notification-verb-menu-list"
               id={menuId}
-              onKeyDown={(event) => { if (event.key === "Escape") closeMenu(); }}
               role="menu"
             >
               {menuVerbs.map((verb) => (
