@@ -33,6 +33,7 @@
  * both locales rather than trusting it to review.
  */
 
+import { isEligibleStatus, type TaskCommandAction } from "@/features/task-commands/taxonomy";
 import type { Locale } from "@/lib/preferences";
 
 /** What a verb actually changes. `2S-SILENCE-011`'s four scopes, named. */
@@ -159,30 +160,49 @@ export function getVerbCopy(locale: Locale): VerbCopyTable {
 }
 
 /**
+ * The task command each task verb dispatches to.
+ *
+ * Named here so the eligibility question below is asked of the **command
+ * taxonomy** rather than of a list of strings this module made up.
+ * `2S-ACT-003`/`-004` name these same two destinations.
+ */
+const TASK_VERB_COMMANDS: Readonly<Partial<Record<VerbId, TaskCommandAction>>> = {
+  complete_task: "complete_task",
+  reschedule_task: "reschedule_due",
+};
+
+/**
  * The verbs a given row may offer, in order.
  *
- * `2S-ACT-005`: eligibility is read from the subject's own available actions,
- * never fixed in a component — so a completed subject offers no *Concluir*, and
- * no control is rendered whose only possible outcome is a refusal.
+ * `2S-ACT-005`: *"Eligibility comes from `isEligibleStatus`, so no control can
+ * be rendered whose only possible outcome is a refusal; a completed subject
+ * offers no *concluir*."* That is asked literally — `isEligibleStatus` is the
+ * same predicate the command path itself consults before applying, and the same
+ * one `bulk-preview.ts` uses to split eligible from ineligible. This surface
+ * therefore cannot disagree with the authority it dispatches to, because it is
+ * asking that authority.
  *
- * `availableActions` is the same list `WorkItemActions` reads, derived by
- * `statusActions` from the task's status. A row with **no** derived subject
- * (see `subject.ts`) passes an empty list and gets its message verbs only.
+ * A **fail-closed** subject (see `subject.ts`) arrives here as
+ * `subjectStatus: null` and gets its message verbs only. So does a subject that
+ * no longer exists — `2S-REACH-004` — because a row whose task was deleted has
+ * no status to be eligible in. **Absence of a task verb is the correct outcome
+ * of an invalid link, never a hidden failure.**
  */
 export function verbsForRow(options: {
   readonly subjectType: "task" | "reminder" | null;
-  readonly availableActions: readonly string[];
+  /** The subject's own status, or `null` when there is no resolvable subject. */
+  readonly subjectStatus: string | null;
 }): readonly VerbDefinition[] {
-  const { subjectType, availableActions } = options;
+  const { subjectType, subjectStatus } = options;
   return VERBS.filter((verb) => {
     if (subjectType === null) return verb.scope === "message";
     if (!verb.appliesTo.includes(subjectType)) return false;
-    if (verb.id === "complete_task") return availableActions.includes("complete_task");
-    // Rescheduling is offered where the subject is still live enough to have a
-    // due date worth moving; the same available-action list decides it, so this
-    // surface never disagrees with Work about what a task admits.
-    if (verb.id === "reschedule_task") {
-      return availableActions.includes("complete_task") || availableActions.includes("resume_task");
+
+    const command = TASK_VERB_COMMANDS[verb.id];
+    if (command) {
+      // No status means no subject to be eligible against. Fail closed.
+      if (subjectStatus === null) return false;
+      return isEligibleStatus(command, subjectStatus);
     }
     return true;
   });

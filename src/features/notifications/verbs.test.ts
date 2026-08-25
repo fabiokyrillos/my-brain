@@ -119,12 +119,12 @@ describe("2S-ANSWER-003: marking read and dismissing are distinct, and neither i
 
 describe("2S-ACT-001 / -005: the primary action is derived from the subject's state", () => {
   it("leads with completing a task the subject admits completing", () => {
-    const verbs = verbsForRow({ subjectType: "task", availableActions: ["complete_task"] });
+    const verbs = verbsForRow({ subjectType: "task", subjectStatus: "todo" });
     expect(primaryVerbFor(verbs)?.id).toBe("complete_task");
   });
 
   it("offers no completion when the subject does not admit it", () => {
-    const verbs = verbsForRow({ subjectType: "task", availableActions: [] });
+    const verbs = verbsForRow({ subjectType: "task", subjectStatus: "completed" });
     expect(verbs.map((verb) => verb.id)).not.toContain("complete_task");
   });
 
@@ -134,25 +134,25 @@ describe("2S-ACT-001 / -005: the primary action is derived from the subject's st
      * render different primaries in the same list."* A component with the
      * primary hard-coded would pass every other test in this file.
      */
-    const live = primaryVerbFor(verbsForRow({ subjectType: "task", availableActions: ["complete_task"] }));
-    const settled = primaryVerbFor(verbsForRow({ subjectType: "task", availableActions: [] }));
+    const live = primaryVerbFor(verbsForRow({ subjectType: "task", subjectStatus: "todo" }));
+    const settled = primaryVerbFor(verbsForRow({ subjectType: "task", subjectStatus: "completed" }));
     expect(live?.id).not.toBe(settled?.id);
   });
 
   it("gives a row with no derived subject its message verbs and no task verb", () => {
-    const verbs = verbsForRow({ subjectType: null, availableActions: [] });
+    const verbs = verbsForRow({ subjectType: null, subjectStatus: null });
     expect(verbs.map((verb) => verb.id)).toEqual(["mark_read", "dismiss"]);
   });
 
   it("never offers a task verb against a reminder", () => {
-    const ids = verbsForRow({ subjectType: "reminder", availableActions: ["complete_task"] })
+    const ids = verbsForRow({ subjectType: "reminder", subjectStatus: "todo" })
       .map((verb) => verb.id);
     expect(ids).not.toContain("complete_task");
     expect(ids).not.toContain("reschedule_task");
   });
 
   it("still offers both silencing verbs for a reminder", () => {
-    const ids = verbsForRow({ subjectType: "reminder", availableActions: [] }).map((verb) => verb.id);
+    const ids = verbsForRow({ subjectType: "reminder", subjectStatus: null }).map((verb) => verb.id);
     expect(ids).toContain("silence_until");
     expect(ids).toContain("silence_subject");
   });
@@ -160,7 +160,7 @@ describe("2S-ACT-001 / -005: the primary action is derived from the subject's st
 
 describe("2S-ACT-002: everything that is not primary lives in one compact menu", () => {
   it("splits the row into exactly one primary plus the rest", () => {
-    const verbs = verbsForRow({ subjectType: "task", availableActions: ["complete_task"] });
+    const verbs = verbsForRow({ subjectType: "task", subjectStatus: "todo" });
     const primary = primaryVerbFor(verbs);
     const menu = menuVerbsFor(verbs);
     expect(primary).not.toBeNull();

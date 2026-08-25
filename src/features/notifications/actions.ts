@@ -366,15 +366,32 @@ export async function suppressNotificationSubject(
      * The RPC refuses by NAME, in `detail`, so the owner gets a sentence about
      * the thing they did rather than a constraint violation. Slice 2S.1's
      * acceptance record §2 lists all six and asserts none of them reaches
-     * storage; this maps each to copy without re-deciding any of them.
+     * storage; this maps each to copy **without re-deciding any of them**.
      *
-     * An unrecognised code is `failed` rather than a guess: inventing a
-     * sentence for a refusal this build does not know about would tell the
-     * owner something that might not be true.
+     * This is the whole reason the schema above checks shape only. Bounding
+     * `reason` or enumerating `scope` on this side would swallow these named
+     * refusals and hand back an undifferentiated `invalid`.
      */
     const detail = typeof error.details === "string" ? error.details : "";
     const known = SUPPRESSION_REFUSALS.find((code) => detail.includes(code));
-    return known ? Object.freeze({ ok: false as const, code: known }) : SUPPRESS_FAILED;
+    if (known) return Object.freeze({ ok: false as const, code: known });
+    /*
+     * `22P02` is an input that could not even be cast — an `entityId` that is
+     * not a uuid, most plausibly. Reported as `invalid` rather than `failed`
+     * because it says something true and different: the request was malformed,
+     * not the operation refused.
+     *
+     * In practice the id comes from `deriveNotificationSubject`, which is
+     * fail-closed on exactly that, so this is the adversarial-caller branch
+     * rather than one the product's own surfaces can reach.
+     */
+    if (error.code === "22P02") return SUPPRESS_INVALID;
+    /*
+     * Anything else is `failed`, deliberately not a guess: inventing a sentence
+     * for a refusal this build does not know about would tell the owner
+     * something that might not be true.
+     */
+    return SUPPRESS_FAILED;
   }
 
   /*
