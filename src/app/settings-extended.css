@@ -1175,3 +1175,180 @@
     top: var(--space-8);
   }
 }
+
+/* ------------------------------------------------------------------------- */
+/* Slice 2S.2 — the verbs on a notice: one primary, one compact menu           */
+/* ------------------------------------------------------------------------- */
+
+.notification-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+/*
+  THE LIVE REGION IS THE VISIBLE MESSAGE, so it must be in the document at all
+  times — a region mounted with its text is a region screen readers do not
+  announce.
+
+  `:empty` therefore collapses it WITHOUT `display:none` or
+  `visibility:hidden`: either of those would remove it from the accessibility
+  tree, and a region that is not in the tree cannot announce anything when its
+  text arrives. Zero height with hidden overflow keeps it out of the layout and
+  in the tree.
+*/
+.notification-row-outcome {
+  flex-basis: 100%;
+  margin: 4px 0 0;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.notification-row-outcome:empty {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.notification-row-outcome[data-status="failed"] {
+  color: var(--tone-risk-fg);
+}
+
+.notification-verb-menu {
+  position: relative;
+}
+
+.notification-verb-menu-list {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  display: grid;
+  gap: 2px;
+  min-width: 260px;
+  max-width: min(320px, calc(100vw - 32px));
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 12%);
+}
+
+.notification-verb-menu-list > li > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+}
+
+.notification-verb-menu-list > li > div:hover,
+.notification-verb-menu-list > li > div:focus-within {
+  background: var(--background-subtle);
+}
+
+.notification-verb-menu-item {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-weight: 750;
+  color: var(--text-primary);
+  /* 2S-MOBILE-006: a thumb target, not a text link. */
+  min-height: 32px;
+}
+
+.notification-verb-meaning {
+  display: block;
+  font: var(--type-caption);
+  color: var(--text-secondary);
+}
+
+.notification-verb-panel {
+  flex-basis: 100%;
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--background-subtle);
+}
+
+.notification-verb-panel-meaning,
+.notification-verb-panel-question {
+  margin: 0;
+  font: var(--type-caption);
+}
+
+.notification-verb-panel-question {
+  font-weight: 750;
+  color: var(--text-primary);
+}
+
+.notification-verb-panel-field {
+  display: grid;
+  gap: 6px;
+  font: var(--type-caption);
+  font-weight: 750;
+}
+
+.notification-verb-panel-field input {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  /* No zoom on focus at a phone viewport: iOS zooms below 16px. */
+  font-size: 16px;
+  min-height: 44px;
+}
+
+.notification-verb-panel-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.notification-verb-panel-controls button {
+  min-height: 44px;
+}
+
+/*
+  MOBILE: the menu must not cover the row it acts on (2S-MOBILE-007), and its
+  trigger and primary action must both be reachable with one thumb
+  (2S-MOBILE-006).
+
+  So at a phone width the menu stops being a floating panel and becomes part of
+  the flow, directly beneath the row's controls — nothing is covered, because
+  nothing overlaps.
+*/
+@media (max-width: 600px) {
+  .notification-row-actions {
+    gap: 10px;
+  }
+
+  .notification-primary-action,
+  .notification-menu-trigger {
+    min-height: 44px;
+    flex: 1 1 auto;
+  }
+
+  .notification-verb-menu {
+    flex-basis: 100%;
+  }
+
+  .notification-verb-menu-list {
+    position: static;
+    min-width: 0;
+    max-width: none;
+    box-shadow: none;
+  }
+
+  .notification-verb-menu-item {
+    min-height: 44px;
+  }
+}

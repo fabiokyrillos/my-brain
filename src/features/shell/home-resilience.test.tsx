@@ -30,6 +30,18 @@ vi.mock("@/features/capture/transcribe-action", () => ({ transcribeRecording: vi
 vi.mock("@/features/capture/composer", () => ({
   Composer: () => <div data-testid="capture">capture</div>,
 }));
+/*
+  Slice 2S.2. Hoje now composes a SIXTH read -- the unanswered notices -- and
+  mounts their verbs, so two more modules reach `server-only` before React
+  renders anything: the loader, and the one bundle of authorities every surface
+  dispatches through (`2S-TRUST-010`).
+*/
+vi.mock("@/features/notifications/verb-handlers", () => ({
+  NOTIFICATION_VERB_HANDLERS: {
+    markAction: vi.fn(), suppressAction: vi.fn(), workAction: vi.fn(),
+    detailAction: vi.fn(), undoAction: vi.fn(),
+  },
+}));
 vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: async () => "Brain" }));
 vi.mock("@/lib/auth/require-user", () => ({
   requireUser: async () => ({ supabase: {}, user: { id: "user-1" } }),
@@ -42,6 +54,7 @@ const loadAttentionProjection = vi.fn();
 const loadMemoryConflicts = vi.fn();
 const loadHomeAgendaProjection = vi.fn();
 const loadOnboardingPath = vi.fn();
+const loadAttentionNotices = vi.fn();
 
 vi.mock("@/features/daily-cycle/work-projection", () => ({
   loadWorkProjection: (...args: unknown[]) => loadWorkProjection(...args),
@@ -55,6 +68,11 @@ vi.mock("@/features/daily-cycle/inbox-projection", () => ({
 vi.mock("@/features/daily-cycle/attention-projection", () => ({
   loadAttentionProjection: (...args: unknown[]) => loadAttentionProjection(...args),
   ATTENTION_PAGE_SIZE: 20,
+}));
+vi.mock("@/features/notifications/attention-notices", () => ({
+  loadAttentionNotices: (...args: unknown[]) => loadAttentionNotices(...args),
+  ATTENTION_NOTICE_LIMIT: 3,
+  EMPTY_ATTENTION_NOTICES: { items: [], hasMore: false },
 }));
 /*
   `2N-CONFLICT-003` joined this contract in 2N.4. Hoje now composes **five**
@@ -109,6 +127,7 @@ function healthy() {
   loadAttentionProjection.mockResolvedValue({ items: [], hasNext: false, nextCursor: null });
   loadMemoryConflicts.mockResolvedValue({ items: [], bounded: false, limit: 20 });
   loadHomeAgendaProjection.mockResolvedValue({ items: [], hasMore: false, timezone: "America/Sao_Paulo" });
+  loadAttentionNotices.mockResolvedValue({ items: [], hasMore: false });
   // A finished path: the panel renders nothing, which is the healthy shape for
   // every other test in this file that is not about onboarding.
   loadOnboardingPath.mockResolvedValue({

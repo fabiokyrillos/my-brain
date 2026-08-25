@@ -35,6 +35,8 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 
 const SURFACE = "src/app/[locale]/app/notifications/page.tsx";
 const AGENT_ACTIONS = "src/features/agent/actions.ts";
+/** The one bundle of authorities both surfaces dispatch through (slice 2S.2). */
+const HANDLERS = "src/features/notifications/verb-handlers.ts";
 /** The migration that defines the deployed `run_user_heartbeat`. */
 const HEARTBEAT = "supabase/migrations/202608040073_account_lifecycle_admin.sql";
 const RECORD = "docs/reports/phase-2s/PHASE_2S_SLICE_00_ACCEPTANCE.md";
@@ -55,68 +57,150 @@ describe("2S-FOUNDATION-003: the notification surface's controls, enumerated fro
    * asserts that as a **closed set on the row**, because the requirement is not
    * "two controls exist" — it is "these are the only ones".
    */
-  it("offers exactly two row controls, and their destinations are what the phase measured", () => {
+  /*
+   * MEASURED AS A BASELINE IN 2S.0, DELIVERED AGAINST IN 2S.2.
+   *
+   * The original assertions here recorded what the surface offered **before**
+   * the verbs existed: two controls, no dismissal, no suppression. Their own
+   * comments named the slices that would change them — *"the control slice 2S.1
+   * retargets"*, *"the property slice 2S.2 must preserve"* — so this is the
+   * anticipated transition, not a guard being weakened to make a build pass.
+   *
+   * What the baseline was protecting is kept, and now asserted against the
+   * mechanism that replaced the inline markup.
+   */
+  it("takes the open control's destination from the row, still", () => {
+    // Unchanged by 2S.2: a Link whose destination is the row's own
+    // `action_url` and nothing computed. Slice 2S.1 retargeted what that URL
+    // POINTS AT; it did not move the decision into the component.
+    expect(read(SURFACE), "the open control must take its destination from the row")
+      .toContain("href={item.action_url}");
+  });
+
+  it("offers the row's verbs from the one shared source, not from inline markup", () => {
     const surface = read(SURFACE);
 
-    // `Abrir` — a Link, whose destination is the row's own `action_url` and
-    // nothing computed. This is the control slice 2S.1 retargets.
-    expect(surface, "the open control must take its destination from the row")
-      .toContain('href={item.action_url}');
+    // The inline `<form action={markNotification}>` is gone from the page: the
+    // dispositions are dispatched by the row component now.
+    expect(surface, "the surface must not hand-roll a disposition form")
+      .not.toContain("<form action={markNotification}>");
+    /*
+     * RETARGETED WITHIN 2S.2, not weakened.
+     *
+     * The page mounted `<NotificationRowActions>` directly for one commit, and
+     * spelled out `primaryVerb`, `menuVerbs`, `subject` and `subjectLabel` at
+     * the call site. Delivering `2S-ACT-011`'s *second* surface made that
+     * insufficient: two pages each assembling those four props satisfy "one
+     * vocabulary" and can still render different rows. Both now hand over the
+     * projected row and `NotificationVerbs` derives them, so the assertion
+     * follows the mechanism.
+     *
+     * The chain is asserted end to end rather than at one link — the page mounts
+     * the shared function, and that function mounts the shared component.
+     */
+    expect(surface, "the row's controls come from the shared mount")
+      .toContain("<NotificationVerbs");
+    expect(read("src/features/notifications/notification-row-actions.tsx"),
+      "the shared mount must render the shared component")
+      .toContain("<NotificationRowActions");
 
-    // `Lida` — a form posting to the one disposition writer, with the status
-    // fixed in a hidden input rather than chosen.
-    expect(surface, "the read control must post to markNotification")
-      .toContain("<form action={markNotification}>");
-    expect(surface, "the read control sends a fixed status")
-      .toMatch(/name="status" value="read"/);
-
-    // The closed half: there is no third row control today. `row-action` is the
-    // class every row control carries, so counting it counts the set.
-    const rowActions = [...surface.matchAll(/className="row-action"/g)].length;
-    expect(rowActions, "the row offers exactly two controls at this baseline").toBe(2);
-
-    // The control for the control: a shape that is genuinely absent. If the
-    // probe were matching loosely, this would match too.
-    expect(surface, "no dismiss control exists on the surface yet")
-      .not.toMatch(/value="dismissed"/);
-    expect(surface, "no suppression control exists on the surface yet")
-      .not.toMatch(/silenciar|suppress/i);
+    // And the set itself is closed by `verbs.ts` rather than by counting
+    // `row-action` classes in a page. Six verbs, enumerated there, asserted by
+    // name in `verbs.test.ts`.
+    const verbs = read("src/features/notifications/verbs.ts");
+    for (const verb of ["complete_task", "reschedule_task", "mark_read", "dismiss", "silence_until", "silence_subject"]) {
+      expect(verbs, `the shared verb set is missing ${verb}`).toContain(`id: "${verb}"`);
+    }
   });
 
   it("renders the read control only where it changes something", () => {
-    // `R-24` — a control whose only outcome is a no-op is not offered. This is
-    // the property slice 2S.2 must preserve when it adds verbs beside it.
-    expect(read(SURFACE), "the read control is gated on the row being unread")
-      .toContain('{item.status === "unread" ? <form action={markNotification}>');
+    /*
+     * `R-24`, and it survived the rewrite — but only because this assertion
+     * failed first. The initial shared verb list offered *marcar como lido* on
+     * every row including rows already read, which is a control whose only
+     * outcome is a no-op.
+     *
+     * The gate moved from the page's markup into `verbsForRow`, where both
+     * surfaces read it, so it is asserted there now.
+     */
+    const verbs = read("src/features/notifications/verbs.ts");
+    expect(verbs, "the read verb must be gated on the notice being unread")
+      .toContain('if (verb.id === "mark_read" && noticeStatus !== "unread") return false;');
+    // And the projection must actually pass the fact, or the gate is inert.
+    expect(read("src/features/notifications/row-projection.ts"))
+      .toContain("noticeStatus: row.status");
   });
 });
 
-describe("2S-FOUNDATION-004: `dismissed` is unreachable, and the census proves it by finding the caller", () => {
+describe("2S-FOUNDATION-004 → 2S-ANSWER-001: `dismissed` WAS unreachable, and now has a writer", () => {
   /*
-   * The trap this test exists to avoid: asserting "nothing sends `dismissed`"
-   * over a scan that found no callers at all would pass over an empty tree.
-   * So the caller count is asserted **first**, and the disposition second.
+   * THE ONE MEASUREMENT IN THIS FILE THAT SLICE 2S.2 EXISTS TO INVALIDATE.
+   *
+   * Slice 2S.0 measured a defect: `markNotification` accepted `"dismissed"`,
+   * its single caller always sent `"read"`, and the list filtered out a state
+   * nothing could produce. Both halves were asserted together, because either
+   * alone reads like a design choice.
+   *
+   * `2S-ANSWER-001` is the repair — *"`dismissed` has a writer reachable from
+   * the surface"* — so the measurement is rewritten to assert the repair rather
+   * than deleted. The trap the original avoided is kept: the CALLER is proved
+   * to exist before anything is claimed about what it sends, because a scan
+   * that found nothing would otherwise pass over an empty tree.
    */
-  it("has exactly one caller of markNotification, and it always sends read", () => {
+  it("still routes every disposition through the one writer, which is unchanged", () => {
+    expect(read(AGENT_ACTIONS), "the action accepts both dispositions")
+      .toMatch(/z\.enum\(\["read", ?"dismissed"\]\)/);
+    /*
+     * No new writer was created for dismissal. `2S-ANSWER-001` needed a
+     * SURFACE, not an authority — which is why this slice adds no write path
+     * for it at all.
+     */
+    const newWriters = sourceFiles().filter((file) => {
+      const body = read(file);
+      return file !== AGENT_ACTIONS
+        && /from\("notifications"\)/.test(body)
+        && /\.update\(/.test(body);
+    });
+    expect(newWriters, "a second writer of notification status appeared").toEqual([]);
+  });
+
+  it("has a reachable caller that can send dismissed", () => {
     const callers = sourceFiles().filter((file) => {
       const body = read(file);
       return file !== AGENT_ACTIONS && /markNotification/.test(body);
     });
+    // Proved to exist FIRST, so what follows is not a claim over an empty scan.
+    expect(callers.length, "the caller census found nothing at all").toBeGreaterThan(0);
+    /*
+     * RETARGETED WITHIN 2S.2, and the reason matters more than the edit.
+     *
+     * The page named `markNotification` itself until the attention surface
+     * arrived and needed the same five authorities. Two pages each importing the
+     * same five would have been two places the set is chosen, so the set moved
+     * into `verb-handlers.ts` and both surfaces import that.
+     *
+     * The requirement — *a writer reachable FROM THE SURFACE* — is unchanged, so
+     * the census now follows the whole path instead of the first hop: the
+     * dispatcher names the action, and the page reaches the dispatcher. Asserting
+     * only the first half would let the page stop importing it and still pass.
+     */
+    expect(callers, "the dispatcher must name the writer").toContain(HANDLERS);
+    expect(read(SURFACE), "the page must reach that dispatcher")
+      .toContain('from "@/features/notifications/verb-handlers"');
 
-    expect(callers, "the caller census must find exactly one caller").toEqual([SURFACE]);
-
-    const surface = read(SURFACE);
-    const statuses = [...surface.matchAll(/name="status" value="([a-z]+)"/g)].map((m) => m[1]);
-    expect(statuses, "the one caller sends exactly one status, and it is read").toEqual(["read"]);
+    // The dispatcher that turns a verb into a status, and it can produce both.
+    const row = read("src/features/notifications/notification-row-actions.tsx");
+    expect(row, "the row must be able to send dismissed")
+      .toContain('verb.id === "mark_read" ? "read" : "dismissed"');
   });
 
-  it("declares a disposition the product cannot produce, and filters on it anyway", () => {
-    // Both halves of the defect, asserted together, because either alone reads
-    // like a design choice.
-    expect(read(AGENT_ACTIONS), "the action still accepts both dispositions")
-      .toMatch(/z\.enum\(\["read", ?"dismissed"\]\)/);
-    expect(read(SURFACE), "the list filters a state nothing can produce")
-      .toContain('.neq("status", "dismissed")');
+  it("keeps filtering `dismissed` — which now guards a state the product CAN produce", () => {
+    /*
+     * `2S-ANSWER-005`. The filter was the second half of the defect precisely
+     * because nothing could produce the state it hid. It is unchanged, and it
+     * is now doing real work.
+     */
+    expect(read(SURFACE)).toContain('.neq("status", "dismissed")');
   });
 });
 

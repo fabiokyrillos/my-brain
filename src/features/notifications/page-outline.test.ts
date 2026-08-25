@@ -186,14 +186,55 @@ describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () =
   });
 
   it("offers `mark as read` only where it changes something", () => {
-    // A row that is already read has nothing to mark, and a control that does
-    // nothing is what `R-24` refuses.
-    expect(code).toContain('item.status === "unread" ? <form action={markNotification}>');
+    /*
+     * `R-24`, and the rule survived a rewrite that could easily have dropped it.
+     *
+     * Slice 2S.2 replaced the single inline `item.status === "unread" ? <form …>`
+     * with a shared verb list, and the first version of that list offered
+     * *marcar como lido* on every row — including rows already read, which is a
+     * control that cannot change anything. **This test caught it.**
+     *
+     * The rule now lives in `verbsForRow`, which is where both surfaces read it
+     * from, and `verbs.test.ts` asserts the behaviour directly. What is checked
+     * here is that the page still HANDS IT the fact it needs: a projection that
+     * stopped passing the notice's status would silently restore the defect.
+     */
+    expect(code).toContain("projectNotificationRows");
+    const projection = readFileSync(
+      join(__dirname, "row-projection.ts"),
+      "utf8",
+    );
+    expect(projection).toContain("noticeStatus: row.status");
   });
 
   it("names each row's controls after the row, so twenty are distinguishable", () => {
-    expect(code).toContain("aria-label={`${copy.markRead}: ${item.title}`}");
+    // The destination link still carries its own name here.
     expect(code).toContain("aria-label={`${copy.openDestination}: ${item.title}`}");
+    /*
+     * The verb controls moved into `NotificationRowActions`, and their names are
+     * built from the shared copy — `accessibleName(subject)` — rather than
+     * assembled at this call site. The requirement is unchanged; what carries it
+     * moved once more in the same slice, and the assertion follows rather than
+     * relaxes.
+     *
+     * The page used to spell out `subjectLabel=` itself, alongside `menuVerbs=`,
+     * `primaryVerb=` and `subject=`. It now hands over the whole projected row
+     * and `NotificationVerbs` derives all four — which is the point of that
+     * function: `2S-ACT-011` cannot be satisfied by two surfaces that each
+     * assemble their own props, however identically they do it today.
+     *
+     * So the chain is asserted end to end instead: the page passes the row, the
+     * mount reads `subjectLabel` off it, and the control's accessible name is
+     * built from it. Weakening any link would break one of these three.
+     */
+    expect(code).toContain("<NotificationVerbs");
+    expect(code).toContain("row={row}");
+    const row = readFileSync(
+      join(__dirname, "notification-row-actions.tsx"),
+      "utf8",
+    );
+    expect(row).toContain("subjectLabel={row.subjectLabel}");
+    expect(row).toContain("accessibleName(subjectLabel)");
   });
 
   it("has both locales for every one of the new strings", () => {

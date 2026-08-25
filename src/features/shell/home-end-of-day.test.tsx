@@ -11,6 +11,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { NeedsAttentionItemView } from "@/features/daily-cycle/contracts";
+import { noticeHandlerSpies } from "@/test/notification-verb-fixtures";
 import { HomeView, type HomeViewModel } from "./home-view";
 
 vi.mock("@/features/product-analytics/interaction-events", () => ({
@@ -42,6 +43,8 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
     priorities: [],
     attention: [],
     attentionHasMore: false,
+    notices: [],
+    noticesHaveMore: false,
     conflicts: { items: [], bounded: false, limit: 0 },
     today: [],
     todayHasMore: false,
@@ -57,7 +60,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
 
 function renderHome(overrides: Partial<HomeViewModel> = {}) {
   return render(
-    <HomeView locale="pt-BR" view={viewModel(overrides)} capture={<div />} agentName="Brain" />,
+    <HomeView locale="pt-BR" view={viewModel(overrides)} capture={<div />} agentName="Brain" noticeHandlers={noticeHandlerSpies().handlers} />,
   );
 }
 

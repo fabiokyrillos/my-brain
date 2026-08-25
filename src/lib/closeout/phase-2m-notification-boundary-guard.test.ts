@@ -84,6 +84,20 @@ const PURE_MODULES = [
    */
   "src/features/notifications/three-facts.ts",
   "src/features/notifications/invitation.ts",
+  /*
+   * Slice 2S.2. All four are pure derivations — no data access, no client, no
+   * content — and they belong on THIS list for the reason `three-facts.ts`
+   * does: the content-carrying scan below is exactly the scan they should be
+   * subject to. `verbs.ts` and `action-copy.ts` are vocabularies, which is
+   * where a task title would be most tempting to interpolate and least
+   * noticeable once it was; `subject.ts` parses a key and decides nothing;
+   * `refusal-copy.ts` is a closed table of sentences whose entire purpose is
+   * that nothing from the database reaches a screen.
+   */
+  "src/features/notifications/subject.ts",
+  "src/features/notifications/verbs.ts",
+  "src/features/notifications/action-copy.ts",
+  "src/features/notifications/refusal-copy.ts",
 ];
 
 /** The modules slice 2M.4b earned, by name, plus slice 2O.6's two surfaces. */
@@ -97,6 +111,31 @@ const DELIVERY_MODULES = [
   // they take props and render copy, and neither reaches a client.
   "src/features/notifications/notification-facts.tsx",
   "src/features/notifications/notification-invitation.tsx",
+  /*
+   * Slice 2S.2. The row component dispatches to Server Actions it receives as
+   * props and reaches no client itself; the projection reads the page's
+   * subjects through the caller's own authenticated client, owner-scoped, in
+   * one query per subject kind.
+   */
+  "src/features/notifications/notification-row-actions.tsx",
+  "src/features/notifications/row-projection.ts",
+  /*
+   * Slice 2S.2, second half — the attention surface.
+   *
+   * `attention-notices.ts` is a reader: it asks for this owner's unanswered
+   * notices through the caller's own authenticated client and hands them to the
+   * same projection the notifications page uses. `attention-notice-row.tsx`
+   * renders one of those rows and mounts the shared controls. `verb-handlers.ts`
+   * holds nothing but references to five Server Actions that already existed —
+   * it declares no action of its own, which `phase-2s-verb-authority.test.ts`
+   * asserts rather than leaving to this list.
+   *
+   * None of the three reaches a push client, and none of them can: the delivery
+   * boundary below still names the two modules that may.
+   */
+  "src/features/notifications/attention-notices.ts",
+  "src/features/notifications/attention-notice-row.tsx",
+  "src/features/notifications/verb-handlers.ts",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));

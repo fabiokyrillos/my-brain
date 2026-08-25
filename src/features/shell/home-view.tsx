@@ -10,6 +10,9 @@ import type { HomeAgendaItem } from "@/features/daily-cycle/home-agenda";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { NeedsAttentionItemRow } from "@/features/daily-cycle/needs-attention-item";
 import { NeedsAttentionLeadCard } from "@/features/daily-cycle/needs-attention-lead";
+import { AttentionNoticeRow } from "@/features/notifications/attention-notice-row";
+import type { NotificationVerbHandlers } from "@/features/notifications/notification-row-actions";
+import type { NotificationRowView } from "@/features/notifications/row-projection";
 import type { PriorityReason } from "@/features/daily-cycle/today-priorities";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { presentationFor } from "@/features/sensitivity/contracts";
@@ -84,6 +87,22 @@ export type HomeViewModel = {
     | { readonly kind: "saved" };
   readonly attention: readonly NeedsAttentionItemView[];
   readonly attentionHasMore: boolean;
+  /**
+   * The unanswered notices, in the same section (`2S-SILENCE-008`,
+   * `2S-ACT-011`).
+   *
+   * Already projected by `projectNotificationRows`, so each row arrives
+   * carrying the verbs it may offer and the subject they act on. This surface
+   * decides none of that — it renders what `/app/notifications` renders, from
+   * the same projection, through the same mount.
+   *
+   * A **separate field** rather than a widened `attention` array, for the reason
+   * `ConflictAttentionItemView` is separate too: a notice has no `entryId`, and
+   * making that field optional to fit a third shape in would weaken it for the
+   * rows that genuinely have one.
+   */
+  readonly notices: readonly NotificationRowView[];
+  readonly noticesHaveMore: boolean;
   /**
    * `2N-CONFLICT-004`. Rendered in the same section as the rows above.
    *
@@ -217,6 +236,7 @@ export function HomeView({
   capture,
   onboarding,
   agentName,
+  noticeHandlers,
 }: {
   locale: Locale;
   view: HomeViewModel;
@@ -230,6 +250,15 @@ export function HomeView({
    */
   onboarding?: ReactNode;
   agentName: string;
+  /**
+   * The five authorities a notice's verbs dispatch to, injected for exactly the
+   * reason `capture` is: they are Server Actions, and this component stays free
+   * of them so it can be rendered under jsdom without tripping `server-only`.
+   *
+   * `2S-TRUST-010`: the bundle's type admits five destinations and all five
+   * predate Phase 2S, so this surface cannot introduce a sixth by passing one.
+   */
+  noticeHandlers: NotificationVerbHandlers;
 }) {
   const copy = getHomeCopy(locale, agentName);
   const { sections } = copy;
@@ -240,7 +269,14 @@ export function HomeView({
    * so a conflict can never be rendered under a heading that says zero, and the
    * quiet state can never appear above a row.
    */
-  const pendingCount = view.attention.length + view.conflicts.items.length;
+  /*
+    Notices join the count in slice 2S.2, and the reason is the same one
+    `2N-CONFLICT-004` gives for conflicts: the heading, the "view all" link and
+    the quiet state all read this number, so a row rendered under a heading that
+    says zero — or a "nothing pending" line above a notice waiting to be
+    answered — would be the silence these requirements exist to end.
+  */
+  const pendingCount = view.attention.length + view.conflicts.items.length + view.notices.length;
   const workHref = `/${locale}/app/work?view=today`;
   const dayCount = view.priorities.length + view.today.length;
 
@@ -362,7 +398,7 @@ export function HomeView({
           <Section
             title={sections.attention.title}
             hint={sections.attention.hint}
-            count={pendingCount ? `${pendingCount}${view.attentionHasMore || view.conflicts.bounded ? "+" : ""}` : undefined}
+            count={pendingCount ? `${pendingCount}${view.attentionHasMore || view.conflicts.bounded || view.noticesHaveMore ? "+" : ""}` : undefined}
             action={
               pendingCount ? (
                 <Link href={`/${locale}/app/inbox?view=needs-you`} className="panel-view-all">
@@ -419,6 +455,31 @@ export function HomeView({
                     <NeedsAttentionItemRow agentName={agentName} item={item} key={item.key} locale={locale} surface="home" timeZone={view.timeZone} />
                   ),
                 )}
+                {/*
+                  The unanswered notices (`2S-SILENCE-008`, `2S-ACT-011`).
+
+                  AFTER the entry rows rather than among them, and that placement
+                  is deliberate: `2S-ATTENTION-007` requires every source this
+                  surface already had to still contribute, unchanged. Appending
+                  leaves the lead card, the collapsed rows and their masking
+                  exactly where they were — a new kind of row displacing the
+                  expanded lead would have changed the existing projection's
+                  behaviour while claiming only to have added to it.
+
+                  Each row mounts `NotificationVerbs`, which is the same function
+                  `/app/notifications` mounts, taking the same
+                  `NotificationRowView`. Neither surface assembles its own verb
+                  set, so neither can hold one the other does not.
+                */}
+                {view.notices.map((notice) => (
+                  <AttentionNoticeRow
+                    handlers={noticeHandlers}
+                    key={notice.notification.id}
+                    locale={locale}
+                    row={notice}
+                    timeZone={view.timeZone}
+                  />
+                ))}
                 <BoundedNotice list={view.conflicts} locale={locale} />
               </div>
             ) : (
@@ -665,7 +726,7 @@ export function HomeView({
                 {pendingCount ? (
                   <li>
                     {sections.attention.title}: {pendingCount}
-                    {view.attentionHasMore || view.conflicts.bounded ? "+" : ""} {sections.endOfDay.unresolved}
+                    {view.attentionHasMore || view.conflicts.bounded || view.noticesHaveMore ? "+" : ""} {sections.endOfDay.unresolved}
                   </li>
                 ) : null}
                 {view.waitingCount ? (
