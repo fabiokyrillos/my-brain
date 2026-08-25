@@ -73,13 +73,15 @@ Successor status: **the roadmap successor — the phase after Phase 2S — is NO
 - **Budget CLOSED: 1 allocated · 1 spent · 1 created · 1 APPLIED.** Parity `202608230101` → **`202608240102`**, **102 local = 102 hosted**, read live after the apply. Merge SHA `7457d82` (PR #311), CI green 3/3 on that exact SHA. **A second migration of any kind remains a stop condition.**
 - **NEXT: slice 2S.2**, re-audited against the `main` slice 2S.1 produced. Closure is **not** authorized; the phase stops at the owner twice — `2S-MOBILE-003` in slice 2S.3, and a closing checkpoint before 2S.4's report may become an ADR.
 
-### Open item raised by slice 2S.1's hosted deployment — needs an owner decision
+### Raised by slice 2S.1's hosted deployment — OWNER DECIDED, now a separate priority initiative
 
-- **`2S-TRUNCATE-AUTHENTICATED` — `authenticated` holds TRUNCATE on 38 of 59 public base tables, and TRUNCATE does not respect RLS.** Measured on the deployed project 2026-08-25. It comes from `alter default privileges` in this schema, not from any one migration: a table that merely omits a grant still carries `REFERENCES, SELECT, TRIGGER, TRUNCATE`. The **21** that do not carry it are exactly the ones whose migrations revoked from `authenticated` explicitly — `reminder_series`, `push_subscriptions`, `notification_consents`, the fourteen RPC-closed tables, and a few others.
-  - **Included:** `entries`, `memories`, `tasks`, `reminders` and `notification_suppressions` — the owner's own core data.
-  - **Why it is narrow:** PostgREST never emits TRUNCATE, so exploiting it needs some other path that runs arbitrary SQL as `authenticated`.
-  - **Why it was not fixed in 2S.1:** the slice had already spent Phase 2S's only migration; the condition is the schema's **majority** posture rather than one table's anomaly; and narrowing it is a decision about **38 tables**, which is the owner's to make, not a deployment record's.
-  - **Recorded in** `docs/reports/phase-2s/PHASE_2S_SLICE_01_DEPLOYMENT.md` §5.
+- **`2S-TRUNCATE-AUTHENTICATED` → Grant hardening initiative. REGISTERED, NOT PLANNED.** **Owner decision, 2026-08-25:** do **not** fix inside Phase 2S and do **not** create a second migration; register it as a separate, priority grant-hardening initiative with a migration of its own. **This does not block slice 2S.2.**
+  - **Charter:** `docs/initiatives/grant-hardening/GRANT_HARDENING_CHARTER.md`
+  - **Evidence, preserved before planning as directed:** `docs/reports/grant-hardening/GRANT_HARDENING_EVIDENCE.md` — nominal census, exact origin in the default privileges, read-only reachability, candidate controls, rollback plan, and proof no application operation depends on the privilege.
+  - **The finding, in one line:** `authenticated` can **TRUNCATE 38 tables but DELETE rows from only 20** — it can destroy wholesale eighteen tables it cannot delete a single row from, and **TRUNCATE does not respect RLS**. `audit_logs`, `ai_usage_events` and `undo_operations` are in that 38.
+  - **Two premises the evidence corrected before planning began:** the default grants **eight** privileges (`arwdDxtm`), not four — `information_schema` **cannot see `MAINTAIN`** on PG17, so any census must use `has_table_privilege`; and **`service_role` is the larger exposure** at 45 tables with all eight, so the scope covers both roles. `anon` is completely closed and is out of scope.
+  - **A control precedent already exists:** event trigger `ensure_rls` enables RLS on every new `public` table. The same shape can revoke inherited privileges.
+  - **Planning still needs its own authorization.** No PRD and no implementation plan exist.
 
 ### Planning record, retained
 
