@@ -332,12 +332,21 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
       .toHaveLength(1);
     expect(laterPhase2r, `Phase 2R must have exactly one migration: ${laterPhase2r.join(", ")}`)
       .toHaveLength(1);
+    // Phase 2S spent the ONE migration OD-2S-7 A allocated and ADR-138
+    // Decision 3 authorized, after this phase closed. Counted explicitly
+    // rather than absorbed into a bumped number, so an unattributed
+    // migration arriving beside it still fails the total. A SECOND 2S
+    // migration is a stop condition and fails here.
+    const laterPhase2s = migrations.filter((name) => /phase[_-]?2s/i.test(name));
+    expect(laterPhase2s, `Phase 2S is allocated exactly one migration: ${laterPhase2s.join(", ")}`)
+      .toHaveLength(1);
     expect(
       migrations,
       "a migration appeared that belongs to neither the pre-phase baseline nor this phase",
     ).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2N + mine.length + 3
-      + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length,
+      + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
+      + laterPhase2s.length,
     );
   });
 

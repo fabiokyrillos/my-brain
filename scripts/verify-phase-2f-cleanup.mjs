@@ -164,6 +164,7 @@ export const SCANNED_TABLES = Object.freeze([
 export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   audit_logs: "append-only and designed to survive its subject; cascades from auth.users at 202607160003:130",
   notifications: "worker/heartbeat-owned, not a Phase 2F fixture target; cascades at 202607160007:52",
+  notification_suppressions: "Phase 2S owner-written silence, read by the heartbeat and never a Phase 2F fixture target; cascades at 202608240102:80",
   heartbeat_runs: "heartbeat-owned per-tick record; cascades at 202607160007:68",
   memories: "no Phase 2F proof writes it; cascades at 202607160006:5",
   entry_embeddings: "no Phase 2F proof writes it; cascades at 202607160006:28",

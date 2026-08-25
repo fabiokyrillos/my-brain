@@ -321,6 +321,20 @@ begin
     values (p_user, 'heartbeat', 'Drill notification ' || p_tag, 'Drill body');
   exception when others then failures := failures || ('notifications: ' || sqlerrm); end;
 
+  -- Phase 2S slice 2S.1. The suppression's subject is polymorphic and proved by
+  -- trigger, so this cannot plant a bare uuid: it has to name a task this same
+  -- populator already created for this same owner, which is why it reuses
+  -- `v_task` from thirty lines above. A fabricated uuid would be refused by
+  -- `validate_polymorphic_entity_owner`, and the failure would read as "the
+  -- drill cannot populate this table" when the truth is that the drill was
+  -- lying about what it owned.
+  begin
+    insert into public.notification_suppressions
+      (user_id, entity_type, entity_id, scope, suppressed_until, reason)
+    values (p_user, 'task', v_task, 'forever', null, 'Drill suppression ' || p_tag);
+  exception when others then
+    failures := failures || ('notification_suppressions: ' || sqlerrm); end;
+
   begin
     insert into public.heartbeat_runs (user_id, status, completed_at)
     values (p_user, 'completed', now());

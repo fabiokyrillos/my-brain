@@ -1714,6 +1714,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_suppressions: {
+        Row: {
+          actor: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          notice_type: string | null
+          reason: string
+          scope: string
+          suppressed_until: string | null
+          user_id: string
+        }
+        Insert: {
+          actor?: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          notice_type?: string | null
+          reason: string
+          scope: string
+          suppressed_until?: string | null
+          user_id: string
+        }
+        Update: {
+          actor?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          notice_type?: string | null
+          reason?: string
+          scope?: string
+          suppressed_until?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           action_url: string | null

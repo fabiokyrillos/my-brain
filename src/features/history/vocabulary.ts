@@ -141,6 +141,9 @@ export const HISTORY_ACTION_TYPES = [
   "entry_reprocessed",
   "entry_reprocessing_enqueued",
   "entry_reprocessing_failed",
+  // Phase 2S slice 2S.1. The owner telling the agent to stop speaking about
+  // one subject, either until an instant or permanently.
+  "notification_suppressed",
   "operation_undone",
   "question_consequence_confirmed",
   // Slice G5 — the five owner-initiated reminder transitions plus the
@@ -258,6 +261,11 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   entry_reprocessed: "interpreted",
   entry_reprocessing_enqueued: "interpreted",
   entry_reprocessing_failed: "failed",
+  // `lifecycle` by the same reasoning the reminder transitions use just
+  // below: cancel and restore END or RESUME a delivery. A suppression ends
+  // the stream of notices about a subject, and nothing about the subject
+  // itself is created, changed or undone.
+  notification_suppressed: "lifecycle",
   operation_undone: "undone",
   question_consequence_confirmed: "answered",
   // Cancel and restore end or resume a delivery, which is `lifecycle`; snooze,

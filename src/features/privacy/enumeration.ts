@@ -204,6 +204,20 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
        */
       { table: "reminder_series" },
       { table: "notifications" },
+      /*
+       * Phase 2S slice 2S.1. A suppression is the owner telling the agent to
+       * stop speaking about one subject, and everything in the row is theirs:
+       * which subject, until when, and the sentence they gave as the reason.
+       * So it is exported and deleted **with the notices it silences**, in the
+       * same category, rather than withheld.
+       *
+       * There is no `withheldColumns` entry and that absence is the decision.
+       * The table is structurally incapable of holding notification content —
+       * `2S-TRUST-006` asserts there is no `title`, `body`, `content` or
+       * `message` column — so the only free text is `reason`, which the owner
+       * wrote about their own subject and would expect to see in an export.
+       */
+      { table: "notification_suppressions" },
       { table: "notification_deliveries" },
       { table: "notification_consents" },
       {

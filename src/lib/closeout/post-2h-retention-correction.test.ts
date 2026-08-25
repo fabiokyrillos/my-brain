@@ -207,6 +207,11 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // point of this assertion: a migration appended after the correction and
       // never reviewed against it fails here by name.
       "202608230101_phase_2r_slice_1_reminder_recurrence.sql",
+      // Phase 2S slice 2S.1, the ONE migration OD-2S-7 A allocated and
+      // ADR-138 Decision 3 authorized: the suppression model, the cadence
+      // rule and the notice destination. Named here rather than tolerated,
+      // for the same reason as every entry above it.
+      "202608240102_phase_2s_slice_1_notification_suppressions.sql",
     ]);
   });
 });

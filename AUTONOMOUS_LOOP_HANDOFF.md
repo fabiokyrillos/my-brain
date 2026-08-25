@@ -14074,3 +14074,92 @@ remains is the separate implementation-authorization ADR. Until it exists,
 nothing may be built.
 
 **Allocated is not created, and signed is not authorized.**
+
+---
+
+## §130 — Phase 2S is IN IMPLEMENTATION (ADR-138): slice 2S.0 is merged, slice 2S.1 spent the one migration, and the second CI found a central integration nobody had made (2026-08-25)
+
+### What exists
+
+**Slice 2S.0 — merged** (`39bb4b8`, PR #310). Reconnaissance only: it measured
+the ground and changed no product behaviour. Three of the PRD's facts moved as a
+result.
+
+**Slice 2S.1 — PR #311, OPEN, not draft, mergeable, base `main` at `14753ee`.**
+This is the slice that spends Phase 2S's **one** migration:
+`202608240102_phase_2s_slice_1_notification_suppressions.sql`. Silence
+(`notification_suppressions`), a cadence that terminates (the backoff ladder),
+and a notice that points at its subject rather than at a list.
+
+**The migration is NOT merged and NOT applied.** Verified directly against the
+hosted project this session: **101** migrations, parity **202608230101**,
+`to_regclass('public.notification_suppressions')` is **null**, and `202608240102`
+is absent from `supabase_migrations.schema_migrations`. Local chain: **102**.
+
+### Two CI runs, two different kinds of finding
+
+**The first run found seven defects, all in this slice, all real** — recorded in
+§8b of the slice record. One was a **security defect**: the undo handler was
+`SECURITY DEFINER` when all twenty existing handlers are invoker with an empty
+`search_path`. A second was the lesson that **omitting a grant is not the same as
+withholding one** — `alter default privileges` in this schema hands every new
+table four `service_role` privileges including `TRUNCATE`, so the migration must
+*revoke*, not merely decline to grant.
+
+**The second run (`32810864199`) found nothing wrong with this slice, and failed
+anyway.** `application` green, `edge worker` green, `database and journey` red on
+one assertion out of 2819 across 73 files:
+
+> *exactly the thirteen RPC-closed tables carry zero service_role grants*
+
+**The failure was caused by the first run's fix being correct.** Revoking every
+`service_role` privilege moved `notification_suppressions` into a closed set —
+and `signup_hardening_grant_census.sql`, the repository's **one** census of that
+set, was still pinned at thirteen. The CI log named both sides: `have` carried
+fourteen, `want` thirteen, and the only difference was the new table.
+
+### The rule this is an instance of
+
+**A slice that changes a posture joins every census of that posture, and the
+census is central.** Nothing in the slice's own files was wrong. The integration
+it never made lived in a file the slice never opened, and only CI runs it —
+Property 3 needs pgTAP, which needs a Postgres no local Docker exists to start.
+
+Two further rules were applied on the way to the fix:
+
+1. **`13 → 14` was refused.** The set was proved **by name** first: derivation
+   (run-time, from `role_table_grants` — membership is a consequence, never a
+   declaration), the thirteen prior members, the new member's legitimacy, and
+   that **no** earlier table had left. That last one twice: `want ⊂ have` in the
+   log, and a branch diff that adds grants for only the new table and its two
+   functions.
+2. **A number written beside a list is a second place the truth has to be
+   maintained.** The census now enumerates row by row and derives its tally with
+   `count(*)`; the numeral cannot lag the list again. The assertion stays **exact
+   equality in both directions** — "at least fourteen" would pass while a
+   historical table silently lost its closure.
+
+The membership is now **also** asserted by `phase-2s-suppression-guard.test.ts`,
+which reads the census file and runs on every `npm test`, so the next slice is
+told before CI tells it. Five mutation controls, five failures, each naming its
+subject, each restored and re-verified.
+
+### One thing the record itself still had wrong
+
+§8b corrected this record's claim that `service_role` holds `SELECT`. The
+**migration's own comment** still carried the superseded sentence, two lines above
+the sentence saying the opposite. The code was right and the comment argued with
+itself. Removed. **A corrected record does not correct the code's comments for
+you.**
+
+### Where the next session starts
+
+With PR #311's new head, and CI. **Nothing may be applied to the hosted project
+until CI is green on the PR head and green again on the merge SHA** — the migration
+is the phase's only one, and it is unspent until then. After that: hosted
+dry-run showing exactly one migration, apply, owner-scoped hosted proofs, and
+`102 = 102` with parity `202608240102`.
+
+Then slice 2S.2, then 2S.3, stopping at the owner's 2S.3 checkpoint.
+
+**A fix that is correct can still break a file it never opened.**

@@ -178,13 +178,31 @@ describe("2S-FOUNDATION-002: the deployed cadence rules, re-asserted against the
 });
 
 describe("2S-FOUNDATION-007: this slice changes no product behaviour", () => {
-  it("creates no migration, and the chain is the one the phase started with", () => {
+  /*
+   * **Inverted by slice 2S.1, in the commit that spends the allocation.**
+   *
+   * This asserted a chain of 101 and zero Phase 2S migrations. Both were true
+   * of slice 2S.0 and one of them stopped being true the moment 2S.1 landed --
+   * so keeping the flat count would have made this guard fail for the reason it
+   * was written to allow.
+   *
+   * What 2S.0 actually claimed is narrower and still holds: **this slice**
+   * spent nothing. That is now asserted directly -- no migration names slice 0 --
+   * and the phase-level ceiling is asserted where it belongs, in
+   * `phase-2s-declarations.test.ts`, which pins the one allocated migration by
+   * name. A count that has to be edited on every later spend is a count that
+   * stops meaning anything.
+   */
+  it("spends no migration of its own, and the phase's one migration belongs to 2S.1", () => {
     const migrations = readdirSync(join(REPO, "supabase/migrations")).filter((f) => f.endsWith(".sql"));
-    expect(migrations.length, "slice 2S.0 spends nothing").toBe(101);
+    const phase = migrations.filter((f) => /phase_2s/i.test(f));
     expect(
-      migrations.filter((f) => /phase_2s/i.test(f)),
-      "the allocation is spent in slice 2S.1, not here",
+      phase.filter((f) => /slice_0/i.test(f)),
+      "slice 2S.0 changes no behaviour and therefore spends nothing",
     ).toEqual([]);
+    expect(phase, "the phase is allocated exactly one migration, and it is slice 2S.1's").toEqual([
+      "202608240102_phase_2s_slice_1_notification_suppressions.sql",
+    ]);
   });
 
   it("adds no writer of notifications", () => {
