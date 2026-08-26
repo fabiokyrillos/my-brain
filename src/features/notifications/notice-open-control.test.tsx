@@ -48,8 +48,8 @@ function setup(options: {
 } = {}) {
   const { alreadySeen = false, gate, fails = false } = options;
 
-  const markAction = vi.fn(async (_payload: FormData) => {
-    timeline.push("write:start");
+  const markAction = vi.fn(async (payload: FormData) => {
+    timeline.push(`write:start:${String(payload.get("status"))}`);
     if (gate) {
       await new Promise<void>((resolve) => {
         gate.release = () => {
@@ -90,7 +90,7 @@ describe("property 1: the change to read finishes before the navigation", () => 
      * write and navigated in the same tick would satisfy "both happened" and
      * still leave the owner on a new page with an unread notice behind them.
      */
-    expect(timeline).toEqual(["write:start", "write:end", `push:${HREF}`]);
+    expect(timeline).toEqual(["write:start:read", "write:end", `push:${HREF}`]);
     expect(markAction).toHaveBeenCalledTimes(1);
     expect(markAction.mock.calls[0][0].get("status")).toBe("read");
   });
@@ -100,15 +100,15 @@ describe("property 1: the change to read finishes before the navigation", () => 
     setup({ gate });
 
     await userEvent.click(screen.getByRole("button", { name: copy.openLabel(SUBJECT) }));
-    await waitFor(() => expect(timeline).toContain("write:start"));
+    await waitFor(() => expect(timeline).toContain("write:start:read"));
 
     // The window the previous test cannot see: the write has started and has
     // not finished, and nothing has navigated.
-    expect(timeline).toEqual(["write:start"]);
+    expect(timeline).toEqual(["write:start:read"]);
 
     gate.release?.();
     await waitFor(() => expect(timeline).toContain(`push:${HREF}`));
-    expect(timeline).toEqual(["write:start", "write:end", `push:${HREF}`]);
+    expect(timeline).toEqual(["write:start:read", "write:end", `push:${HREF}`]);
   });
 });
 

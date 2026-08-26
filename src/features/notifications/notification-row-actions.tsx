@@ -31,6 +31,7 @@ import type { WorkItemActionState } from "@/features/operations/work-action-stat
 import type { TaskDetailCommandState } from "@/features/task-commands/detail-action-state";
 import type { TaskUndoOffer } from "@/features/task-commands/task-undo-state";
 import type { Locale } from "@/lib/preferences";
+import { addLocalDays, compareLocalDates, localDateOf, parseLocalDate } from "@/lib/time/local-day";
 
 import { getNotificationActionCopy } from "./action-copy";
 import { refusalMessage, type ActionRefusal } from "./refusal-copy";
@@ -85,16 +86,24 @@ export type NotificationVerbHandlers = {
 export function NotificationVerbs({
   row,
   locale,
+  timeZone,
   handlers,
 }: {
   row: NotificationRowView;
   locale: Locale;
+  /**
+   * The owner's zone (`LDC-DAILY-001`). Required, never defaulted — a default
+   * here would be the DEVICE's zone, which is exactly the defect
+   * `LDC-GUARD-001` caught in the consequence sentence below.
+   */
+  timeZone: string;
   handlers: NotificationVerbHandlers;
 }) {
   return (
     <NotificationRowActions
       detailAction={handlers.detailAction}
       locale={locale}
+      timeZone={timeZone}
       markAction={handlers.markAction}
       menuVerbs={row.menuVerbs}
       notificationId={row.notification.id}
@@ -136,6 +145,7 @@ const FOCUSABLE = 'button, input:not([type="hidden"]), select, textarea, [href]'
 
 export function NotificationRowActions({
   locale,
+  timeZone,
   notificationId,
   subject,
   subjectLabel,
@@ -148,6 +158,8 @@ export function NotificationRowActions({
   undoAction,
 }: {
   locale: Locale;
+  /** The owner's zone (`LDC-DAILY-001`). Required, never defaulted. */
+  timeZone: string;
   notificationId: string;
   subject: NotificationSubject | null;
   subjectLabel: string;
@@ -166,6 +178,15 @@ export function NotificationRowActions({
   const [menuOpen, setMenuOpen] = useState(false);
   /** The verb waiting on its own inline panel — a date, a reason, or a question. */
   const [panelVerb, setPanelVerb] = useState<VerbDefinition | null>(null);
+  /**
+   * The chosen expiry, held here so the consequence can be stated before the
+   * owner confirms (`2S-ACCESS-002`).
+   *
+   * A controlled input rather than a read of the DOM on submit: the sentence
+   * has to change WITH the date, and reading the node would tell the owner what
+   * they chose only after they had already chosen it.
+   */
+  const [silenceUntil, setSilenceUntil] = useState("");
 
   /**
    * The operation keys, one per verb, held in a ref and minted lazily.
@@ -358,6 +379,61 @@ export function NotificationRowActions({
   const activePanel = settled ? null : panelVerb;
   const isMenuOpen = settled ? false : menuOpen;
 
+  const menu = useRef<HTMLUListElement | null>(null);
+
+  /** The menu's items, in document order, skipping any that cannot take focus. */
+  function menuItems(): HTMLElement[] {
+    if (!menu.current) return [];
+    return [...menu.current.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .filter((element) => !element.hasAttribute("disabled"));
+  }
+
+  /**
+   * `2S-ACCESS-006` — *"it OPENS, MOVES, activates and closes by keyboard
+   * alone."*
+   *
+   * Opening puts focus on the first item, which is what makes "moves" reachable
+   * at all: a menu whose focus stayed on the trigger has nothing to move
+   * through, and the reader would have to Tab out of the row to reach it.
+   *
+   * An effect keyed on the menu's openness, for the same reason the panel's
+   * focus is an effect: the list does not exist in the DOM until React has
+   * rendered it, so anything scheduled from the click handler finds `menu.current`
+   * still null.
+   */
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    menuItems()[0]?.focus({ preventScroll: true });
+    // `menuItems` reads a ref, so the dependency that matters is the transition
+    // into openness and nothing else.
+  }, [isMenuOpen]);
+
+  /**
+   * Arrow, Home and End move focus between the items; Escape is handled by the
+   * container above, which hears it whether focus is on the trigger or inside.
+   *
+   * Wrapping at both ends, because a menu that stops at the last item makes the
+   * owner reverse direction to reach the first — the pattern every menu the
+   * reader has met already wraps.
+   */
+  function moveThroughMenu(event: React.KeyboardEvent<HTMLUListElement>) {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+    const items = menuItems();
+    if (items.length === 0) return;
+    event.preventDefault();
+    const current = items.indexOf(document.activeElement as HTMLElement);
+    const next =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? items.length - 1
+          : event.key === "ArrowDown"
+            ? (current + 1 + items.length) % items.length
+            : (current - 1 + items.length) % items.length;
+    items[next]?.focus({ preventScroll: true });
+  }
+
   /** `2S-ACCESS-006`: focus returns to the trigger that opened the menu. */
   function closeMenu() {
     setMenuOpen(false);
@@ -418,7 +494,27 @@ export function NotificationRowActions({
     }
   }
 
-  function renderVerbButton(verb: VerbDefinition, className: string) {
+  /**
+   * One verb's control.
+   *
+   * `extra` carries what a MENU ITEM needs and a primary action does not: the
+   * `menuitem` role, the id of the sentence describing it, and `tabIndex={-1}`
+   * so the roving focus below owns the tab order rather than the browser.
+   *
+   * The role sits on the **button**, not on a wrapper. It used to sit on a
+   * `<div role="menuitem">` around it, which is an ARIA contradiction — the
+   * thing that takes focus and the thing that claims to be the item were two
+   * different elements, so a screen reader's menu navigation had nothing to
+   * move between.
+   */
+  function renderVerbButton(
+    verb: VerbDefinition,
+    className: string,
+    extra?: { readonly describedBy: string },
+  ) {
+    const menuAttributes = extra
+      ? ({ role: "menuitem", tabIndex: -1, "aria-describedby": extra.describedBy } as const)
+      : {};
     const needsPanel = verb.confirm || verb.id === "silence_until" || verb.id === "silence_subject" || verb.id === "reschedule_task";
     if (needsPanel) {
       return (
@@ -429,6 +525,7 @@ export function NotificationRowActions({
           key={verb.id}
           onClick={() => openPanel(verb)}
           type="button"
+          {...menuAttributes}
         >
           {verbCopy[verb.id].label}
         </button>
@@ -445,6 +542,7 @@ export function NotificationRowActions({
              this is the one the owner can see. */
           disabled={pending}
           type="submit"
+          {...menuAttributes}
         >
           {verbCopy[verb.id].label}
         </button>
@@ -497,13 +595,19 @@ export function NotificationRowActions({
             <ul
               className="notification-verb-menu-list"
               id={menuId}
+              onKeyDown={moveThroughMenu}
+              ref={menu}
               role="menu"
             >
               {menuVerbs.map((verb) => (
                 <li key={verb.id} role="none">
-                  <div role="menuitem" tabIndex={-1}>
-                    {renderVerbButton(verb, "notification-verb-menu-item")}
-                    <span className="notification-verb-meaning">{verbCopy[verb.id].meaning}</span>
+                  <div>
+                    {renderVerbButton(verb, "notification-verb-menu-item", {
+                      describedBy: `${menuId}-${verb.id}`,
+                    })}
+                    <span className="notification-verb-meaning" id={`${menuId}-${verb.id}`}>
+                      {verbCopy[verb.id].meaning}
+                    </span>
                   </div>
                 </li>
               ))}
@@ -527,8 +631,40 @@ export function NotificationRowActions({
           {activePanel.id === "silence_until" ? (
             <label className="notification-verb-panel-field">
               {copy.untilLabel}
-              <input name="until" required type="date" />
+              <input
+                name="until"
+                onChange={(event) => setSilenceUntil(event.target.value)}
+                required
+                type="date"
+                value={silenceUntil}
+              />
             </label>
+          ) : null}
+
+          {/*
+            `2S-ACCESS-002`. The consequence, stated BEFORE the owner confirms
+            and computed from what they actually chose — not a fixed sentence
+            that would be true of any date.
+
+            Announced as well as shown: a reader who changes the date without
+            looking back at this line is a reader who is told nothing. It is a
+            live region rather than plain text for exactly that, and it is
+            rendered only inside the silencing panels, so no other verb grows a
+            region it has nothing to put in.
+          */}
+          {activePanel.scope === "cadence" ? (
+            <p
+              aria-atomic="true"
+              aria-live="polite"
+              className="notification-verb-panel-consequence"
+              role="status"
+            >
+              {activePanel.id === "silence_subject"
+                ? copy.silenceForeverConsequence
+                : silenceUntil
+                  ? copy.silenceUntilConsequence(silenceUntil, daysUntil(silenceUntil, timeZone))
+                  : copy.silenceUntilUnchosen}
+            </p>
           ) : null}
 
           {activePanel.id === "reschedule_task" ? (
@@ -586,6 +722,43 @@ export function NotificationRowActions({
     </div>
   );
 }
+
+/**
+ * Whole calendar days from **the owner's today** to a `YYYY-MM-DD`.
+ *
+ * ## The defect this replaced, caught by `LDC-GUARD-001`
+ *
+ * The first version read `new Date().getFullYear()`, `.getMonth()` and
+ * `.getDate()`. This is a **client** component, so those are the *device's*
+ * zone — and an owner in São Paulo reading the page on a laptop still set to
+ * Lisbon would be told a different number of days than the suppression will
+ * actually last. That is the same defect this repository has already fixed on
+ * four other surfaces, and the guard refused it on sight.
+ *
+ * `localDateOf` and `compareLocalDates` are the one contract in `src/lib/time/`.
+ * The count walks calendar days rather than dividing milliseconds, so a day
+ * that is 23 or 25 hours long still counts as one.
+ *
+ * Never negative: a past date is the RPC's refusal to make (`SUPPRESSION_PAST_DATED`),
+ * not this sentence's, and a "-3 days" would be a sentence describing something
+ * that cannot happen.
+ */
+function daysUntil(value: string, timeZone: string): number {
+  const chosen = parseLocalDate(value);
+  if (!chosen) return 0;
+  let cursor = localDateOf(new Date(), timeZone);
+  let days = 0;
+  // Bounded, so a malformed pair can never spin: nothing this sentence
+  // describes is further away than a couple of years.
+  while (days < MAX_SILENCE_DAYS && compareLocalDates(cursor, chosen) < 0) {
+    cursor = addLocalDays(cursor, 1);
+    days += 1;
+  }
+  return days;
+}
+
+/** Two years. Past this the sentence says nothing useful anyway. */
+const MAX_SILENCE_DAYS = 730;
 
 /** `HTML date` gives `YYYY-MM-DD`; the RPC takes an instant. */
 function toInstant(value: FormDataEntryValue | null): string | undefined {

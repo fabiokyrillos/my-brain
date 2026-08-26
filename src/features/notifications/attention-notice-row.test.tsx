@@ -51,6 +51,39 @@ function renderRow(options: Parameters<typeof noticeRow>[0] & { locale?: Locale 
   return { row, spies };
 }
 
+/**
+ * A control by its accessible name, whatever ARIA role it carries.
+ *
+ * The menu's items are `role="menuitem"` since slice 2S.3 — the correct pattern,
+ * and the one that makes arrow navigation mean anything. An explicit role
+ * REPLACES the implicit one, so `getByRole("button", …)` stopped finding them.
+ *
+ * This accepts either role and then asserts the element really is a `<button>`,
+ * so the queries keep claiming what they always claimed: an interactive
+ * control, not merely a label. Matching by ACCESSIBLE NAME rather than by
+ * `aria-label` matters too — the panel's own buttons carry visible text and no
+ * label, and a helper built on `getByLabelText` silently stopped finding them.
+ */
+function controlsNamed(name: string | RegExp): HTMLElement[] {
+  // Both roles, because `getByRole` in this version takes a role STRING and a
+  // menu item is not a button any more.
+  return [
+    ...screen.queryAllByRole("menuitem", { name }),
+    ...screen.queryAllByRole("button", { name }),
+  ];
+}
+
+function control(name: string | RegExp): HTMLButtonElement {
+  const matches = controlsNamed(name);
+  expect(matches, `expected exactly one control named ${String(name)}`).toHaveLength(1);
+  expect(matches[0].tagName, `${String(name)} is not a real control`).toBe("BUTTON");
+  return matches[0] as HTMLButtonElement;
+}
+
+function queryControl(name: string | RegExp): HTMLElement | null {
+  return controlsNamed(name)[0] ?? null;
+}
+
 /** Every control the row rendered, by accessible name. */
 function controlNames(): string[] {
   return screen.getAllByRole("button").map((button) => button.getAttribute("aria-label") ?? button.textContent ?? "");
@@ -109,11 +142,11 @@ describe("2S-ACT-011: the attention row offers exactly the verbs the authority d
       expect(document.querySelectorAll(".notification-menu-trigger")).toHaveLength(1);
 
       // And the rest are behind that one trigger.
-      await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+      await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
       const menu = screen.getByRole("menu");
       for (const verb of expected.slice(1)) {
         expect(
-          within(menu).getByRole("button", { name: verbCopy[verb.id].accessibleName(row.subjectLabel) }),
+          within(menu).getByLabelText(verbCopy[verb.id].accessibleName(row.subjectLabel)),
           `${locale}/${verb.id} is missing from the menu`,
         ).toBeTruthy();
       }
@@ -134,7 +167,7 @@ describe("2S-ATTENTION-006: opening a notice from home marks it seen", () => {
     const { row, spies } = renderRow();
     const copy = getNotificationActionCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.openLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.openLabel(row.subjectLabel)));
 
     /*
      * The write, and what it sent. `2S-TRUST-010`: the destination is
@@ -159,7 +192,7 @@ describe("2S-ATTENTION-006: opening a notice from home marks it seen", () => {
     const { row, spies } = renderRow({ source: { status: "read" } });
     const copy = getNotificationActionCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.openLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.openLabel(row.subjectLabel)));
 
     expect(spies.markAction).not.toHaveBeenCalled();
     expect(pushed).toEqual([row.notification.action_url]);
@@ -174,7 +207,7 @@ describe("2S-ATTENTION-006: opening a notice from home marks it seen", () => {
      */
     const { row } = renderRow({ source: { action_url: null } });
     const copy = getNotificationActionCopy("pt-BR");
-    expect(screen.queryByRole("button", { name: copy.openLabel(row.subjectLabel) })).toBeNull();
+    expect(queryControl(copy.openLabel(row.subjectLabel))).toBeNull();
     expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
   });
 
@@ -198,13 +231,13 @@ describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no
 
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
 
     // The control that can fail: the task verbs must be absent from the WHOLE
     // row, menu included, not merely absent from the primary slot.
     for (const taskVerb of ["complete_task", "reschedule_task"] as const) {
       expect(
-        screen.queryByRole("button", { name: verbCopy[taskVerb].accessibleName(row.subjectLabel) }),
+        queryControl(verbCopy[taskVerb].accessibleName(row.subjectLabel)),
         `${taskVerb} is offered against an unresolvable subject`,
       ).toBeNull();
     }
@@ -219,7 +252,7 @@ describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no
     const { row } = renderRow({ subjectStatus: "completed" });
     const verbCopy = getVerbCopy("pt-BR");
     expect(
-      screen.queryByRole("button", { name: verbCopy.complete_task.accessibleName(row.subjectLabel) }),
+      queryControl(verbCopy.complete_task.accessibleName(row.subjectLabel)),
     ).toBeNull();
   });
 
@@ -242,9 +275,9 @@ describe("R-24: an answered notice is offered nothing it cannot change", () => {
     const copy = getNotificationActionCopy("pt-BR");
 
     expect(row.verbs.some((verb) => verb.id === "mark_read")).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
     expect(
-      screen.queryByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }),
+      queryControl(verbCopy.mark_read.accessibleName(row.subjectLabel)),
     ).toBeNull();
   });
 
@@ -260,11 +293,11 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.dismiss.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.dismiss.accessibleName(row.subjectLabel)));
 
     expect(screen.getByText(copy.confirmQuestion.dismiss as string)).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: copy.cancelAction }));
+    await userEvent.click(control(copy.cancelAction));
     expect(spies.markAction).not.toHaveBeenCalled();
   });
 
@@ -273,8 +306,8 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
     const verbCopy = getVerbCopy("pt-BR");
     const copy = getNotificationActionCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.mark_read.accessibleName(row.subjectLabel)));
 
     expect(screen.queryByText(copy.confirmQuestion.dismiss as string)).toBeNull();
     expect(spies.markAction).toHaveBeenCalledTimes(1);
@@ -316,8 +349,8 @@ describe("2S-ACCESS-007: one announceable node, and it is the visible one", () =
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.mark_read.accessibleName(row.subjectLabel)));
 
     const regions = await screen.findAllByRole("status");
     const speaking = regions.filter((region) => region.textContent !== "");

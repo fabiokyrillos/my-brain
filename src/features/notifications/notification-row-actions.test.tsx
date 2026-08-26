@@ -80,6 +80,7 @@ function setup(options: {
       subject={subject}
       subjectLabel="Pagar o aluguel"
       suppressAction={suppressAction as never}
+      timeZone="America/Sao_Paulo"
       undoAction={undoAction as never}
       workAction={workAction as never}
     />,
@@ -106,18 +107,51 @@ function outcomeText(): string {
   return document.querySelector(".notification-row-outcome")?.textContent ?? "";
 }
 
+/**
+ * A control by its accessible name, whatever ARIA role it carries.
+ *
+ * The menu's items are `role="menuitem"` since slice 2S.3 — the correct pattern,
+ * and the one that makes arrow navigation mean anything. An explicit role
+ * REPLACES the implicit one, so `getByRole("button", …)` stopped finding them.
+ *
+ * This accepts either role and then asserts the element really is a `<button>`,
+ * so the queries keep claiming what they always claimed: an interactive
+ * control, not merely a label. Matching by ACCESSIBLE NAME rather than by
+ * `aria-label` matters too — the panel's own buttons carry visible text and no
+ * label, and a helper built on `getByLabelText` silently stopped finding them.
+ */
+function controlsNamed(name: string | RegExp): HTMLElement[] {
+  // Both roles, because `getByRole` in this version takes a role STRING and a
+  // menu item is not a button any more.
+  return [
+    ...screen.queryAllByRole("menuitem", { name }),
+    ...screen.queryAllByRole("button", { name }),
+  ];
+}
+
+function control(name: string | RegExp): HTMLButtonElement {
+  const matches = controlsNamed(name);
+  expect(matches, `expected exactly one control named ${String(name)}`).toHaveLength(1);
+  expect(matches[0].tagName, `${String(name)} is not a real control`).toBe("BUTTON");
+  return matches[0] as HTMLButtonElement;
+}
+
+function queryControl(name: string | RegExp): HTMLElement | null {
+  return controlsNamed(name)[0] ?? null;
+}
+
 afterEach(cleanup);
 
 describe("2S-ACT-001 / -002: one primary, one menu, and the primary follows the subject", () => {
   it("leads with the task verb for a live subject", () => {
     setup({ subjectStatus: "todo" });
-    expect(screen.getByRole("button", { name: /Concluir tarefa: Pagar o aluguel/ })).toBeTruthy();
+    expect(control(/Concluir tarefa: Pagar o aluguel/)).toBeTruthy();
   });
 
   it("leads with a MESSAGE verb once the subject no longer admits the task verb", () => {
     setup({ subjectStatus: "completed" });
-    expect(screen.queryByRole("button", { name: /Concluir tarefa/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /Marcar aviso como lido/ })).toBeTruthy();
+    expect(queryControl(/Concluir tarefa/)).toBeNull();
+    expect(control(/Marcar aviso como lido/)).toBeTruthy();
   });
 
   it("renders exactly one primary and one menu trigger at rest", () => {
@@ -126,22 +160,22 @@ describe("2S-ACT-001 / -002: one primary, one menu, and the primary follows the 
     // trigger. Asserted against the RENDERED row, per `2S-ACT-002`.
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(2);
-    expect(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") })).toBeTruthy();
+    expect(control(copy.menuLabel("Pagar o aluguel"))).toBeTruthy();
   });
 });
 
 describe("no task action for an absent, unreadable or foreign subject", () => {
   it("offers only message verbs when there is no subject at all", () => {
     setup({ subject: null, subjectStatus: null });
-    expect(screen.queryByRole("button", { name: /tarefa/i })).toBeNull();
-    expect(screen.getByRole("button", { name: /Marcar aviso como lido/ })).toBeTruthy();
+    expect(queryControl(/tarefa/i)).toBeNull();
+    expect(control(/Marcar aviso como lido/)).toBeTruthy();
   });
 
   it("offers no silencing verb either when there is no subject to silence", async () => {
     setup({ subject: null, subjectStatus: null });
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    expect(screen.queryByRole("button", { name: /Silenciar/ })).toBeNull();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    expect(queryControl(/Silenciar/)).toBeNull();
   });
 });
 
@@ -159,7 +193,7 @@ describe("2S-ACT-007: a pending action refuses a second submission of itself", (
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    const primary = screen.getByRole("button", { name: /Concluir tarefa/ });
+    const primary = control(/Concluir tarefa/);
     await user.click(primary);
 
     // The control is disabled while pending, so a second click cannot dispatch.
@@ -183,12 +217,12 @@ describe("2S-ACT-008: a failure preserves the row and its menu", () => {
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
 
     await waitFor(() => expect(outcomeText()).toBe(refusalMessage("pt-BR", "failed")));
     // The row survives: primary and menu trigger are both still there.
-    expect(screen.getByRole("button", { name: /Concluir tarefa/ })).toBeTruthy();
-    expect(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") })).toBeTruthy();
+    expect(control(/Concluir tarefa/)).toBeTruthy();
+    expect(control(copy.menuLabel("Pagar o aluguel"))).toBeTruthy();
   });
 
   it("offers the reload a stale row needs, rather than a generic failure", async () => {
@@ -200,7 +234,7 @@ describe("2S-ACT-008: a failure preserves the row and its menu", () => {
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
 
     await waitFor(() => expect(outcomeText()).toBe(refusalMessage("pt-BR", "stale")));
   });
@@ -212,7 +246,7 @@ describe("2S-ACT-008: a failure preserves the row and its menu", () => {
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
 
     await waitFor(() => expect(outcomeText()).toBe(refusalMessage("pt-BR", "failed")));
     expect(document.body.textContent).not.toContain("23505");
@@ -226,8 +260,8 @@ describe("2S-ACT-010: confirmation is asked only for the verb that really loses 
     const { markAction } = setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
 
     expect(screen.getByText(copy.confirmQuestion.dismiss as string)).toBeTruthy();
     // Nothing was dispatched by opening the question.
@@ -238,9 +272,9 @@ describe("2S-ACT-010: confirmation is asked only for the verb that really loses 
     const { markAction } = setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
-    await user.click(screen.getByRole("button", { name: copy.cancelAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
+    await user.click(control(copy.cancelAction));
 
     expect(markAction).not.toHaveBeenCalled();
     expect(screen.queryByText(copy.confirmQuestion.dismiss as string)).toBeNull();
@@ -250,8 +284,8 @@ describe("2S-ACT-010: confirmation is asked only for the verb that really loses 
     const { markAction } = setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Marcar aviso como lido/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Marcar aviso como lido/));
 
     await waitFor(() => expect(markAction).toHaveBeenCalledTimes(1));
     const submitted = markAction.mock.calls[0][0] as FormData;
@@ -264,9 +298,9 @@ describe("2S-ANSWER-001: dismissal reaches the writer with the value it never se
     const { markAction } = setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
-    await user.click(screen.getByRole("button", { name: copy.confirmAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
+    await user.click(control(copy.confirmAction));
 
     await waitFor(() => expect(markAction).toHaveBeenCalledTimes(1));
     const submitted = markAction.mock.calls[0][0] as FormData;
@@ -280,11 +314,11 @@ describe("2S-ACT-009: undo appears only where a real one came back", () => {
     setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Marcar aviso como lido/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Marcar aviso como lido/));
 
     await waitFor(() => expect(outcomeText()).toBe(copy.applied.mark_read));
-    expect(screen.queryByRole("button", { name: /desfazer/i })).toBeNull();
+    expect(queryControl(/desfazer/i)).toBeNull();
   });
 
   it("offers undo when the database returned a real offer", async () => {
@@ -298,10 +332,10 @@ describe("2S-ACT-009: undo appears only where a real one came back", () => {
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
 
     await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
-    expect(screen.queryByRole("button", { name: /desfazer/i })).toBeTruthy();
+    expect(queryControl(/desfazer/i)).toBeTruthy();
   });
 });
 
@@ -311,9 +345,9 @@ describe("the silencing verbs preserve the RPC's named refusals as useful senten
     setup({ handlers: { suppressAction: suppressAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Silenciar este assunto/ }));
-    await user.click(screen.getByRole("button", { name: copy.applyAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar este assunto/));
+    await user.click(control(copy.applyAction));
 
     await waitFor(() => expect(outcomeText()).toBe(refusalMessage("pt-BR", "SUPPRESSION_REASON_MISSING")));
     expect(document.body.textContent).not.toContain("SUPPRESSION_");
@@ -324,9 +358,9 @@ describe("the silencing verbs preserve the RPC's named refusals as useful senten
     setup({ handlers: { suppressAction: suppressAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Silenciar este assunto/ }));
-    await user.click(screen.getByRole("button", { name: copy.applyAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar este assunto/));
+    await user.click(control(copy.applyAction));
 
     await waitFor(() => expect(outcomeText()).toBe(refusalMessage("pt-BR", "SUPPRESSION_PAST_DATED")));
     expect(outcomeText()).not.toBe(refusalMessage("pt-BR", "SUPPRESSION_UNBOUNDED"));
@@ -339,9 +373,9 @@ describe("the silencing verbs preserve the RPC's named refusals as useful senten
     setup({ handlers: { suppressAction: suppressAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Silenciar este assunto/ }));
-    await user.click(screen.getByRole("button", { name: copy.applyAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar este assunto/));
+    await user.click(control(copy.applyAction));
 
     await waitFor(() => expect(suppressAction).toHaveBeenCalledTimes(1));
     const [input] = suppressAction.mock.calls[0] as unknown as [Record<string, unknown>];
@@ -396,8 +430,8 @@ describe("accessibility contract: one announceable source, announced once", () =
     const { markAction } = setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Marcar aviso como lido/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Marcar aviso como lido/));
     await waitFor(() => expect(outcomeText()).toBe(copy.applied.mark_read));
 
     expect(markAction).toHaveBeenCalledTimes(1);
@@ -418,7 +452,7 @@ describe("accessibility contract: one announceable source, announced once", () =
     setup({ handlers: { workAction: workAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
 
     const region = document.querySelector('[role="status"]');
     await waitFor(() => expect(region?.getAttribute("aria-busy")).toBe("true"));
@@ -436,15 +470,15 @@ describe("accessibility contract: one announceable source, announced once", () =
     setup({ handlers: { suppressAction: suppressAction as never } });
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Silenciar este assunto/ }));
-    await user.click(screen.getByRole("button", { name: copy.applyAction }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar este assunto/));
+    await user.click(control(copy.applyAction));
     await waitFor(() =>
       expect(outcomeText()).toBe(refusalMessage("pt-BR", "SUPPRESSION_REASON_MISSING")),
     );
 
     // A second, different round: the region holds the NEW sentence only.
-    await user.click(screen.getByRole("button", { name: /Concluir tarefa/ }));
+    await user.click(control(/Concluir tarefa/));
     await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
     expect(document.querySelectorAll('[role="status"]')).toHaveLength(1);
     expect(screen.queryByText(refusalMessage("pt-BR", "SUPPRESSION_REASON_MISSING"))).toBeNull();
@@ -453,13 +487,191 @@ describe("accessibility contract: one announceable source, announced once", () =
   it("does not move focus when a round settles", async () => {
     setup();
     const user = userEvent.setup();
-    const primary = screen.getByRole("button", { name: /Concluir tarefa/ });
+    const primary = control(/Concluir tarefa/);
 
     await user.click(primary);
     await waitFor(() => expect(outcomeText()).toBe("Tarefa concluída."));
 
     // Focus stays where the owner left it, rather than jumping to the outcome.
     expect(document.activeElement).toBe(primary);
+  });
+});
+
+describe("2S-ACCESS-002: a control whose effect is silence says what stops, and for how long, BEFORE it stops", () => {
+  async function openSilenceUntil(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar por um tempo/));
+  }
+
+  function isoDaysFromToday(days: number): string {
+    const now = new Date();
+    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
+    return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+  }
+
+  it("says nothing it cannot know before a date is chosen", async () => {
+    setup();
+    const user = userEvent.setup();
+    await openSilenceUntil(user);
+
+    // Not a fixed sentence pretending to describe a choice nobody has made.
+    expect(screen.getByText(copy.silenceUntilUnchosen)).toBeTruthy();
+  });
+
+  it("states the date AND the number of days, before the owner confirms", async () => {
+    const { suppressAction } = setup();
+    const user = userEvent.setup();
+    await openSilenceUntil(user);
+
+    const until = isoDaysFromToday(7);
+    await user.type(screen.getByLabelText(copy.untilLabel), until);
+
+    await waitFor(() =>
+      expect(screen.getByText(copy.silenceUntilConsequence(until, 7))).toBeTruthy(),
+    );
+    // BEFORE: nothing has been dispatched at the moment the sentence is on screen.
+    expect(suppressAction).not.toHaveBeenCalled();
+  });
+
+  it("says `1 dia` rather than `1 dias`, because the sentence is read", async () => {
+    setup();
+    const user = userEvent.setup();
+    await openSilenceUntil(user);
+
+    const until = isoDaysFromToday(1);
+    await user.type(screen.getByLabelText(copy.untilLabel), until);
+
+    await waitFor(() => expect(screen.getByText(/1 dia\./)).toBeTruthy());
+    expect(screen.queryByText(/1 dias/)).toBeNull();
+  });
+
+  it("announces the consequence, so a reader who changes the date is told", async () => {
+    setup();
+    const user = userEvent.setup();
+    await openSilenceUntil(user);
+
+    const consequence = document.querySelector(".notification-verb-panel-consequence");
+    expect(consequence?.getAttribute("role")).toBe("status");
+    expect(consequence?.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("tells the owner the permanent silence does not expire", async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Silenciar este assunto/));
+
+    expect(screen.getByText(copy.silenceForeverConsequence)).toBeTruthy();
+    // The two silencing verbs promise different things, and the sentences differ.
+    expect(copy.silenceForeverConsequence).not.toBe(copy.silenceUntilUnchosen);
+  });
+
+  it("gives no consequence region to a verb that silences nothing", async () => {
+    /*
+     * The control that keeps this scoped: `2S-ACCESS-002` is about controls
+     * whose effect is SILENCE. A region rendered for every verb would be a
+     * region with nothing to say for four of the six.
+     */
+    setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
+
+    expect(document.querySelector(".notification-verb-panel-consequence")).toBeNull();
+  });
+});
+
+describe("2S-ACCESS-006: the compact menu opens, MOVES, activates and closes by keyboard alone", () => {
+  it("puts focus on the first item when it opens", async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+
+    const items = screen.getAllByRole("menuitem");
+    expect(items.length).toBeGreaterThan(1);
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("moves down and up with the arrows, wrapping at both ends", async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    const items = screen.getAllByRole("menuitem");
+
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(items[1]);
+
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(items[0]);
+
+    // Wrapping: up from the first reaches the last, and down from the last
+    // returns to the first. A menu that stopped would make the owner reverse
+    // direction to reach the other end.
+    await user.keyboard("{ArrowUp}");
+    expect(document.activeElement).toBe(items[items.length - 1]);
+
+    await user.keyboard("{ArrowDown}");
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("jumps to the ends with Home and End", async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    const items = screen.getAllByRole("menuitem");
+
+    await user.keyboard("{End}");
+    expect(document.activeElement).toBe(items[items.length - 1]);
+
+    await user.keyboard("{Home}");
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it("activates the focused item with the keyboard, and dispatches it", async () => {
+    const { markAction } = setup();
+    const user = userEvent.setup();
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+
+    // *Marcar aviso como lido* is the one menu verb that needs no panel, so
+    // activating it is a dispatch rather than a disclosure.
+    const read = control(/Marcar aviso como lido/);
+    await user.keyboard("{Home}");
+    while (document.activeElement !== read) {
+      await user.keyboard("{ArrowDown}");
+    }
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(markAction).toHaveBeenCalledTimes(1));
+  });
+
+  it("leaves every item out of the tab order, because focus roves", async () => {
+    /*
+     * The other half of a roving-focus menu, and the half that is easy to
+     * forget: items must be reachable by ARROW and not by TAB, or a reader
+     * tabbing past the row walks through six controls that were meant to be one.
+     */
+    setup();
+    await userEvent.click(control(copy.menuLabel("Pagar o aluguel")));
+    for (const item of screen.getAllByRole("menuitem")) {
+      expect(item.getAttribute("tabindex")).toBe("-1");
+    }
+  });
+
+  it("describes each item with its own meaning, rather than nesting the two", async () => {
+    /*
+     * The role sits on the BUTTON now. It used to sit on a `<div role="menuitem">`
+     * wrapped around it — the thing that took focus and the thing claiming to be
+     * the item were two different elements, so menu navigation had nothing to
+     * move between.
+     */
+    setup();
+    await userEvent.click(control(copy.menuLabel("Pagar o aluguel")));
+    for (const item of screen.getAllByRole("menuitem")) {
+      expect(item.tagName).toBe("BUTTON");
+      const describedBy = item.getAttribute("aria-describedby");
+      expect(describedBy, "an item with no description").toBeTruthy();
+      expect(document.getElementById(describedBy as string)?.textContent ?? "").not.toBe("");
+    }
   });
 });
 
@@ -473,23 +685,25 @@ describe("accessibility contract: the compact menu closes and gives focus back",
   it("closes on Escape and returns focus to its trigger", async () => {
     setup();
     const user = userEvent.setup();
-    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+    const trigger = control(copy.menuLabel("Pagar o aluguel"));
 
     await user.click(trigger);
     expect(screen.getByRole("menu")).toBeTruthy();
     expect(trigger.getAttribute("aria-expanded")).toBe("true");
 
     /*
-     * TAB INTO THE MENU FIRST, and the reason is a control that did not fail.
+     * FOCUS HAS TO LEAVE BEFORE "RETURNS FOCUS" MEANS ANYTHING, and a mutation
+     * control proved that: with the reader still standing on the trigger,
+     * `activeElement === trigger` was true whether or not the component gave
+     * focus back, so deleting the `focus()` call passed.
      *
-     * Without this the reader is still standing on the trigger when Escape
-     * arrives, so `document.activeElement === trigger` is true whether or not
-     * the component gives focus back — and a mutation that deleted the
-     * `focus()` call passed. Focus has to LEAVE before "returns focus" means
-     * anything.
+     * Slice 2S.3 makes the departure part of the product rather than part of
+     * the test: opening moves focus to the FIRST ITEM, which is what makes
+     * `2S-ACCESS-006`'s "moves" reachable at all — a menu whose focus stayed on
+     * the trigger has nothing to move through.
      */
-    await user.tab();
-    expect(document.activeElement, "focus never entered the menu").not.toBe(trigger);
+    const items = screen.getAllByRole("menuitem");
+    expect(document.activeElement, "opening did not move focus into the menu").toBe(items[0]);
     expect(screen.getByRole("menu").contains(document.activeElement)).toBe(true);
 
     await user.keyboard("{Escape}");
@@ -504,7 +718,7 @@ describe("accessibility contract: the compact menu closes and gives focus back",
     // the test above and still leave a pointer user with one way in and none out.
     setup();
     const user = userEvent.setup();
-    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+    const trigger = control(copy.menuLabel("Pagar o aluguel"));
     await user.click(trigger);
     expect(screen.getByRole("menu")).toBeTruthy();
     await user.click(trigger);
@@ -517,8 +731,8 @@ describe("accessibility contract: the dismissal question holds focus and gives i
     setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
 
     await waitFor(() => {
       const panel = document.querySelector(".notification-verb-panel");
@@ -530,8 +744,8 @@ describe("accessibility contract: the dismissal question holds focus and gives i
     setup();
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") }));
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await user.click(control(copy.menuLabel("Pagar o aluguel")));
+    await user.click(control(/Descartar aviso/));
     const panel = document.querySelector(".notification-verb-panel");
     await waitFor(() => expect(panel?.contains(document.activeElement)).toBe(true));
 
@@ -545,11 +759,11 @@ describe("accessibility contract: the dismissal question holds focus and gives i
   it("returns focus to the menu trigger when cancelled", async () => {
     setup();
     const user = userEvent.setup();
-    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+    const trigger = control(copy.menuLabel("Pagar o aluguel"));
 
     await user.click(trigger);
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
-    await user.click(screen.getByRole("button", { name: copy.cancelAction }));
+    await user.click(control(/Descartar aviso/));
+    await user.click(control(copy.cancelAction));
 
     // Back on the trigger — NOT on the menu item, which no longer exists.
     await waitFor(() => expect(document.activeElement).toBe(trigger));
@@ -558,10 +772,10 @@ describe("accessibility contract: the dismissal question holds focus and gives i
   it("returns focus to the menu trigger when Escape closes the question", async () => {
     setup();
     const user = userEvent.setup();
-    const trigger = screen.getByRole("button", { name: copy.menuLabel("Pagar o aluguel") });
+    const trigger = control(copy.menuLabel("Pagar o aluguel"));
 
     await user.click(trigger);
-    await user.click(screen.getByRole("button", { name: /Descartar aviso/ }));
+    await user.click(control(/Descartar aviso/));
     await waitFor(() => {
       expect(document.querySelector(".notification-verb-panel")).not.toBeNull();
     });

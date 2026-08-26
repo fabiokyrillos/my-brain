@@ -205,6 +205,61 @@ describe("the section's numbers account for the notices", () => {
   });
 });
 
+describe("2S-ATTENTION-007: the surface's existing sources are unchanged", () => {
+  /**
+   * Every row the section's PRE-EXISTING sources contribute, in order.
+   *
+   * An EQUALITY against the pre-slice projection is what the requirement asks
+   * for, and equality needs something comparable. Selecting the rows each older
+   * source renders — the expanded lead, the collapsed entry rows, the conflict
+   * rows — and reading their text in document order captures which sources
+   * contributed, how many rows each produced, and where they sat. A source that
+   * stopped contributing fails here; so does one whose rows moved.
+   *
+   * Deliberately NOT the section's whole `textContent`: that also carries the
+   * count, which legitimately changes, and comparing it would have meant string
+   * surgery on a number — a test that edits its own subject to make it match.
+   */
+  function existingRows(): string[] {
+    return [...attentionSection().querySelectorAll(".attention-lead, .needs-attention-row, [data-conflict=\"row\"]")]
+      .map((row) => row.textContent ?? "");
+  }
+
+  it("contributes exactly the same rows, in the same order, with and without notices", () => {
+    const items = [attentionItem(), attentionItem({ key: "attention-2", entryId: "22222222-2222-4222-8222-222222222222", title: "Responder a Marina" })];
+
+    renderHome({ attention: items });
+    const before = existingRows();
+    expect(before.length, "the control read no rows at all").toBeGreaterThan(0);
+    cleanup();
+
+    renderHome({ attention: items, notices: [noticeRow()] });
+    expect(existingRows()).toEqual(before);
+  });
+
+  it("adds the notices BESIDE those rows rather than among them", () => {
+    // The order the section renders in is part of what "unchanged" means: the
+    // notices are appended, so every pre-existing row still precedes them.
+    const eyebrow = getNotificationActionCopy("pt-BR").attentionEyebrow;
+    renderHome({ attention: [attentionItem()], notices: [noticeRow()] });
+
+    const text = attentionSection().textContent ?? "";
+    const lastExistingRow = existingRows().at(-1) ?? "";
+    expect(text.indexOf(lastExistingRow)).toBeLessThan(text.indexOf(eyebrow));
+  });
+
+  it("keeps the quiet state exactly as it was on a day with nothing at all", () => {
+    renderHome();
+    const withoutTheFeature = attentionSection().textContent ?? "";
+    cleanup();
+
+    // The same day with the notices field present and empty: nothing about the
+    // empty state may depend on the new source existing.
+    renderHome({ notices: [], noticesHaveMore: false });
+    expect(attentionSection().textContent ?? "").toBe(withoutTheFeature);
+  });
+});
+
 describe("the notices displace nothing that was already there", () => {
   it("keeps the entry rows rendering beside them", () => {
     const item = attentionItem();

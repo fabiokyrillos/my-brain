@@ -91,7 +91,7 @@ export function AttentionNoticeRow({
             subjectLabel={row.subjectLabel}
           />
         ) : null}
-        <NotificationVerbs handlers={handlers} locale={locale} row={row} />
+        <NotificationVerbs handlers={handlers} locale={locale} row={row} timeZone={timeZone} />
       </div>
     </article>
   );
