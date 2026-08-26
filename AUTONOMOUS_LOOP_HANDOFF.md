@@ -14375,3 +14375,142 @@ no automated lane substitutes — including an emulated WebKit project, because 
 pointer query is not a device.
 
 **Four green focus tests can all be about the same half of the thing.**
+
+## §132 — Slice 2S.3 is code-complete and STOPS at the owner's device checkpoint; five defects, and the ones the owner's own controls found (2026-08-25)
+
+### What exists
+
+**Slice 2S.3 — merged as `1f27a65525b2aabe9bb97d42525e5522d7578342` (PR #316).** CI green 3/3 on the PR head
+`1735f74` (run `32975116897`) **and green 3/3 again on that exact merge SHA** (run
+`32975976778`).
+
+**Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
+The budget stays fully spent and a second of any kind stays a stop condition.
+
+**Nothing is classified.** Eleven of this slice's twenty-two requirements wait on
+a lane nobody has run and on a device nobody has held, and the acceptance record
+says so instead of assigning them a class.
+
+### The one product decision the owner handed this slice, and its shape
+
+The queue's filters, decided 2026-08-25: unanswered notices appear under
+**Todos**; they get a chip of their **own**; they are **never** placed in a chip
+meant for records, conflicts or any other type; the count and the list derive
+from the **same set**; every existing filter behaves exactly as it did; and on a
+phone the chip stays reachable, readable and free of horizontal overflow.
+
+Nine tests, one per clause, and the one that matters most is the **inverse**:
+without the handlers no notice row renders **and none is counted**. A number
+that included rows the surface withheld would be exactly the divergence the
+decision forbids.
+
+**It corrected a divergence that predated the slice.** `itemCount` was
+`items.length` even after `2N-CONFLICT-003` put conflicts in the same queue, so a
+day whose only item was a contradiction reported **zero** items viewed.
+
+### A requirement whose own example does not exist on the surface it governs
+
+`2S-ATTENTION-002` reads *"a task present from its own source and from a notice
+appears once"*. Measured: the queue's other sources are `list_needs_attention`,
+which returns **entries**, and the memory conflicts, which return **memories**.
+Neither carries a task, so that pairing cannot occur.
+
+What does duplicate is **a subject with more than one unanswered notice**, and it
+is not hypothetical — a task key carries the owner's local date, so a subject
+nobody answers accumulates one notice per qualifying day. Slice 2S.0 measured
+**54 of 57 notices as `task_stale`, about three tasks**.
+
+The collapse is therefore by subject; the newest survives; **nothing is deleted**
+— the older notices stay answerable on `/app/notifications`; a row with **no
+resolvable subject is never collapsed**, because two of those are two different
+things and folding them would silently hide a notice; and `hasMore` is read
+**after** the collapse, so it cannot promise a distinct subject that is not
+there.
+
+**A requirement can name an example that its own surface cannot produce. Read the
+tree before implementing the sentence.**
+
+### Two defects the owner's own controls found, and neither was where I looked
+
+The owner asked for five proofs on *Abrir*. Two of them failed the product:
+
+1. **`disabled` is not the defence.** It guards the **button**, not the **form**:
+   a `form.requestSubmit()` reaches the action with the button disabled, and the
+   first version performed a second write from it.
+2. **An in-flight flag did not help either**, because **React queues actions
+   rather than running them concurrently** — the second dispatch ran *after* the
+   first settled, when the flag was already clear.
+
+The guard is now about what **happened**, not about what is happening: a notice
+this control already opened is not opened again, and a **failed** round leaves
+both flags down, because a control that can never be pressed again is the other
+half of "stuck".
+
+**A pending flag guards a window. What you usually need to guard is a fact.**
+
+### Three more, all found by guards that already existed
+
+- **`LDC-GUARD-001`**: the silence day-count read `new Date().getFullYear()` and
+  friends. This is a **client** component, so those are the **device's** zone —
+  an owner in São Paulo reading on a laptop still set to Lisbon would be told a
+  different number of days than the suppression will last. It walks calendar days
+  through `localDateOf`/`addLocalDays` now, so a 23-hour day still counts as one.
+- **`stylesheet-class-coverage`**: `.notice-open-outcome` shipped with **no rule
+  at all** — the class existed and nothing drew it, the defect this repository
+  has already paid for on this very feature.
+- **An ARIA contradiction**: `role="menuitem"` sat on a `<div>` *wrapped around*
+  the button, so the element that takes focus and the element claiming to be the
+  item were different, and menu navigation had nothing to move between. The role
+  is on the button now, and the meaning reaches it through `aria-describedby`.
+
+### A check that passed by containing its own subject, for the second time this phase
+
+`/app/inbox` was missing from **both** writers' revalidation, which is a real gap
+now that the queue holds notices: an action on the history page left it showing a
+row the owner had already answered.
+
+The mutation control that deleted the fix left the test **green** — because
+`agent/actions.ts` holds *another* action that revalidates `/app/inbox` for its
+own reasons, and a file-wide `toContain` was reading a neighbour. The scan reads
+**one exported function's body** now.
+
+### The rendered lane exists, has never been run, and cannot gate
+
+`e2e/online-phase-2s-attention.spec.ts` covers `2S-ATTENTION-001`/`-003`/`-004`/
+`-005`/`-006`, `2S-ACCESS-002`/`-004`/`-006` and `2S-MOBILE-001`/`-002`/`-006`/
+`-007` **on the real routes**.
+
+Both surfaces are authenticated. `phase-2o-mobile-accessibility.spec.ts` gates in
+CI over the **public** routes precisely because those are the ones reachable
+without a session — its own header says so. So this lane needs the hosted project
+and runs by hand, exactly as `online-phase-2o-mobile-accessibility.spec.ts` does.
+**Running it writes to production**: a disposable account, a task, three notices,
+and a deletion afterwards.
+
+What it does that a weaker lane would not: it plants **three notices about two
+subjects**, so the collapse's number can be wrong; it reaches the empty state
+only **after** rows were proved on the same account, which is
+`2S-ATTENTION-004`'s own wording; it runs axe **twice per surface — menu closed
+and menu OPEN**, because `role="menu"`, `role="menuitem"`, `aria-expanded` and
+`aria-describedby` exist only while it is open; and `2S-MOBILE-007` is asserted
+**geometrically**, because "visible" would pass for an element a panel sits on
+top of.
+
+### Controls and gates
+
+**Seventeen mutation controls, seventeen failures**, every mutation verified
+performed on disk and every file restored. Gates: typecheck **zero**; lint at
+**baseline**; **9 656 assertions passing with ZERO failing**; build green.
+
+### Where the next session starts — AND IT MUST NOT START WITH 2S.4
+
+**The owner's `2S-MOBILE-003` device checkpoint**, which no automated lane
+substitutes and which `2S-CLOSE-009` forbids discharging with a document. The
+procedure is in `docs/reports/phase-2s/PHASE_2S_SLICE_03_ACCEPTANCE.md` §7: run
+the online lane against the hosted project, then five checks on a real phone.
+
+Slice 2S.4 may not begin until that checkpoint is held. A green pipeline is not
+it, and this record is not it either.
+
+**A requirement can name an example its own surface cannot produce — and a lane
+that has not been run proves nothing, however carefully it was written.**
