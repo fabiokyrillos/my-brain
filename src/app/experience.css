@@ -392,6 +392,26 @@
 }
 .attention-filter[aria-pressed="true"] { background: var(--action-primary); border-color: var(--action-primary); color: var(--action-primary-text); }
 
+/*
+ * Slice 2S.3, on the owner's decision: at a phone width the filter row stays
+ * REACHABLE, READABLE and free of horizontal overflow.
+ *
+ * `flex-wrap: wrap` above already answers the overflow half -- the row grows
+ * downward instead of sideways, and nothing here changes that. What the chips
+ * did not have was a thumb target: 32px is a pointer size. A fourth chip makes
+ * that worse rather than newly wrong, which is why it is fixed here.
+ *
+ * Measured against the rendered page at a phone viewport, never against a
+ * pointer query: headless Chromium reports `pointer: coarse` at 1280px.
+ */
+@media (max-width: 600px) {
+  .attention-filters { gap: 10px; }
+  .attention-filter { min-height: 44px; padding: 0 14px; }
+}
+
+/* The notice rows inside the full queue. One queue, three kinds of row. */
+.attention-notices { display: grid; gap: 9px; }
+
 /* `2J-ATTN-007`/`010`. The inline and bulk retries. Both are ordinary buttons
    with visible labels -- no icon-only affordance and no gesture, because
    2J-ATTN-011 requires the mobile interaction to have a visible equivalent. */

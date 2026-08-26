@@ -42,9 +42,20 @@ import type { Locale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 
 import { projectNotificationRows, type NotificationRowView, type NotificationRowSource } from "./row-projection";
+import { deriveNotificationSubject } from "./subject";
 
 /** Home's share of the attention queue. Small, because Home is not a list page. */
 export const ATTENTION_NOTICE_LIMIT = 3;
+
+/**
+ * The full queue's share, at `/app/inbox?view=needs-you`.
+ *
+ * Twenty rather than three, because that surface is the one "ver tudo"
+ * promises — and twenty rather than unbounded, because a page that renders
+ * every notice an account ever accumulated is a page that stops rendering.
+ * `hasMore` still answers honestly above it.
+ */
+export const ATTENTION_NOTICE_QUEUE_LIMIT = 20;
 
 export type AttentionNoticesPage = {
   readonly items: readonly NotificationRowView[];
@@ -73,12 +84,68 @@ export async function loadAttentionNotices(
     .order("created_at", { ascending: false })
     .limit(limit + 1);
 
-  const rows = (requireSupabaseData(result, "load attention notices") ?? []) as NotificationRowSource[];
+  const raw = (requireSupabaseData(result, "load attention notices") ?? []) as NotificationRowSource[];
+  if (raw.length === 0) return EMPTY_ATTENTION_NOTICES;
+
+  const rows = oneRowPerSubject(raw);
   const page = rows.slice(0, limit);
   if (page.length === 0) return EMPTY_ATTENTION_NOTICES;
 
   return {
     items: await projectNotificationRows(supabase, { rows: page, userId, locale }),
+    /*
+      Read AFTER the collapse, and the difference matters. `raw.length > limit`
+      would answer "the read was capped", which can be true because the extra
+      row was a duplicate of one already shown — and "+1" beside a queue holding
+      everything there is would be a number that promises something that is not
+      there. This answers the narrower, true thing: at least one further
+      DISTINCT subject exists.
+    */
     hasMore: rows.length > limit,
   };
+}
+
+/**
+ * `2S-ATTENTION-002` — **a subject the list already shows is not shown twice.**
+ *
+ * ## What actually duplicates here, measured rather than assumed
+ *
+ * The requirement's example is *"a task present from its own source and from a
+ * notice"*, and that pairing does not exist on this surface: the queue's other
+ * two sources are `list_needs_attention`, which returns **entries**, and the
+ * memory conflicts, which return **memories**. Neither carries a task.
+ *
+ * What does duplicate is a subject with more than one unanswered notice — and
+ * it is not hypothetical. The deployed heartbeat writes `overdue:{task}:{date}`
+ * and `stale:{task}:{date}`, and a task key carries the owner's **local date**,
+ * so a subject nobody answers accumulates one notice per qualifying day until
+ * the backoff ladder stops it. Slice 2S.0 measured exactly that: **54 of 57
+ * notices were `task_stale`, about three tasks.** Eighteen rows for one subject
+ * is what this collapses.
+ *
+ * ## The newest one survives, and the rest are not lost
+ *
+ * `created_at desc` is the order the read already asks for, so the first
+ * occurrence of a subject is its most recent notice. The older ones are still
+ * in the database, still visible on `/app/notifications`, and still answerable
+ * there. This is a projection, never a deletion.
+ *
+ * ## A notice with no resolvable subject is never collapsed
+ *
+ * An unreadable `dedupe_key`, a deleted subject or a forged one all produce
+ * "no subject", and two rows with no subject are two different things rather
+ * than one thing seen twice. Keying them by their own id keeps each of them —
+ * the safe direction, because the alternative silently hides a notice.
+ */
+function oneRowPerSubject(rows: readonly NotificationRowSource[]): NotificationRowSource[] {
+  const seen = new Set<string>();
+  const kept: NotificationRowSource[] = [];
+  for (const row of rows) {
+    const subject = deriveNotificationSubject(row);
+    const key = subject ? `${subject.subjectType}:${subject.subjectId}` : `row:${row.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(row);
+  }
+  return kept;
 }

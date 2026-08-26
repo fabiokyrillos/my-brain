@@ -23,11 +23,37 @@ export type NotificationActionCopy = {
    * rather than leaving the reader to infer it from the verbs.
    */
   readonly attentionEyebrow: string;
+  /**
+   * *Abrir*, on the attention surface only.
+   *
+   * The history page has its own `openDestination` in `copy.ts` and keeps it:
+   * there the control is a plain link, because a HISTORY surface that marked a
+   * row read merely for following a link would be answering on the reader's
+   * behalf. On the attention surface, opening IS the answer -- which is what
+   * `2S-ATTENTION-006` says.
+   */
+  readonly openAction: string;
+  readonly openLabel: (subject: string) => string;
   readonly menuTrigger: string;
   readonly menuLabel: (subject: string) => string;
   readonly untilLabel: string;
   readonly dueLabel: string;
   readonly reasonLabel: string;
+  /**
+   * `2S-ACCESS-002` — *"a control whose effect is silence announces its
+   * consequence BEFORE acting: the owner is told what stops, and for how long,
+   * before it stops."*
+   *
+   * Two sentences rather than one, because the two silencing verbs promise
+   * different things and a shared sentence would have to be vague about the
+   * half that differs. `silenceUntilConsequence` takes the chosen date and the
+   * whole number of days it is away; `silenceForeverConsequence` says the one
+   * thing that ends it.
+   */
+  readonly silenceUntilConsequence: (until: string, days: number) => string;
+  readonly silenceForeverConsequence: string;
+  /** Shown while no date has been chosen yet: the consequence is not knowable. */
+  readonly silenceUntilUnchosen: string;
   readonly applyAction: string;
   readonly confirmAction: string;
   readonly cancelAction: string;
@@ -39,11 +65,20 @@ export type NotificationActionCopy = {
 
 const PT: NotificationActionCopy = {
   attentionEyebrow: "Aviso",
+  openAction: "Abrir",
+  openLabel: (subject) => `Abrir e marcar como visto: ${subject}`,
   menuTrigger: "Mais ações",
   menuLabel: (subject) => `Mais ações para: ${subject}`,
   untilLabel: "Silenciar até",
   dueLabel: "Novo prazo",
   reasonLabel: "Motivo (curto)",
+  silenceUntilConsequence: (until, days) =>
+    days === 1
+      ? `Você não receberá avisos sobre este assunto até ${until} — 1 dia.`
+      : `Você não receberá avisos sobre este assunto até ${until} — ${days} dias.`,
+  silenceForeverConsequence:
+    "Você não receberá mais avisos sobre este assunto. Isso não expira: só termina se você desfizer.",
+  silenceUntilUnchosen: "Escolha uma data para ver até quando o silêncio vale.",
   applyAction: "Confirmar",
   confirmAction: "Sim, descartar",
   cancelAction: "Cancelar",
@@ -65,11 +100,20 @@ const PT: NotificationActionCopy = {
 
 const EN: NotificationActionCopy = {
   attentionEyebrow: "Notice",
+  openAction: "Open",
+  openLabel: (subject) => `Open and mark seen: ${subject}`,
   menuTrigger: "More actions",
   menuLabel: (subject) => `More actions for: ${subject}`,
   untilLabel: "Silence until",
   dueLabel: "New due date",
   reasonLabel: "Reason (short)",
+  silenceUntilConsequence: (until, days) =>
+    days === 1
+      ? `You will get no notices about this subject until ${until} — 1 day.`
+      : `You will get no notices about this subject until ${until} — ${days} days.`,
+  silenceForeverConsequence:
+    "You will get no further notices about this subject. This does not expire: it ends only if you undo it.",
+  silenceUntilUnchosen: "Choose a date to see how long the silence lasts.",
   applyAction: "Confirm",
   confirmAction: "Yes, dismiss",
   cancelAction: "Cancel",

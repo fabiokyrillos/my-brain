@@ -1291,6 +1291,20 @@
   color: var(--text-primary);
 }
 
+/*
+ * `2S-ACCESS-002`. The consequence, stated before the owner confirms. Given the
+ * weight of a fact rather than of a hint: it is the sentence that tells them
+ * what stops and for how long, and a caption-grey line would read as an aside.
+ */
+.notification-verb-panel-consequence {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: var(--tone-attention-bg);
+  color: var(--tone-attention-fg);
+  font: var(--type-caption);
+}
+
 .notification-verb-panel-field {
   display: grid;
   gap: 6px;

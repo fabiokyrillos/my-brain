@@ -139,16 +139,30 @@ describe("2S-ACT-011 (2/4): every surface mounts the verbs through one function"
   });
 
   it("has every surface hand over the projection's own row, and build no verb props itself", () => {
+    /*
+     * SCOPED TO THE MOUNT'S OWN ATTRIBUTES, and the first version was not.
+     *
+     * It scanned the whole file for the four derived prop names, and slice 2S.3
+     * failed it immediately -- because the attention row grew an *Abrir* control
+     * that legitimately needs `notificationId` and `subjectLabel` of its own.
+     * That control mounts no verbs at all.
+     *
+     * **A guard must forbid the act, not the word**, for the second time in this
+     * phase. The act is *assembling a verb set at the call site*, so the scan
+     * reads the `<NotificationVerbs …/>` element's attributes and nothing else.
+     * That is stricter than the file-wide version, not looser: it also proves
+     * every mount really carries `row={row}` rather than merely that the file
+     * mentions it somewhere.
+     */
     for (const surface of mountingSurfaces()) {
-      const source = code(surface);
-      expect(source, `${surface} does not hand over the projected row`).toContain("row={row}");
-      /*
-       * The four props `NotificationVerbs` derives. A surface that set any of
-       * them itself would be assembling a verb set of its own — which is exactly
-       * how two surfaces agreeing today drift tomorrow.
-       */
-      for (const derived of ["primaryVerb=", "menuVerbs=", "subjectLabel=", "notificationId="]) {
-        expect(source, `${surface} assembles ${derived} itself`).not.toContain(derived);
+      const mounts = [...code(surface).matchAll(/<NotificationVerbs([^>]*)\/>/g)].map((m) => m[1]);
+      expect(mounts.length, `${surface} mounts the verbs in a shape this scan cannot read`)
+        .toBeGreaterThan(0);
+      for (const attributes of mounts) {
+        expect(attributes, `${surface} does not hand over the projected row`).toContain("row={row}");
+        for (const derived of ["primaryVerb=", "menuVerbs=", "subjectLabel=", "notificationId="]) {
+          expect(attributes, `${surface} assembles ${derived} at the mount`).not.toContain(derived);
+        }
       }
     }
   });

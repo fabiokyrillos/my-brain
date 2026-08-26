@@ -24,7 +24,10 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
+const pushed: string[] = [];
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: () => {}, push: (href: string) => { pushed.push(href); } }),
+}));
 
 import { noticeHandlerSpies, noticeRow } from "@/test/notification-verb-fixtures";
 import type { Locale } from "@/lib/preferences";
@@ -35,7 +38,10 @@ import { getVerbCopy, verbsForRow } from "./verbs";
 
 const OWNER_ZONE = "America/Sao_Paulo";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  pushed.length = 0;
+});
 
 function renderRow(options: Parameters<typeof noticeRow>[0] & { locale?: Locale } = {}) {
   const { locale = "pt-BR", ...rowOptions } = options;
@@ -43,6 +49,39 @@ function renderRow(options: Parameters<typeof noticeRow>[0] & { locale?: Locale 
   const spies = noticeHandlerSpies();
   render(<AttentionNoticeRow handlers={spies.handlers} locale={locale} row={row} timeZone={OWNER_ZONE} />);
   return { row, spies };
+}
+
+/**
+ * A control by its accessible name, whatever ARIA role it carries.
+ *
+ * The menu's items are `role="menuitem"` since slice 2S.3 — the correct pattern,
+ * and the one that makes arrow navigation mean anything. An explicit role
+ * REPLACES the implicit one, so `getByRole("button", …)` stopped finding them.
+ *
+ * This accepts either role and then asserts the element really is a `<button>`,
+ * so the queries keep claiming what they always claimed: an interactive
+ * control, not merely a label. Matching by ACCESSIBLE NAME rather than by
+ * `aria-label` matters too — the panel's own buttons carry visible text and no
+ * label, and a helper built on `getByLabelText` silently stopped finding them.
+ */
+function controlsNamed(name: string | RegExp): HTMLElement[] {
+  // Both roles, because `getByRole` in this version takes a role STRING and a
+  // menu item is not a button any more.
+  return [
+    ...screen.queryAllByRole("menuitem", { name }),
+    ...screen.queryAllByRole("button", { name }),
+  ];
+}
+
+function control(name: string | RegExp): HTMLButtonElement {
+  const matches = controlsNamed(name);
+  expect(matches, `expected exactly one control named ${String(name)}`).toHaveLength(1);
+  expect(matches[0].tagName, `${String(name)} is not a real control`).toBe("BUTTON");
+  return matches[0] as HTMLButtonElement;
+}
+
+function queryControl(name: string | RegExp): HTMLElement | null {
+  return controlsNamed(name)[0] ?? null;
 }
 
 /** Every control the row rendered, by accessible name. */
@@ -67,18 +106,47 @@ describe("2S-ACT-011: the attention row offers exactly the verbs the authority d
       });
       expect(row.verbs.map((verb) => verb.id)).toEqual(expected.map((verb) => verb.id));
 
-      // The row shows one primary plus one menu trigger — `2S-ACT-002`.
+      /*
+       * `2S-ACT-002` — one primary VERB plus one menu trigger, and the row's
+       * whole control set enumerated as a closed set beside them.
+       *
+       * RETARGETED IN 2S.3, and the reason is in this repository's own
+       * baseline. `2S-FOUNDATION-003` measured this surface as offering **two
+       * controls, *Abrir* and *Lida***: the destination was always a control of
+       * its own, sitting beside whatever the row's verb was. `2S-ACT-002` is
+       * about what replaced *Lida* — every other ACTION in one menu — not about
+       * removing the destination.
+       *
+       * On `/app/notifications` that distinction is carried by element type:
+       * *Abrir* is an `<a>`, so it never entered a button count. On the
+       * attention row it cannot be, because `2S-ATTENTION-006` requires opening
+       * to WRITE before it navigates, and a link that raced its own write would
+       * leave the owner looking at a notice they just opened, still unread.
+       *
+       * So the set is enumerated instead of counted — which is stricter, not
+       * looser: a fourth control of any kind fails here.
+       */
       const names = controlNames();
       expect(names).toContain(verbCopy[expected[0].id].accessibleName(row.subjectLabel));
       expect(names).toContain(copy.menuLabel(row.subjectLabel));
-      expect(names).toHaveLength(2);
+      expect(names.slice().sort()).toEqual(
+        [
+          verbCopy[expected[0].id].accessibleName(row.subjectLabel),
+          copy.menuLabel(row.subjectLabel),
+          copy.openLabel(row.subjectLabel),
+        ].sort(),
+      );
+
+      // And the verbs themselves are still exactly two controls.
+      expect(document.querySelectorAll(".notification-primary-action")).toHaveLength(1);
+      expect(document.querySelectorAll(".notification-menu-trigger")).toHaveLength(1);
 
       // And the rest are behind that one trigger.
-      await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+      await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
       const menu = screen.getByRole("menu");
       for (const verb of expected.slice(1)) {
         expect(
-          within(menu).getByRole("button", { name: verbCopy[verb.id].accessibleName(row.subjectLabel) }),
+          within(menu).getByLabelText(verbCopy[verb.id].accessibleName(row.subjectLabel)),
           `${locale}/${verb.id} is missing from the menu`,
         ).toBeTruthy();
       }
@@ -94,6 +162,64 @@ describe("2S-ACT-011: the attention row offers exactly the verbs the authority d
   });
 });
 
+describe("2S-ATTENTION-006: opening a notice from home marks it seen", () => {
+  it("writes through the SAME authority the *Lida* verb uses, then navigates", async () => {
+    const { row, spies } = renderRow();
+    const copy = getNotificationActionCopy("pt-BR");
+
+    await userEvent.click(control(copy.openLabel(row.subjectLabel)));
+
+    /*
+     * The write, and what it sent. `2S-TRUST-010`: the destination is
+     * `markNotification`, out of the same bundle the verbs dispatch through, and
+     * the value is the one *Lida* sends. Opening chooses WHEN, never WHAT.
+     */
+    expect(spies.markAction).toHaveBeenCalledTimes(1);
+    const sent = spies.markAction.mock.calls[0][0] as FormData;
+    expect(sent.get("status")).toBe("read");
+    expect(sent.get("notificationId")).toBe(row.notification.id);
+
+    // And only then the navigation.
+    expect(pushed).toEqual([row.notification.action_url]);
+  });
+
+  it("navigates a notice that was already seen WITHOUT writing", async () => {
+    /*
+     * `R-24` again: a control whose only possible outcome is a no-op should not
+     * perform it. The control that makes this mean something is the test above,
+     * which proves the write happens when the notice IS unread.
+     */
+    const { row, spies } = renderRow({ source: { status: "read" } });
+    const copy = getNotificationActionCopy("pt-BR");
+
+    await userEvent.click(control(copy.openLabel(row.subjectLabel)));
+
+    expect(spies.markAction).not.toHaveBeenCalled();
+    expect(pushed).toEqual([row.notification.action_url]);
+  });
+
+  it("renders no open control for a notice with nowhere to go", () => {
+    /*
+     * `notifications.action_url` is nullable. A control that navigated to
+     * nothing would be a false affordance, so the row offers none -- and the
+     * verbs are untouched, because having no destination says nothing about
+     * what the owner may do to the notice.
+     */
+    const { row } = renderRow({ source: { action_url: null } });
+    const copy = getNotificationActionCopy("pt-BR");
+    expect(queryControl(copy.openLabel(row.subjectLabel))).toBeNull();
+    expect(screen.getAllByRole("button").length).toBeGreaterThan(0);
+  });
+
+  it("names the row in the open control, like every other control on it", () => {
+    const { row } = renderRow({ subjectLabel: "Pagar o aluguel" });
+    for (const name of controlNames()) {
+      expect(name, `a control does not name its row: ${name}`).toContain("Pagar o aluguel");
+    }
+    expect(row.notification.action_url).not.toBeNull();
+  });
+});
+
 describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no task verb", () => {
   /*
    * The three ways a subject fails to resolve converge on one behaviour, and
@@ -105,13 +231,13 @@ describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no
 
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
 
     // The control that can fail: the task verbs must be absent from the WHOLE
     // row, menu included, not merely absent from the primary slot.
     for (const taskVerb of ["complete_task", "reschedule_task"] as const) {
       expect(
-        screen.queryByRole("button", { name: verbCopy[taskVerb].accessibleName(row.subjectLabel) }),
+        queryControl(verbCopy[taskVerb].accessibleName(row.subjectLabel)),
         `${taskVerb} is offered against an unresolvable subject`,
       ).toBeNull();
     }
@@ -126,7 +252,7 @@ describe("2S-ACT-005 / 2S-REACH-004: a subject that cannot be resolved offers no
     const { row } = renderRow({ subjectStatus: "completed" });
     const verbCopy = getVerbCopy("pt-BR");
     expect(
-      screen.queryByRole("button", { name: verbCopy.complete_task.accessibleName(row.subjectLabel) }),
+      queryControl(verbCopy.complete_task.accessibleName(row.subjectLabel)),
     ).toBeNull();
   });
 
@@ -149,9 +275,9 @@ describe("R-24: an answered notice is offered nothing it cannot change", () => {
     const copy = getNotificationActionCopy("pt-BR");
 
     expect(row.verbs.some((verb) => verb.id === "mark_read")).toBe(false);
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
     expect(
-      screen.queryByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }),
+      queryControl(verbCopy.mark_read.accessibleName(row.subjectLabel)),
     ).toBeNull();
   });
 
@@ -167,11 +293,11 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.dismiss.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.dismiss.accessibleName(row.subjectLabel)));
 
     expect(screen.getByText(copy.confirmQuestion.dismiss as string)).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: copy.cancelAction }));
+    await userEvent.click(control(copy.cancelAction));
     expect(spies.markAction).not.toHaveBeenCalled();
   });
 
@@ -180,8 +306,8 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
     const verbCopy = getVerbCopy("pt-BR");
     const copy = getNotificationActionCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.mark_read.accessibleName(row.subjectLabel)));
 
     expect(screen.queryByText(copy.confirmQuestion.dismiss as string)).toBeNull();
     expect(spies.markAction).toHaveBeenCalledTimes(1);
@@ -190,26 +316,47 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
 });
 
 describe("2S-ACCESS-007: one announceable node, and it is the visible one", () => {
-  it("mounts the live region before there is any result to announce", () => {
+  /*
+   * RETARGETED IN 2S.3, and the distinction is the whole contract.
+   *
+   * The row now holds TWO interactive units: the verbs, and *Abrir*. Each
+   * announces its own outcome, so the row has two polite regions — and that is
+   * correct rather than a regression. What 2S.2 forbade was never "two
+   * regions"; it was **one sentence living in two announceable nodes**, which
+   * is what an `sr-only` twin beside a visible paragraph produced.
+   *
+   * So the property is stated as what it always was, now that there is more
+   * than one region to state it over: every region is empty at rest, every
+   * region is the visible text rather than a hidden copy of it, and after any
+   * one action exactly one region has anything to say.
+   */
+  it("mounts every live region before there is any result to announce", () => {
     renderRow();
     const regions = screen.getAllByRole("status");
-    expect(regions).toHaveLength(1);
-    expect(regions[0].getAttribute("aria-live")).toBe("polite");
-    expect(regions[0].textContent).toBe("");
+    // Two units, two regions, and the count is asserted so a THIRD one — an
+    // `sr-only` twin, say — fails here.
+    expect(regions).toHaveLength(2);
+    for (const region of regions) {
+      expect(region.getAttribute("aria-live")).toBe("polite");
+      expect(region.textContent).toBe("");
+      expect(region.className, "a region that is announced must also be read")
+        .not.toContain("sr-only");
+    }
   });
 
-  it("keeps the outcome visible and announced by the SAME node", async () => {
+  it("keeps the outcome visible, and puts it in exactly ONE region", async () => {
     const { row } = renderRow();
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
 
-    await userEvent.click(screen.getByRole("button", { name: copy.menuLabel(row.subjectLabel) }));
-    await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
+    await userEvent.click(control(copy.menuLabel(row.subjectLabel)));
+    await userEvent.click(control(verbCopy.mark_read.accessibleName(row.subjectLabel)));
 
     const regions = await screen.findAllByRole("status");
-    expect(regions, "a second announceable node appeared").toHaveLength(1);
-    expect(regions[0].textContent).toBe(copy.applied.mark_read);
-    // The same node the reader sees — not an `sr-only` twin beside a visible copy.
+    const speaking = regions.filter((region) => region.textContent !== "");
+    expect(speaking, "the outcome was announced by more than one node").toHaveLength(1);
+    expect(speaking[0].textContent).toBe(copy.applied.mark_read);
+    // And it appears once in the whole row, not twice.
     expect(screen.getAllByText(copy.applied.mark_read)).toHaveLength(1);
   });
 });

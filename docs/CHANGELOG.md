@@ -3,6 +3,66 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-25 - Phase 2S slice 2S.3: where the notices appear, up to the owner's checkpoint
+
+**Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
+
+**Delivered in code:** the unanswered notices inside the full *Precisa de você*
+queue with a filter of their own; the collapse of a subject that already has a
+row; *Abrir*, which marks a notice seen before it navigates; the silence
+consequence stated before the owner confirms; arrow navigation through the
+compact menu; and the cross-surface readback.
+
+**The owner's decision on the queue's filters**, given 2026-08-25 and delivered
+clause by clause: notices under **Todos**, a chip of their **own**, never folded
+into a chip meant for records or conflicts, count and list from the **same set**,
+existing filters untouched, and the chips thumb-sized at a phone width. It also
+corrected a divergence predating the slice — `itemCount` was `items.length` even
+after conflicts joined the queue, so a day whose only item was a contradiction
+reported zero items viewed.
+
+**`2S-ATTENTION-002`'s own example does not exist on this surface.** The
+criterion names *"a task present from its own source and from a notice"*, and the
+queue's other sources return entries and memories — neither carries a task. What
+does duplicate is a subject with more than one unanswered notice, and slice
+2S.0 measured it: 54 of 57 notices were `task_stale`, about three tasks. The
+collapse is by subject, the newest survives, nothing is deleted, and a row with
+no resolvable subject is never collapsed.
+
+**Three defects, all found by guards or controls rather than by review.**
+`LDC-GUARD-001` caught a day count reading the DEVICE's zone in a client
+component — an owner in São Paulo on a laptop set to Lisbon would have been told
+the wrong number of days. `stylesheet-class-coverage` caught a class shipping
+with no rule. And an ARIA contradiction: `role="menuitem"` sat on a `<div>`
+wrapped around the button, so the element that took focus and the element
+claiming to be the item were different.
+
+**Two more found by the owner's own controls on *Abrir*.** `disabled` guards the
+button and not the form, so a `form.requestSubmit()` wrote twice; and an
+in-flight flag did not help either, because React queues actions rather than
+running them concurrently. The guard is about what happened now, and a failed
+round leaves the control usable.
+
+**`/app/inbox` was missing from both writers' revalidation.** That queue now
+holds notices, so an action on the history page left it showing a row the owner
+had already answered.
+
+**Seventeen mutation controls, seventeen failures.** One failed to fail first: a
+scan for `/app/inbox` over a whole file was satisfied by an unrelated action in
+the same file — a check passing by containing its own subject, and it reads one
+function's body now.
+
+**THE RENDERED LANE IS WRITTEN AND HAS NOT BEEN RUN.**
+`e2e/online-phase-2s-attention.spec.ts` covers `2S-ATTENTION-001`/`-003`/`-004`/
+`-005`/`-006`, `2S-ACCESS-002`/`-004`/`-006` and `2S-MOBILE-001`/`-002`/`-006`/
+`-007` on the real routes. Those routes are authenticated, so the lane needs the
+hosted project and cannot gate in CI — the same split `2O.7` established. Running
+it writes to production. **Eleven requirements wait on it, and `2S-MOBILE-003`
+waits on the owner and their device.** Nothing is classified in the slice record.
+
+**Record:** `docs/reports/phase-2s/PHASE_2S_SLICE_03_ACCEPTANCE.md`.
+
+
 ## 2026-08-25 - Phase 2S slice 2S.2: the verbs, on both surfaces, through one authority
 
 **Zero migrations.** The phase's one migration was spent and applied by slice

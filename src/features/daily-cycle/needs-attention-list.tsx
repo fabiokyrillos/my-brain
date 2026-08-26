@@ -10,6 +10,9 @@ import { UniversalStateLine } from "@/features/experience/universal-state";
 import { presentationFor } from "@/features/sensitivity/contracts";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
 import type { Bounded } from "@/features/bounds/contracts";
+import { AttentionNoticeRow } from "@/features/notifications/attention-notice-row";
+import type { NotificationVerbHandlers } from "@/features/notifications/notification-row-actions";
+import type { NotificationRowView } from "@/features/notifications/row-projection";
 import { NeedsAttentionItemRow } from "./needs-attention-item";
 import { ConflictAttentionItemRow } from "./conflict-attention-item";
 import {
@@ -29,7 +32,26 @@ import { getConflictSectionCopy, getDailyCycleCopy, type DailyCycleLocale } from
  * keep working over one set of items. A separate surface would have needed its
  * own version of each, and two of them would eventually disagree.
  */
-type AttentionFilter = TrackedAttentionReason | "conflict" | "all";
+/**
+ * The filter's vocabulary, widened by exactly one AGAIN.
+ *
+ * `2N-CONFLICT-003` added `conflict`; slice 2S.3 adds `notice`, on the owner's
+ * decision of 2026-08-25 and with its shape stated by them:
+ *
+ * - unanswered notices appear under **Todos**;
+ * - they get a filter of their **own**;
+ * - they are **never** placed in a filter meant for records, conflicts or any
+ *   other type — a chip that promised one kind and delivered another would be
+ *   the control that lies about its own scope, which is the sentence this file
+ *   already carries about conflicts;
+ * - the count and the list derive from the **same set**;
+ * - every existing filter behaves exactly as it did.
+ *
+ * A third kind in one queue rather than a second list, for the reason the
+ * second kind was: the chip row, the empty-filtered sentence and the load-more
+ * control all keep working over one set of items.
+ */
+type AttentionFilter = TrackedAttentionReason | "conflict" | "notice" | "all";
 
 /**
  * What a caller that derives no conflicts passes.
@@ -43,6 +65,9 @@ const NO_CONFLICTS: Bounded<ConflictAttentionItemView> = Object.freeze({
   bounded: false,
   limit: 0,
 });
+
+/** What a caller with no notices passes. Frozen, like `NO_CONFLICTS` beside it. */
+const NO_NOTICES: readonly NotificationRowView[] = Object.freeze([]);
 
 export type LoadMoreNeedsAttentionPage = {
   readonly items: readonly NeedsAttentionItemView[];
@@ -108,6 +133,7 @@ const filterCopy = {
   "pt-BR": {
     legend: "Filtrar por tipo",
     all: "Tudo",
+    notices: "Avisos",
     retry: "Tentar de novo",
     retryAll: "Tentar de novo tudo que falhou",
     retrying: "Tentando…",
@@ -118,6 +144,7 @@ const filterCopy = {
   en: {
     legend: "Filter by type",
     all: "All",
+    notices: "Notices",
     retry: "Try again",
     retryAll: "Try again for everything that failed",
     retrying: "Trying…",
@@ -137,6 +164,8 @@ export function NeedsAttentionList({
   retryAction,
   timeZone,
   conflicts = NO_CONFLICTS,
+  notices = NO_NOTICES,
+  noticeHandlers,
 }: {
   initialItems: readonly NeedsAttentionItemView[];
   initialCursor: AttentionCursor | null;
@@ -151,6 +180,24 @@ export function NeedsAttentionList({
    * the owner's memories are consistent when the scan simply stopped.
    */
   conflicts?: Bounded<ConflictAttentionItemView>;
+  /**
+   * The unanswered notices, already projected by `projectNotificationRows` —
+   * so each row arrives carrying the verbs it may offer and the subject they
+   * act on. This list decides none of that.
+   *
+   * Not paginated with the entry rows and sharing no cursor with them, exactly
+   * like the conflicts: they come from a different read.
+   */
+  notices?: readonly NotificationRowView[];
+  /**
+   * The five authorities a notice's verbs dispatch to (`2S-TRUST-010`).
+   *
+   * Optional, and the rows are rendered only when it is present: a notice row
+   * without its handlers would be a row of controls that cannot act. A caller
+   * that passes notices and forgets these gets no notice rows rather than
+   * broken ones.
+   */
+  noticeHandlers?: NotificationVerbHandlers;
   /** Omitted by callers that do not offer in-place retry (e.g. a preview). */
   retryAction?: RetryProcessingAction;
   /**
@@ -183,6 +230,21 @@ export function NeedsAttentionList({
   const visibleConflicts = activeFilter === "all" || activeFilter === "conflict" ? conflicts.items : [];
 
   /**
+   * The notices obey the same filter, and appear under **Todos** and under
+   * their **own** chip only.
+   *
+   * The owner's decision is explicit that they must never be folded into a chip
+   * meant for records or for conflicts, so this predicate names exactly two
+   * filters and no reason: adding a `TrackedAttentionReason` here would make a
+   * chip promising one kind deliver another.
+   *
+   * `noticeHandlers` gates the rows rather than the chip's label, because a
+   * notice row without its authorities is a row of controls that cannot act.
+   */
+  const visibleNotices =
+    noticeHandlers && (activeFilter === "all" || activeFilter === "notice") ? notices : [];
+
+  /**
    * `2J-ATTN-005`. A pure narrowing of what is already loaded -- not a second
    * query. A server-side filter would be a second shape over
    * `list_needs_attention`, and two shapes over one RPC is how an ownership
@@ -208,7 +270,25 @@ export function NeedsAttentionList({
    * nothing, and the conflict chip follows the same rule for the same reason.
    */
   const hasConflicts = conflicts.items.length > 0;
-  const filterCount = availableReasons.length + (hasConflicts ? 1 : 0);
+  /*
+    The notice chip follows the rule the other two already follow: a filter that
+    would yield nothing is never advertised. It also requires the handlers,
+    because a chip that revealed rows this list cannot render would be worse
+    than no chip.
+  */
+  const hasNotices = Boolean(noticeHandlers) && notices.length > 0;
+  const filterCount = availableReasons.length + (hasConflicts ? 1 : 0) + (hasNotices ? 1 : 0);
+
+  /**
+   * THE ONE SET THE COUNT AND THE LIST BOTH READ.
+   *
+   * The owner's decision of 2026-08-25 requires the count and the list to derive
+   * from the same set, with no divergence. This is that set — and it corrects a
+   * divergence that predates this slice: `itemCount` was `items.length` even
+   * after `2N-CONFLICT-003` put conflicts in the same queue, so a day whose only
+   * item was a contradiction reported **zero** items viewed.
+   */
+  const queueSize = items.length + conflicts.items.length + (hasNotices ? notices.length : 0);
 
   /**
    * `2J-ATTN-010`. Bulk is offered only where the items are semantically
@@ -283,7 +363,7 @@ export function NeedsAttentionList({
 
   return (
     <div className="list-stack needs-attention-list">
-      <NeedsAttentionViewed surface="needs_attention" itemCount={items.length} locale={locale} />
+      <NeedsAttentionViewed surface="needs_attention" itemCount={queueSize} locale={locale} />
 
       {filterCount > 1 ? (
         <fieldset className="attention-filters">
@@ -304,6 +384,16 @@ export function NeedsAttentionList({
               onClick={() => setActiveFilter("conflict")}
             >
               {copy.attentionReasons.resolve_validity_conflict.title}
+            </button>
+          ) : null}
+          {hasNotices ? (
+            <button
+              type="button"
+              className="attention-filter"
+              aria-pressed={activeFilter === "notice"}
+              onClick={() => setActiveFilter("notice")}
+            >
+              {text.notices}
             </button>
           ) : null}
           {availableReasons.map((reason) => (
@@ -360,7 +450,7 @@ export function NeedsAttentionList({
         narrowed to a reason that matched no entry would have printed "no item of
         this type" directly above a conflict row that was plainly of that type.
       */}
-      {visible.length === 0 && visibleConflicts.length === 0 && (items.length > 0 || hasConflicts) ? (
+      {visible.length === 0 && visibleConflicts.length === 0 && visibleNotices.length === 0 && queueSize > 0 ? (
         <UniversalStateLine description={text.emptyFiltered} locale={locale} state="empty" />
       ) : null}
 
@@ -394,6 +484,29 @@ export function NeedsAttentionList({
           </div>
         );
       })}
+
+      {/*
+        The unanswered notices, AFTER the entry rows — the same order Home puts
+        them in, so an owner who follows "ver tudo" meets the queue arranged the
+        way the surface they came from arranged it.
+
+        Each row mounts the same `NotificationVerbs` both other surfaces mount,
+        taking the same projected row. This list assembles no verb set of its
+        own, which is what `phase-2s-verb-authority.test.ts` reads.
+      */}
+      {visibleNotices.length > 0 && noticeHandlers ? (
+        <section aria-label={text.notices} className="attention-notices">
+          {visibleNotices.map((notice) => (
+            <AttentionNoticeRow
+              handlers={noticeHandlers}
+              key={notice.notification.id}
+              locale={locale}
+              row={notice}
+              timeZone={timeZone}
+            />
+          ))}
+        </section>
+      ) : null}
 
       {retryError && <p role="alert" className="form-error">{retryError}</p>}
       {/*

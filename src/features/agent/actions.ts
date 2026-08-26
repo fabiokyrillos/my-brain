@@ -540,6 +540,14 @@ export async function markNotification(formData: FormData) {
   */
   revalidatePath("/[locale]/app/notifications", "page");
   revalidatePath(`/${parsed.data.locale}/app`);
+  /*
+    Slice 2S.3 adds the THIRD surface, and its absence was a real gap.
+    `/app/inbox?view=needs-you` now holds the unanswered notices too, so an
+    action taken on the history page left that queue showing a row the owner had
+    already answered. `2S-ATTENTION-008` is exactly the property that forbids
+    it: neither surface may hold a state the other contradicts.
+  */
+  revalidatePath(`/${parsed.data.locale}/app/inbox`);
 }
 
 // SH-QUOTA-006: the allowlist is not defined here any more. `ATTACHMENT_LIMITS`

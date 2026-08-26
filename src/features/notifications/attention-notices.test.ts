@@ -10,6 +10,18 @@ const TASK = "3f7c1b52-0e2a-4d61-9f83-2b6a1c9d4e70";
 const OWNER = "11111111-2222-4333-8444-555555555555";
 const INTRUDER = "99999999-8888-4777-8666-555555555555";
 
+/**
+ * A distinct subject per planted row.
+ *
+ * The bound tests used to plant N notices carrying the SAME `dedupe_key`, which
+ * `2S-ATTENTION-002` now collapses to one — so they measured the bound against
+ * a page the product would never render. Distinct subjects restore what they
+ * were about, and the collapse gets tests of its own below.
+ */
+function subjectId(index: number): string {
+  return `3f7c1b52-0e2a-4d61-9f83-2b6a1c9d4e${String(70 + index).padStart(2, "0")}`;
+}
+
 type NoticeRow = {
   id: string;
   type: string;
@@ -140,7 +152,7 @@ describe("the bound is real, and hasMore is answered without a second round trip
   it("returns the limit and reports more when a further row exists", async () => {
     const { client, calls } = fakeSupabase({
       notifications: Array.from({ length: ATTENTION_NOTICE_LIMIT + 4 }, (_, index) =>
-        notice({ id: `n-${index}` }),
+        notice({ id: `n-${index}`, dedupe_key: `overdue:${subjectId(index)}:2026-08-25` }),
       ),
       tasks: [{ id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER }],
     });
@@ -158,13 +170,114 @@ describe("the bound is real, and hasMore is answered without a second round trip
 
   it("reports no more when the page is exactly the bound", async () => {
     const { client } = fakeSupabase({
-      notifications: Array.from({ length: ATTENTION_NOTICE_LIMIT }, (_, index) => notice({ id: `n-${index}` })),
+      notifications: Array.from({ length: ATTENTION_NOTICE_LIMIT }, (_, index) =>
+        notice({ id: `n-${index}`, dedupe_key: `overdue:${subjectId(index)}:2026-08-25` }),
+      ),
       tasks: [{ id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER }],
     });
 
     const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
 
     expect(page.items).toHaveLength(ATTENTION_NOTICE_LIMIT);
+    expect(page.hasMore).toBe(false);
+  });
+});
+
+describe("2S-ATTENTION-002: a subject the list already shows is not shown twice", () => {
+  it("collapses many unanswered notices about ONE subject to a single row", async () => {
+    /*
+     * Not hypothetical. The deployed heartbeat writes `stale:{task}:{local_date}`
+     * and a task key carries the owner's local date, so a subject nobody answers
+     * accumulates one notice per qualifying day. Slice 2S.0 measured 54 of 57
+     * notices as `task_stale`, about three tasks.
+     */
+    const { client } = fakeSupabase({
+      notifications: [
+        notice({ id: "day-3", type: "task_stale", created_at: "2026-08-25T10:00:00Z", dedupe_key: `stale:${TASK}:2026-08-25` }),
+        notice({ id: "day-2", type: "task_stale", created_at: "2026-08-24T10:00:00Z", dedupe_key: `stale:${TASK}:2026-08-24` }),
+        notice({ id: "day-1", type: "task_stale", created_at: "2026-08-23T10:00:00Z", dedupe_key: `stale:${TASK}:2026-08-23` }),
+      ],
+      tasks: [{ id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER }],
+    });
+
+    const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
+
+    expect(page.items).toHaveLength(1);
+    // The NEWEST survives: `created_at desc` is the order the read already asks
+    // for, so the first occurrence of a subject is its most recent notice.
+    expect(page.items[0].notification.id).toBe("day-3");
+  });
+
+  it("collapses across notice TYPES about the same subject, not only across days", async () => {
+    // `overdue:` and `stale:` are different keys about one task. A collapse keyed
+    // on the whole `dedupe_key` would keep both and satisfy nothing.
+    const { client } = fakeSupabase({
+      notifications: [
+        notice({ id: "overdue", created_at: "2026-08-25T11:00:00Z", dedupe_key: `overdue:${TASK}:2026-08-25` }),
+        notice({ id: "stale", type: "task_stale", created_at: "2026-08-25T10:00:00Z", dedupe_key: `stale:${TASK}:2026-08-25` }),
+      ],
+      tasks: [{ id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER }],
+    });
+
+    const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].notification.id).toBe("overdue");
+  });
+
+  it("keeps two notices about two DIFFERENT subjects — the control that makes the above mean something", async () => {
+    const OTHER = subjectId(1);
+    const { client } = fakeSupabase({
+      notifications: [
+        notice({ id: "a", type: "task_stale", dedupe_key: `stale:${TASK}:2026-08-25` }),
+        notice({ id: "b", type: "task_stale", dedupe_key: `stale:${OTHER}:2026-08-25` }),
+      ],
+      tasks: [
+        { id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER },
+        { id: OTHER, title: "Enviar o contrato", status: "todo", user_id: OWNER },
+      ],
+    });
+
+    const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
+
+    expect(page.items).toHaveLength(2);
+  });
+
+  it("never collapses two notices that have no resolvable subject", async () => {
+    /*
+     * Two rows with no subject are two different things, not one thing seen
+     * twice. Collapsing them would silently hide a notice — the one direction
+     * this projection must never take.
+     */
+    const { client } = fakeSupabase({
+      notifications: [
+        notice({ id: "a", dedupe_key: null }),
+        notice({ id: "b", dedupe_key: "overdue:not-a-uuid:2026-08-25" }),
+      ],
+      tasks: [],
+    });
+
+    const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
+
+    expect(page.items.map((row) => row.notification.id).sort()).toEqual(["a", "b"]);
+  });
+
+  it("reports no more when every extra row read was a duplicate", async () => {
+    /*
+     * `hasMore` is read AFTER the collapse. Answering from the raw read would
+     * say "+1" beside a queue that already holds every distinct subject there
+     * is — a number promising something that is not there.
+     */
+    const { client } = fakeSupabase({
+      notifications: Array.from({ length: ATTENTION_NOTICE_LIMIT + 1 }, (_, index) =>
+        notice({ id: `n-${index}`, type: "task_stale", dedupe_key: `stale:${TASK}:2026-08-${10 + index}` }),
+      ),
+      tasks: [{ id: TASK, title: "Pagar o aluguel", status: "todo", user_id: OWNER }],
+    });
+
+    const page = await loadAttentionNotices(client as never, { userId: OWNER, locale: "pt-BR" });
+
+    expect(page.items).toHaveLength(1);
     expect(page.hasMore).toBe(false);
   });
 });
