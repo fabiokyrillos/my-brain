@@ -31,6 +31,22 @@ vi.mock("@/features/daily-cycle/inbox-projection", async (importOriginal) => ({
   loadInboxProjection: vi.fn(),
 }));
 vi.mock("@/features/byok/pending-entries", () => ({ loadPendingEntryCount: vi.fn() }));
+/*
+  Slice 2S.3. The needs-you branch composes a FOURTH independent read — the
+  unanswered notices — and mounts their verbs, so two more modules reach
+  `server-only` before this page renders anything: the loader, and the one
+  bundle of authorities every surface dispatches through (`2S-TRUST-010`).
+*/
+vi.mock("@/features/notifications/attention-notices", () => ({
+  loadAttentionNotices: vi.fn(async () => ({ items: [], hasMore: false })),
+  ATTENTION_NOTICE_QUEUE_LIMIT: 20,
+}));
+vi.mock("@/features/notifications/verb-handlers", () => ({
+  NOTIFICATION_VERB_HANDLERS: {
+    markAction: vi.fn(), suppressAction: vi.fn(), workAction: vi.fn(),
+    detailAction: vi.fn(), undoAction: vi.fn(),
+  },
+}));
 vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
 vi.mock("@/features/profile/agent-identity", () => ({ getAgentName: vi.fn(async () => "Brain") }));
 vi.mock("@/features/profile/owner-timezone", () => ({ getOwnerTimeZone: vi.fn(async () => "America/Sao_Paulo") }));

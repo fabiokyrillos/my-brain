@@ -536,6 +536,7 @@ describe("Phase 2S: planning contains no classification and no execution record"
       "PHASE_2S_SLICE_00_ACCEPTANCE.md",
       "PHASE_2S_SLICE_01_ACCEPTANCE.md",
       "PHASE_2S_SLICE_02_ACCEPTANCE.md",
+      "PHASE_2S_SLICE_03_ACCEPTANCE.md",
     ];
     const records = readdirSync(join(REPO, REPORTS)).filter((name) => /ACCEPTANCE/i.test(name));
     expect(records.sort(), "a record exists for a slice that has not run, or one is missing")
