@@ -46,6 +46,16 @@ import { projectNotificationRows, type NotificationRowView, type NotificationRow
 /** Home's share of the attention queue. Small, because Home is not a list page. */
 export const ATTENTION_NOTICE_LIMIT = 3;
 
+/**
+ * The full queue's share, at `/app/inbox?view=needs-you`.
+ *
+ * Twenty rather than three, because that surface is the one "ver tudo"
+ * promises — and twenty rather than unbounded, because a page that renders
+ * every notice an account ever accumulated is a page that stops rendering.
+ * `hasMore` still answers honestly above it.
+ */
+export const ATTENTION_NOTICE_QUEUE_LIMIT = 20;
+
 export type AttentionNoticesPage = {
   readonly items: readonly NotificationRowView[];
   readonly hasMore: boolean;

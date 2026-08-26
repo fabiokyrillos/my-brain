@@ -283,15 +283,35 @@ describe("2S-ACT-010: only the irreversible verb asks first", () => {
 });
 
 describe("2S-ACCESS-007: one announceable node, and it is the visible one", () => {
-  it("mounts the live region before there is any result to announce", () => {
+  /*
+   * RETARGETED IN 2S.3, and the distinction is the whole contract.
+   *
+   * The row now holds TWO interactive units: the verbs, and *Abrir*. Each
+   * announces its own outcome, so the row has two polite regions — and that is
+   * correct rather than a regression. What 2S.2 forbade was never "two
+   * regions"; it was **one sentence living in two announceable nodes**, which
+   * is what an `sr-only` twin beside a visible paragraph produced.
+   *
+   * So the property is stated as what it always was, now that there is more
+   * than one region to state it over: every region is empty at rest, every
+   * region is the visible text rather than a hidden copy of it, and after any
+   * one action exactly one region has anything to say.
+   */
+  it("mounts every live region before there is any result to announce", () => {
     renderRow();
     const regions = screen.getAllByRole("status");
-    expect(regions).toHaveLength(1);
-    expect(regions[0].getAttribute("aria-live")).toBe("polite");
-    expect(regions[0].textContent).toBe("");
+    // Two units, two regions, and the count is asserted so a THIRD one — an
+    // `sr-only` twin, say — fails here.
+    expect(regions).toHaveLength(2);
+    for (const region of regions) {
+      expect(region.getAttribute("aria-live")).toBe("polite");
+      expect(region.textContent).toBe("");
+      expect(region.className, "a region that is announced must also be read")
+        .not.toContain("sr-only");
+    }
   });
 
-  it("keeps the outcome visible and announced by the SAME node", async () => {
+  it("keeps the outcome visible, and puts it in exactly ONE region", async () => {
     const { row } = renderRow();
     const copy = getNotificationActionCopy("pt-BR");
     const verbCopy = getVerbCopy("pt-BR");
@@ -300,9 +320,10 @@ describe("2S-ACCESS-007: one announceable node, and it is the visible one", () =
     await userEvent.click(screen.getByRole("button", { name: verbCopy.mark_read.accessibleName(row.subjectLabel) }));
 
     const regions = await screen.findAllByRole("status");
-    expect(regions, "a second announceable node appeared").toHaveLength(1);
-    expect(regions[0].textContent).toBe(copy.applied.mark_read);
-    // The same node the reader sees — not an `sr-only` twin beside a visible copy.
+    const speaking = regions.filter((region) => region.textContent !== "");
+    expect(speaking, "the outcome was announced by more than one node").toHaveLength(1);
+    expect(speaking[0].textContent).toBe(copy.applied.mark_read);
+    // And it appears once in the whole row, not twice.
     expect(screen.getAllByText(copy.applied.mark_read)).toHaveLength(1);
   });
 });

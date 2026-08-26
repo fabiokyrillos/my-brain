@@ -27,7 +27,7 @@ import { formatInstant } from "@/lib/time/instant-format";
 import type { Locale } from "@/lib/preferences";
 
 import { getNotificationActionCopy } from "./action-copy";
-import { NoticeOpenControl } from "./notice-open-control";
+import { isOwnerScopedDestination, NoticeOpenControl } from "./notice-open-control";
 import { NotificationVerbs, type NotificationVerbHandlers } from "./notification-row-actions";
 import type { NotificationRowView } from "./row-projection";
 
@@ -65,16 +65,23 @@ export function AttentionNoticeRow({
       <div className="list-meta">
         {stamp ? <span>{stamp}</span> : null}
         {/*
-          `2S-ATTENTION-006`. Rendered only where the notice has somewhere to
-          go: `notifications.action_url` is nullable, and a control that
-          navigated to nothing would be the "controle falso" the direction
+          `2S-ATTENTION-006`. Rendered only where the notice has somewhere this
+          product may send the owner.
+
+          `notifications.action_url` is nullable AND it is a stored string. A
+          row is data, and data is untrusted: an absolute URL, a
+          protocol-relative `//host` or a `javascript:` payload sitting in that
+          column would otherwise become a navigation this surface performed on
+          the owner's behalf. `isOwnerScopedDestination` is the whitelist, and a
+          destination that fails it renders no control at all — an affordance
+          for something that cannot happen is the "controle falso" the direction
           forbids.
 
           It takes `markAction` out of the same bundle the verbs dispatch
           through, so opening writes through the authority `2S-TRUST-010`
           enumerates rather than through one of its own.
         */}
-        {row.notification.action_url ? (
+        {isOwnerScopedDestination(row.notification.action_url) ? (
           <NoticeOpenControl
             alreadySeen={row.notification.status !== "unread"}
             href={row.notification.action_url}

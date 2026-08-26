@@ -4,6 +4,8 @@ import { ConversationalQuestions } from "@/features/agent/conversational-questio
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
+import { ATTENTION_NOTICE_QUEUE_LIMIT, loadAttentionNotices } from "@/features/notifications/attention-notices";
+import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import { loadMemoryConflicts } from "@/features/daily-cycle/conflict-projection";
 // `2J-ATTN-007`. The EXISTING reinterpretation action, passed down. The list
 // never imports it, and there is no generic attention-mutation executor: the
@@ -247,13 +249,25 @@ export default async function InboxPage({
     // come from `list_needs_attention` and conflicts are derived from the owner's
     // own memories, so neither can fail the other. Run together because they are
     // independent, not because they are related.
-    const [projection, conflicts, awaitingAi] = await Promise.all([
+    const [projection, conflicts, awaitingAi, notices] = await Promise.all([
       loadAttentionProjection(supabase, { locale }),
       loadMemoryConflicts(supabase, { locale, userId: user.id }),
       // A third independent read, for the third thing the queue cannot see from
       // the RPC. A `head` count, so no captured text is pulled into a page that
       // only needs to know whether to raise the notice.
       loadPendingEntryCount(supabase, user.id),
+      /*
+        A FOURTH independent read, on the owner's decision of 2026-08-25: the
+        unanswered notices belong in this queue, under **Todos** and under a
+        filter of their own. Same reason as the third — independent, so neither
+        can fail the other — and a page-sized bound rather than Home's handful,
+        because this is the surface "ver tudo" promises.
+      */
+      loadAttentionNotices(supabase, {
+        userId: user.id,
+        locale,
+        limit: ATTENTION_NOTICE_QUEUE_LIMIT,
+      }),
     ]);
 
     return (
@@ -267,9 +281,17 @@ export default async function InboxPage({
           only item was a contradiction would have rendered "nothing needs you
           right now" — which is the exact silence `2N-CONFLICT-004` forbids.
         */}
-        {projection.items.length || conflicts.items.length ? (
+        {/*
+          Counts the notices too. Left as it was, a queue whose only item was an
+          unanswered notice would have rendered "nothing needs you right now" —
+          the same silence `2N-CONFLICT-004` forbade for contradictions, one kind
+          of row later.
+        */}
+        {projection.items.length || conflicts.items.length || notices.items.length ? (
           <NeedsAttentionList agentName={agentName}
             conflicts={conflicts}
+            noticeHandlers={NOTIFICATION_VERB_HANDLERS}
+            notices={notices.items}
             initialItems={projection.items}
             initialCursor={projection.nextCursor}
             initialHasNext={projection.hasNext}
