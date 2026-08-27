@@ -14833,3 +14833,146 @@ once more, at a closing checkpoint before 2S.4's report may become an ADR.
 
 **A surface can be correct, a lane can be green, and the owner can still open the
 page to find nothing there — because the data was never theirs.**
+
+---
+
+## §135 — Slice 2S.4, the closeout: a generator that refused on its first run, and a requirement nobody had exercised (2026-08-27)
+
+Merge SHA `def9fa9a322c651dc543f59175cb2207f8417b8e` (PR #321), CI green 3/3 on
+the PR head `d48e93c` (run `33107444538`) and green 3/3 again on that exact merge
+SHA (run `33108162380`) — three completed jobs each time. **Zero migrations**;
+parity untouched at `202608240102`, 102 local = 102 hosted, both re-read live.
+
+**THE PHASE IS NOT CLOSED, AND NOTHING IN THIS SECTION CLOSES IT.** `2S-CLOSE-010`
+reserves closure for the owner, as an ADR, after a closing device checkpoint.
+Neither has happened; no closing ADR exists; no successor is started, planned or
+named.
+
+### THE FINDING: a closeout is worth what it can refuse
+
+The generator's **first run** refused, and the refusal was real. `2S-ANSWER-006`
+had been classified **`rule`** in slice 2S.2's record — merged, reviewed and
+green for two days. `rule` is a declared **kind**; it is not one of the five
+delivery classes, and a record that invents a sixth is a record nobody can
+reconcile. It is `not-built-by-rule` now, which is what all three of Phase 2R's
+own `rule` requirements were.
+
+**Phase 2R found five of these at its closeout, misfiled since its first slice.**
+This one was found before the matrix existed. That is the entire argument for
+building the reconciliation as a refusal rather than writing the rule down:
+**a contract stated in prose is not a contract anybody enforces.**
+
+### AND THE SECOND ONE, WHICH IS THE ONE WORTH CARRYING
+
+`2S-TRUST-011` reads: *"the existing per-row-per-action operation key and its
+idempotency refusal are reused and **exercised from this surface**."* The reuse
+was real. **The exercise did not exist** — a search for `operationKey` across
+every test in the feature returned nothing at all.
+
+What existed was a test proving the control is `disabled` while a round is in
+flight, and it looked like the same thing. It is not:
+
+> **A control that cannot be pressed twice says nothing about what happens when
+> the response is lost.**
+
+The lost response is the whole reason the key exists. The dispatch throws, the
+owner presses again, and the authority must see the **same** key or the replay is
+invisible to it. Two exercises now assert exactly that — the same key after a
+thrown round, a **rotated** key after a terminal one — each with a mutation
+control that removes the mechanism and watches the assertion fail.
+
+**A requirement that says "exercised" and is checked by reading the mechanism is
+a requirement nobody exercised.** Read the verb in the criterion, then go looking
+for the thing that performs it.
+
+### The reconciliation, in the direction that matters
+
+**All eighteen requirements declared `baseline` were delivered `baseline`. Zero
+recorded as `built`.** The defect that cost Phase 2R five rows did not repeat.
+
+The opposite direction was exercised for real rather than by control alone:
+`2S-CADENCE-008` and `2S-REACH-002` were declared `build` and delivered
+`baseline`. `2S-CLOSE-004` protects that on purpose — **a reconciliation that
+refused both directions would push a phase toward manufacturing a change to make
+a label look right.**
+
+Final: **99 declared · 99 classified · zero `undelivered`** — 72 `built`, 20
+`baseline`, 6 `not-built-by-rule`, 1 `partial`. The `partial` is `2S-CLOSE-010`
+itself: the mechanism is built, and the remainder is the owner's.
+
+### `2S-CLOSE-012` — the defect re-measured, and only half of it moved
+
+**The daily repetition stopped on the day slice 2S.1's migration landed.** Three
+per day for eighteen unbroken days, then **zero** on 08-25, 08-26 and 08-27.
+
+That claim was attacked before it was written, four ways: the heartbeat ran **48
+times in 48 hours**, all `completed`; the three subject tasks are unchanged since
+2026-07-30; **no suppression exists** on that account; and the ladder was read
+from `pg_get_functiondef(run_user_heartbeat)` rather than from the migration file
+— `0 → send`, `1 → +1d`, `2 → +3d`, `3 → +7d`, **`else → false`**.
+
+**The half that did not move is stated plainly.** `read`, `dismissed` and
+`notification_suppressions` are all **zero** in production. Nobody has answered a
+notice. Everything built for answering is proved by tests, by pgTAP and by one
+hosted lane on a **disposable** account — and by none of the product's real use.
+The owner approved the measurement as evidence the cadence stopped and
+**explicitly not** as evidence of real user response.
+
+### Two enumerations that came back wider than their own sentences
+
+- **`2S-TRUST-005`** says *"the heartbeat remains the only writer."* Enumerated
+  from the deployed database, there are **three**: `run_user_heartbeat` (INSERT),
+  `prune_notifications` (DELETE, Phase 2H) and `markNotification` (UPDATE). **This
+  phase added none of them**, which is the property the class records — and the
+  record says three rather than reporting the one that fits.
+- **`2S-TRUST-010`/`2S-CLOSE-013`** proved the reuse claim against a **commit**
+  rather than a sentence: the five handlers looked for at slice 2S.0's merge
+  `39bb4b8`, four present and `suppressNotificationSubject` absent and
+  authorized. `OD-2S-3` B's objection is an exit code now.
+
+### The threat model: eighteen closed, one carried, one raised
+
+A threat closes only when its mitigation exists **and has been exercised**.
+`T-2S-16` was not closed until this slice wrote the exercise. `T-2S-19` is
+**carried** — both convergence mechanisms exist, and divergence under real use
+cannot be exercised while nobody has answered a notice.
+
+And one is **RAISED, as an owner question rather than a defect:** the ladder's
+terminal branch means a subject nobody answers goes **silent until it changes**.
+That is `OD-2S-4` A working as signed, and it is also the state three real tasks
+are in right now — stale since July, and the product no longer mentions them.
+Recorded rather than left to be rediscovered.
+
+### The guard that was inverted a second time, exactly as it predicted
+
+`phase-2s-declarations.test.ts` refused the closeout artifacts *until 2S.4 builds
+them*, in its own words. They are asserted **present** now, with the distinction
+unmoved: a record may exist only for a slice that has run, and the closing report
+must still carry the sentence saying it does not close the phase. **A guard that
+says when it will need inverting is a guard the next reader can invert safely.**
+
+### Gates
+
+Typecheck **zero**; lint **0 errors** over `src`, `e2e` and the generator;
+**9 696 assertions passing with zero failures**; build green; and the generator's
+own guard carries **35 assertions with every refusal exercised against a planted
+defect** — including the vacuity control that refuses a handler bundle it cannot
+read, because a refusal that cannot fire is not a refusal.
+
+Three repo-walking guards time out locally at the 5000ms default and pass with a
+longer one; verified individually. **Read whether a failure is an assertion or a
+clock before believing it.**
+
+### Where the next session starts
+
+**The owner's CLOSING checkpoint.** Not slice 2S.4 — it is merged. Not a
+successor — none may be started, planned or named. Closure is not authorized, and
+a green pipeline is not closure.
+
+**Three items stay open and none substitutes for another:**
+`/app/notifications` walked on the device with a **real** notice row; the
+heartbeat producing a notice on the **owner's own** account; and a notice
+**answered in real use**.
+
+**A closeout is worth exactly what it can refuse — and both of the things this
+one found had already been merged, reviewed and green.**
