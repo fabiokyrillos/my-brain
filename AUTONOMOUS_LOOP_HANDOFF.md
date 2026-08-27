@@ -14718,3 +14718,118 @@ document. The five checks are in
 
 **A 320px viewport is a measurement, not a hand on a phone — and a lane written
 to prove a page can spend three runs proving nothing at all.**
+
+---
+
+## §134 — The device checkpoint is HELD, and the account it was written for had nothing on it (2026-08-27)
+
+`2S-MOBILE-003` is discharged: a person, their own iPhone, the **deployed
+production build `6d38edc`**, the five named items, all reported passing.
+`2S-CLOSE-009` is satisfied by a hand on a phone rather than by a document.
+**Slice 2S.4 is no longer blocked by it, and nothing in this section starts it.**
+
+Zero migrations; parity untouched at `202608240102`, 102 local = 102 hosted.
+
+### THE FINDING IS NOT THE CHECKPOINT — IT IS THAT THE CHECKPOINT COULD NOT START
+
+The owner opened `/app`, saw *Precisa de você* holding exactly one row, and asked:
+*"Seria aqui? Não tô vendo nada de 'mais ações'."*
+
+They were right to ask. **There was no notice on the surface.** The row was
+**entry-derived** — *"O MICHAEL PROPÕE … Resolver sugestões"* — from a capture
+made two minutes earlier. That section holds more than one kind of item, and only
+the notice rows carry *Abrir*, a primary action and the compact menu. The
+checklist's five items were all about a row that was not there.
+
+Measured rather than argued: of the two real accounts, **all 57 unread notices
+belong to the OTHER one.** The owner's had **zero**.
+
+**I had handed over a checklist without checking whose account would open it.**
+It was assembled from the acceptance record's §7, which is correct about the
+product and silent about which account has data. The record now says so in its
+own §11, and the lesson generalises past this phase: **a checklist handed over
+without checking whose account will open it is a checklist about somebody else's
+data.**
+
+### AND THE SILENCE WAS THE PRODUCT WORKING, WHICH TOOK MEASURING TO ESTABLISH
+
+It would have been easy — and wrong — to read "no notices" as a defect on the
+heels of a section that found seven. It is not. Read from
+`run_user_heartbeat` itself:
+
+- quiet hours are **22:30 → 07:00** and it was **23:19**, so the function writes
+  nothing at all by design;
+- `task_overdue` requires a task past its `due_at`; the owner had **none**;
+- `task_stale` requires a task with **no** `due_at`, idle past a
+  priority-dependent threshold — **0 days urgent · 2 high · 7 normal · 15 low**.
+  The owner has exactly **one** task of that shape, its priority is unset, and it
+  had been idle for **under four days**.
+
+Nothing was broken. There was nothing worth saying, which is the whole promise of
+this feature.
+
+### THE ROUTE WAS THE OWNER'S TO CHOOSE, AND THE ROW WAS A FIXTURE
+
+Three routes were put to the owner — sign in to the account that has notices,
+mark a task urgent and wait for the morning tick, or have one notice planted —
+and they chose the **planted notice**, explicitly.
+
+One row was written to their real account, in the heartbeat's exact shape:
+`task_stale`, `unread`, normal priority, `dedupe_key` `stale:{task}:{local date}`,
+`action_url` `/pt-BR/app/work/{task}`, pointing at one of the owner's own tasks.
+The body was copied **inside the SQL statement**, so the task's title never left
+the database.
+
+**The record says the row was planted rather than implying the product produced
+it.** What the checkpoint proves is exactly what `2S-MOBILE-003` asks — *a
+person, the device, the named list* — over a notice of the right shape. It does
+**not** prove the heartbeat's cadence; that is slice 2S.2's pgTAP suite's job and
+is proved there by calling the function.
+
+### THE OWNER TOUCHED NO CONTROL THAT WRITES, AND IT WAS VERIFIED BEFORE DELETION
+
+They were warned that *Abrir* and a confirmed silence both write, and that
+looking was enough for items 1 and 3. Checked before the row was removed: the
+notice was still **`unread`** (so *Abrir* was never tapped),
+`notification_suppressions` was **0** (so the silence panel was previewed and
+cancelled), the subject task was untouched and no `undo_operations` row appeared.
+The notice was then **deleted by id**.
+
+### RESIDUE, ITEMISED RATHER THAN ASSERTED
+
+`notifications` is back to **57**; `tasks`, `notification_suppressions` and
+`undo_operations` unchanged. **50 of the 59 `public` tables did not move at all.**
+The nine that did are **the owner's own use of their own product**:
+
+| table | Δ | what it is |
+|---|---|---|
+| `entries`, `jobs`, `entry_interpretations`, `entry_embeddings` | +1 each | the capture the owner made at 23:17 and the async pipeline processing it |
+| `ai_usage_events` | **+2** | that capture's extraction and embedding |
+| `audit_logs` | +2 | the same pipeline's audit rows |
+| `product_events` | +11 | the owner's navigation during the checkpoint |
+| `heartbeat_runs` | +8 | four hourly `pg_cron` ticks × two real users |
+| `rate_limit_events` | +1 | the owner's session |
+
+The two AI calls are named on purpose: this work ran under a *no AI* constraint
+and it held. They belong to the owner's capture. **"Zero writes by me" and
+"nothing moved" are different claims, and only the first one was true.**
+
+### WHAT IS OPEN, RECORDED RATHER THAN COUNTED DONE
+
+- **`/app/notifications` was not separately walked on the device.** §7's prose
+  named that surface; the five enumerated items reach `/app` and
+  `/app/inbox?view=needs-you`. The lane measured the history page at 320px and
+  375px, and **a viewport is not a device**. One more pass closes it.
+- **The heartbeat producing a notice on the owner's own account** has not been
+  observed end to end on hardware, because the checkpoint used a planted row.
+- **`2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.**
+
+### Where the next session starts
+
+**Slice 2S.4 — unblocked, not started, and it needs the owner's word to begin.**
+ADR-138 already authorizes 2S.0 … 2S.4, so nothing new is required except the
+instruction. Closure is still **not** authorized: the phase stops at the owner
+once more, at a closing checkpoint before 2S.4's report may become an ADR.
+
+**A surface can be correct, a lane can be green, and the owner can still open the
+page to find nothing there — because the data was never theirs.**
