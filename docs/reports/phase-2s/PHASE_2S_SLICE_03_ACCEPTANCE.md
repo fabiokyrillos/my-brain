@@ -21,11 +21,18 @@
   product defect that took `/app` down for every owner with an unanswered
   notice — and an **eighth that CI found**, latent on `main` and visible only in
   a three-hour window each day.
-- **AI calls: none. BYOK credit spent: none. Push: not resumed, not repaired,
-  not claimed. Signup unchanged. Rollout unchanged.**
+- **One further hosted write, authorized explicitly: a single notice planted in
+  the owner's own account** so the device checkpoint had something to act on, and
+  **deleted by id** afterwards. `notifications` is back to 57 and nothing the
+  owner touched wrote anything — §11.
+- **AI calls by this work: none. BYOK credit spent: none. Push: not resumed, not
+  repaired, not claimed. Signup unchanged. Rollout unchanged.** (Two
+  `ai_usage_events` rows appeared during the checkpoint window; they are the
+  product's extraction and embedding of a capture **the owner made**, itemised in
+  §11.)
 
-**This record stops at the owner's `2S-MOBILE-003` checkpoint**, and everything
-below the line marked §7 is what remains.
+**The owner's `2S-MOBILE-003` checkpoint was HELD on 2026-08-27** — §7 and §11.
+What remains after it is named there rather than implied.
 
 ---
 
@@ -190,15 +197,16 @@ One of them failed to fail and was repaired first — §5.
 
 ---
 
-## 7. THE OWNER CHECKPOINT — what is not done, and what it needs
+## 7. THE OWNER CHECKPOINT — HELD 2026-08-27, and what it did and did not cover
 
 `2S-MOBILE-003`: *"The owner validates this phase's surfaces on their own
 device. A person with the device, on a named list of items. **No automated lane
 substitutes**, including an emulated WebKit project."*
 `2S-CLOSE-009`: *"A hardware proof is never discharged by a document."*
 
-**The lane has since been run — §10. The device has not.** The rows below say
-which is which, and nothing here claims the device.
+**The owner held it on their own iPhone on 2026-08-27** and reported all five
+named items passed — §11 records how it was reached, what it cost, and the one
+surface the named list does not reach.
 
 | item | state | why |
 |---|---|---|
@@ -206,7 +214,7 @@ which is which, and nothing here claims the device.
 | `2S-ATTENTION-001` · `-003` · `-004` · `-005` · `-006` | **proved on the rendered page** | by that lane; `-006` is proved in the **database** as well as on the page |
 | `2S-ACCESS-004` (axe) | **proved on all three rendered routes**, menu closed and open | by that lane |
 | `2S-MOBILE-001` · `-002` · `-006` · `-007` | **proved on the rendered page at 320px and 375px** | by that lane |
-| `2S-MOBILE-003` | **AWAITING THE OWNER, ON THEIR DEVICE — not performed** | *"No automated lane substitutes, including an emulated WebKit project."* An emulated viewport is not a device, and this lane ran Chromium at a phone size |
+| `2S-MOBILE-003` | **HELD 2026-08-27 — a person, an iPhone, the five named items, all reported passing** | performed against the **deployed production build `6d38edc`**, not a lane and not a preview; §11 |
 | `2S-ACCESS-005` (VoiceOver) | **NOT EXECUTED — OWNER WAIVED**, carried verbatim | nothing in this phase may be reported as screen-reader evidence |
 
 ### The procedure, short and in order
@@ -238,9 +246,11 @@ Then the phone, on the real device, at `/app` and `/app/notifications`:
 |---|---|
 | any rendered-page proof | **performed** — §10. This row read *not performed* when the slice merged. |
 | a screen-reader run | **not performed**, and waived. The announcement contract is asserted in the accessibility tree, which is not the same thing. |
-| `2S-MOBILE-003` | **the owner's, on their device — still not performed.** A 320px Chromium viewport is a measurement, not a hand on a phone. |
-| an iOS Safari, PWA-shell or software-keyboard proof | **none.** The lane is Chromium; the emulated WebKit project was not used here. |
-| a hosted write beyond the lane | **none.** No AI call, no BYOK credit, no migration, no signup change, no rollout change, no push work. |
+| `2S-MOBILE-003` | **HELD 2026-08-27 on the owner's iPhone**, five named items, all reported passing — §11. This row read *still not performed* until then. |
+| the notice the checkpoint acted on | **planted, not produced.** It carried the heartbeat's exact shape, but the heartbeat did not write it — §11. |
+| `/app/notifications` on the device | **not walked.** The five named items reach `/app` and `/app/inbox?view=needs-you`; the history page was measured at 320px and 375px by the lane, and a viewport is not a device. **Recorded open.** |
+| a PWA-shell or software-keyboard proof | **none**, and none is claimed. |
+| a hosted write beyond the lane | **one**, authorized explicitly: the planted notice, deleted by id afterwards. No migration, no BYOK credit, no signup change, no rollout change, no push work, and no AI call by this work. |
 
 ---
 
@@ -423,3 +433,92 @@ synthetic values.**
 by slice 2S.1; hosted parity remains `202608240102`, 102 local = 102 hosted), no
 AI call, no BYOK credit, no signup change, no rollout change, and push was not
 resumed, repaired or claimed.
+
+---
+
+## 11. The device checkpoint, held — and the account that had nothing to check
+
+`2S-MOBILE-003` was held on **2026-08-27**, on the owner's own iPhone, against the
+**deployed production build `6d38edc`** — not a lane, not a preview, not an
+emulated viewport. The owner reported **all five named items passing**.
+
+### It could not start, and the reason is worth more than the checkpoint
+
+The owner opened `/app`, found *Precisa de você* holding exactly one row, and
+asked where *Mais ações* was. **There was no notice on the surface.** The row they
+were looking at was **entry-derived** — *"O MICHAEL PROPÕE … Resolver
+sugestões"* — from a capture made two minutes earlier. That section holds more
+than one kind of item, and only the notice rows carry *Abrir*, a primary action
+and the compact menu.
+
+Measured rather than guessed: of the two real accounts, **all 57 unread notices
+belong to the other one**. The owner's account had **zero**, and the checklist in
+§7 had been handed over without checking which account would open it.
+
+**The silence was the product working.** The owner's quiet hours are
+**22:30 → 07:00** and it was 23:19, so the heartbeat produces nothing by design.
+Beyond that, `run_user_heartbeat` writes `task_overdue` only for a task past its
+`due_at` — the owner had none — and `task_stale` only for a task with **no**
+`due_at` left untouched past a priority-dependent threshold: 0 days urgent, 2
+high, **7 normal**, 15 low. Exactly one of the owner's tasks has that shape, its
+priority is unset, and it had been idle for under four days. **Nothing was
+broken; there was simply nothing worth saying.**
+
+### What it cost, and what it makes this record
+
+The owner was given three routes — sign in to the account that has notices, mark
+a task urgent and wait for the morning tick, or have one notice planted — and
+**chose the planted notice**, explicitly.
+
+One row was written to the owner's real account: `task_stale`, `unread`, normal
+priority, `dedupe_key` `stale:{task}:{local date}` and `action_url`
+`/pt-BR/app/work/{task}` — **the exact shape the heartbeat writes**. It pointed at
+one of the owner's own tasks, and the body was copied **inside the SQL statement**
+so the task's title never left the database.
+
+**So the row was a fixture, and this record says so rather than implying the
+product produced it.** What the checkpoint therefore proves is what
+`2S-MOBILE-003` asks — *a person, the device, the named list* — over a notice of
+the right shape. It does not prove the heartbeat's cadence, which is slice 2S.2's
+pgTAP suite's job and is proved there by calling the function.
+
+**Nothing else was written, and the owner touched no control that writes.**
+Verified before deletion: the notice was still `unread`, so *Abrir* was never
+tapped; `notification_suppressions` was **0**, so the silence panel was previewed
+and cancelled rather than confirmed; the subject task was untouched and no
+`undo_operations` row appeared. The notice was then deleted by id.
+
+### Residue, itemised rather than asserted
+
+`notifications` is back to **57**, and `tasks`, `notification_suppressions` and
+`undo_operations` are unchanged. Of the 59 `public` tables, **50 did not move at
+all**. The nine that did are **the owner's own use of their own product**, not
+this work:
+
+| table | Δ | what it is |
+|---|---|---|
+| `entries`, `jobs`, `entry_interpretations`, `entry_embeddings` | +1 each | the capture the owner made at 23:17 and the async pipeline processing it |
+| `ai_usage_events` | **+2** | that capture's extraction and embedding — **calls the product made on the owner's own entry** |
+| `audit_logs` | +2 | the same pipeline's audit rows |
+| `product_events` | +11 | the owner's navigation during the checkpoint |
+| `heartbeat_runs` | +8 | four hourly `pg_cron` ticks × two real users |
+| `rate_limit_events` | +1 | the owner's session |
+
+The two AI calls are named here deliberately: this session was under a *no AI*
+constraint, and it held — those calls belong to the owner's capture, not to the
+work.
+
+### What the checkpoint does NOT cover
+
+- **`/app/notifications` was not separately walked on the device.** §7's prose
+  named that surface, and the five enumerated items reach `/app` and
+  `/app/inbox?view=needs-you` only. The automated lane measured the history page
+  at 320px and 375px, but that is a viewport and not a device. **One more pass
+  would close it**, and it is recorded as open rather than counted as done.
+- **`2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.** Nothing in
+  this phase may be reported as screen-reader evidence.
+- **The heartbeat producing a notice on the owner's own account** has not been
+  observed end to end on the device, because the checkpoint used a planted row.
+
+**A checklist handed over without checking whose account will open it is a
+checklist about somebody else's data.**

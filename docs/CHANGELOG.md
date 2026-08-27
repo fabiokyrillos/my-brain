@@ -3,6 +3,57 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-27 - Phase 2S: the owner's device checkpoint is HELD, and the account that had nothing to check
+
+**Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
+
+`2S-MOBILE-003` was held on the owner's own iPhone against the deployed
+production build `6d38edc` — a person, the device, the five named items, all
+reported passing. `2S-CLOSE-009` is satisfied by a hand on a phone rather than by
+a document, and slice 2S.4 is no longer blocked by it. Nothing here starts 2S.4.
+
+**It could not start, and the reason is worth more than the checkpoint.** The
+owner opened `/app`, found *Precisa de você* holding one row and asked where
+*Mais ações* was — there was no notice on the surface at all. The row was
+entry-derived, from a capture made two minutes earlier; that section holds more
+than one kind of item, and only notice rows carry *Abrir*, a primary action and
+the compact menu. Measured: of the two real accounts, **all 57 unread notices
+belong to the other one**. The checklist had been handed over without checking
+whose account would open it.
+
+**The silence was the product working.** Quiet hours are 22:30 → 07:00 and it was
+23:19, so the heartbeat writes nothing by design. Beyond that, `task_overdue`
+needs a task past its `due_at` — there were none — and `task_stale` needs a task
+with no `due_at` idle past a priority threshold (0 urgent · 2 high · 7 normal ·
+15 low); the owner's one task of that shape has no priority set and had been idle
+under four days.
+
+**One notice was planted with the owner's explicit authorization, and deleted by
+id afterwards.** It carried the heartbeat's exact shape and pointed at one of the
+owner's own tasks, with the body copied inside the SQL statement so the title
+never left the database. The record says the row was a **fixture** rather than
+implying the product produced it: the checkpoint proves what `2S-MOBILE-003`
+asks — a person, the device, the named list — and not the heartbeat's cadence,
+which slice 2S.2's pgTAP suite proves by calling the function.
+
+**The owner touched no control that writes**, verified before deletion: the
+notice was still `unread`, `notification_suppressions` was 0, the subject task
+was untouched and no `undo_operations` row appeared.
+
+**Residue is itemised rather than asserted.** `notifications` is back to 57 and
+50 of the 59 `public` tables did not move at all. The nine that did are the
+owner's own use of their own product — a capture and its async pipeline
+(`entries`/`jobs`/`entry_interpretations`/`entry_embeddings` +1 each,
+`ai_usage_events` +2, `audit_logs` +2), their navigation (`product_events` +11),
+four hourly `pg_cron` ticks across two users (`heartbeat_runs` +8) and their
+session (`rate_limit_events` +1). The two AI calls are named deliberately: this
+work was under a no-AI constraint and it held.
+
+**Recorded open rather than counted done:** `/app/notifications` was not
+separately walked on the device, and the heartbeat producing a notice on the
+owner's own account has not been observed end to end on hardware.
+`2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.
+
 ## 2026-08-26 - Phase 2S slice 2S.3 correction: the hosted lane was run, and it found seven defects
 
 **Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
