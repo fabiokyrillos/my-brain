@@ -14976,3 +14976,99 @@ heartbeat producing a notice on the **owner's own** account; and a notice
 
 **A closeout is worth exactly what it can refuse — and both of the things this
 one found had already been merged, reviewed and green.**
+
+---
+
+## §136 — The last device item is closed, the owner decided the raised question, and the phase stops one step short of closure (2026-08-27)
+
+Merge SHA `6666e29400321cbcc220f858ce1e6536ca727f29` (PR #323), CI green 3/3 on
+the PR head `7f92f10` (run `33115663958`) and green 3/3 again on that exact merge
+SHA (run `33116429648`). **Zero migrations**; parity untouched at `202608240102`,
+102 local = 102 hosted.
+
+**THE PHASE IS NOT CLOSED.** No closing ADR exists, closure is not authorized,
+and no successor is started, planned or named. This section does not change that.
+
+### `/app/notifications`, on the device, on a real row
+
+All six named points passed on the owner's own iPhone, and **only those six are
+recorded**: no horizontal scrolling; the row and its controls easy to tap;
+*Mais ações* opens without covering the row; *Silenciar por um tempo* states the
+duration before confirmation; the date field causes no zoom; and no action was
+confirmed. The owner did not tap *Abrir* either, and said so.
+
+**This is the item §134 recorded as open** — the first pass had reached that page
+in its **empty state**, and two of its points could not be attributed to a page
+that had a row on it. It took a second fixture to close, and the owner set the
+procedure: a residue baseline first, one fully synthetic notice, no AI, no BYOK,
+no migration, and **no deletion or alteration until they confirmed explicitly.**
+
+### The exception was declared BEFORE the validation, not after it
+
+The fixture's content was synthetic. Its `dedupe_key` and `action_url` were not:
+they reference the id of one of the owner's own tasks, because
+`attention-notice-row.test.tsx:192` asserts that a notice whose subject does not
+resolve **offers no silencing verb at all** — so a fully detached row would have
+made three of the six points unreachable.
+
+That was said **before** the owner picked up the phone, together with its
+consequence: the product may render that task's own title inside the primary
+action's label. **No task title was read by this work, and none appears in any
+artifact it produced.**
+
+**A constraint you cannot fully meet is a thing to declare in advance, with the
+reason and the cost. Declared afterwards it is an excuse.**
+
+### Residue zero, and the discipline that makes it mean something
+
+Verified **before** deletion, not after: the fixture was still `unread` with a
+null `read_at`, `notification_suppressions` **0**, `undo_operations` **20**, the
+eight tasks untouched since the plant, and **zero** audit rows in the window.
+Then deleted **by id**.
+
+**58 of the 59 `public` tables are identical to the pre-plant baseline.** The one
+that moved is `product_events` **+1** — a single `needs_attention_viewed` on
+*home* at a **mobile** viewport, which is the owner's own navigation. It is named
+rather than absorbed, because *"zero writes by me"* and *"nothing moved"* are
+different claims and only the first one was ever true.
+
+### The owner answered the question slice 2S.4 raised
+
+The closeout raised that the ladder's terminal branch leaves a subject nobody
+answers **silent until it changes** — signed behaviour, and also the live state of
+three real tasks. It was raised as an **owner question**, not as a defect, and it
+came back answered:
+
+> **The terminal silence is the intended semantics.** Send, +1 day, +3 days,
+> +7 days, then nothing until the subject changes. The subject stays reachable on
+> the attention surfaces, and the owner does not want indefinite notification
+> about something that has not moved.
+
+`OD-2S-4` A stands as signed. The threat model reads **eighteen CLOSED · one
+CARRIED · one RAISED and since DECIDED**.
+
+**A closeout that raises a question and gets an answer has done its job; one that
+resolves the question itself has taken a decision that was not its to take.**
+
+### What is still open, and what it is allowed to stand for
+
+| open | state |
+|---|---|
+| the heartbeat producing a notice on the **owner's own** account | **NOT EXECUTED**, and a **non-blocking residual** by the owner's decision. The cadence and the function are proved by pgTAP and by the hosted measurement |
+| a notice **answered in real use** | `read`, `dismissed` and `notification_suppressions` are still **all zero** in production |
+| `2S-ACCESS-005` (VoiceOver) | **NOT EXECUTED — OWNER WAIVED** |
+
+**Two fixtures were planted in this phase and NEITHER is evidence of the
+heartbeat.** The owner said so explicitly and the records say so in every place
+they mention them. A planted row proves a surface renders and a control behaves;
+it proves nothing about what produces the row.
+
+### Where the next session starts
+
+**The owner's FINAL closing authorization, and nothing before it.** Until it is
+given: no ADR of closure may be written, the phase may not be formally closed,
+and the successor may not be started, planned or named. Slice 2S.4 is merged;
+there is no more implementation to do.
+
+**A phase ends when its owner says so, and every artifact in this repository is
+built to make that the only way it can end.**
