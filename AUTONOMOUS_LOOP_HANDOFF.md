@@ -14514,3 +14514,207 @@ it, and this record is not it either.
 
 **A requirement can name an example its own surface cannot produce — and a lane
 that has not been run proves nothing, however carefully it was written.**
+
+---
+
+## §133 — The slice 2S.3 lane was finally RUN, and it found seven defects — one of them `/app` down for every owner with an unanswered notice; CI found an eighth (2026-08-26)
+
+Merge SHA `a0ba0524ae902f6f52d1c7cf443234d45c8e55bd` (PR #318), CI green 3/3 on
+the PR head `e029260` (run `33027767393`) and green 3/3 again on that exact merge
+SHA (run `33028286904`) — three completed jobs each time. **The first head,
+`2f97e58`, FAILED**, and what it failed on is the eighth defect below. **Zero
+migrations**; parity untouched at `202608240102`, 102 local = 102 hosted.
+
+§132 closed with the sentence *"a lane that has not been run proves nothing,
+however carefully it was written."* This section is the invoice for it.
+
+```
+npm run test:e2e:online -- e2e/online-phase-2s-attention.spec.ts --project=desktop
+Running 18 tests using 1 worker
+  18 passed (2.7m)
+```
+
+Three attempts. The first timed out on the local `webServer` — **no test ran and
+no hosted row was written**, confirmed against a database byte-identical to the
+baseline. The second reported **13 passed / 5 failed, and twelve of the thirteen
+were false.**
+
+### THE DEFECT THAT MATTERS: the RSC boundary is only drawn by Next
+
+`isOwnerScopedDestination` was exported from `notice-open-control.tsx`, which
+carries `"use client"`. **The directive marks the MODULE, not the export**, so
+`attention-notice-row.tsx` — a Server Component — could not call it. React
+refused, and `/app` served its error boundary **to every owner with an
+unanswered notice**: the whole point of the slice, broken for exactly the
+accounts it was built for.
+
+**Nothing caught it and nothing could have.** jsdom renders a Server Component
+and a Client Component as the same function in the same bundle, so all three
+hundred of the feature's component assertions passed. This repository already
+recorded *the RSC boundary is only tested in production* — as a lesson, with no
+executable guard behind it. Now there is one:
+`src/lib/closeout/rsc-boundary-guard.test.ts`, and its rule is the decidable
+one — **a server module may RENDER a value imported from a client module and may
+never CALL one.**
+
+The predicate is pure, so the fix is not to move the caller but to stop the
+function claiming a side it does not need: it lives in `destination.ts`, a module
+with **no directive**. And `notice-open-control.tsx` does **not** re-export it —
+the first draft of the fix did, which keeps every old import compiling and is
+really **the same trap left open**, because the predicate would still be
+reachable *through a client module*.
+
+**The guard's own classifier had a blind spot on its first pass.** It decided a
+module was client code from the first non-empty **line**, and three modules here
+open with a docblock and declare the directive after it — `deletion-surface.tsx`,
+`consent-surface.tsx`, `account-state-surface.tsx`. All three were filed as
+**server** modules, which blinds the guard twice over. It reads the first
+**statement** from comment-stripped source now, and a fourth assertion fails if
+any module carrying the directive is ever filed as server code again.
+
+### AN ERROR PAGE SATISFIES ALMOST EVERY MEASUREMENT A LANE MAKES
+
+axe finds no serious violation on one. An error page does not scroll sideways.
+And the menu scan called `test.skip` when it found no trigger — **so the lane
+reported a pass for the surface it had most failed to measure.** Only the three
+tests that demanded a *control* failed.
+
+Every visit now refuses `[data-ux-state="error_recoverable"]` **and** the
+boundary's own heading, and the second reading is the one worth carrying: the
+first draft guessed *"algo deu errado"*, which appears nowhere in this product.
+**A detector that cannot fire is the same thing as no detector** — read the copy
+the component actually renders, never the copy you would have written.
+
+### A SURFACE MEASURED THROUGH ANOTHER SURFACE'S SELECTOR REPORTS ZERO
+
+The hardening pass added `expectNotices` and applied the attention surface's
+`.notice-attention-row` to all three surfaces. `/app/notifications` has **never**
+rendered it — that page renders `li.list-row.notification-row`, its own contract
+since long before this phase, and **three** rows where the attention surface
+renders two, because the collapse by subject is the attention surface's rule and
+not the history's. Four tests said *"the page is empty"* about a page that was
+full.
+
+**Borrowing a selector is the same class of mistake as measuring a fixture
+instead of the page: the number that comes back is about the wrong object.**
+
+### A ROW COUNT IS NOT A WRITE, AND `.first()` WAS A COIN TOSS
+
+`2S-ATTENTION-006` opened `.first()` and asserted `count === before - 1`. Both
+halves were wrong, and the product was right both times.
+
+- The three notices are inserted by **one statement**, so they share a
+  `created_at`, and the read orders by `created_at desc` **with no tiebreaker**.
+  Which subject led the page was undefined: the test passed or failed on the
+  draw.
+- The fixture **deliberately** gives one subject two unanswered notices, because
+  `2S-ATTENTION-002` needs something to collapse. Marking one of that pair seen
+  is a completely correct write that leaves the row exactly where it was — the
+  subject still has an unanswered notice, and the surface is telling the truth
+  when it keeps showing it. `expected 1, received 2` was **accusing the product
+  of being right.**
+
+The test opens the single-notice subject now and reads the notices back **from
+the database** either side of the interaction: exactly one moved to `read`, and
+it is the one the row carried. That read runs at the moment the destination URL
+is on screen and **does not retry**, which is also how it proves the order the
+control promises — a control that navigated before its write finished would be
+caught there rather than tolerated.
+
+**Prove a write where the write happens.** A projection can stay put for a
+correct write and can move for a reason that has nothing to do with one.
+
+### `fullyParallel` MADE SIX ACCOUNTS OUT OF ONE
+
+The lane declared no describe mode. `playwright.config.ts` sets
+`fullyParallel: true`, so on twelve cores the eighteen tests went to **six
+workers** — and each worker evaluates the describe body of its own, so
+`crypto.randomUUID()` ran six times and the lane created and deleted **six
+disposable accounts**. It did not visibly corrupt itself only because of that
+per-worker email; the file's stated ordering, where `2S-ATTENTION-004` clears
+and re-plants, was a fiction throughout.
+
+`test.describe.configure({ mode: "default" })` now — one worker, declaration
+order — and deliberately **not** `"serial"`, whose skip-after-failure turns a
+finding into a silence.
+
+**A shared-account lane that does not declare its mode is not serial by
+accident.** Every other online spec in this repository declares one.
+
+### And the fixture wrote two rows for nothing
+
+`plantNotices` indexed `taskIds`, which is append-only, so its **second** planting
+created two tasks it never referenced and hung its notices back on the first two.
+Nothing failed, which is exactly why it survived a run.
+
+### AN EIGHTH DEFECT, FOUND BY CI RATHER THAN BY THE RUN — AND LATENT ON `main`
+
+The first CI on this branch failed two `2S-ACCESS-002` assertions, and **neither
+was this branch's doing.** The tests typed a date computed by `isoDaysFromToday`,
+which read `new Date()` in the **host's** zone, while the component derives its
+day count in the **owner's** — `localDateOf(new Date(), timeZone)`, which is
+where slice 2S.3 already moved it after `LDC-GUARD-001` caught the same mistake
+in the product.
+
+The two frames agree for twenty-one hours a day and disagree for three. CI ran at
+**00:26 UTC**, where São Paulo was still on the previous day, so the test typed
+*tomorrow* by its clock while the component read *the day after* by the owner's:
+`2 dias` where the test wanted `1 dia`. Slice 2S.3 merged at 13:35 UTC, outside
+the window — **this branch's timing is the only reason it ever surfaced.**
+
+The test states its dates in the owner's zone now, through the same
+`localDateOf`/`addLocalDays` contract the component walks, with the zone named
+once so the render and the arithmetic cannot drift apart.
+
+**`TZ=UTC` reproduces CI's clock exactly on a machine at UTC-3**, which is what
+turned a guess into a proof: under it the old helper fails **those two assertions
+and no others**, and the new one passes along with the whole suite — 9 662
+assertions, zero failing. Worth keeping: a suite that only ever runs in one zone
+cannot tell you which clock it read, and one environment variable will say.
+
+**A test that reads a different clock than the product is not measuring the
+product.**
+
+### Residue: zero, and proved by comparison
+
+A snapshot of **all 59 `public` tables** taken before the run is **identical, row
+for row**, to one taken after `afterAll`. `auth.users` is **2**, both real and
+pre-existing; accounts matching `codex-2s3-%@example.com` and `%@example.com` are
+**0**; lane-titled tasks **0**; lane-keyed notices **0**; `audit_logs` and
+`product_events` written in the last three hours **0**. The 54 notices titled
+*Tarefa sem movimento* are the pre-existing `task_stale` rows slice 2S.0 counted.
+**No personal content was read — only counts and predicates over synthetic
+values.**
+
+### A local gate that failed for a reason that was not the code
+
+One full-suite run reported **six failures**. Every one was `Test timed out in
+5000ms` in a guard that walks the repository — not an assertion. The cause was the
+`next dev` server left running from the online lane, competing for I/O on a
+filesystem this repository already knows is slow. Stopped it; **9 662 assertions
+passing with zero failing**, and the three failing FILES are the pre-existing
+Windows rolldown-shebang baseline. **Read whether a failure is an assertion or a
+clock before believing it.**
+
+### Controls and gates
+
+Mutation control on the new guard: the old import restored, the guard fails by
+name, the file restored and re-verified. Gates: typecheck **zero**; lint **0
+errors** over `src` and `e2e` (the six in `npm run lint` are inside gitignored
+`.worktrees/`, which CI never checks out); **9 662 assertions passing with zero
+failing**; build **exit 0**; the rendered authenticated lane **18/18 on the
+hosted project**.
+
+No AI call, no BYOK spend, no migration, no signup change, no rollout change, and
+push HTTP 403 stays not resumed, not repaired and not claimed.
+
+### Where the next session starts — AND IT STILL MUST NOT START WITH 2S.4
+
+**The owner's `2S-MOBILE-003` device checkpoint**, unchanged and undischarged.
+The lane above is Chromium at a phone size; `2S-MOBILE-003` asks for *a person
+with the device*, and `2S-CLOSE-009` forbids discharging a hardware proof with a
+document. The five checks are in
+`docs/reports/phase-2s/PHASE_2S_SLICE_03_ACCEPTANCE.md` §7.
+
+**A 320px viewport is a measurement, not a hand on a phone — and a lane written
+to prove a page can spend three runs proving nothing at all.**
