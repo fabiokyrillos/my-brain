@@ -3,6 +3,51 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-27 - Phase 2S: /app/notifications validated on the device, and the owner decides the ladder's terminal silence
+
+**Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
+**The phase is still NOT closed**, no closing ADR exists, and no successor is
+started, planned or named.
+
+**The last open device item is closed.** `/app/notifications` was validated on the
+owner's own iPhone on a **real notice row**, and all six named points passed: no
+horizontal scrolling; the row and its controls easy to tap; *Mais ações* opens
+without covering the row; *Silenciar por um tempo* states the duration before
+confirmation; the date field causes no zoom; and no action was confirmed. Only
+those six are recorded.
+
+**The procedure was the owner's, and it was followed exactly.** A residue baseline
+first, one fully synthetic notice, no AI, no BYOK, no migration, and **no deletion
+until the owner confirmed explicitly**. One exception to *fully synthetic* was
+declared **before** the validation rather than after it: the row's `dedupe_key`
+and `action_url` reference the id of one of the owner's own tasks, because a
+notice whose subject does not resolve **offers no silencing verb at all**, which
+would have made three of the six points unreachable. No task title was read by
+this work and none appears in any artifact it produced.
+
+**Residue zero, proved against the pre-plant baseline.** Verified before deletion:
+the fixture was still `unread` with a null `read_at`, suppressions were zero, undo
+operations unchanged, the eight tasks untouched, and no audit row written. Deleted
+by id. **58 of the 59 `public` tables are identical**; the one that moved is
+`product_events` +1 — a single `needs_attention_viewed` on *home* at a mobile
+viewport, the owner's own navigation. `ai_usage_events` did not move.
+
+**The owner decided the item slice 2S.4 raised.** The cadence ladder's terminal
+silence — send, +1 day, +3 days, +7 days, then nothing until the subject changes
+— **is the intended semantics**. The subject stays reachable on the attention
+surfaces, and the owner does not want indefinite notification about something that
+has not moved. `OD-2S-4` A stands as signed, and the threat model records the item
+as **decided** rather than carried.
+
+**Two items stay open, and neither substitutes for the other.** The heartbeat
+producing a notice on the owner's own account is **NOT EXECUTED** and recorded as
+a **non-blocking residual** by the owner's decision — the cadence and the function
+are proved by pgTAP and by the hosted measurement, and **the fixtures are not
+offered as evidence of the heartbeat anywhere**. And a notice **answered in real
+use**: `read`, `dismissed` and `notification_suppressions` are still all zero in
+production. `2S-ACCESS-005` (VoiceOver) stays **NOT EXECUTED — OWNER WAIVED**.
+
+
 ## 2026-08-27 - Phase 2S slice 2S.4: the closeout, and the two things it found that were merged and green
 
 **Zero migrations.** Parity untouched at `202608240102`, **102 local = 102

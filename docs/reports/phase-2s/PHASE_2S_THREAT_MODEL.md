@@ -418,7 +418,8 @@ disposition, and it says OPEN.
 `2S-CLOSE-007`: **a threat closes only when its mitigation exists AND has been
 exercised.** Existing is not enough, and a green pipeline is not an exercise.
 
-**Eighteen CLOSED · one CARRIED · one RAISED.** Nothing here closes on a document.
+**Eighteen CLOSED · one CARRIED · one RAISED and since DECIDED by the owner.**
+Nothing here closes on a document.
 
 | threat | disposition | what exercised it |
 |---|---|---|
@@ -441,10 +442,11 @@ exercised.** Existing is not enough, and a green pipeline is not an exercise.
 | `T-2S-17` a stale control writing anyway | **CLOSED** | The pre-existing `stale_pre_state` refusal is reached **from this surface** and rendered as the reload affordance rather than a generic failure |
 | `T-2S-18` an undo that reports success and restores nothing | **CLOSED** | The undo offer comes straight from the database's own answer and is never constructed in the row; a disposition with no compensation row offers none |
 | `T-2S-19` the two surfaces diverging | **CARRIED, narrowed** | Both mechanisms are in place — one projection read by all three surfaces, and every writer invalidating all three routes — and slice 2S.3 found `/app/inbox` missing from **both** writers and added it. What is **not** exercised is divergence under real use: `read`, `dismissed` and `notification_suppressions` are all **zero** in production, so no owner has yet acted on one surface and looked at another. Destination: the open item *a notice answered in real use* |
-| **RAISED at closeout — not one of the nineteen** | **carried, and it is an owner question** | The ladder's terminal branch means a subject nobody answers eventually goes **silent forever until it changes**. That is `OD-2S-4` A working as signed, and it is also the state three real tasks are in right now: stale since 2026-07-30, and the product no longer mentions them. Not a defect and not a closure — **an owner decision about whether silence is the right end state**, recorded here rather than left for someone to rediscover |
+| **RAISED at closeout — not one of the nineteen** | **DECIDED BY THE OWNER, 2026-08-27** | The ladder's terminal branch means a subject nobody answers eventually goes **silent forever until it changes**. That is `OD-2S-4` A working as signed, and it is also the state three real tasks are in right now: stale since 2026-07-30, and the product no longer mentions them. Not a defect. **The owner decided on 2026-08-27 that this IS the intended semantics** — send, +1 day, +3 days, +7 days, then nothing until the subject changes, with the subject still reachable on the attention surfaces. `OD-2S-4` A stands as signed |
 
-**One carried and one raised, and neither quietly.** `T-2S-19` needs use, not a
-test. The raised item needs the owner, not a fix.
+**One carried, and the raised item is now decided.** `T-2S-19` needs use, not a
+test. The raised item went to the owner and came back answered on 2026-08-27:
+the terminal silence is the semantics they want.
 
 **A threat closed by reading its mitigation is a threat nobody tested — and
 `T-2S-16` spent this whole phase in that condition.**
