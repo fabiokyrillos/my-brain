@@ -3,6 +3,85 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-27 - Phase 2S slice 2S.4: the closeout, and the two things it found that were merged and green
+
+**Zero migrations.** Parity untouched at `202608240102`, **102 local = 102
+hosted**, both re-read live at closeout. **The phase is NOT closed**: closure is
+an owner decision recorded as an ADR after a closing checkpoint, and neither has
+happened.
+
+**The matrix is generated and refuses rather than emitting a partial one.**
+`scripts/generate-phase-2s-traceability.mjs` implements the traceability
+contract's twenty-two refusals, writes nothing when any fires, and `--check`
+compares the committed file against a fresh generation byte for byte. **99
+declared · 99 classified · zero `undelivered`.**
+
+**The reconciliation came back clean in the direction that matters.** All
+eighteen requirements declared `baseline` were delivered `baseline`; **zero were
+recorded as `built`**. Phase 2R ran the same reconciliation for the first time at
+its own closeout and found five requirements taking credit for work nobody did,
+misfiled since that phase's first slice. The opposite direction was exercised for
+real: `2S-CADENCE-008` and `2S-REACH-002` were declared `build` and delivered
+`baseline` — a phase discovering the property already held, which `2S-CLOSE-004`
+protects so that no phase is pushed into manufacturing a change to make a label
+look right.
+
+**The generator's first run found a class that was merged and green.**
+`2S-ANSWER-006` had been classified `rule` — a declared **kind**, never one of
+the five delivery classes. It is `not-built-by-rule` now, which is what all three
+of Phase 2R's own `rule` requirements were.
+
+**And the closeout found a requirement nobody had exercised.** `2S-TRUST-011`
+reads *"the operation key and its idempotency refusal are reused and **exercised
+from this surface**"*, and nothing in the feature named `operationKey` at all.
+What existed proved the control is `disabled` while a round is in flight, which
+is a different property: **a control that cannot be pressed twice says nothing
+about what happens when the response is lost**, and the lost response is the case
+the key exists for. Two exercises were written — a retry after a thrown round
+carries the **same** key, a terminal outcome **rotates** it — each with a
+mutation control. Two mutations, two failures.
+
+**`2S-CLOSE-012` re-measured the defect and half of it moved.** The daily
+repetition stopped on the day slice 2S.1's migration landed: three per day for
+eighteen unbroken days, then zero for three. The conclusion survived four
+attacks — the heartbeat ran 48 times in 48 hours, all completed; the subject
+tasks are unchanged since 2026-07-30; no suppression exists on that account; and
+the ladder was read from the deployed function rather than the migration file.
+**The half that did not move is stated plainly**: `read`, `dismissed` and
+`notification_suppressions` are all zero in production, so the answering half is
+proved by tests and by one hosted lane on a disposable account, **not by use**.
+
+**The threat model is re-dispositioned against what was built** — eighteen
+closed, one carried, one raised — and a threat closes only when its mitigation
+exists **and has been exercised**. `T-2S-16` was not closed until this slice
+wrote the exercise. `T-2S-19` is carried because divergence under real use cannot
+be exercised while nobody has answered a notice. And one item is **raised**: the
+cadence ladder's terminal branch means a subject nobody answers goes silent until
+it changes, which is signed behaviour and is also the state three real tasks are
+in now — an owner question, recorded rather than left to be rediscovered.
+
+**The reuse claim is proved against a commit.** The five handlers the shared
+bundle dispatches to were looked for at slice 2S.0's merge `39bb4b8`: four
+present, `suppressNotificationSubject` absent and authorized. Refusal 20 reads
+the bundle from the tree, so `OD-2S-3` B's objection is an exit code rather than
+a review note.
+
+**`2S-TRUST-005`'s enumeration is wider than its own sentence**, and the record
+says so: three writers of `notifications` exist — the heartbeat's insert, Phase
+2H's retention delete, and `markNotification`'s status update — and this phase
+added none of them.
+
+**The declarations guard was inverted a second time, exactly as its own note
+predicted.** It refused the closeout artifacts *until 2S.4 builds them*; they are
+asserted present now, and the closing report must still carry the sentence
+saying it does not close the phase.
+
+**Three open device items are kept distinct, and none substitutes for another:**
+`/app/notifications` walked on the device with a **real** notice row, the
+heartbeat producing a notice on the owner's own account, and a notice answered in
+real use. `2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.
+
+
 ## 2026-08-27 - Phase 2S: the owner's device checkpoint is HELD, and the account that had nothing to check
 
 **Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.

@@ -254,17 +254,51 @@ Then the phone, on the real device, at `/app` and `/app/notifications`:
 
 ---
 
-## 9. Classification — deliberately deferred
+## 9. Classification — deferred until the evidence existed, and written now
 
-**No requirement is classified in this record.** `2S-CLOSE-001` puts
-classification in slice 2S.4, from a generated matrix that *refuses rather than
-emitting a partial one*, and `2S-CLOSE-009` forbids discharging a hardware proof
-with a document. Eleven of this slice's twenty-two requirements are waiting on a
-lane nobody has run and on a device nobody has held; classifying them now would
-be the over-claim the whole closeout apparatus exists to refuse.
+**This section was empty when the slice merged, and deliberately so.** It read
+*"no requirement is classified in this record"*, because eleven of the
+twenty-two were waiting on a lane nobody had run and on a device nobody had
+held. Classifying them then would have been the over-claim the whole closeout
+apparatus exists to refuse.
 
-**A lane that has not been run proves nothing, and a document saying it would
-have passed proves less.**
+Both are now done — §10 ran the lane, §11 held the device — so the table is
+written **during slice 2S.4**, from the evidence rather than ahead of it.
+`2S-CLOSE-001`'s generator reads this table; nothing here is typed into the
+matrix by hand.
+
+| Requirement | Class | Evidence |
+|---|---|---|
+| `2S-ATTENTION-001` | **built** | §10 — the unanswered notices render on the real `/app`, proved on the hosted project with rows planted for the account under test, and the verbs arrive with them from the one shared mount |
+| `2S-ATTENTION-002` | **built** | §2, §10 — three unanswered notices about two subjects render **two** rows on the rendered page; the duplicate is planted so the number is able to be wrong, and the collapse is a projection that deletes nothing |
+| `2S-ATTENTION-003` | **built** | §10 — the number on the heading is compared against the rows a reader can see under it, derived from `queueSize` and never typed |
+| `2S-ATTENTION-004` | **built** | §10 — the empty state is reached **after** rows were proved on the same account, and it is a real empty state (`Nada precisa de você agora.`) rather than a section that vanished |
+| `2S-ATTENTION-005` | **built** | §10 — measured against the rendered page on the hosted project, never a fixture; §10.2 is the price paid for the version that measured an error page instead |
+| `2S-ATTENTION-006` | **built** | §10.4 — opening marks it seen, proved **in the database**: exactly one notice moved to `read`, it is the one the row carried, and the read runs with the destination on screen and no retry, which is what proves the write finished before the navigation |
+| `2S-ATTENTION-007` | **baseline** | `src/features/shell/home-notices.test.tsx:208` — every pre-existing source of the attention surface still renders and is still counted; **no change was made to any of them**, and `home-view.tsx:462` records why the ordering is deliberate |
+| `2S-ATTENTION-008` | **built** | §5 — by two independent mechanisms: one projection read by all three surfaces, and every writer invalidating all three routes. `/app/inbox` was missing from both writers and was added |
+| `2S-ACCESS-001` | **built** | `attention-notice-row.test.tsx:156` and `:214` — every control names its subject, so twenty rows are twenty distinguishable destinations rather than twenty repetitions of the same word |
+| `2S-ACCESS-002` | **built** | §4, §10 — the silence consequence states the date **and** the number of days before the owner confirms; the day count walks calendar days in the **owner's** zone after `LDC-GUARD-001` caught it reading the device's |
+| `2S-ACCESS-003` | **built** | `attention-notice-row.test.tsx:333` — every live region is mounted **before** there is any result to announce; a region created together with its message is never announced |
+| `2S-ACCESS-004` | **built** | §10 — axe finds no serious violation on all three rendered routes, scanned twice each: menu closed **and** menu open, because `role="menu"`, `aria-expanded` and `aria-describedby` exist only while it is open |
+| `2S-ACCESS-005` | **not-built-by-rule** | **NOT EXECUTED — OWNER WAIVED**, carried verbatim and restated by the owner on 2026-08-27. No screen-reader evidence is claimed anywhere in this phase; the accessibility tree is asserted instead and is **not** the same thing. Destination: stays waived |
+| `2S-ACCESS-006` | **built** | §10 — the compact menu opens, moves, activates and closes by keyboard alone on the rendered page, and Escape returns focus to the trigger. The handler sits on the container because the trigger is the list's sibling, which four green focus tests did not notice |
+| `2S-ACCESS-007` | **built** | `attention-notice-row.test.tsx:318` — one announceable node, and it is the visible one; a second region would announce the same outcome twice |
+| `2S-MOBILE-001` | **built** | §10 — nothing scrolls sideways at **320px and 375px** on all three rendered surfaces, each measured through its own row contract; and §11, on the owner's iPhone |
+| `2S-MOBILE-002` | **built** | §10 — the date field's computed `font-size` is read from the rendered page and is ≥16px, the threshold below which iOS zooms; read from the computed style, never from the rule meant to set it |
+| `2S-MOBILE-003` | **built** | §11 — **held 2026-08-27 on the owner's own iPhone**, against the deployed production build `6d38edc`, five named items, all reported passing. No automated lane substitutes and none is offered as one; §11 also records what the session did **not** cover |
+| `2S-MOBILE-004` | **baseline** | **This phase's surfaces added no dialog at all.** The dismissal confirmation is an inline panel (`.notification-verb-panel-question`), which `attention-notice-row.test.tsx:291` exercises — deliberately *"the control against a blanket dialog"*. `ConfirmDialog` still carries `useScrollLock` where it is used, so 2R's property is untouched and **no change was made** |
+| `2S-MOBILE-005` | **not-built-by-rule** | The rule refuses it by name: `2R-DRAWER-NOT-LOCKED` stays an **owner design decision**, carried in PRD §7.1 and not resolved here. Destination: the owner. `.ux-detail` still declares `aria-modal` without locking, and this phase neither repaired nor claimed it |
+| `2S-MOBILE-006` | **built** | §10 — the primary action, the menu trigger and *Abrir* each measured ≥44px tall **on the rendered page** at a phone viewport, never against a media query, because headless Chromium reports `pointer: coarse` at 1280px |
+| `2S-MOBILE-007` | **built** | §10 — asserted **geometrically**: the menu's top edge is compared against the row title's bottom edge, because "visible" alone would pass for an element a panel sits on top of |
+
+**Eighteen `built`, two `baseline`, two `not-built-by-rule`, zero `partial`,
+zero `undelivered`.** The two `baseline` rows each say explicitly that **no
+change was made**, which is the half of that class the reconciliation exists to
+protect.
+
+**A class written before its evidence is a claim; this table waited for the
+evidence and is therefore a record.**
 
 ---
 
@@ -508,17 +542,46 @@ The two AI calls are named here deliberately: this session was under a *no AI*
 constraint, and it held — those calls belong to the owner's capture, not to the
 work.
 
-### What the checkpoint does NOT cover
+### `/app/notifications` on the device — a SECOND pass, and only half of it counts
 
-- **`/app/notifications` was not separately walked on the device.** §7's prose
-  named that surface, and the five enumerated items reach `/app` and
-  `/app/inbox?view=needs-you` only. The automated lane measured the history page
-  at 320px and 375px, but that is a viewport and not a device. **One more pass
-  would close it**, and it is recorded as open rather than counted as done.
+The owner walked `/app/notifications` on the iPhone afterwards and reported four
+things. **Two of them cannot be attributed and are therefore not recorded as
+validated**, on the owner's own instruction.
+
+The planted notice had already been deleted, and the owner could not confirm
+whether that pass happened before or after the deletion. With zero notifications
+the page renders its empty state — no row, no *Mais ações*, no date field — so
+*"the menu opens without covering the row"* and *"the date field does not zoom"*
+**could only have been observed inside a roughly ten-minute window**, and nothing
+in the data settles it: the page emits no view event, so the absence of one
+proves nothing either way.
+
+| reported | recorded |
+|---|---|
+| no horizontal scrolling | **VALIDATED**, on the empty state — true of that page in either reading |
+| the controls present are easy to tap | **VALIDATED**, likewise |
+| no destructive action or silence confirmed | **VALIDATED** — and independently true in the database |
+| *Mais ações* opens without covering the row | **NOT RECORDED.** Cannot be attributed to a page that had a row on it |
+| the date field causes no zoom | **NOT RECORDED**, same reason |
+
+**An observation that cannot be attributed to the state it describes is not
+evidence, and the owner said so before this record did.**
+
+### Three open items, kept distinct because one does not stand for another
+
+| open | why it is its own item | destination |
+|---|---|---|
+| **`/app/notifications` walked on the device with a REAL notice row** | the empty state exercises a layout, not the row's controls | plant one synthetic notice, have the owner validate, and **delete only after their explicit confirmation** — the owner's stated procedure |
+| **the heartbeat producing a notice on the owner's own account** | the checkpoint used a **planted** row; a fixture is not cadence | the owner's account reaching a `task_stale` or `task_overdue` condition on its own |
+| **a notice answered in real use** | `read`, `dismissed` and `notification_suppressions` are all **0** in production | ordinary use, not a lane and not a plant |
+
+**None of these blocks the closeout**, and none of them substitutes for another.
+`2S-MOBILE-003`'s named list is the five items in §7, all held; the three above
+are assurances beyond it.
+
 - **`2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.** Nothing in
   this phase may be reported as screen-reader evidence.
-- **The heartbeat producing a notice on the owner's own account** has not been
-  observed end to end on the device, because the checkpoint used a planted row.
 
 **A checklist handed over without checking whose account will open it is a
-checklist about somebody else's data.**
+checklist about somebody else's data — and an observation nobody can place in
+time is not one either.**
