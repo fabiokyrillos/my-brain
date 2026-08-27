@@ -30,50 +30,35 @@
  * `R-24`, the rule the verb list already carries: a control whose only possible
  * outcome is a no-op should not perform it.
  *
- * ## The destination is checked before it is followed
+ * ## The destination is checked before it is followed, and the check lives elsewhere
  *
- * `notifications.action_url` is a **stored string**. The heartbeat writes
- * `/{locale}/app/…` into it, but a row is data and data is untrusted: an
- * absolute URL, a protocol-relative `//host`, or a `javascript:` payload in
- * that column would otherwise become a navigation this component performed on
- * the owner's behalf. `isOwnerScopedDestination` is the whitelist, and a
- * destination that fails it renders **no control at all** rather than a control
- * that refuses when pressed — an affordance for something that cannot happen is
- * the "controle falso" the direction forbids.
+ * `isOwnerScopedDestination` is in `destination.ts`, a module with **no
+ * directive**, and that is not tidiness. It used to be exported from here — and
+ * `"use client"` marks the whole MODULE, so the Server Component that renders
+ * this control could not call it. `/app` fell into its error boundary for every
+ * owner with an unanswered notice, and no test saw it, because jsdom renders
+ * both kinds of component as the same function in the same bundle.
+ *
+ * This module does **not** re-export it either, and the first draft of the fix
+ * did. A re-export keeps every old import compiling, which sounds like kindness
+ * and is really the same trap left open: the predicate would still be reachable
+ * *through a client module*, and the next server component to reach for it
+ * would reach the same way the last one did. `src/lib/closeout/rsc-boundary-guard.test.ts`
+ * would catch it — but a guard is the second line, not the first.
+ *
+ * A destination that fails the check renders **no control at all** rather than
+ * a control that refuses when pressed — an affordance for something that cannot
+ * happen is the "controle falso" the direction forbids.
  */
 
 import { useRouter } from "next/navigation";
 import { useActionState, useRef } from "react";
 
-import { isLocale, type Locale } from "@/lib/preferences";
+import type { Locale } from "@/lib/preferences";
 
 import { getNotificationActionCopy } from "./action-copy";
 import type { MarkHandler } from "./notification-row-actions";
 import { refusalMessage } from "./refusal-copy";
-
-/**
- * Whether a stored `action_url` is somewhere this product may send the owner.
- *
- * Deliberately a **whitelist of shape**, not a blacklist of schemes: the set of
- * things that are not `/{locale}/app/…` is unbounded, and every blacklist of an
- * unbounded set is a blacklist with a hole in it.
- *
- * - It must be a path, so `https://…` and `mailto:` are out.
- * - It must not start with `//`, which a browser reads as protocol-relative and
- *   which is the classic way a "path" turns out to be another origin.
- * - Its first segment must be a locale this product serves, and its second
- *   must be `app` — the authenticated tree. `/pt-BR/auth/…` is refused too:
- *   nothing about a notice belongs on a sign-in route.
- */
-export function isOwnerScopedDestination(value: string | null | undefined): value is string {
-  if (typeof value !== "string" || value.length === 0) return false;
-  if (!value.startsWith("/") || value.startsWith("//")) return false;
-  // `\` is a path separator to some browsers, so a leading `/\` is `//` wearing
-  // a different hat.
-  if (value.startsWith("/\\")) return false;
-  const [, localeSegment, section] = value.split("/");
-  return isLocale(localeSegment) && section === "app";
-}
 
 type OpenState = { readonly status: "idle" | "failed"; readonly message: string };
 

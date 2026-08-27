@@ -3,6 +3,69 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-26 - Phase 2S slice 2S.3 correction: the hosted lane was run, and it found seven defects
+
+**Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
+
+The rendered authenticated lane that slice 2S.3 wrote and did not run was run
+against the hosted project with the owner's authorization, on a disposable
+account with synthetic fixtures. It finished **18/18 green on one worker**, and
+getting there took three attempts.
+
+**`/app` was broken for every owner with an unanswered notice.**
+`isOwnerScopedDestination` was exported from `notice-open-control.tsx`, which
+carries `"use client"` — and the directive marks the **module**, not the export,
+so the Server Component that renders the row could not call it. React refused,
+and `/app` served its error boundary. Nothing caught it and nothing could have:
+jsdom renders a Server Component and a Client Component as the same function in
+the same bundle, so every component assertion passed. The predicate is pure, so
+it moved to `destination.ts`, a module with **no directive**, usable from both;
+`notice-open-control.tsx` does not re-export it, because a re-export is the same
+trap left open. `src/lib/closeout/rsc-boundary-guard.test.ts` is the guard this
+repository lacked: a server module may **render** a value imported from a client
+module and may never **call** one.
+
+**Thirteen of the lane's passes were over that error page.** axe finds no
+serious violation on an error page, an error page does not scroll sideways, and
+the menu scan called `test.skip` when it found no trigger — so the lane reported
+a pass for the surface it had most failed to measure. Every visit now refuses the
+error boundary by marker and by heading, read from the copy the component
+actually renders; a missing trigger is a failure.
+
+**Four more tests were asking the wrong page about the wrong class.**
+`/app/notifications` renders `li.list-row.notification-row` and has never
+rendered `.notice-attention-row`; it also renders three rows where the attention
+surface renders two, because the collapse by subject is the attention surface's
+rule. Each surface carries its own row contract now, and the menu trigger is
+taken from inside that surface's row.
+
+**`2S-ATTENTION-006` was a coin toss measuring the projection instead of the
+write.** It opened `.first()` among three notices that share a `created_at`
+under an order with no tiebreaker, then asserted a row count — and the fixture
+deliberately gives one subject two unanswered notices, so a perfectly correct
+write leaves the row where it was. It now opens the single-notice subject and
+reads the notices back from the database either side of the interaction: exactly
+one moved to `read`, it is the one the row carried, and the read does not retry,
+which is what proves the write finished before the navigation.
+
+**The lane declared no describe mode**, so `fullyParallel` handed it six workers
+and it created six disposable accounts rather than one; it is
+`mode: "default"` now — one worker, declaration order, and not `"serial"`, whose
+skip-after-failure would turn a finding into a silence. **The fixture indexed an
+append-only array**, so its second planting made two tasks it never used. And
+**the new guard had a blind spot in its own classifier**: it read the first
+non-empty line rather than the first statement, so three client modules that
+open with a docblock were filed as server code.
+
+**Residue: zero, proved after `afterAll` and not before.** A snapshot of all 59
+`public` tables taken before the run is identical, row for row, to one taken
+after it. No AI call, no BYOK credit, no migration, no signup change, no rollout
+change, and push was not resumed, repaired or claimed.
+
+**`2S-MOBILE-003` is still the owner's, on their own device.** A 320px Chromium
+viewport is a measurement, not a hand on a phone.
+
+
 ## 2026-08-25 - Phase 2S slice 2S.3: where the notices appear, up to the owner's checkpoint
 
 **Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.

@@ -14,8 +14,8 @@ import { signInOnline } from "./support/online-session";
  * against a media query, because headless Chromium reports `pointer: coarse` at
  * 1280px and a pointer query is not a device."*
  *
- * The two surfaces are `/app` and `/app/notifications`, and both are behind a
- * session. `phase-2o-mobile-accessibility.spec.ts` proves the rendered floor in
+ * The surfaces are `/app`, `/app/notifications` and `/app/inbox?view=needs-you`,
+ * and every one of them is behind a session. `phase-2o-mobile-accessibility.spec.ts` proves the rendered floor in
  * CI and reaches only the **public** routes, precisely because they are the ones
  * reachable without one. So this lane needs the hosted project and runs by hand,
  * exactly as `online-phase-2o-mobile-accessibility.spec.ts` does — and the
@@ -46,11 +46,32 @@ const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey);
 
+/**
+ * The three rendered surfaces — **each with its own row contract, never a
+ * borrowed one.**
+ *
+ * `rowSelector` is not a convenience. The first hardened run of this lane
+ * failed four tests because one selector was applied to all three: `/app` and
+ * `/app/inbox?view=needs-you` both mount `AttentionNoticeRow`, whose element
+ * carries `.notice-attention-row` — and `/app/notifications` does not mount it
+ * at all. That page renders `li.list-row.notification-row`, its own contract
+ * since long before this phase, and it renders **three** rows where the
+ * attention surface renders two, because the collapse by subject is the
+ * attention surface's rule and not the history's.
+ *
+ * A surface measured through another surface's selector reports zero rows and
+ * says "the page is empty" about a page that is full. Borrowing a selector is
+ * therefore the same class of mistake as measuring a fixture instead of the
+ * page: the number that comes back is about the wrong object.
+ */
 const SURFACES = [
-  { name: "home (pt-BR)", path: "/pt-BR/app" },
-  { name: "notifications (en)", path: "/en/app/notifications" },
-  { name: "needs-you queue (pt-BR)", path: "/pt-BR/app/inbox?view=needs-you" },
+  { name: "home (pt-BR)", path: "/pt-BR/app", rowSelector: ".notice-attention-row" },
+  { name: "notifications (en)", path: "/en/app/notifications", rowSelector: "li.notification-row" },
+  { name: "needs-you queue (pt-BR)", path: "/pt-BR/app/inbox?view=needs-you", rowSelector: ".notice-attention-row" },
 ] as const;
+
+/** The attention surface's row, named once so no test spells it by hand. */
+const ATTENTION_ROW = ".notice-attention-row";
 
 async function axeViolations(page: Page, only?: string[]) {
   await page.addScriptTag({ path: AXE_PATH });
@@ -82,6 +103,30 @@ async function settle(page: Page) {
 }
 
 test.describe("the unanswered notices, on the pages that actually render them", () => {
+  /**
+   * ONE WORKER, IN DECLARATION ORDER — and the run that lacked this line is why.
+   *
+   * `playwright.config.ts` sets `fullyParallel: true`, so without a mode here
+   * these eighteen tests are handed to six workers. Each worker evaluates this
+   * describe body of its own, so `crypto.randomUUID()` runs six times and the
+   * lane silently created and deleted **six disposable accounts** rather than
+   * one — six sets of hosted writes, six teardowns to trust, and a residue
+   * guarantee six times as easy to lose if one worker dies.
+   *
+   * It also made the file's own stated ordering fiction. `2S-ATTENTION-004`
+   * clears every notice and re-plants them; a sibling running concurrently on
+   * the same account would have measured whichever half of that it happened to
+   * catch. That the run did not visibly corrupt itself is an accident of the
+   * per-worker email, not a property of the lane.
+   *
+   * `"default"` rather than `"serial"`, unlike the other online specs here, and
+   * the difference is deliberate: `"serial"` SKIPS the remaining tests after a
+   * failure, and this lane exists to be read in full. A test downstream of a
+   * half-applied fixture fails at `expectRows`, which names the cause out loud —
+   * that is a finding, where a skip is a silence.
+   */
+  test.describe.configure({ mode: "default" });
+
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
   const email = `codex-2s3-${crypto.randomUUID()}@example.com`;
@@ -112,20 +157,33 @@ test.describe("the unanswered notices, on the pages that actually render them", 
    */
   async function plantNotices() {
     const today = new Date().toISOString().slice(0, 10);
+    /*
+      The ids THIS planting made, kept locally as well as appended to the
+      lane's record.
+
+      The rows below used to index `taskIds`, which is append-only — so the
+      SECOND planting (`2S-ATTENTION-004` re-plants after it clears) created two
+      tasks it then never referenced and hung its notices back on the first two.
+      Nothing failed, which is exactly why it survived a run: two hosted rows
+      written for nothing, and a fixture that does not mean what it reads like.
+    */
+    const planted: string[] = [];
     for (const title of ["Pagar o aluguel", "Enviar o contrato"]) {
       const created = await rest("tasks", {
         method: "POST",
         body: JSON.stringify({ user_id: userId, title, status: "inbox" }),
       });
       expect(created.ok, `planting the task ${title}`).toBe(true);
-      taskIds.push(((await created.json()) as Array<{ id: string }>)[0].id);
+      const id = ((await created.json()) as Array<{ id: string }>)[0].id;
+      planted.push(id);
+      taskIds.push(id);
     }
 
     const rows = [
-      { task: taskIds[0], type: "task_stale", prefix: "stale", day: today, title: "Tarefa sem movimento", body: "Pagar o aluguel" },
-      { task: taskIds[1], type: "task_stale", prefix: "stale", day: today, title: "Tarefa sem movimento", body: "Enviar o contrato" },
+      { task: planted[0], type: "task_stale", prefix: "stale", day: today, title: "Tarefa sem movimento", body: "Pagar o aluguel" },
+      { task: planted[1], type: "task_stale", prefix: "stale", day: today, title: "Tarefa sem movimento", body: "Enviar o contrato" },
       // The duplicate: same subject as the first, a different day.
-      { task: taskIds[0], type: "task_stale", prefix: "stale", day: "2026-01-02", title: "Tarefa sem movimento", body: "Pagar o aluguel" },
+      { task: planted[0], type: "task_stale", prefix: "stale", day: "2026-01-02", title: "Tarefa sem movimento", body: "Pagar o aluguel" },
     ];
 
     const inserted = await rest("notifications", {
@@ -182,10 +240,91 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     expect(deletion.ok).toBe(true);
   });
 
+  /**
+   * A page that really rendered, and a row that is really there.
+   *
+   * ## Why this is not "goto and settle"
+   *
+   * The first run of this lane reported **thirteen passes over the error
+   * boundary**. `/app` was throwing — a Server Component was calling a function
+   * that lived in a `"use client"` module — and the page it served instead
+   * satisfied almost every measurement: axe finds no serious violation on an
+   * error page, an error page does not scroll sideways, and the menu scan
+   * SKIPPED itself because it could not find a trigger.
+   *
+   * Only the three tests that demanded a control failed. The rest were the trap
+   * this repository already has a name for: **a test that cannot fail on a blank
+   * page**.
+   *
+   * So every visit now refuses the error boundary by name, and `expectRows` is
+   * the precondition every rendered measurement states before measuring — in
+   * this surface's own row contract, never in a neighbour's.
+   */
   async function visit(page: Page, path: string) {
     await page.goto(path);
     await expect(page.locator("h1").first()).toBeVisible();
+
+    /*
+     * `src/app/[locale]/app/error.tsx` is the boundary. If it rendered, the
+     * measurement below would be of a page the owner never wanted to see, and
+     * every silent assertion would pass over it.
+     */
+    const boundary = page.locator('[data-ux-state="error_recoverable"]');
+    if ((await boundary.count()) > 0) {
+      throw new Error(`${path} rendered its error boundary; nothing below it can be measured`);
+    }
+    /*
+     * The boundary's own heading, as the second reading — read from the copy the
+     * component actually renders rather than guessed. The first draft of this
+     * check guessed "algo deu errado", which appears nowhere in this product,
+     * so it would have detected nothing at all: a detector that cannot fire is
+     * the same thing as no detector.
+     */
+    const heading = (await page.locator("h1").first().innerText()).toLowerCase();
+    if (heading.includes("não foi possível carregar") || heading.includes("could not load this page")) {
+      throw new Error(`${path} rendered an error heading; nothing below it can be measured`);
+    }
+
     await settle(page);
+  }
+
+  /**
+   * The precondition for every rendered measurement: **this surface's own rows
+   * are on this surface's page.**
+   *
+   * Stated rather than assumed, because "no violation" and "no sideways scroll"
+   * are both true of a page with nothing on it — and the selector is a
+   * parameter rather than a constant because the first version of this helper
+   * hard-coded the attention surface's class and then asked `/app/notifications`
+   * about it. The history page renders `li.notification-row`, has never
+   * rendered `.notice-attention-row`, and was reported empty for four tests
+   * while it was in fact rendering all three planted notices.
+   */
+  async function expectRows(page: Page, selector: string, atLeast = 1) {
+    const rows = page.locator(selector);
+    await expect(
+      rows,
+      `the surface rendered no \`${selector}\`, so nothing below measures what it claims to`,
+    ).not.toHaveCount(0);
+    expect(await rows.count(), `${selector} rows`).toBeGreaterThanOrEqual(atLeast);
+  }
+
+  /**
+   * The notices as the DATABASE holds them, read with the service role.
+   *
+   * `2S-ATTENTION-006` is a claim about a WRITE, and a row disappearing from a
+   * projection is not the same statement: the attention surface collapses a
+   * subject to one row, so a count can stay put for an entirely correct write
+   * and can move for a reason that has nothing to do with one. This reads the
+   * three rows themselves, so the assertion can name which one moved.
+   */
+  async function noticeStates(): Promise<Array<{ id: string; body: string; status: string }>> {
+    const response = await rest(
+      `notifications?user_id=eq.${userId}&select=id,body,status&order=body.asc,id.asc`,
+      { method: "GET" },
+    );
+    expect(response.ok, "reading the notices back").toBe(true);
+    return (await response.json()) as Array<{ id: string; body: string; status: string }>;
   }
 
   /* ---------------------------------------------------------------------- *
@@ -228,23 +367,79 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     expect(Number(shown)).toBe(rows);
   });
 
+  /**
+   * `2S-ATTENTION-006` — and the two things the first version of this test got
+   * wrong, both of which the hosted run found.
+   *
+   * ## 1. It opened `.first()`, and `.first()` is a coin toss here
+   *
+   * The three planted notices are inserted by **one** statement, so all three
+   * carry the same `created_at`. `loadAttentionNotices` orders by
+   * `created_at desc` with no tiebreaker, and Postgres is free to return equal
+   * keys in any order — so which subject leads the page is undefined, and this
+   * test passed or failed on that draw.
+   *
+   * ## 2. `before - 1` was a claim about the projection, not about the write
+   *
+   * The fixture deliberately gives one subject **two** unanswered notices, so
+   * `2S-ATTENTION-002` has something to collapse. Marking one of that pair seen
+   * is a completely correct write that leaves the row exactly where it was —
+   * because the subject still has an unanswered notice, and the attention
+   * surface is telling the truth when it keeps showing it. The hosted run
+   * reported `expected 1, received 2` for precisely that, and the product was
+   * right both times.
+   *
+   * ## So the write is proved where the write happens
+   *
+   * The row opened is the one whose subject has exactly **one** notice, which
+   * makes the projection's answer unambiguous — and the database is read either
+   * side of the interaction, so the assertion names *which* notice moved rather
+   * than counting rows and hoping.
+   *
+   * The database read also proves the **order** the control promises.
+   * `NoticeOpenControl` awaits the write and navigates in the statement after
+   * it, so by the moment the destination URL is on screen the write is already
+   * committed. The read below runs at that moment and does not retry: a control
+   * that navigated first would be caught here, not tolerated.
+   */
   test("2S-ATTENTION-006: opening a notice from home marks it seen", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW, 2);
 
-    const before = await page.locator(".notice-attention-row").count();
-    expect(before).toBeGreaterThan(0);
+    const before = await page.locator(ATTENTION_ROW).count();
+    expect(before).toBe(2);
 
-    await page.locator(".notice-attention-row .notice-open-control").first().click();
+    const planted = await noticeStates();
+    expect(planted.filter((notice) => notice.status === "unread")).toHaveLength(3);
+    // The subject with exactly one notice. The other has two, by construction.
+    const singles = planted.filter((notice) => notice.body === "Enviar o contrato");
+    expect(singles, "the single-notice subject").toHaveLength(1);
+    const target = singles[0];
+
+    const row = page.locator(ATTENTION_ROW, { hasText: "Enviar o contrato" });
+    await expect(row).toHaveCount(1);
+    await row.locator(".notice-open-control").click();
     await page.waitForURL(/\/app\/work\//);
+
+    const after = await noticeStates();
+    // The write happened, it happened BEFORE the navigation, and it touched
+    // exactly one row — no second write from the same press, no widening of the
+    // verb to every notice about the subject.
+    expect(after.filter((notice) => notice.status === "read").map((notice) => notice.id)).toEqual([target.id]);
+    expect(after.filter((notice) => notice.status === "unread")).toHaveLength(2);
 
     /*
      * THE ASSERTION READS THE ROW AFTER THE INTERACTION, which is the
-     * requirement's own wording. The attention surface shows the UNANSWERED
-     * notices, so a notice that was marked seen is one fewer row here.
+     * requirement's own wording. The surface shows the UNANSWERED notices, so
+     * the row whose only notice was answered is gone — and the row whose subject
+     * still has one is still here, which is the same rule read from the other
+     * side.
      */
     await visit(page, "/pt-BR/app");
-    await expect(page.locator(".notice-attention-row")).toHaveCount(before - 1);
+    await expect(page.locator(ATTENTION_ROW, { hasText: "Enviar o contrato" })).toHaveCount(0);
+    await expect(page.locator(ATTENTION_ROW, { hasText: "Pagar o aluguel" })).toHaveCount(1);
+    await expect(page.locator(ATTENTION_ROW)).toHaveCount(before - 1);
   });
 
   /* ---------------------------------------------------------------------- *
@@ -277,6 +472,8 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     test(`2S-ACCESS-004: axe finds no serious violation on ${surface.name}`, async ({ page }) => {
       await signInOnline(page, { email, locale: "pt-BR" });
       await visit(page, surface.path);
+      // The surface is measured with rows ON it: an empty page has no violations.
+      await expectRows(page, surface.rowSelector);
       expect(await axeViolations(page)).toEqual([]);
     });
 
@@ -288,8 +485,21 @@ test.describe("the unanswered notices, on the pages that actually render them", 
        */
       await signInOnline(page, { email, locale: "pt-BR" });
       await visit(page, surface.path);
-      const trigger = page.locator(".notification-menu-trigger").first();
-      if ((await trigger.count()) === 0) test.skip(true, "no notice row on this surface");
+      /*
+       * NO SKIP. The first version skipped itself when it found no trigger —
+       * and it found none because the page had thrown, so the lane reported a
+       * pass for the surface it had most failed to measure. A missing trigger is
+       * now a failure, which is what it always was.
+       */
+      await expectRows(page, surface.rowSelector);
+      /*
+       * The trigger is taken from INSIDE this surface's own row. A bare
+       * `.notification-menu-trigger` would happily find one anywhere on the
+       * page — a shell, a header, another list — and then the scan would be of
+       * a menu that does not belong to the row this surface renders.
+       */
+      const trigger = page.locator(`${surface.rowSelector} .notification-menu-trigger`).first();
+      await expect(trigger).toBeVisible();
       await trigger.click();
       await expect(page.locator('[role="menu"]').first()).toBeVisible();
       await settle(page);
@@ -304,6 +514,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
   test("2S-ACCESS-006: the menu opens, moves, activates and closes by keyboard alone", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW);
 
     const trigger = page.locator(".notice-attention-row .notification-menu-trigger").first();
     await trigger.focus();
@@ -333,6 +544,8 @@ test.describe("the unanswered notices, on the pages that actually render them", 
       await signInOnline(page, { email, locale: "pt-BR" });
       for (const surface of SURFACES) {
         await visit(page, surface.path);
+        // A page with nothing on it does not scroll sideways either.
+        await expectRows(page, surface.rowSelector);
         const overflow = await page.evaluate(() => ({
           scrollWidth: document.documentElement.scrollWidth,
           clientWidth: document.documentElement.clientWidth,
@@ -351,6 +564,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     await page.setViewportSize({ width: 375, height: 812 });
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW);
 
     /*
      * Measured on the RENDERED PAGE, never against a media query: headless
@@ -368,6 +582,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     await page.setViewportSize({ width: 375, height: 812 });
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW);
 
     const row = page.locator(".notice-attention-row").first();
     const title = row.locator("strong").first();
@@ -394,6 +609,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
     await page.setViewportSize({ width: 375, height: 812 });
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW);
 
     await page.locator(".notice-attention-row .notification-menu-trigger").first().click();
     await page.locator('[role="menuitem"]', { hasText: "Silenciar por um tempo" }).first().click();
@@ -409,6 +625,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
   test("2S-ACCESS-002: the silence panel states the consequence before it acts", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await visit(page, "/pt-BR/app");
+    await expectRows(page, ATTENTION_ROW);
 
     await page.locator(".notice-attention-row .notification-menu-trigger").first().click();
     await page.locator('[role="menuitem"]', { hasText: "Silenciar por um tempo" }).first().click();
