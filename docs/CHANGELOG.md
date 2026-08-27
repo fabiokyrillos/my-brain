@@ -62,6 +62,20 @@ open with a docblock were filed as server code.
 after it. No AI call, no BYOK credit, no migration, no signup change, no rollout
 change, and push was not resumed, repaired or claimed.
 
+**An eighth defect, found by CI rather than by the run, and latent on `main`.**
+`2S-ACCESS-002`'s tests typed a date computed from `new Date()` in the **host's**
+zone, while the component derives its day count in the **owner's** — which is
+where slice 2S.3 already moved it after `LDC-GUARD-001` caught the same mistake
+in the product. The two frames agree for twenty-one hours a day, and CI ran at
+00:26 UTC, inside the three where they do not: the test typed *tomorrow* by its
+clock and the component read *the day after* by the owner's. The test states its
+dates in the owner's zone now, through the same `localDateOf`/`addLocalDays`
+contract, and the zone is named once so the render and the arithmetic cannot
+drift. Proved in both directions by re-running the whole suite with `TZ=UTC`,
+which reproduces CI's condition exactly on a machine at UTC-3: the old helper
+fails those two assertions and no others, the new one passes, and 9 662
+assertions pass with it.
+
 **`2S-MOBILE-003` is still the owner's, on their own device.** A 320px Chromium
 viewport is a measurement, not a hand on a phone.
 

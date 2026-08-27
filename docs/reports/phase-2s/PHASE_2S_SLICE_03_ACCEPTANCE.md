@@ -17,9 +17,10 @@
   tasks and three notices, and deleted the account in `afterAll`. Residue was
   proved **zero** by comparing a full snapshot of all 59 `public` tables taken
   before the run against one taken after it: **identical, row for row**. See
-  **§10**, which also records the **seven defects the run found**, one of them a
+  **§10**, which also records the **seven defects the run found** — one of them a
   product defect that took `/app` down for every owner with an unanswered
-  notice.
+  notice — and an **eighth that CI found**, latent on `main` and visible only in
+  a three-hour window each day.
 - **AI calls: none. BYOK credit spent: none. Push: not resumed, not repaired,
   not claimed. Signup unchanged. Rollout unchanged.**
 
@@ -85,9 +86,11 @@ pointer query is not a device."*
 The surfaces are `/app`, `/app/notifications` and `/app/inbox?view=needs-you`.
 **Every one of them is behind a session**, and the first and third render the
 attention row while the second renders the history's own — §10.3 is the price of
-having read that the other way round. `e2e/phase-2o-mobile-accessibility.spec.ts` proves the rendered floor
-in CI and reaches only the **public** routes, precisely because those are the
-ones reachable without one — its own header says so.
+having read that the other way round.
+
+`e2e/phase-2o-mobile-accessibility.spec.ts` proves the rendered floor in CI and
+reaches only the **public** routes, precisely because those are the ones
+reachable without one — its own header says so.
 
 **So this lane cannot gate in CI.** `e2e/online-phase-2s-attention.spec.ts` is
 written against the hosted project and runs by hand, exactly as
@@ -368,6 +371,37 @@ every measurement this lane makes.
    first **statement** now, from the comment-stripped source, and a fourth
    assertion fails if any module carrying the directive is ever filed as server
    code again.
+
+
+### An eighth defect, found by CI rather than by the run — and latent on `main`
+
+This branch's first CI failed two assertions in
+`notification-row-actions.test.tsx`, and **neither is this branch's doing.**
+
+`2S-ACCESS-002`'s tests typed a date computed by `isoDaysFromToday`, which read
+`new Date()` in the **host's** zone, while the component derives its day count in
+the **owner's** — `localDateOf(new Date(), timeZone)`, which is where slice 2S.3
+already moved it after `LDC-GUARD-001` caught the same mistake in the product.
+The two frames agree for twenty-one hours a day and disagree for three. CI ran at
+**00:26 UTC**, where São Paulo was still on the previous day, so the test typed
+*tomorrow* by its clock and the component read *the day after tomorrow* by the
+owner's: `2 dias` where the test wanted `1 dia`.
+
+It was **latent on `main`** — slice 2S.3 merged at 13:35 UTC, outside the window —
+and this branch's timing is the only reason it surfaced. The fix states the
+test's dates in the owner's zone, through the same `localDateOf`/`addLocalDays`
+contract the component walks, and names that zone once so the render and the
+arithmetic cannot drift apart.
+
+**Proved rather than assumed, in both directions.** The whole suite was re-run
+with `TZ=UTC`, which reproduces CI's condition exactly on this machine — the host
+reads 2026-08-27 while São Paulo reads 2026-08-26. The old `isoDaysFromToday`
+fails **those two assertions and no others** under it; the new one passes, and so
+does everything else: **9 662 assertions, zero failing.**
+
+**A test that reads a different clock than the product is not measuring the
+product** — and a suite that only ever runs in one zone cannot tell you which
+clock it read.
 
 ### Residue, proved after `afterAll` and not before
 
