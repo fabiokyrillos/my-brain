@@ -50,6 +50,8 @@ const AUDIT = `${REPORTS}/PHASE_2S_CURRENT_EXPERIENCE_AUDIT.md`;
 const GAPS = `${REPORTS}/PHASE_2S_GAPS_AND_OPPORTUNITIES.md`;
 const THREATS = `${REPORTS}/PHASE_2S_THREAT_MODEL.md`;
 const CONTRACT = `${REPORTS}/PHASE_2S_TRACEABILITY_CONTRACT.md`;
+/** Slice 2S.4's closing record, which must exist and must not claim closure. */
+const CLOSING_REPORT = `${REPORTS}/PHASE_2S_CLOSING_REPORT.md`;
 const COVERAGE = `${REPORTS}/PHASE_2S_REQUIREMENT_COVERAGE.md`;
 
 /** A requirement's row in a PRD table: `| \`2S-FAMILY-001\` | … |`. */
@@ -531,21 +533,46 @@ describe("Phase 2S: planning contains no classification and no execution record"
    * builds them. An absence nobody asserts is an absence nobody notices
    * disappearing.
    */
-  it("ships only the acceptance records of slices that have run, and no closeout artifact", () => {
+  it("ships only the acceptance records of slices that have run, and the closeout artifacts 2S.4 owes", () => {
+    /*
+     * **Inverted a second time, by slice 2S.4, exactly as the note above said it
+     * would be.** The closeout artifacts were refused *until 2S.4 builds them*;
+     * 2S.4 built them, so refusing them now would deny the work the same
+     * authorization required — the mirror-image error this guard has already
+     * been corrected for once.
+     *
+     * The distinction still does not move: a record may exist **only for a slice
+     * that has run**, and the set stays closed, so an unnumbered or out-of-order
+     * record still refuses. What changed is which side of the line the matrix
+     * and the generator sit on, and they are now asserted **present** rather
+     * than merely permitted — an artifact nobody asserts is an artifact nobody
+     * notices disappearing.
+     */
     const DELIVERED = [
       "PHASE_2S_SLICE_00_ACCEPTANCE.md",
       "PHASE_2S_SLICE_01_ACCEPTANCE.md",
       "PHASE_2S_SLICE_02_ACCEPTANCE.md",
       "PHASE_2S_SLICE_03_ACCEPTANCE.md",
+      "PHASE_2S_SLICE_04_ACCEPTANCE.md",
     ];
     const records = readdirSync(join(REPO, REPORTS)).filter((name) => /ACCEPTANCE/i.test(name));
     expect(records.sort(), "a record exists for a slice that has not run, or one is missing")
       .toEqual(DELIVERED);
-    for (const name of readdirSync(join(REPO, REPORTS))) {
-      expect(/TRACEABILITY_MATRIX/i.test(name), `${name} is a closeout artifact`).toBe(false);
+
+    for (const artifact of ["PHASE_2S_TRACEABILITY_MATRIX.md", "PHASE_2S_CLOSING_REPORT.md"]) {
+      expect(existsSync(join(REPO, REPORTS, artifact)), `${artifact} is a 2S.4 artifact and is missing`)
+        .toBe(true);
     }
     expect(existsSync(join(REPO, "scripts/generate-phase-2s-traceability.mjs")), "the generator is a 2S.4 artifact")
-      .toBe(false);
+      .toBe(true);
+
+    /*
+     * And the one thing 2S.4 must still NOT ship: closure. `2S-CLOSE-010` keeps
+     * it an owner decision recorded as an ADR after a closing device checkpoint,
+     * so a closing ADR appearing without one is exactly what this half refuses.
+     */
+    expect(read(CLOSING_REPORT), "the closing report must not claim the phase is closed")
+      .toMatch(/THIS REPORT DOES NOT CLOSE THE PHASE/);
   });
 
   it("classifies only what its own slices delivered, and never a baseline as built", () => {

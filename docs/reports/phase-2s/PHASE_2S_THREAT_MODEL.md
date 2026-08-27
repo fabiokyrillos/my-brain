@@ -410,3 +410,41 @@ case, a stop condition.
 exist in merged code, and a test or a person must have **exercised** it. Slice
 2S.4 re-dispositions each against what was built. Until then this table is the
 disposition, and it says OPEN.
+
+---
+
+## Re-disposition at closeout — slice 2S.4, 2026-08-27
+
+`2S-CLOSE-007`: **a threat closes only when its mitigation exists AND has been
+exercised.** Existing is not enough, and a green pipeline is not an exercise.
+
+**Eighteen CLOSED · one CARRIED · one RAISED.** Nothing here closes on a document.
+
+| threat | disposition | what exercised it |
+|---|---|---|
+| `T-2S-1` a suppression crossing an owner boundary | **CLOSED** | RLS enabled **and forced**, four owner-scoped policies, `service_role` revoked on all seven privileges — read from the deployed project — and slice 2S.1's hosted proof reached the cross-tenant path and got `REFUSED(42501)` rather than an empty result |
+| `T-2S-2` a silence that silences too much | **CLOSED** | The four scopes exercised **one at a time**, with the other three subjects of change read after each; a null `notice_type` suppresses the subject and a value narrows to one kind, so silencing the daily nag does not silence a genuinely overdue warning |
+| `T-2S-3` a cadence rule that does not terminate | **CLOSED, and exercised in production** | The ladder read from `pg_get_functiondef(run_user_heartbeat)` — `0 → send`, `1 → +1d`, `2 → +3d`, `3 → +7d`, `else → false` — and observed on real rows: **3 per day for eighteen unbroken days, then zero for three**, with the producer still running and the subjects unchanged |
+| `T-2S-4` the heartbeat's existing rules silently weakening | **CLOSED** | Quiet hours, the daily cap, the 24-hour floor and the per-user lock re-proved by **calling** the function in pgTAP rather than matching substrings against `prosrc`; the floor re-read as unmoved in the deployed definition at closeout |
+| `T-2S-5` content leaking into a suppression store | **CLOSED** | The one new store's columns enumerated from the deployed database: a subject reference, a scope, an expiry, an actor and the owner's own `reason`. **No column a title or body could occupy** |
+| `T-2S-6` a disposition whose copy and behaviour disagree | **CLOSED** | The verb set, its copy and its eligibility read from one vocabulary that both surfaces import; `phase-2s-verb-authority.test.ts` reads the import graph and its surface list is **derived** from the tree with at least two members asserted |
+| `T-2S-7` an undo that does not restore | **CLOSED** | Every undo followed by a read of the ledger row **and** of the restored subject |
+| `T-2S-8` the attention surface double-counting | **CLOSED** | `queueSize` read by both the count and the list; the collapse is by subject; and the hosted lane rendered **three notices about two subjects as two rows** with the heading's number equal to the rows under it |
+| `T-2S-9` the migration widening authority | **CLOSED** | A seven-way `has_table_privilege` probe on the deployed project returns false for `service_role` on every privilege; the migration **revokes** explicitly, because `alter default privileges` grants four nobody asked for |
+| `T-2S-10` silence mistaken for autonomy | **CLOSED** | Nothing this phase built reads `eligible` or any automation category state, and `automation_category_policies` was re-read at closeout **whatever its row count** — it holds zero |
+| `T-2S-11` silent spend — the credential is active | **CLOSED** | Zero AI calls by this phase, and it is a **live** refusal: the BYOK credential is `active`, so a call was possible. The two `ai_usage_events` rows inside the checkpoint window are the product's extraction and embedding of a capture **the owner made**, itemised in slice 2S.3 §11 rather than absorbed |
+| `T-2S-12` push reported as working | **CLOSED** | Refusal 18 forbids the **claim** and not the word, so *"push is still not working"* stays sayable; the detector is two-sided, and `notification_deliveries` still holds zero |
+| `T-2S-13` a hardware proof discharged by a document | **CLOSED** | Refusal 15 refuses `2S-MOBILE-003` classified without an owner device session, **and** a person held it on their own iPhone on 2026-08-27 against the deployed build |
+| `T-2S-14` the successor phase starting by accident | **CLOSED** | Refusal 16 checks all three shapes — a `2T-*` declaration in the PRD and both `phase-2t` directories — and the A13 detector still refuses a start signal |
+| `T-2S-15` a second authority over a task's status | **CLOSED** | Refusal 20 reads the handler bundle from the tree and compares it against slice 2S.0's merge commit `39bb4b8`: four writers present, one absent and authorized. **This is `OD-2S-3` B's whole risk, and it is an exit code rather than a review note** |
+| `T-2S-16` one action applied twice | **CLOSED — and it was NOT closed until this slice** | The closeout found that nothing in the feature named `operationKey` at all. Two exercises were written: a retry after a thrown round carries the **same** key, and a terminal outcome **rotates** it. Two mutation controls, two failures. See the slice record §6 |
+| `T-2S-17` a stale control writing anyway | **CLOSED** | The pre-existing `stale_pre_state` refusal is reached **from this surface** and rendered as the reload affordance rather than a generic failure |
+| `T-2S-18` an undo that reports success and restores nothing | **CLOSED** | The undo offer comes straight from the database's own answer and is never constructed in the row; a disposition with no compensation row offers none |
+| `T-2S-19` the two surfaces diverging | **CARRIED, narrowed** | Both mechanisms are in place — one projection read by all three surfaces, and every writer invalidating all three routes — and slice 2S.3 found `/app/inbox` missing from **both** writers and added it. What is **not** exercised is divergence under real use: `read`, `dismissed` and `notification_suppressions` are all **zero** in production, so no owner has yet acted on one surface and looked at another. Destination: the open item *a notice answered in real use* |
+| **RAISED at closeout — not one of the nineteen** | **carried, and it is an owner question** | The ladder's terminal branch means a subject nobody answers eventually goes **silent forever until it changes**. That is `OD-2S-4` A working as signed, and it is also the state three real tasks are in right now: stale since 2026-07-30, and the product no longer mentions them. Not a defect and not a closure — **an owner decision about whether silence is the right end state**, recorded here rather than left for someone to rediscover |
+
+**One carried and one raised, and neither quietly.** `T-2S-19` needs use, not a
+test. The raised item needs the owner, not a fix.
+
+**A threat closed by reading its mitigation is a threat nobody tested — and
+`T-2S-16` spent this whole phase in that condition.**

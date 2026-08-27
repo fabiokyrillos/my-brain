@@ -378,7 +378,7 @@ was missing was a record saying which half of the overlap each slice owns.
 | `2S-ANSWER-003` | **built** | two controls, two outcomes (pgTAP §3a vs §3b), two sentences (`verbs.test.ts`, both locales) |
 | `2S-ANSWER-004` | **built** | pgTAP §1 — the heartbeat **called** after a dismissal, no duplicate, exactly one row on the key |
 | `2S-ANSWER-005` | **baseline** | the page's filter is byte-identical and now guards a state §3b produces |
-| `2S-ANSWER-006` | **rule** | pgTAP §5 — each member written and accepted, a fourth written and refused, the row read after the refusal |
+| `2S-ANSWER-006` | **not-built-by-rule** | pgTAP §5 — the `notifications_status_check` members enumerated, each written and accepted, a fourth written and **refused by name**, and the row read after the refusal. Declared kind `rule`, so its delivery IS that recorded refusal; the class was written `**rule**` until slice 2S.4's generator refused it — `rule` is a declared KIND and never one of the five classes |
 | `2S-ANSWER-007` | **built** | pgTAP §3a — the subject re-read unchanged, the other notice re-read unread, no suppression, read after `reset role` |
 | `2S-ANSWER-008` | **built** | pgTAP §2 — proved by **calling** `run_user_heartbeat`, not by reading the rule |
 | `2S-ACT-001` | **built** | `primaryVerbFor` over `verbsForRow`; two subjects in different states render different primaries **in one rendered list** (`home-notices.test.tsx`) |

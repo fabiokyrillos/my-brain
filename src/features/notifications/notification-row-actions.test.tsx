@@ -224,6 +224,76 @@ describe("2S-ACT-007: a pending action refuses a second submission of itself", (
   });
 });
 
+/**
+ * `2S-TRUST-011` — **the operation key, exercised FROM THIS SURFACE.**
+ *
+ * Slice 2S.4's closeout found that nothing in this feature named `operationKey`
+ * at all. The requirement's wording is *"the existing per-row-per-action
+ * operation key and its idempotency refusal are reused and **exercised from this
+ * surface**"*, and the in-flight `disabled` test above exercises a different
+ * property: that a second press cannot dispatch. **A control that cannot be
+ * pressed twice says nothing about what happens when the response is lost.**
+ *
+ * That is the case the key exists for. The dispatch throws — a network fault,
+ * not a refusal — the owner presses again, and the authority must see the SAME
+ * key so it can recognise the replay and write once. `work-item-actions.tsx`
+ * mints its keys in a ref for exactly this reason, and this row copies the
+ * mechanism; these two tests are what make the copy checkable.
+ */
+describe("2S-TRUST-011: the operation key survives a lost response and rotates after a terminal one", () => {
+  function keysFrom(action: ReturnType<typeof vi.fn>): string[] {
+    return action.mock.calls.map((call) => String((call[1] as FormData).get("operationKey")));
+  }
+
+  it("sends the SAME key when a thrown round is retried, so a replay is refusable", async () => {
+    let throwOnce = true;
+    const workAction = vi.fn(async () => {
+      if (throwOnce) {
+        throwOnce = false;
+        throw new Error("the network went away");
+      }
+      return { ...idleWorkState(), status: "applied" as const, detail: "ok", announcement: "ok" };
+    });
+    setup({ handlers: { workAction: workAction as never } });
+    const user = userEvent.setup();
+
+    const primary = control(/Concluir tarefa/);
+    await user.click(primary);
+    await waitFor(() => expect(workAction).toHaveBeenCalledTimes(1));
+    // The round threw, so no terminal outcome rotated the key.
+    await waitFor(() => expect((primary as HTMLButtonElement).disabled).toBe(false));
+    await user.click(primary);
+    await waitFor(() => expect(workAction).toHaveBeenCalledTimes(2));
+
+    const [first, second] = keysFrom(workAction);
+    expect(first, "a key was minted at all").toMatch(/^[0-9a-f-]{36}$/);
+    expect(second, "the retry must carry the SAME key or the replay is invisible").toBe(first);
+  });
+
+  it("rotates the key after a terminal outcome, so the next action is not a replay", async () => {
+    const workAction = vi.fn(async () => ({
+      ...idleWorkState(),
+      status: "applied" as const,
+      detail: "ok",
+      announcement: "ok",
+    }));
+    setup({ handlers: { workAction: workAction as never } });
+    const user = userEvent.setup();
+
+    const primary = control(/Concluir tarefa/);
+    await user.click(primary);
+    await waitFor(() => expect(workAction).toHaveBeenCalledTimes(1));
+    await user.click(primary);
+    await waitFor(() => expect(workAction).toHaveBeenCalledTimes(2));
+
+    const [first, second] = keysFrom(workAction);
+    // A key that never rotated would make every later action look like a replay
+    // of the first, and the authority would refuse work the owner really asked
+    // for. The Work surface rotates for the same reason.
+    expect(second, "a terminal outcome must rotate the key").not.toBe(first);
+  });
+});
+
 describe("2S-ACT-008: a failure preserves the row and its menu", () => {
   it("shows a useful sentence and leaves the controls in place", async () => {
     const workAction = vi.fn(async () => ({
