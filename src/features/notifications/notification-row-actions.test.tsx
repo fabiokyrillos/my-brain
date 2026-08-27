@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
+import { addLocalDays, formatLocalDate, localDateOf } from "@/lib/time/local-day";
+
 import { NotificationRowActions } from "./notification-row-actions";
 import { getNotificationActionCopy } from "./action-copy";
 import { refusalMessage } from "./refusal-copy";
@@ -29,6 +31,22 @@ const TASK: NotificationSubject = {
 };
 
 const copy = getNotificationActionCopy("pt-BR");
+
+/**
+ * The owner's zone, named once — the render below takes it and every date this
+ * file computes is stated in it.
+ *
+ * It was spelled inline at the render and nowhere else, and
+ * `isoDaysFromToday` computed its dates from `new Date()` in the **host's**
+ * zone. The two agree for twenty-one hours a day and disagree for three, so
+ * this suite failed in CI at 00:26 UTC — where São Paulo was still on the
+ * previous day — while passing on any machine west of UTC. The component was
+ * right: slice 2S.3 already moved its day count onto `localDateOf`/`addLocalDays`
+ * for exactly this reason (`LDC-GUARD-001`), and the test had stayed on the
+ * device's clock. **A test that reads a different clock than the product is not
+ * measuring the product.**
+ */
+const OWNER_ZONE = "America/Sao_Paulo";
 
 function idleWorkState() {
   return {
@@ -80,7 +98,7 @@ function setup(options: {
       subject={subject}
       subjectLabel="Pagar o aluguel"
       suppressAction={suppressAction as never}
-      timeZone="America/Sao_Paulo"
+      timeZone={OWNER_ZONE}
       undoAction={undoAction as never}
       workAction={workAction as never}
     />,
@@ -503,10 +521,12 @@ describe("2S-ACCESS-002: a control whose effect is silence says what stops, and 
     await user.click(control(/Silenciar por um tempo/));
   }
 
+  /**
+   * `days` from today **in the owner's zone** — the same walk the component
+   * makes, through the same contract, so the two cannot disagree.
+   */
   function isoDaysFromToday(days: number): string {
-    const now = new Date();
-    const target = new Date(now.getFullYear(), now.getMonth(), now.getDate() + days);
-    return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(target.getDate()).padStart(2, "0")}`;
+    return formatLocalDate(addLocalDays(localDateOf(new Date(), OWNER_ZONE), days));
   }
 
   it("says nothing it cannot know before a date is chosen", async () => {

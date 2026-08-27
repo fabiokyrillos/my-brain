@@ -28,7 +28,13 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { getNotificationActionCopy } from "./action-copy";
-import { isOwnerScopedDestination, NoticeOpenControl } from "./notice-open-control";
+/*
+  The predicate is imported from `destination.ts`, where it lives, and not
+  through the client module that renders it. That module does not re-export it —
+  see its header — so this import is the only one there is.
+*/
+import { isOwnerScopedDestination } from "./destination";
+import { NoticeOpenControl } from "./notice-open-control";
 import { refusalMessage } from "./refusal-copy";
 
 const HREF = "/pt-BR/app/work/3f7c1b52-0e2a-4d61-9f83-2b6a1c9d4e70";

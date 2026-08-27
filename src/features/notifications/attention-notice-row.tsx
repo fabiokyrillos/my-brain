@@ -27,7 +27,8 @@ import { formatInstant } from "@/lib/time/instant-format";
 import type { Locale } from "@/lib/preferences";
 
 import { getNotificationActionCopy } from "./action-copy";
-import { isOwnerScopedDestination, NoticeOpenControl } from "./notice-open-control";
+import { isOwnerScopedDestination } from "./destination";
+import { NoticeOpenControl } from "./notice-open-control";
 import { NotificationVerbs, type NotificationVerbHandlers } from "./notification-row-actions";
 import type { NotificationRowView } from "./row-projection";
 

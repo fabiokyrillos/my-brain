@@ -98,6 +98,15 @@ const PURE_MODULES = [
   "src/features/notifications/verbs.ts",
   "src/features/notifications/action-copy.ts",
   "src/features/notifications/refusal-copy.ts",
+  /*
+   * Slice 2S.3. A pure predicate over a stored string: no client, no fetch, no
+   * writer, no React. It is PURE rather than delivery for a reason the RSC
+   * boundary made expensive — it lived inside a `"use client"` module, and the
+   * Server Component that needed it could not call it. A module with no
+   * directive is usable from both sides, which is what a decision module should
+   * always have been.
+   */
+  "src/features/notifications/destination.ts",
 ];
 
 /** The modules slice 2M.4b earned, by name, plus slice 2O.6's two surfaces. */
