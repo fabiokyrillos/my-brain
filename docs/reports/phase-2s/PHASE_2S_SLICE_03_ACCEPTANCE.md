@@ -585,3 +585,88 @@ are assurances beyond it.
 **A checklist handed over without checking whose account will open it is a
 checklist about somebody else's data — and an observation nobody can place in
 time is not one either.**
+
+---
+
+## 12. `/app/notifications` on the device, with a real notice row — the open item, closed
+
+The first pass reached that page in its **empty state** and two of its five points
+could not be attributed (§11). The owner authorized a second synthetic notice
+under stated conditions, validated the page on their own iPhone, and confirmed
+**all six** points on 2026-08-27.
+
+| # | reported | recorded |
+|---|---|---|
+| 1 | no horizontal scrolling | **VALIDATED** |
+| 2 | the row and its controls are easy to tap | **VALIDATED** |
+| 3 | **Mais ações** opens without covering the row | **VALIDATED** |
+| 4 | *Silenciar por um tempo* states the duration **before** confirmation | **VALIDATED** |
+| 5 | tapping the date field causes **no zoom** | **VALIDATED** |
+| 6 | no action was confirmed | **VALIDATED**, and independently true in the database |
+
+**Nothing beyond those six is recorded.** The owner did not tap *Abrir* either,
+and said so.
+
+### The fixture, and the one place it was not fully synthetic
+
+One row was written under the owner's stated conditions: a baseline first, fully
+synthetic content, no AI, no BYOK, no migration, and **no deletion or alteration
+until the owner confirmed explicitly.**
+
+- title *"Aviso de teste (sintético)"*, body *"Linha sintética para validar a
+  página de notificações no aparelho. Nenhum conteúdo real."*
+- `type` `task_stale`, `unread`, normal priority.
+
+**Its `dedupe_key` and `action_url` reference the id of one of the owner's own
+tasks, and that was declared before the validation rather than after it.** It is
+necessary: `attention-notice-row.test.tsx:192` asserts that a notice whose
+subject does not resolve **offers no silencing verb at all**, so a fully
+detached row would have made points 3, 4 and 5 impossible to reach. The
+consequence — the product may render that task's own title inside the primary
+action's label — is the product showing the owner their own data. **No task title
+was read by this work, and none appears in any artifact it produced.**
+
+### Residue: zero, proved against a baseline taken before the write
+
+`notifications` is back to **57**. Verified **before** deletion: the fixture was
+still `unread` with a null `read_at`, `notification_suppressions` was **0**,
+`undo_operations` was **20**, the eight tasks were untouched since the plant, and
+**zero** audit rows were written in the window. Then deleted **by id**.
+
+**58 of the 59 `public` tables are identical to the pre-plant baseline.** The one
+that moved is `product_events` **+1** — a single `needs_attention_viewed` on
+*home* at a **mobile** viewport, which is the owner's own navigation during the
+validation. `ai_usage_events` did **not** move: **no AI call, no BYOK spend, no
+migration.**
+
+---
+
+## 13. The owner's decisions of 2026-08-27, recorded
+
+**1 — The cadence ladder's terminal silence is the intended semantics.**
+`0 → send`, `+1 day`, `+3 days`, `+7 days`, then **no further notice until the
+subject changes**. The subject stays reachable on the attention surfaces; the
+owner does not want indefinite notification about something that has not moved.
+This **closes the item slice 2S.4 raised** — it was raised as an owner question
+and it has an owner's answer. `OD-2S-4` A stands as signed.
+
+**2 — The heartbeat producing a real notice on the owner's own account stays
+NOT EXECUTED**, recorded as a **non-blocking residual**. The cadence and the
+function are proved by pgTAP and by the hosted measurement; **the fixture above is
+not evidence of the heartbeat and is not offered as any**, here or anywhere else
+in this phase's record.
+
+**3 — `2S-ACCESS-005` (VoiceOver) stays NOT EXECUTED — OWNER WAIVED.**
+
+**4 — Closure is still not authorized.** No closing ADR may be written, the phase
+may not be formally closed, and no successor may be started or planned.
+
+### What remains open after all of this
+
+| open | state |
+|---|---|
+| the heartbeat producing a notice on the **owner's own** account | **NOT EXECUTED — non-blocking residual**, by the owner's decision |
+| a notice **answered in real use** | `read`, `dismissed` and `notification_suppressions` are all **zero** in production |
+| `2S-ACCESS-005` (VoiceOver) | **NOT EXECUTED — OWNER WAIVED** |
+
+**`/app/notifications` on the device is no longer among them.**

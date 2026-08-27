@@ -165,7 +165,7 @@ a requirement nobody exercised.**
 | close the phase | **not done, and not authorized.** `2S-CLOSE-010` needs an owner decision recorded as an ADR after a closing device checkpoint. A green pipeline is not that, and neither is this record |
 | name or start a successor | **none.** No `2T-*` declaration, no `phase-2t` directory; refusal 16 checks all three shapes |
 | a screen-reader run | **not performed**, and waived by the owner again on 2026-08-27 |
-| the three open device items | `/app/notifications` with a **real** notice row, the heartbeat producing a notice on the owner's own account, and a notice **answered in real use** — all three carried into §8, kept distinct, none substituting for another |
+| the open device items | **`/app/notifications` with a real notice row was validated on 2026-08-27** and is no longer open (slice 2S.3 §12). **Two remain**: the heartbeat producing a notice on the owner's own account — recorded by the owner as a **non-blocking residual**, and the fixtures are **not** offered as evidence of it — and a notice **answered in real use**. Kept distinct; neither substitutes for the other |
 
 ---
 
@@ -192,7 +192,7 @@ a requirement nobody exercised.**
 | `2S-CLOSE-004` | **built** | The reverse direction is deliberately **not** refused, and this phase exercised it for real rather than by control alone: **`2S-CADENCE-008` and `2S-REACH-002` were declared `build` and delivered `baseline`** — the phase discovering that the property already held. Refusing both directions would push a phase toward manufacturing a change to make a label look right |
 | `2S-CLOSE-005` | **built** | The budget reconciled at closeout — 1 allocated · 1 spent · 1 created · 1 applied, `102 local = 102 hosted`, parity `202608240102`, both counts **re-read live**; refusals 11–13 compare the files on disk against the counts the closing record states |
 | `2S-CLOSE-006` | **built** | Refusal 6 — the eleven declared families are read with a letters-only pattern and a digit-bearing family is proved **invisible** to it, which is the property that hid `2K-A11Y` from three counts at once |
-| `2S-CLOSE-007` | **built** | `PHASE_2S_THREAT_MODEL.md` — every threat re-dispositioned against what was built, and a threat closes only when its mitigation **exists and has been exercised** |
+| `2S-CLOSE-007` | **built** | `PHASE_2S_THREAT_MODEL.md` — every threat re-dispositioned against what was built, and a threat closes only when its mitigation **exists and has been exercised**: eighteen closed, one carried, and one raised that the owner decided on 2026-08-27 |
 | `2S-CLOSE-008` | **built** | Refusal 17 — the nineteen inherited remainders of PRD §7.1 are each looked for in the closing record by name, and a missing one refuses |
 | `2S-CLOSE-009` | **not-built-by-rule** | The rule is *a hardware proof is never discharged by a document*, and it is enforced twice: refusal 15 refuses `2S-MOBILE-003` classified without naming an owner device session, and no record in this phase reports the device checkpoint as anything but held by a person. Destination: the owner, who held it on 2026-08-27 |
 | `2S-CLOSE-010` | **partial** | The mechanism is built — closure requires an owner ADR after a closing device checkpoint, refusal 14 refuses a decision called signed with no ADR naming it, and this record explicitly does not close the phase. **Remainder: the owner's closing device checkpoint and the closing ADR. Destination: the owner.** Neither has happened and neither is claimed |

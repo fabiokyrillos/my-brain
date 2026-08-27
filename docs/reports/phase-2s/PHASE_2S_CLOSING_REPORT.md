@@ -182,13 +182,31 @@ deployed production build `6d38edc`, on the five named items, all reported
 passing. `2S-CLOSE-009` forbids discharging a hardware proof with a document, and
 nothing here does.
 
-**Three items remain open, and one does not stand for another:**
+**`/app/notifications` was validated on the device on 2026-08-27**, on a real
+notice row, under the owner's stated procedure: a residue baseline first, a fully
+synthetic notice, no AI, no BYOK, no migration, and **no deletion until the owner
+confirmed explicitly.** All six named points passed, the fixture was then deleted
+by id, and **58 of the 59 `public` tables are identical to the pre-plant
+baseline** — the one that moved is the owner's own navigation. Slice 2S.3 §12.
+
+**Two items remain open, and one does not stand for another:**
 
 | open | why it is its own item | destination |
 |---|---|---|
-| **`/app/notifications` walked on the device with a REAL notice row** | the owner's second pass reached that page in its **empty state**; no horizontal scrolling, the controls present easy to tap, and nothing destructive confirmed were all validated, and *"the menu does not cover the row"* and *"the date field does not zoom"* **were not**, because they cannot be attributed to a page that had a row on it | plant one synthetic notice, have the owner validate, and delete it **only after their explicit confirmation** — the owner's stated procedure |
-| **the heartbeat producing a notice on the owner's own account** | the device checkpoint used a **planted** row. A fixture is not cadence, and this report does not offer it as one | the owner's account reaching a `task_stale` or `task_overdue` condition on its own |
+| **the heartbeat producing a notice on the owner's own account** | the device validations used **planted** rows. **A fixture is not cadence, and this report does not offer it as one.** The owner records this as a **non-blocking residual**: the cadence and the function are proved by pgTAP and by the hosted measurement | the owner's account reaching a `task_stale` or `task_overdue` condition on its own |
 | **a notice answered in real use** | `read`, `dismissed` and `notification_suppressions` are all zero in production | ordinary use — not a lane, not a plant |
+
+### The one item this report raised, and the owner's answer
+
+Slice 2S.4 raised that the ladder's terminal branch leaves a subject nobody
+answers **silent until it changes** — signed behaviour, and also the state three
+real tasks are in.
+
+**The owner decided on 2026-08-27 that this is the intended semantics:** send,
+`+1 day`, `+3 days`, `+7 days`, then nothing further until the subject changes.
+The subject stays reachable on the attention surfaces, and the owner does not want
+indefinite notification about something that has not moved. `OD-2S-4` A stands as
+signed, and the raised item is **decided rather than carried**.
 
 Also not claimed:
 
