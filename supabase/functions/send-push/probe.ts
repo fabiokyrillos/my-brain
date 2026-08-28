@@ -10,78 +10,92 @@ import {
 
 /**
  * Asks the push service what it thinks of our VAPID token, **without a device
- * and without a subscription**.
+ * and without a subscription** — and, since run 1, with the controls that decide
+ * whether the answer is about our token at all.
  *
- * ## Why this exists
+ * ## What run 1 got right, and what it could not see
  *
- * Two hardware runs answered `unauthorized` with `403`, and `403` is where a
- * rejected `sub`, a wrong `aud`, an unverifiable signature, an unexpected key
- * and a refused subscription all converge. Each run cost one of three strikes
- * against the owner's only subscription and left the next reading no less
- * ambiguous than the last. The question "is our authentication itself
- * acceptable?" is separable from "does THIS subscription accept THIS key", and
- * only the second one needs a real device.
+ * Run 1 sent two requests — the real token and one with a corrupted signature —
+ * and Apple answered `BadJwtToken` to both. That was read as "our VAPID is
+ * rejected". It is *consistent* with that, and it is equally consistent with
+ * something this probe had no way to distinguish: **a push service that answers
+ * `BadJwtToken` to anything aimed at a resource it cannot find.** Both requests
+ * named a fabricated path. A control that only ever varies the token cannot tell
+ * you whether the token was read.
  *
- * So this probe asks the first one against a **fabricated** resource on a real
- * push service's origin. It cannot reach the owner's subscription because it is
- * never given one, and it cannot charge a strike because it has no database
- * client to charge it with — `SenderConfig` and `fetch` are the whole of its
- * input, which is a structural guarantee rather than a promise.
+ * Offline verification then made the ambiguity impossible to ignore. Our token
+ * verifies against RFC 8292's own published vector's verifier, in a **different
+ * runtime and a different crypto implementation** (Node/OpenSSL, not the Deno
+ * WebCrypto that produced it): the header segment is byte-identical to the RFC's,
+ * the claim set and its order match, `exp` is inside the 24-hour ceiling, the
+ * signature is 64 raw bytes of `r ‖ s` rather than DER, and it verifies. A token
+ * that is correct by the specification and rejected by the service is either a
+ * service-specific rule the specification does not carry, or an answer that was
+ * never about the token.
  *
- * ## Why the negative control is not optional
+ * ## The two controls that were missing
  *
- * A `403` from a request whose token is fine and whose PATH is fabricated proves
- * nothing about the token. So the same request is sent twice: once with the real
- * authorization, once with the signature deliberately corrupted. If the service
- * answers the corrupted one differently, the probe can see the authentication
- * layer at all; if it answers both identically, the probe is blind and says so.
+ * - **`absent`** — the same request with **no `Authorization` header at all**. If
+ *   the service answers what it answered the real token, its answer does not
+ *   depend on our token and every other reading here is void.
+ * - **`expired`** — a token that is provably well-formed and deliberately stale.
+ *   If the service names the expiry, it is parsing claims, and its verdict on the
+ *   real token is a verdict rather than a shrug.
  *
- * The mutation is **verified rather than assumed**: the corrupted header is
- * compared to the real one and the probe reports `mutation: "not_applied"` and
- * refuses to conclude anything if they are equal. A control that silently failed
- * to mutate is a control that agrees with everything.
+ * And one that splits the remaining space in half:
  *
- * ## What it may and may not conclude
+ * - **`ephemeral`** — a freshly generated pair, correct audience, valid expiry,
+ *   built by the same code. Rejected too? The fault is in what we BUILD.
+ *   Accepted? The fault is the key we HOLD.
  *
- * `vapid_rejected` is asserted **only** when the service names an authentication
- * failure from `vapidRejectionReasons` — its own word, from a closed set. Two
- * `403`s with no such word are **inconclusive**, not a verdict: that is exactly
- * the inference that has already been made twice on this residual without
- * evidence. Anything the fabricated path could have caused is recorded as
- * inconclusive too, however suggestive it looks.
+ * ## What it still may not do
+ *
+ * It reaches no database, names no subscription, charges no strike and produces
+ * no notification: it is handed a config and a `fetch` and nothing else, which is
+ * structural rather than a promise. Every recipient key it uses is generated per
+ * request and discarded. And it may not conclude anything its controls do not
+ * support — `inconclusive` is the answer whenever they do not.
  */
 
 /** Apple's public Web Push origin. A vendor's address, never a user's. */
 export const APPLE_PUSH_ORIGIN = "https://web.push.apple.com";
 
-/** The one conclusive verdict, and the honest absence of one. */
-export type ProbeVerdict = "vapid_rejected" | "inconclusive";
+/** The request shapes, each isolating exactly one variable. */
+export const probeVariants = ["real", "corrupted", "absent", "ephemeral", "expired"] as const;
+export type ProbeVariant = (typeof probeVariants)[number];
 
-/**
- * A content-free reading of what the pair of answers looked like. Evidence the
- * owner can act on, deliberately kept apart from `verdict` so that suggestive
- * evidence can never be read as proof.
- */
+export type ProbeVerdict =
+  /** Apple validates tokens on their own terms AND rejects what this code BUILDS. */
+  | "construction_rejected"
+  /** Apple validates tokens on their own terms AND rejects the key we HOLD. */
+  | "configured_key_rejected"
+  /** Rejected as VAPID, but the controls cannot say whether it is the key or the build. */
+  | "vapid_rejected_cause_unresolved"
+  /** The controls do not support any reading. The honest default. */
+  | "inconclusive";
+
 export type ProbeSignal =
-  /** The control's token was not actually mutated: the probe proves nothing. */
-  | "mutation_not_applied"
-  /** The service named an authentication failure for our REAL token. */
+  /** The unauthenticated request got the SAME answer: the answer is not about our token. */
+  | "answer_does_not_depend_on_token"
+  /** A deliberately stale token was named as stale: the service parses claims. */
+  | "service_validates_claims"
+  /** The service named an authentication failure for the REAL token. */
   | "real_rejected_as_vapid"
-  /** The service answered our real token by complaining about the RESOURCE. */
+  /** ...and for a freshly generated, provably valid one too. */
+  | "ephemeral_rejected_as_vapid"
+  /** The service answered the real token by complaining about the RESOURCE. */
   | "real_answered_about_resource"
-  /** The service named an authentication failure for the CORRUPTED token only. */
-  | "control_rejected_as_vapid"
-  /** Neither answer named anything from the closed set. */
+  /** The corrupted-signature control was not actually mutated. */
+  | "mutation_not_applied"
+  /** Nothing in the closed set was named by anything. */
   | "no_vapid_signal";
 
-export type ProbeAnswer = Readonly<{ status: number; reason: VendorReason }>;
+export type ProbeAnswer = Readonly<{ variant: ProbeVariant; status: number; reason: VendorReason }>;
 
 export type VapidProbeReport = Readonly<{
   status: "vapid_probe";
-  /** A push service's public origin. Never a subscription, never a path. */
   origin: string;
-  real: ProbeAnswer;
-  control: ProbeAnswer;
+  answers: readonly ProbeAnswer[];
   mutation: "applied" | "not_applied";
   signals: readonly ProbeSignal[];
   verdict: ProbeVerdict;
@@ -151,8 +165,25 @@ async function ephemeralRecipient(): Promise<{ p256dh: string; auth: string }> {
   };
 }
 
+/**
+ * A throwaway application-server pair, generated per call.
+ *
+ * It is a REAL VAPID identity that simply belongs to nobody: correct curve,
+ * coherent halves, and a `k=` that matches what signed the token. It exists so
+ * "is the token we build acceptable" can be asked without the answer depending
+ * on which key the deployment happens to hold.
+ */
+async function ephemeralSenderKeys(): Promise<{ publicKey: string; privateKey: string }> {
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+  return { publicKey: base64UrlEncode(raw), privateKey: jwk.d as string };
+}
+
 /** Twelve hours, the same lifetime the delivery path signs. */
 const PROBE_VAPID_TTL_SECONDS = 12 * 60 * 60;
+/** Comfortably stale, and still a well-formed token. */
+const PROBE_EXPIRED_OFFSET_SECONDS = -3 * 60 * 60;
 
 export async function probeVapid(dependencies: ProbeDependencies): Promise<VapidProbeReport | ProbeRefusal> {
   const { config, nowSeconds } = dependencies;
@@ -165,9 +196,9 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
 
   const endpoint = fabricatedEndpoint(origin);
 
-  let authorization: string;
+  let real: string;
   try {
-    authorization = await createVapidAuthorization({
+    real = await createVapidAuthorization({
       endpoint,
       publicKey: config.vapidPublicKey,
       privateKey: config.vapidPrivateKey,
@@ -178,7 +209,28 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
     return Object.freeze({ status: "vapid_probe" as const, refused: "vapid_key_malformed" });
   }
 
-  const corrupted = corruptVapidSignature(authorization);
+  const corrupted = corruptVapidSignature(real);
+
+  // Both fresh-key variants use the SAME subject as the deployment, so the only
+  // thing that differs between `real` and `ephemeral` is which key signed.
+  const fresh = await ephemeralSenderKeys();
+  const withFreshKey = (expiresAtSeconds: number) =>
+    createVapidAuthorization({
+      endpoint,
+      publicKey: fresh.publicKey,
+      privateKey: fresh.privateKey,
+      subject: config.vapidSubject,
+      expiresAtSeconds,
+    });
+
+  let ephemeral: string;
+  let expired: string;
+  try {
+    ephemeral = await withFreshKey(nowSeconds() + PROBE_VAPID_TTL_SECONDS);
+    expired = await withFreshKey(nowSeconds() + PROBE_EXPIRED_OFFSET_SECONDS);
+  } catch {
+    return Object.freeze({ status: "vapid_probe" as const, refused: "probe_key_failed" });
+  }
 
   let body: Uint8Array;
   try {
@@ -192,56 +244,78 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
     return Object.freeze({ status: "vapid_probe" as const, refused: "probe_payload_failed" });
   }
 
-  const ask = async (header: string): Promise<ProbeAnswer> => {
+  const ask = async (variant: ProbeVariant, header: string | null): Promise<ProbeAnswer> => {
+    const headers: Record<string, string> = {
+      "Content-Encoding": "aes128gcm",
+      "Content-Type": "application/octet-stream",
+      TTL: "0",
+    };
+    // `absent` is the control that decides whether any of the others mean
+    // anything, so it must differ from `real` in EXACTLY one way: no header.
+    if (header !== null) headers.Authorization = header;
     try {
-      const response = await dependencies.fetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: header,
-          "Content-Encoding": "aes128gcm",
-          "Content-Type": "application/octet-stream",
-          TTL: "0",
-        },
-        body: body as BodyInit,
-      });
-      return Object.freeze({ status: response.status, reason: await readVendorReason(response) });
+      const response = await dependencies.fetch(endpoint, { method: "POST", headers, body: body as BodyInit });
+      return Object.freeze({ variant, status: response.status, reason: await readVendorReason(response) });
     } catch {
       // Status `0` is not a status any service returns, which is what makes it
       // usable as "the request never produced an answer" without inventing a
       // category the rest of the sender does not have.
-      return Object.freeze({ status: 0, reason: "vendor_absent" as VendorReason });
+      return Object.freeze({ variant, status: 0, reason: "vendor_absent" as VendorReason });
     }
   };
 
-  const real = await ask(authorization);
-  const control = corrupted === null ? real : await ask(corrupted);
+  const answers: ProbeAnswer[] = [];
+  answers.push(await ask("real", real));
+  if (corrupted !== null) answers.push(await ask("corrupted", corrupted));
+  answers.push(await ask("absent", null));
+  answers.push(await ask("ephemeral", ephemeral));
+  answers.push(await ask("expired", expired));
+
+  const of = (variant: ProbeVariant) => answers.find((answer) => answer.variant === variant);
+  const realAnswer = of("real")!;
+  const absentAnswer = of("absent")!;
+  const ephemeralAnswer = of("ephemeral")!;
+  const expiredAnswer = of("expired")!;
 
   const signals: ProbeSignal[] = [];
   if (corrupted === null) signals.push("mutation_not_applied");
-  if (vapidRejectionReasons.includes(real.reason)) signals.push("real_rejected_as_vapid");
-  if (subscriptionRejectionReasons.includes(real.reason)) signals.push("real_answered_about_resource");
-  if (corrupted !== null && vapidRejectionReasons.includes(control.reason)) {
-    signals.push("control_rejected_as_vapid");
-  }
+
+  // THE control. If an unauthenticated request draws the same answer, the answer
+  // is about the fabricated resource and nothing below is evidence about a token.
+  const answerIsAboutTheToken =
+    !(absentAnswer.status === realAnswer.status && absentAnswer.reason === realAnswer.reason);
+  if (!answerIsAboutTheToken) signals.push("answer_does_not_depend_on_token");
+
+  // A stale token NAMED as stale proves the service reads claims rather than
+  // pattern-matching a failure.
+  const claimsAreRead = expiredAnswer.reason === "ExpiredProviderToken";
+  if (claimsAreRead) signals.push("service_validates_claims");
+
+  if (vapidRejectionReasons.includes(realAnswer.reason)) signals.push("real_rejected_as_vapid");
+  if (vapidRejectionReasons.includes(ephemeralAnswer.reason)) signals.push("ephemeral_rejected_as_vapid");
+  if (subscriptionRejectionReasons.includes(realAnswer.reason)) signals.push("real_answered_about_resource");
   if (signals.length === 0) signals.push("no_vapid_signal");
 
   /*
-   * The single conclusive reading, and everything else is `inconclusive`.
+   * The decision procedure, and it refuses far more often than it concludes.
    *
-   * Two `403`s do NOT establish "our VAPID is rejected" — a fabricated path can
-   * produce a `403` on its own, and inferring a cause from a status is the
-   * mistake this whole residual is made of. The service has to NAME an
-   * authentication failure, in its own closed vocabulary, about our REAL token,
-   * with a control that actually mutated.
+   * Nothing is read as a verdict about our token unless the `absent` control
+   * shows the service's answer depends on the token at all, and unless the
+   * mutation control actually mutated. With both of those, a rejection of the
+   * REAL token separates into two repairs by whether a freshly generated,
+   * provably valid identity is rejected the same way.
    */
-  const verdict: ProbeVerdict =
-    corrupted !== null && vapidRejectionReasons.includes(real.reason) ? "vapid_rejected" : "inconclusive";
+  let verdict: ProbeVerdict = "inconclusive";
+  if (answerIsAboutTheToken && corrupted !== null && vapidRejectionReasons.includes(realAnswer.reason)) {
+    if (vapidRejectionReasons.includes(ephemeralAnswer.reason)) verdict = "construction_rejected";
+    else if (subscriptionRejectionReasons.includes(ephemeralAnswer.reason)) verdict = "configured_key_rejected";
+    else verdict = "vapid_rejected_cause_unresolved";
+  }
 
   return Object.freeze({
     status: "vapid_probe" as const,
     origin,
-    real,
-    control,
+    answers: Object.freeze(answers),
     mutation: corrupted === null ? ("not_applied" as const) : ("applied" as const),
     signals: Object.freeze(signals),
     verdict,

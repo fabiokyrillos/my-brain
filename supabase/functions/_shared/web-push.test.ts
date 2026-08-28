@@ -279,3 +279,207 @@ Deno.test("a mismatched pair never yields a token the advertised key can verify"
   );
   assertEquals(valid, false);
 });
+
+/*
+ * ============================================================================
+ * RFC 8292's own VAPID vector, checked by a verifier written from the curve
+ * equations rather than by the runtime that produced the signature.
+ * ============================================================================
+ *
+ * Every VAPID assertion in this file until now signed with `crypto.subtle` and
+ * verified with `crypto.subtle`. That agrees with itself by construction: a
+ * construction that hashed the wrong bytes, ordered `r` and `s` backwards, or
+ * emitted DER where JOSE wants raw `r ‖ s` would round-trip perfectly and be
+ * rejected by every push service on earth. Apple answered `BadJwtToken` to a
+ * token this file already called correct, which is exactly the shape of failure
+ * a same-implementation round trip cannot see.
+ *
+ * So ECDSA verification is done below in ~40 lines of BigInt arithmetic over
+ * P-256 — no WebCrypto, no library, nothing shared with the signer except
+ * SHA-256 itself, which is not the part under test. It is pinned first against
+ * RFC 8292 section 2.4's published token (a known answer, produced years ago by
+ * somebody else's implementation), then pointed at ours.
+ */
+
+/** NIST P-256. */
+const P = 0xffffffff00000001000000000000000000000000ffffffffffffffffffffffffn;
+const N = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551n;
+const B = 0x5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604bn;
+const GX = 0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296n;
+const GY = 0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5n;
+
+type Point = { x: bigint; y: bigint } | null; // null is the point at infinity
+
+const mod = (a: bigint, m: bigint): bigint => ((a % m) + m) % m;
+
+/** Fermat inversion; `p` is prime, so a^(p-2) = a^-1. */
+function inverse(a: bigint, m: bigint): bigint {
+  let result = 1n;
+  let base = mod(a, m);
+  let exponent = m - 2n;
+  while (exponent > 0n) {
+    if (exponent & 1n) result = (result * base) % m;
+    base = (base * base) % m;
+    exponent >>= 1n;
+  }
+  return result;
+}
+
+function add(p1: Point, p2: Point): Point {
+  if (p1 === null) return p2;
+  if (p2 === null) return p1;
+  if (p1.x === p2.x && mod(p1.y + p2.y, P) === 0n) return null;
+  const slope = p1.x === p2.x && p1.y === p2.y
+    // Doubling: (3x² - 3) / 2y, since a = -3 on this curve.
+    ? mod((3n * p1.x * p1.x - 3n) * inverse(2n * p1.y, P), P)
+    : mod((p2.y - p1.y) * inverse(p2.x - p1.x, P), P);
+  const x = mod(slope * slope - p1.x - p2.x, P);
+  return { x, y: mod(slope * (p1.x - x) - p1.y, P) };
+}
+
+function multiply(k: bigint, point: Point): Point {
+  let result: Point = null;
+  let addend = point;
+  let scalar = mod(k, N);
+  while (scalar > 0n) {
+    if (scalar & 1n) result = add(result, addend);
+    addend = add(addend, addend);
+    scalar >>= 1n;
+  }
+  return result;
+}
+
+const toBigInt = (bytes: Uint8Array): bigint =>
+  bytes.reduce((total, byte) => (total << 8n) | BigInt(byte), 0n);
+
+function onCurve(point: { x: bigint; y: bigint }): boolean {
+  return mod(point.y * point.y, P) === mod(point.x * point.x * point.x - 3n * point.x + B, P);
+}
+
+/**
+ * ECDSA-SHA256 verification, from the definition. Returns false rather than
+ * throwing for anything out of range, so a malformed input is a rejection.
+ */
+async function verifyP256(
+  publicKeyPoint: Uint8Array,
+  message: Uint8Array,
+  signature: Uint8Array,
+): Promise<boolean> {
+  if (publicKeyPoint.length !== 65 || publicKeyPoint[0] !== 0x04) return false;
+  if (signature.length !== 64) return false;
+  const Q = { x: toBigInt(publicKeyPoint.slice(1, 33)), y: toBigInt(publicKeyPoint.slice(33, 65)) };
+  if (!onCurve(Q)) return false;
+
+  const r = toBigInt(signature.slice(0, 32));
+  const s = toBigInt(signature.slice(32, 64));
+  if (r <= 0n || r >= N || s <= 0n || s >= N) return false;
+
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", message as BufferSource));
+  const e = toBigInt(digest); // 256-bit curve, so no truncation is needed
+  const w = inverse(s, N);
+  const point = add(multiply(mod(e * w, N), { x: GX, y: GY }), multiply(mod(r * w, N), Q));
+  if (point === null) return false;
+  return mod(point.x, N) === r;
+}
+
+/** RFC 8292 section 2.4, Figure 1 and Figure 2. Public test data. */
+const RFC8292 = {
+  jwt:
+    "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJodHRwczovL3B1c2guZXhhbXBsZS5uZXQiLCJleHAiOjE0NTM1MjM3NjgsInN1YiI6Im1haWx0bzpwdXNoQGV4YW1wbGUuY29tIn0.i3CYb7t4xfxCDquptFOepC9GAu_HLGkMlMuCGSK2rpiUfnK9ojFwDXb1JrErtmysazNjjvW2L9OkSSHzvoD1oA",
+  k: "BA1Hxzyi1RUM1b5wjxsn7nGxAszw2u61m164i3MrAIxHF6YK5h4SDYic-dRuU_RCPCfA5aq9ojSwk5Y2EmClBPs",
+  header: { typ: "JWT", alg: "ES256" },
+  claims: { aud: "https://push.example.net", exp: 1453523768, sub: "mailto:push@example.com" },
+} as const;
+
+function splitToken(authorization: string) {
+  const match = /^vapid t=([^.]+)\.([^.]+)\.([A-Za-z0-9_-]+), k=([A-Za-z0-9_-]+)$/.exec(authorization);
+  if (match === null) throw new Error("the Authorization header did not parse");
+  const [, header, claims, signature, key] = match;
+  return { header, claims, signature, key, signingInput: `${header}.${claims}` };
+}
+
+Deno.test("the independent verifier accepts RFC 8292's published token and rejects a corrupted one", async () => {
+  const [header, claims, signature] = RFC8292.jwt.split(".");
+  const message = new TextEncoder().encode(`${header}.${claims}`);
+  const key = base64UrlDecode(RFC8292.k);
+
+  // Known answer: a signature produced years ago by another implementation.
+  assertEquals(await verifyP256(key, message, base64UrlDecode(signature)), true);
+
+  // Non-vacuity: the verifier must be able to say no. One bit.
+  const corrupted = base64UrlDecode(signature);
+  corrupted[corrupted.length - 1] ^= 0x01;
+  assertEquals(await verifyP256(key, message, corrupted), false);
+
+  // And the decoded values are the ones the RFC prints, so the encoding this
+  // repository produces is being compared against the right thing.
+  assertEquals(JSON.parse(new TextDecoder().decode(base64UrlDecode(header))), RFC8292.header);
+  assertEquals(JSON.parse(new TextDecoder().decode(base64UrlDecode(claims))), RFC8292.claims);
+});
+
+Deno.test("OUR VAPID token verifies under the independent verifier, and matches the RFC's shape", async () => {
+  const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+  const jwk = await crypto.subtle.exportKey("jwk", pair.privateKey);
+
+  const authorization = await createVapidAuthorization({
+    endpoint: "https://push.example.net/p/JzLQ3raZJfFBR0aqvOMsLrt54w4rJUsV",
+    publicKey: base64UrlEncode(raw),
+    privateKey: jwk.d as string,
+    subject: "mailto:push@example.com",
+    expiresAtSeconds: RFC8292.claims.exp,
+  });
+  const token = splitToken(authorization);
+
+  // The signature is ours; the verifier is not.
+  assertEquals(
+    await verifyP256(
+      base64UrlDecode(token.key),
+      new TextEncoder().encode(token.signingInput),
+      base64UrlDecode(token.signature),
+    ),
+    true,
+  );
+
+  // JOSE wants raw `r ‖ s`. A DER-wrapped signature is 70-72 bytes and would be
+  // rejected by every push service while verifying happily against itself.
+  assertEquals(base64UrlDecode(token.signature).length, 64);
+
+  // The protected header is byte-identical to the RFC's, which pins `typ`,
+  // `alg`, the key order and the absence of padding in one assertion.
+  assertEquals(token.header, RFC8292.jwt.split(".")[0]);
+  // And the claim set is the RFC's, key for key and in the same order.
+  assertEquals(token.claims, RFC8292.jwt.split(".")[1]);
+  // `k=` is the uncompressed point that signed it, verbatim and canonical.
+  assertEquals(base64UrlDecode(token.key).length, 65);
+  assertEquals(base64UrlDecode(token.key)[0], 0x04);
+});
+
+Deno.test("a token signed by a DIFFERENT key does not verify against the advertised one", async () => {
+  /*
+   * The failure mode `vapidKeyPairAgrees` exists for, restated against a
+   * verifier that shares no code with the signer — because the runtime that
+   * signs imports an EC private JWK from `d` alone and never consults `x`/`y`.
+   */
+  const mine = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
+  const other = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign"]);
+  const mineJwk = await crypto.subtle.exportKey("jwk", mine.privateKey);
+  const otherRaw = new Uint8Array(await crypto.subtle.exportKey("raw", other.publicKey));
+
+  const authorization = await createVapidAuthorization({
+    endpoint: "https://push.example.net/p/abc",
+    publicKey: base64UrlEncode(otherRaw), // advertised
+    privateKey: mineJwk.d as string, // actually signing
+    subject: "mailto:push@example.com",
+    expiresAtSeconds: 1453523768,
+  });
+  const token = splitToken(authorization);
+  assertEquals(
+    await verifyP256(
+      base64UrlDecode(token.key),
+      new TextEncoder().encode(token.signingInput),
+      base64UrlDecode(token.signature),
+    ),
+    false,
+  );
+});

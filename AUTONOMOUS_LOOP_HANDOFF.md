@@ -15339,3 +15339,121 @@ No other residual is resumed. Signup stays closed and the rollout gate untouched
 
 **The `403` is still unexplained, and the next run will say more than the last two
 did without asking the device to pay for it.**
+
+---
+
+## §139 — The JWT is correct, an independent verifier says so, and the probe that blamed it was missing its control (2026-08-28)
+
+Under ADR-140. **Zero migrations**, parity unchanged at `202608240102`.
+
+### What the first probe run said, and what it could not have known
+
+The owner ran `mode: "vapid_probe"` through the Vault/`pg_net` path — the secret
+never left the database — and Apple answered:
+
+```
+real:    { reason: "BadJwtToken", status: 403 }
+control: { reason: "BadJwtToken", status: 403 }
+verdict: "vapid_rejected"   mutation: "applied"
+```
+
+That verdict was **mine, and it was over-stated.** Both requests named a
+**fabricated** resource, and both varied only the token. A push service that
+answers `BadJwtToken` to anything it cannot find produces exactly that reading.
+My own probe documentation said "anything the fabricated path could itself have
+caused is inconclusive" and then concluded anyway, because the rule was written
+about the *reason vocabulary* and not about the *shape of the experiment*.
+
+> **A control that only varies the thing you suspect cannot tell you whether the
+> thing you suspect was read.**
+
+### The JWT is correct, and it is not our runtime saying so
+
+Every VAPID assertion in this repository until now signed with `crypto.subtle`
+and verified with `crypto.subtle`. That agrees with itself by construction — a
+token that hashed the wrong bytes, ordered `r` and `s` backwards, or emitted DER
+where JOSE wants raw `r ‖ s` would round-trip perfectly and be refused by every
+push service alive.
+
+So verification now happens in **~40 lines of BigInt arithmetic over P-256**,
+written from the curve equations, sharing nothing with the signer but SHA-256 —
+which is not the part under test. It is pinned against **RFC 8292 section 2.4's
+published token**, produced years ago by somebody else's implementation:
+
+| check | result |
+|---|---|
+| the RFC's own published token verifies | **yes** |
+| the same token with one bit flipped is rejected | **yes** (non-vacuity) |
+| **our token verifies** | **yes** |
+| signature length | **64 bytes** — raw `r ‖ s`, not DER |
+| protected header segment | **byte-identical** to the RFC's `eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9` |
+| claim set and key order | `aud,exp,sub` — the RFC's, key for key |
+| `exp` distance | 12h, inside RFC 8292's 24-hour ceiling |
+| a token signed by a different key than `k=` advertises | **rejected** |
+
+The same three checks were also run in a **different runtime and a different
+crypto library** (Node/OpenSSL against Deno/WebCrypto) before being written down.
+They agree.
+
+**Header, algorithm, audience, subject, issued-at/expiration, ES256 signature,
+DER↔JOSE conversion, base64url encoding, the matching public key and the
+`Authorization` construction are all correct.** The defect is not in the token
+this code builds.
+
+### The probe, rebuilt around the controls it was missing
+
+Five variants, one variable each, all device-free and subscription-free:
+
+| variant | isolates |
+|---|---|
+| `real` | the baseline |
+| `corrupted` | the signature alone |
+| **`absent`** | **no `Authorization` header at all** |
+| **`ephemeral`** | a freshly generated, provably valid identity, same claims |
+| **`expired`** | a well-formed token deliberately stale |
+
+`absent` is the one that decides whether any other reading is evidence: if an
+unauthenticated request draws the same answer as the real token, the answer is
+about the resource and **everything else is void**. `expired` asks whether the
+service parses claims at all — a stale token *named as stale* is a service
+reading the token rather than pattern-matching a failure. And `ephemeral` splits
+the remaining space exactly in half: rejected too, and the fault is in what we
+**build**; accepted, and it is the key we **hold**.
+
+The verdict vocabulary now refuses far more than it concludes —
+`construction_rejected`, `configured_key_rejected`,
+`vapid_rejected_cause_unresolved`, `inconclusive` — and **none of them is emitted
+while `absent` matches `real`.** That case is asserted directly, with the run-1
+reading as its fixture.
+
+### What was deliberately not touched
+
+`deliver.ts` is **byte-identical** to what is deployed. The correction that
+stopped a `401`/`403` charging the device a strike, and the closed content-free
+reason vocabulary, are untouched — verified by `git diff --numstat` returning no
+row for that file. No migration was created. The re-subscription defect stays
+filed and unfunded at §3.6 of the backlog.
+
+### Gates
+
+`typecheck` zero errors · `lint` zero errors in the CI scope · worker suite
+**208 assertions green** (was 201), of which **52 in `send-push`** and **12 in
+`web-push`** · vitest **9696 of 9699, zero `AssertionError`** in an untruncated
+log, the three failures being 5000ms timeouts in repository-wide scans that pass
+**92 of 92 in 3.6s** with a generous timeout · `npm run build` exit 0.
+
+The failing set *changes between runs* — `phase-2f-documentation`,
+`reports-taxonomy-guard`, `phase-2r-foundation`, `byok/guards` have each taken a
+turn — which is what contention looks like and is not what a defect looks like.
+
+### Where the next session starts
+
+**The probe must be run again after this deploy, before anything else.** Its
+answer decides which repair is next, and it may well be that no repair to this
+codebase is warranted at all — in which case the `403` belongs to something about
+the deployment or the account rather than the token, and that is a different
+investigation with different evidence.
+
+**Push still does not work, the `403` is still unexplained, and the owner's
+iPhone has still never received a push.** No real send may happen until the probe
+stops returning `BadJwtToken`.

@@ -105,6 +105,38 @@ That is repaired ahead of any further send; see §3.1.
 
 ---
 
+## 2.2 The probe ran, and its first reading was corrected (2026-08-28)
+
+The owner ran `mode: "vapid_probe"` through the Vault/`pg_net` path, so the
+dispatch secret never left the database. Apple answered `BadJwtToken` / 403 to
+**both** the real token and the corrupted-signature control.
+
+That was recorded as `verdict: "vapid_rejected"`, and **that verdict was
+over-stated.** Both requests named a fabricated resource and varied only the
+token; a service that answers `BadJwtToken` to anything it cannot find yields the
+identical reading. The probe was missing the control that separates the two.
+
+**The token itself is correct, established against an independent verifier.**
+ECDSA P-256 verification written from the curve equations in BigInt — sharing no
+code with the signer — accepts RFC 8292 section 2.4's published token, rejects it
+with one bit flipped, and accepts ours. The protected header is byte-identical to
+the RFC's, the claim set and its order match, `exp` sits inside the 24-hour
+ceiling, the signature is 64 raw bytes rather than DER, and a token signed by a
+key other than the one `k=` advertises is refused. Cross-checked in a second
+runtime and crypto library (Node/OpenSSL vs Deno/WebCrypto).
+
+So `2M-NOTIFY-011`'s **header, algorithm, audience, subject, expiry, ES256
+signature, JOSE encoding, base64url and `Authorization` construction are all
+eliminated.** Hypothesis 1's "an Apple-specific requirement of RFC 8292 the
+sender does not produce" is narrowed to a requirement that is **not visible in
+the token**, and hypotheses 3 and 4 gain weight accordingly.
+
+The probe now sends five variants — `real`, `corrupted`, `absent`, `ephemeral`,
+`expired` — and emits no verdict at all while an unauthenticated request draws
+the same answer as the real token.
+
+---
+
 ## 3. The work, when it is authorized
 
 Nothing here may be closed by writing a document, and nothing here may be closed

@@ -3,6 +3,40 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-28 - The VAPID token is correct, and the probe that blamed it was missing its control (ADR-140)
+
+**Zero migrations.** Parity unchanged at `202608240102`. `deliver.ts` is
+byte-identical to what is deployed: the correction that stopped a `401`/`403`
+charging the device a strike, and the closed content-free reason vocabulary, are
+untouched.
+
+**Push still does not work.** The `HTTP 403` is still unexplained and the owner's
+iPhone has still never received a push.
+
+**The first probe run concluded too much, and the conclusion is withdrawn.** Apple
+answered `BadJwtToken` to the real token and to a corrupted-signature control —
+but both named a fabricated resource and varied only the token, so a service that
+answers `BadJwtToken` to anything it cannot find gives the same reading. *A
+control that only varies the thing you suspect cannot tell you whether the thing
+you suspect was read.*
+
+**The token is correct, and our own runtime is not what says so.** ECDSA P-256
+verification written from the curve equations in BigInt — sharing nothing with
+the signer but SHA-256 — accepts RFC 8292 section 2.4's published token, rejects
+it with one bit flipped, and accepts ours. The protected header is byte-identical
+to the RFC's, the claims and their order match, `exp` is inside the 24-hour
+ceiling, the signature is 64 raw bytes rather than DER, and a token signed by a
+key other than `k=` advertises is refused. Cross-checked in a second runtime and
+crypto library. Header, algorithm, audience, subject, expiry, signature, DER↔JOSE
+conversion, base64url and the `Authorization` construction are all eliminated.
+
+**The probe is rebuilt around the controls it lacked**: five variants — `real`,
+`corrupted`, **`absent`** (no `Authorization` header at all), **`ephemeral`** (a
+freshly generated valid identity), **`expired`** (well-formed and stale). It
+emits no verdict while an unauthenticated request draws the same answer as the
+real token, and its vocabulary now distinguishes `construction_rejected` from
+`configured_key_rejected` from `vapid_rejected_cause_unresolved`.
+
 ## 2026-08-28 - The push `403` is instrumented, and a diagnostic run stops costing the device a strike (ADR-140)
 
 **Zero migrations.** A corrective initiative on the residual ADR-107 deferred out
