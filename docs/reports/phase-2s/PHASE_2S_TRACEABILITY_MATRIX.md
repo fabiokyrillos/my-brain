@@ -9,9 +9,9 @@ correct reads as complete, which is why a refusal produces no file at all.
 
 | Class | Count |
 |---|---:|
-| `built` | 72 |
+| `built` | 73 |
 | `baseline` | 20 |
-| `partial` | 1 |
+| `partial` | 0 |
 | `not-built-by-rule` | 6 |
 | `undelivered` | 0 |
 
@@ -112,7 +112,7 @@ correct reads as complete, which is why a refusal produces no file at all.
 | `2S-CLOSE-007` | 2S.4 | built | `PHASE_2S_THREAT_MODEL.md` — every threat re-dispositioned against what was built, and a threat closes only when its mitigation **exists and has been exercised**: eighteen closed, one carried, and one raised that the owner decided on 2026-08-27 |
 | `2S-CLOSE-008` | 2S.4 | built | Refusal 17 — the nineteen inherited remainders of PRD §7.1 are each looked for in the closing record by name, and a missing one refuses |
 | `2S-CLOSE-009` | 2S.4 | not-built-by-rule | The rule is *a hardware proof is never discharged by a document*, and it is enforced twice: refusal 15 refuses `2S-MOBILE-003` classified without naming an owner device session, and no record in this phase reports the device checkpoint as anything but held by a person. Destination: the owner, who held it on 2026-08-27 |
-| `2S-CLOSE-010` | 2S.4 | partial | The mechanism is built — closure requires an owner ADR after a closing device checkpoint, refusal 14 refuses a decision called signed with no ADR naming it, and this record explicitly does not close the phase. **Remainder: the owner's closing device checkpoint and the closing ADR. Destination: the owner.** Neither has happened and neither is claimed |
+| `2S-CLOSE-010` | 2S.4 | built | **ADR-139, 2026-08-28** — and by nothing else. It stood at `partial` for exactly as long as it should have: the mechanism was built here, and the remainder was the owner's. It is `built` now only by the **combination** the requirement itself names — the completed device checkpoint (slice 2S.3 §11 and §12, on real hardware, in two sittings) **and** the owner's authorization recorded as an ADR. Neither half alone would have done it, and a green pipeline is neither half |
 | `2S-CLOSE-011` | 2S.4 | built | Refusal 16 — a successor requirement in the PRD, a `docs/initiatives/phase-2t` directory and a `docs/reports/phase-2t` directory are each refused; none exists |
 | `2S-CLOSE-012` | 2S.4 | built | §5 — the query re-run against the deployed database, the result recorded **including the half that did not move**, and the mechanism read from the deployed function rather than the migration file |
 | `2S-CLOSE-013` | 2S.4 | built | §3 — the closing record names the authority each inline verb dispatches to, and refusal 21 refuses a record that omits one while refusal 20 refuses a writer absent from the 2S.0 baseline |
