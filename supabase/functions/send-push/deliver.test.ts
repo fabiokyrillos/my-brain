@@ -11,6 +11,9 @@ import {
   isAllowedPushHost,
   parseDeliveryRequest,
   recordSuppression,
+  subscriptionRejectionReasons,
+  vapidRejectionReasons,
+  vendorReasons,
 } from "./deliver.ts";
 import { base64UrlEncode } from "../_shared/web-push.ts";
 
@@ -206,6 +209,7 @@ Deno.test("the configuration self-check names every fault as a category and neve
 
   assertEquals(await inspectSenderConfiguration(mine), {
     subject: "operational",
+    subjectScheme: "mailto",
     publicKey: "p256_point",
     privateKey: "p256_scalar",
     pair: "consistent",
@@ -213,6 +217,7 @@ Deno.test("the configuration self-check names every fault as a category and neve
 
   assertEquals(await inspectSenderConfiguration({ ...mine, vapidPublicKey: other.vapidPublicKey }), {
     subject: "operational",
+    subjectScheme: "mailto",
     publicKey: "p256_point",
     privateKey: "p256_scalar",
     pair: "mismatched",
@@ -220,12 +225,12 @@ Deno.test("the configuration self-check names every fault as a category and neve
 
   assertEquals(
     await inspectSenderConfiguration({ ...mine, vapidPublicKey: base64UrlEncode(new Uint8Array(31)) }),
-    { subject: "operational", publicKey: "malformed", privateKey: "p256_scalar", pair: "unusable" },
+    { subject: "operational", subjectScheme: "mailto", publicKey: "malformed", privateKey: "p256_scalar", pair: "unusable" },
   );
 
   assertEquals(
     await inspectSenderConfiguration({ ...mine, vapidPrivateKey: base64UrlEncode(new Uint8Array(31)) }),
-    { subject: "operational", publicKey: "p256_point", privateKey: "malformed", pair: "unusable" },
+    { subject: "operational", subjectScheme: "mailto", publicKey: "p256_point", privateKey: "malformed", pair: "unusable" },
   );
 
   // The default subject is still visible here, which is what made hardware run
@@ -337,7 +342,7 @@ Deno.test("the permitted path encrypts, signs and posts, then finishes the ledge
     allowedHosts: ALLOWED_TEST_HOSTS,
   });
 
-  assertEquals(outcome, { status: "sent", delivered: 1, retired: 0, failed: 0, diagnostics: [], subject: "operational" });
+  assertEquals(outcome, { status: "sent", delivered: 1, retired: 0, failed: 0, deviceStrikes: 0, diagnostics: [], subject: "operational" });
   assertEquals(seen.length, 1);
   assertEquals(seen[0].headers.get("Content-Encoding"), "aes128gcm");
   assertEquals(seen[0].headers.get("Authorization")?.startsWith("vapid t="), true);
@@ -419,8 +424,11 @@ Deno.test("a 410 retires the subscription; a 500 only strikes it", async () => {
   // The 410 device is `gone`; the 500 device is a server error that must NOT
   // retire it. Both now name themselves instead of being one silent `failed`.
   assertEquals(outcome, {
-    status: "sent", delivered: 0, retired: 1, failed: 1, subject: "operational",
-    diagnostics: [{ category: "gone", status: 410 }, { category: "server_error", status: 500 }],
+    status: "sent", delivered: 0, retired: 1, failed: 1, deviceStrikes: 1, subject: "operational",
+    diagnostics: [
+      { category: "gone", status: 410, reason: "vendor_absent" },
+      { category: "server_error", status: 500, reason: "vendor_absent" },
+    ],
   });
   const finish = calls.find((call) => call.name === "finish_push_delivery");
   // The distinction is the whole point: a browser that discarded the
@@ -454,7 +462,7 @@ Deno.test("one device's failure never stops another device's delivery", async ()
     allowedHosts: ALLOWED_TEST_HOSTS,
   });
   assertEquals(outcome, {
-    status: "sent", delivered: 1, retired: 0, failed: 1, subject: "operational",
+    status: "sent", delivered: 1, retired: 0, failed: 1, deviceStrikes: 1, subject: "operational",
     diagnostics: [{ category: "subscription_malformed" }],
   });
 });
@@ -506,7 +514,7 @@ Deno.test("an endpoint outside the push-service allowlist is never contacted", a
   });
   assertEquals(fetched, 0);
   assertEquals(outcome, {
-    status: "sent", delivered: 0, retired: 0, failed: 1, subject: "operational",
+    status: "sent", delivered: 0, retired: 0, failed: 1, deviceStrikes: 1, subject: "operational",
     diagnostics: [{ category: "host_not_allowed" }],
   });
   // Struck rather than retired: an unrecognised host is our list being out of
@@ -653,8 +661,15 @@ Deno.test("a non-2xx answer is reported with its status and a category, not sile
   assertEquals(sent(outcome).failed, 1);
   assertEquals(sent(outcome).retired, 0);
   // The line the iPhone run could not produce.
+  //
+  // `vendor_unknown` and NOT `BadJwtToken`, and the fixture body is what makes
+  // that assertion worth making: it is a bare reason token in PLAIN TEXT, which
+  // is exactly the shape a scanning parser would lift a value out of. A reason is
+  // only ever admitted as the value of a named field in a JSON object, matched
+  // against the closed set by equality — so text that merely CONTAINS a known
+  // token yields nothing, and nothing the wire chose can reach the output.
   assertEquals(sent(outcome).diagnostics, [
-    { category: "unauthorized", status: 403 },
+    { category: "unauthorized", status: 403, reason: "vendor_unknown" },
   ]);
   // A 403 must NOT retire the device: a rejected signature is our configuration
   // being wrong, not the browser having discarded anything.
@@ -848,7 +863,8 @@ Deno.test("a reserved subject is surfaced in the outcome, without the address", 
 
   // The two readings that together are an answer rather than a symptom.
   assertEquals(sent(outcome).subject, "reserved");
-  assertEquals(sent(outcome).diagnostics, [{ category: "unauthorized", status: 403 }]);
+  // No body at all is its own answer, and a different one from an unreadable body.
+  assertEquals(sent(outcome).diagnostics, [{ category: "unauthorized", status: 403, reason: "vendor_absent" }]);
   // The address itself never travels.
   assertEquals(JSON.stringify(outcome).includes("my-brain.invalid"), false);
   assertEquals(JSON.stringify(outcome).includes("ops@"), false);
@@ -872,7 +888,7 @@ Deno.test("a successful delivery reports no diagnostics at all", async () => {
     nowSeconds: () => 1_800_000_000,
     allowedHosts: ALLOWED_TEST_HOSTS,
   });
-  assertEquals(outcome, { status: "sent", delivered: 1, retired: 0, failed: 0, diagnostics: [], subject: "operational" });
+  assertEquals(outcome, { status: "sent", delivered: 1, retired: 0, failed: 0, deviceStrikes: 0, diagnostics: [], subject: "operational" });
 });
 
 Deno.test("the suppression event's idempotency key is stable per item and distinct per reason", async () => {
@@ -891,4 +907,281 @@ Deno.test("the suppression event's idempotency key is stable per item and distin
   assertEquals((await keyFor("daily_cap", "a".repeat(64))) === first, false);
   assertEquals((await keyFor("quiet_hours", "b".repeat(64))) === first, false);
   assertEquals(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(first), true);
+});
+
+/*
+ * ============================================================================
+ * The 403 correction — `unauthorized` is OUR fault and must cost the device
+ * nothing.
+ * ============================================================================
+ *
+ * `finish_push_delivery` increments `push_subscriptions.failure_count` for every
+ * id in `p_failed_subscription_ids`, and the THIRD strike sets `state =
+ * 'expired'` and takes the consent out with the last device. This module already
+ * reasons that a 401/403 "is our configuration being wrong rather than the
+ * user's browser having discarded anything" — and then charges the device for it
+ * anyway, three attempts later, through a column rather than through retirement.
+ *
+ * The owner's only subscription stood at `failure_count = 2` when this was
+ * found. One more diagnostic run would have destroyed it.
+ */
+
+const UNAUTH_SUB = "2f4b0001-0000-4000-8000-0000000000c1";
+
+function unauthorizedFixture(keys: { p256dh: string; auth: string }) {
+  return recordingClient({
+    begin_push_delivery: {
+      data: {
+        permitted: true,
+        delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+        subscriptions: [{ id: UNAUTH_SUB, endpoint: "https://push.example.test/x", ...keys }],
+      },
+    },
+  });
+}
+
+Deno.test("a 401/403 costs the device no strike: it is never reported to the database as failed", async () => {
+  for (const status of [401, 403]) {
+    const keys = await realSubscriptionKeys();
+    const { client, calls } = unauthorizedFixture(keys);
+    const outcome = await deliverPush(REQUEST, {
+      client,
+      config: await vapidPair(),
+      fetch: (async () =>
+        new Response(JSON.stringify({ reason: "InvalidProviderToken" }), { status })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
+
+    const finish = calls.find((call) => call.name === "finish_push_delivery");
+    // The whole point: the database is told nothing that would increment
+    // `failure_count`, flip `state` to `expired`, or move the consent.
+    assertEquals(finish?.payload.p_failed_subscription_ids, [], `status ${status}`);
+    assertEquals(finish?.payload.p_gone_subscription_ids, [], `status ${status}`);
+    // And no path deletes or re-creates a subscription: the sender has no RPC
+    // that could, which is asserted rather than assumed.
+    assertEquals(
+      calls.map((call) => call.name).sort(),
+      ["begin_push_delivery", "finish_push_delivery"],
+      `status ${status}`,
+    );
+    // The attempt is still VISIBLE — it failed, and the outcome says so.
+    assertEquals(sent(outcome).failed, 1, `status ${status}`);
+    assertEquals(sent(outcome).deviceStrikes, 0, `status ${status}`);
+    assertEquals(sent(outcome).diagnostics.length, 1, `status ${status}`);
+  }
+});
+
+Deno.test("MUTATION CONTROL: a status that is genuinely the device's fault still charges a strike", async () => {
+  /*
+   * Without this, the test above would pass just as happily against a sender
+   * that stopped reporting EVERY failure — which would defeat the retry ceiling
+   * `2M-NOTIFY-010` requires. The exemption has to be exactly `unauthorized` and
+   * nothing else.
+   */
+  const keys = await realSubscriptionKeys();
+  const { client, calls } = unauthorizedFixture(keys);
+  await deliverPush(REQUEST, {
+    client,
+    config: await vapidPair(),
+    fetch: (async () => new Response(null, { status: 500 })) as unknown as typeof fetch,
+    nowSeconds: () => 1_800_000_000,
+    allowedHosts: ALLOWED_TEST_HOSTS,
+  });
+  const finish = calls.find((call) => call.name === "finish_push_delivery");
+  assertEquals(finish?.payload.p_failed_subscription_ids, [UNAUTH_SUB]);
+});
+
+Deno.test("MUTATION CONTROL: 404/410 still retires, and retirement is still exactly those two", async () => {
+  const keys = await realSubscriptionKeys();
+  for (const status of [404, 410]) {
+    const { client, calls } = unauthorizedFixture(keys);
+    await deliverPush(REQUEST, {
+      client,
+      config: await vapidPair(),
+      fetch: (async () => new Response(null, { status })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
+    const finish = calls.find((call) => call.name === "finish_push_delivery");
+    assertEquals(finish?.payload.p_gone_subscription_ids, [UNAUTH_SUB], `status ${status}`);
+    assertEquals(finish?.payload.p_failed_subscription_ids, [], `status ${status}`);
+  }
+});
+
+Deno.test("the vendor reason cannot smuggle an endpoint, a JWT, an address, a subscription id or a key", async () => {
+  /*
+   * The cure must not become the leak — the second time this file has had to say
+   * so, and the first time about a value the PUSH SERVICE chooses.
+   *
+   * Reading the refusal document is what turns `403` into a repair, and it is
+   * also the only place in this sender where third-party text has ever been
+   * parsed. So every prohibited value is planted INSIDE that document, in the
+   * exact fields the parser consults, and neither the returned outcome nor
+   * anything written to the console may contain any of them.
+   */
+  const keys = await realSubscriptionKeys();
+  const config = await vapidPair();
+  const MARKERS = {
+    endpoint: "https://push.example.test/SUBSCRIPTION-PATH-MARKER?token=TOKEN-MARKER",
+    subscriptionId: "2f4b0001-0000-4000-8000-00000000cccc",
+    userId: REQUEST.userId,
+    email: "ops@leak-marker.example",
+    jwt: "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJKV1QtTUFSS0VSIn0.SIGNATURE-MARKER",
+    p256dh: keys.p256dh,
+    auth: keys.auth,
+    vapidPublicKey: config.vapidPublicKey,
+  };
+
+  // A refusal document shaped exactly like a real one, carrying every
+  // prohibited value in the two fields the parser reads and several it does not.
+  const body = JSON.stringify({
+    reason: MARKERS.endpoint,
+    error: MARKERS.jwt,
+    contact: MARKERS.email,
+    subscription: MARKERS.subscriptionId,
+    key: MARKERS.p256dh,
+    auth: MARKERS.auth,
+    applicationServerKey: MARKERS.vapidPublicKey,
+    user: MARKERS.userId,
+  });
+
+  const logged: string[] = [];
+  const realError = console.error;
+  const realWarn = console.warn;
+  console.error = (...args: unknown[]) => { logged.push(args.map((a) => JSON.stringify(a)).join(" ")); };
+  console.warn = (...args: unknown[]) => { logged.push(args.map((a) => JSON.stringify(a)).join(" ")); };
+
+  let outcome: unknown;
+  try {
+    const { client } = recordingClient({
+      begin_push_delivery: {
+        data: {
+          permitted: true,
+          delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+          subscriptions: [{ id: MARKERS.subscriptionId, endpoint: MARKERS.endpoint, ...keys }],
+        },
+      },
+    });
+    outcome = await deliverPush(REQUEST, {
+      client,
+      config,
+      fetch: (async () => new Response(body, { status: 403 })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: [/^push\.example\.test$/],
+    });
+  } finally {
+    console.error = realError;
+    console.warn = realWarn;
+  }
+
+  const observed = JSON.stringify(outcome) + "\n" + logged.join("\n");
+  for (const [name, marker] of Object.entries(MARKERS)) {
+    assertEquals(observed.includes(marker), false, `${name} leaked through the vendor reason`);
+  }
+  // The raw document never travels either, in whole or in any recognisable part.
+  assertEquals(observed.includes(body), false);
+  assertEquals(observed.includes("applicationServerKey"), false);
+  // Non-vacuity: the run really did parse a 403 document and really did answer.
+  assertEquals(sent(outcome as Awaited<ReturnType<typeof deliverPush>>).diagnostics, [
+    { category: "unauthorized", status: 403, reason: "vendor_unknown" },
+  ]);
+  assertEquals(logged.length > 0, true);
+});
+
+Deno.test("a reason the vendor is entitled to give DOES travel, or the parser proves nothing", async () => {
+  /*
+   * The other half of the control above. A parser that returned `vendor_unknown`
+   * for everything would pass every leak assertion in this file and would be
+   * worthless — it is the reason arriving intact that makes the 403 diagnosable
+   * at all.
+   */
+  const keys = await realSubscriptionKeys();
+  for (const [reason, status] of [["BadJwtToken", 403], ["InvalidProviderToken", 403], ["BadSubscription", 404]] as const) {
+    const { client } = recordingClient({
+      begin_push_delivery: {
+        data: {
+          permitted: true,
+          delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+          subscriptions: [{ id: "2f4b0001-0000-4000-8000-0000000000c1", endpoint: "https://push.example.test/a", ...keys }],
+        },
+      },
+    });
+    const outcome = await deliverPush(REQUEST, {
+      client,
+      config: await vapidPair(),
+      fetch: (async () => new Response(JSON.stringify({ reason }), { status })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
+    assertEquals(sent(outcome).diagnostics[0].reason, reason);
+  }
+});
+
+Deno.test("the two sentinels are ours, and the wire may not forge either", async () => {
+  /*
+   * `vendor_unknown` and `vendor_absent` are this file's words for "we could not
+   * tell". A push service that echoed one of them back would be making an
+   * assertion about our own confidence, so neither is admitted from the wire.
+   */
+  const keys = await realSubscriptionKeys();
+  for (const forged of ["vendor_unknown", "vendor_absent"]) {
+    const { client } = recordingClient({
+      begin_push_delivery: {
+        data: {
+          permitted: true,
+          delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+          subscriptions: [{ id: "2f4b0001-0000-4000-8000-0000000000c1", endpoint: "https://push.example.test/a", ...keys }],
+        },
+      },
+    });
+    const outcome = await deliverPush(REQUEST, {
+      client,
+      config: await vapidPair(),
+      fetch: (async () =>
+        new Response(JSON.stringify({ reason: forged }), { status: 403 })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
+    // It collapses because it was not admitted, not because it happened to match.
+    assertEquals(sent(outcome).diagnostics[0].reason, "vendor_unknown");
+  }
+});
+
+Deno.test("the vendor reason vocabulary is closed, and its two halves do not overlap", () => {
+  assertEquals(new Set(vendorReasons).size, vendorReasons.length);
+  for (const reason of vapidRejectionReasons) {
+    assertEquals(vendorReasons.includes(reason), true, reason);
+    assertEquals(subscriptionRejectionReasons.includes(reason), false, `${reason} is in both halves`);
+  }
+  for (const reason of subscriptionRejectionReasons) {
+    assertEquals(vendorReasons.includes(reason), true, reason);
+  }
+  // The two sentinels are members, and they are the only ones that are not a
+  // vendor's own token.
+  assertEquals(vendorReasons.includes("vendor_unknown"), true);
+  assertEquals(vendorReasons.includes("vendor_absent"), true);
+});
+
+Deno.test("the VAPID subject's SCHEME is reported, and it is a scheme and not an address", async () => {
+  /*
+   * `categoriseVapidSubject` answers `operational` for `mailto:` and `https:`
+   * alike, which is correct about RFC 8292 and useless for testing "Apple is
+   * stricter than the RFC about one of the two forms" — an unexcluded
+   * hypothesis. A scheme is a word from a three-member set and carries no host,
+   * no address and no user.
+   */
+  const config = await vapidPair();
+  assertEquals((await inspectSenderConfiguration(config)).subjectScheme, "mailto");
+  assertEquals(
+    (await inspectSenderConfiguration({ ...config, vapidSubject: "https://real-domain.app/contact" })).subjectScheme,
+    "https",
+  );
+  assertEquals(
+    (await inspectSenderConfiguration({ ...config, vapidSubject: "tel:+551199999999" })).subjectScheme,
+    "other",
+  );
+  const report = await inspectSenderConfiguration(config);
+  assertEquals(JSON.stringify(report).includes("ops@"), false);
+  assertEquals(JSON.stringify(report).includes("push-fixture.dev"), false);
 });
