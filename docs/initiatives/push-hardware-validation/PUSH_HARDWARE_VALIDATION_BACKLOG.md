@@ -70,6 +70,41 @@ equivalence is an observation, not an exoneration.**
 
 ---
 
+## 2.1 What the 2026-08-28 corrective read measured, and one recorded fact it contradicts
+
+Measured read-only against the hosted project, reported as verdicts, and never by
+printing a key, an endpoint or an address:
+
+| claim | verdict | how |
+|---|---|---|
+| either VAPID half has changed since the subscription was created | **no** | both secrets carry `updated_at = 2026-08-12T10:16:28Z`, and neither has moved since |
+| the subscription was created **after** the deployed key was set | **yes**, by 3h13m | `push_subscriptions.created_at = 2026-08-12T13:29:14Z` |
+| `VAPID_PRIVATE_KEY` reachable from the application | **no** | only `VAPID_PUBLIC_KEY` exists on Vercel, marked *Sensitive* |
+| the deployed sender is the sender in `main` | **byte-identical** | the deployed source downloaded over the working tree; `git diff --numstat` reported no rows at all |
+| the stored subscription is structurally usable | **yes** | host `web.push.apple.com`; `p256dh` 87 canonical base64url characters decoding to a `0x04`-prefixed point; `auth` 16 bytes |
+| the delivery ledger still holds the two failed runs | **no** | `notification_deliveries` is empty across every channel |
+
+Together these **eliminate the stale-key-binding reading of hypothesis 2**: the
+subscription cannot have been bound to a key generation that no longer exists,
+because there has only ever been one and it predates the subscription.
+
+**And one recorded fact is wrong, in the reassuring direction.** §57 of the
+handoff recorded *"the owner re-subscribed after 14:47 UTC"*. The row's
+`created_at` is `13:29` and only its `updated_at` moved, to `17:11` — and
+`push_subscriptions`' upsert resets `failure_count` on conflict, so a
+**re-registration of the same endpoint** is exactly what that pair of timestamps
+looks like. The subscription was never re-created. As it turns out it did not
+need to be; but the claim was believed rather than measured, and §3.6 below is
+the defect that would have made it impossible to honour anyway.
+
+**The subscription stood at `failure_count = 2` of 3, with `last_delivered_at`
+still null.** `finish_push_delivery` sets `state = 'expired'` on the third strike
+and the consent follows the last device out, so the next failing diagnostic run
+would have destroyed the only device this residual can be investigated with.
+That is repaired ahead of any further send; see §3.1.
+
+---
+
 ## 3. The work, when it is authorized
 
 Nothing here may be closed by writing a document, and nothing here may be closed
@@ -116,6 +151,46 @@ by an emulated run.
 - `2L-MOBILE-008` and `2L-ACCESS-008` were routed to Phase 2M by `2M-DEVICE-005`
   and are **still open**. They belong to the same owner-run device session and
   travel here rather than being absorbed.
+
+---
+
+### 3.6 A separate defect: the product cannot re-subscribe
+
+**Recorded on 2026-08-28, deliberately NOT repaired in the same change as the
+403 instrumentation, and explicitly NOT offered as an explanation of the 403.**
+
+`push-controls.tsx`'s enable handler reuses whatever subscription the browser
+already holds:
+
+```ts
+let subscription = await registration.pushManager.getSubscription();
+if (subscription === null) {
+  subscription = await registration.pushManager.subscribe({ ... applicationServerKey: key });
+}
+```
+
+Nothing compares that subscription's `applicationServerKey` to the key the
+deployment is currently configured with. A subscription is bound to the
+application server key it was created with, for its whole life, and a push
+service is entitled to refuse a token advertising any other. So if the two ever
+diverge — a rotated pair, a restored backup, a second environment — every send
+fails permanently and **pressing the button again cannot fix it**: the branch
+that would re-subscribe is unreachable while a subscription exists, so the user
+re-registers the same stale endpoint and the row's `updated_at` moves while its
+binding does not.
+
+**This is not the current 403.** §2.1 measured that both halves have been frozen
+since `2026-08-12T10:16:28Z` and that the subscription was created three hours
+later, so there is no divergence for it to be the consequence of. It is recorded
+here because it is real, because it is a latent trap that makes any future key
+rotation unrecoverable through the product's own surface, and because the belief
+that the owner "re-subscribed" — which this defect makes impossible — was carried
+in the record for sixteen days.
+
+The repair, when it is authorized, is to compare the existing subscription's
+`applicationServerKey` against the configured key and `unsubscribe()` before
+re-subscribing when they differ. It needs no migration. It must not be folded
+into the 403 work unless later evidence shows it participates in the cause.
 
 ---
 
