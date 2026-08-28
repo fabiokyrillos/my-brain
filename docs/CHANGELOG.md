@@ -3,6 +3,72 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-28 - The push `403` is instrumented, and a diagnostic run stops costing the device a strike (ADR-140)
+
+**Zero migrations.** A corrective initiative on the residual ADR-107 deferred out
+of Phase 2M. No successor phase is started, planned or named.
+
+**Push still does not work.** The `HTTP 403` from Apple Web Push is **unexplained**,
+the owner's iPhone has **never received a push**, and nothing here changes either.
+No root cause is asserted.
+
+**A `401`/`403` no longer charges the device a strike.** `finish_push_delivery`
+increments `push_subscriptions.failure_count` for every id reported as failed, and
+the third strike sets `state = 'expired'` and takes the consent out with the last
+device. The sender already refused to *retire* on a rejected signature — "our
+configuration being wrong rather than the user's browser having discarded
+anything" — and then charged for it anyway, through a column, three attempts
+later. The owner's only subscription stood at **`failure_count = 2` of 3** with
+`last_delivered_at` still null, so the next diagnostic run would have destroyed
+the device the investigation needs. The exemption is exactly `unauthorized`:
+`400`, `413`, `429`, `5xx` and an unexpected status still charge a strike,
+`404`/`410` still retire, and the delivery row still spends its own `attempts`.
+Three mutation controls assert each half.
+
+**The push service's own word for the refusal is now read, through a closed
+vocabulary.** The refusal document was fetched and discarded on every run so far,
+which is why four hypotheses were still unseparated after two hardware runs. It is
+parsed as JSON, one of two named fields is taken, and a value is admitted only on
+exact equality with a list this repository chose — so text that merely *contains* a
+known token yields `vendor_unknown`, and the two sentinels (`vendor_unknown`,
+`vendor_absent`) are excluded from wire matching and cannot be forged. Every
+prohibited value — endpoint, JWT, address, subscription id, `p256dh`, `auth`,
+public key — is planted inside the parsed document by a control and asserted
+absent from the outcome and the console.
+
+**`mode: "vapid_probe"` asks the push service about our token without a device.**
+It signs a real token against a **fabricated** resource with an ephemeral
+recipient, and is handed no database client, no user and no subscription — so it
+cannot charge a strike, finish a delivery, produce a notification or name a
+device. Its negative control corrupts only the signature and the mutation is
+verified rather than assumed. It concludes `vapid_rejected` **only** when the
+service names an authentication failure from the closed set; two `403`s are
+inconclusive, and so is anything the fabricated path could have caused.
+
+**Also measured, and reported as verdicts rather than values:** both VAPID halves
+carry `updated_at = 2026-08-12T10:16:28Z` and have not moved; the subscription was
+created three hours later, against the key deployed now; `VAPID_PRIVATE_KEY` is
+absent from the application environment; and the deployed sender is byte-identical
+to `main`. Together these eliminate the stale-key-binding reading of the
+subscription hypothesis.
+
+**A gate was reported before it was read, and CI caught it.** The full suite was
+run as `npm test 2>&1 | tail -25` and then described as having "zero
+`AssertionError` in the whole run" — from a log holding twenty-five lines. CI
+found the assertion that had been failing throughout: `BYOK-GUARD-005`, which
+pins the exact set of files permitted to touch `crypto.subtle`, and which the
+probe's ephemeral-recipient generation had joined without being named. Both files
+are named now, individually and with the reason each earned the entry, and the
+stricter keyed-operation assertion beside it still refuses them. *A summary line
+is not evidence, and a pipe that discards the evidence still prints the summary.*
+
+**One recorded fact is corrected.** The handoff's §57 said the owner "re-subscribed
+after 14:47 UTC". The row's `created_at` is `13:29Z` and only its `updated_at`
+moved — and `push-controls.tsx` reuses an existing browser subscription without
+ever comparing its `applicationServerKey`, so a genuine re-subscription was not
+possible. That defect is **real, separate, and not the cause**; it is filed
+unfunded in the backlog's §3.6 and deliberately not repaired here.
+
 ## 2026-08-28 - Phase 2S is CLOSED (ADR-139), by an owner decision after the checkpoint on real hardware
 
 **Zero migrations.** The budget closes where it opened — 1 allocated · 1 spent ·

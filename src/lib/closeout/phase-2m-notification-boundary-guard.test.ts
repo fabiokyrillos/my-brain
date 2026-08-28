@@ -441,6 +441,8 @@ describe("governance ships before delivery, and the directory proves it", () => 
       "supabase/functions/send-push/deliver.test.ts",
       "supabase/functions/send-push/deliver.ts",
       "supabase/functions/send-push/index.ts",
+      "supabase/functions/send-push/probe.test.ts",
+      "supabase/functions/send-push/probe.ts",
     ]);
 
     /*

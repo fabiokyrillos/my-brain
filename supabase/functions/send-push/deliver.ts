@@ -130,12 +130,145 @@ export const deliveryFailureCategories = [
 export type DeliveryFailureCategory = (typeof deliveryFailureCategories)[number];
 
 /**
+ * WHY the push service refused, as a CLOSED vocabulary of the vendors' own
+ * tokens — and never as their prose.
+ *
+ * Two hardware runs spent two of the owner's three strikes to learn the number
+ * `403`, and `403` is where a rejected `sub`, a wrong `aud`, an unverifiable
+ * signature, an unexpected key and a refused subscription all converge. The push
+ * service knows which of those it was and says so, in a small JSON document, in
+ * a field whose value comes from ITS OWN closed set — and this sender read the
+ * status and threw the document away.
+ *
+ * So the document is read now, and it is read the only way it safely can be:
+ * parsed as JSON, one named field taken, and that field's value admitted ONLY if
+ * it matches a member of the list below by **exact equality**. Nothing is
+ * extracted by scanning, because a scan over attacker-reachable text finds
+ * whatever it was told to look for inside whatever else that text was carrying.
+ * A body that is not JSON, is not an object, is too large to be a reason
+ * document, or names something not on this list, collapses to `vendor_unknown`
+ * and the body itself is discarded unread into the bargain.
+ *
+ * Every member is a constant chosen by THIS FILE. None is echoed from the wire —
+ * the wire can only ever SELECT one of these — so a reason can be logged,
+ * returned and stored without any of `2M-NOTIFY-006`'s prohibitions coming with
+ * it, exactly as `deliveryFailureCategories` promises for the category.
+ */
+export const vendorReasons = [
+  // Apple / APNs — the VAPID token itself.
+  "BadJwtToken",
+  "InvalidProviderToken",
+  "ExpiredProviderToken",
+  "MissingProviderToken",
+  "TooManyProviderTokenUpdates",
+  // Apple / APNs — the subscription, not the authentication.
+  "BadSubscription",
+  "BadDeviceToken",
+  "Unregistered",
+  "DeviceTokenNotForTopic",
+  "TopicDisallowed",
+  "BadTopic",
+  "MissingTopic",
+  // Apple / APNs — the request.
+  "BadPath",
+  "MethodNotAllowed",
+  "PayloadEmpty",
+  "PayloadTooLarge",
+  "BadMessageId",
+  "BadPriority",
+  "BadExpirationDate",
+  "BadCollapseId",
+  "DuplicateHeaders",
+  "InvalidPushType",
+  "Forbidden",
+  // Apple / APNs — load and lifecycle.
+  "TooManyRequests",
+  "IdleTimeout",
+  "InternalServerError",
+  "ServiceUnavailable",
+  "Shutdown",
+  // Ours, and deliberately last: these two are the only answers that are not a
+  // vendor's word, and they are excluded from wire matching below so that a
+  // service echoing one of them back cannot forge either.
+  "vendor_unknown", // there was a body, and nothing on this list was in it
+  "vendor_absent",  // there was no body at all
+] as const;
+export type VendorReason = (typeof vendorReasons)[number];
+
+/** The subset that names an AUTHENTICATION failure and therefore points at us. */
+export const vapidRejectionReasons: readonly VendorReason[] = [
+  "BadJwtToken",
+  "InvalidProviderToken",
+  "ExpiredProviderToken",
+  "MissingProviderToken",
+];
+
+/** The subset that names the SUBSCRIPTION and therefore points at the device. */
+export const subscriptionRejectionReasons: readonly VendorReason[] = [
+  "BadSubscription",
+  "BadDeviceToken",
+  "Unregistered",
+];
+
+/** Larger than any reason document and far smaller than a page. */
+const MAX_REASON_BODY_BYTES = 2048;
+
+/** The two sentinels the wire may never select, so neither can be forged. */
+const OURS: readonly string[] = ["vendor_unknown", "vendor_absent"];
+const WIRE_REASONS: ReadonlySet<string> = new Set(
+  vendorReasons.filter((reason) => !OURS.includes(reason)),
+);
+
+/**
+ * The push service's own word for what it refused, or one of our two sentinels.
+ *
+ * Never throws and never returns anything it read. The body is consumed here and
+ * goes no further: there is no path from this function's input to its output
+ * except selection from `vendorReasons`.
+ */
+export async function readVendorReason(response: Response): Promise<VendorReason> {
+  let text: string;
+  try {
+    text = await response.text();
+  } catch {
+    // A body that cannot be read is not a body. Nothing to report and nothing
+    // to leak.
+    return "vendor_absent";
+  }
+  if (text.trim() === "") return "vendor_absent";
+  // A reason document is small. Anything larger is a page, an error screen or
+  // an intermediary's HTML, and is not parsed at all.
+  if (text.length > MAX_REASON_BODY_BYTES) return "vendor_unknown";
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return "vendor_unknown";
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return "vendor_unknown";
+
+  const record = parsed as Record<string, unknown>;
+  // `reason` is Apple's field name; `error` is the one the other services use.
+  // Only these two are consulted, and only an EXACT member of the closed set is
+  // admitted, so a value that merely CONTAINS a known token is not one.
+  for (const field of ["reason", "error"]) {
+    const value = record[field];
+    if (typeof value === "string" && WIRE_REASONS.has(value)) return value as VendorReason;
+  }
+  return "vendor_unknown";
+}
+
+/**
  * One content-free diagnostic line. `status` is present only when the push
- * service actually answered, which is itself the distinction that was missing.
+ * service actually answered, which is itself the distinction that was missing;
+ * `reason` is present only when it answered with a document, and is always one
+ * of `vendorReasons`.
  */
 export type DeliveryDiagnostic = Readonly<{
   category: DeliveryFailureCategory;
   status?: number;
+  reason?: VendorReason;
 }>;
 
 export type DeliveryOutcome =
@@ -143,7 +276,18 @@ export type DeliveryOutcome =
     status: "sent";
     delivered: number;
     retired: number;
+    /** Every attempt that did not land, whoever's fault it was. */
     failed: number;
+    /**
+     * How many of those were reported to the database as the DEVICE's failure,
+     * and therefore cost a subscription one of its three strikes.
+     *
+     * It exists to be read at a hardware checkpoint. `failed: 1, deviceStrikes:
+     * 0` is the whole statement that a run diagnosed something at no cost to the
+     * owner's only device, and it is the response's own word for what the RPC
+     * payload asserts in the tests.
+     */
+    deviceStrikes: number;
     /** Content-free, one entry per attempt that did not land. */
     diagnostics: readonly DeliveryDiagnostic[];
     /** The VAPID `sub`'s category — never the address. */
@@ -258,6 +402,17 @@ export function categoriseVapidSubject(subject: string): "operational" | "reserv
 export type SenderConfigurationReport = Readonly<{
   subject: "operational" | "reserved" | "malformed";
   /**
+   * Which FORM the `sub` takes — never the address.
+   *
+   * RFC 8292 admits `mailto:` and `https:` alike, and `categoriseVapidSubject`
+   * therefore answers `operational` for both. That is correct about the RFC and
+   * useless for telling the two apart, and "Apple is stricter than the RFC about
+   * one of the two forms" is an unexcluded hypothesis that a scheme — a word
+   * from a two-member set, carrying no address, no host and no user — is enough
+   * to test. Adding it costs nothing and removes a reason to ask the device.
+   */
+  subjectScheme: "mailto" | "https" | "other";
+  /**
    * `not_canonical` is its own answer because `k=` carries the configured TEXT.
    * A value that decodes to a real point but is padded, or re-encoded by some
    * tool along the way, produces a header parameter no service will match
@@ -311,10 +466,18 @@ export async function inspectSenderConfiguration(
 
   return Object.freeze({
     subject: categoriseVapidSubject(config.vapidSubject),
+    subjectScheme: categoriseVapidSubjectScheme(config.vapidSubject),
     publicKey,
     privateKey,
     pair,
   });
+}
+
+/** The `sub`'s scheme as a word from a closed set. Reads no host and no address. */
+export function categoriseVapidSubjectScheme(subject: string): "mailto" | "https" | "other" {
+  if (/^mailto:/i.test(subject)) return "mailto";
+  if (/^https:\/\//i.test(subject)) return "https";
+  return "other";
 }
 
 /**
@@ -514,7 +677,29 @@ export async function deliverPush(
 
   const authorizationCache = new Map<string, string>();
   const gone: string[] = [];
+  /** Reported to the database, and therefore charged to the device. */
   const failed: string[] = [];
+  /**
+   * NOT reported to the database, and therefore charged to nobody.
+   *
+   * A 401/403 is the push service saying it could not authenticate US. This
+   * module already said so — "a rejected signature is our configuration being
+   * wrong rather than the user's browser having discarded anything" — and then
+   * charged the device anyway, because `finish_push_delivery` increments
+   * `push_subscriptions.failure_count` for every id in
+   * `p_failed_subscription_ids`, and the third strike sets `state = 'expired'`
+   * and takes the consent out with the last device.
+   *
+   * Retirement was exactly 404/410 and that was correct; it was simply not the
+   * only way this table retires a subscription. The owner's only device stood at
+   * two strikes with `last_delivered_at` still null when that was found — one
+   * more diagnostic run and there would have been nothing left to diagnose with.
+   *
+   * The delivery ROW still finishes as `failed` and still spends its own
+   * `attempts`, so the message's retry ceiling is untouched. It is only the
+   * DEVICE that stops paying for our configuration.
+   */
+  const unauthenticated: string[] = [];
   const diagnostics: DeliveryDiagnostic[] = [];
   let delivered = 0;
 
@@ -523,12 +708,19 @@ export async function deliverPush(
    * without also saying why. The previous version had two that did exactly
    * that, and an iPhone found it.
    */
-  const note = (category: DeliveryFailureCategory, status?: number): void => {
-    diagnostics.push(status === undefined ? { category } : { category, status });
-    // The log line carries the category and the status and NOTHING else — no
-    // endpoint, no subscription id, no owner, no key, no payload, no response
-    // body. `2M-NOTIFY-006` applies to a log exactly as it applies to a push.
-    console.error("[send-push] attempt failed", status === undefined ? { category } : { category, status });
+  const note = (category: DeliveryFailureCategory, status?: number, reason?: VendorReason): void => {
+    const line: DeliveryDiagnostic = {
+      category,
+      ...(status === undefined ? {} : { status }),
+      ...(reason === undefined ? {} : { reason }),
+    };
+    diagnostics.push(line);
+    // The log line carries the category, the status and the vendor's own closed
+    // token, and NOTHING else — no endpoint, no subscription id, no owner, no
+    // key, no payload, and no response body: `reason` is selected from
+    // `vendorReasons` rather than read off the wire. `2M-NOTIFY-006` applies to
+    // a log exactly as it applies to a push.
+    console.error("[send-push] attempt failed", line);
   };
 
   for (const subscription of subscriptions) {
@@ -585,11 +777,17 @@ export async function deliverPush(
         // its own name so it can be SEEN, and it must still not retire a device,
         // because a rejected signature is our configuration being wrong rather
         // than the user's browser having discarded anything.
-        note("gone", response.status);
+        note("gone", response.status, await readVendorReason(response));
         gone.push(subscription.id);
       } else {
-        note(categoriseStatus(response.status), response.status);
-        failed.push(subscription.id);
+        const category = categoriseStatus(response.status);
+        note(category, response.status, await readVendorReason(response));
+        // The one exemption, and it is exactly `unauthorized`. Everything else
+        // — 400, 413, 429, 5xx, an unexpected status — is still the device's
+        // strike, because `2M-NOTIFY-010`'s per-device ceiling is what stops a
+        // subscription that fails every time from being retried forever.
+        if (category === "unauthorized") unauthenticated.push(subscription.id);
+        else failed.push(subscription.id);
       }
     } catch (error) {
       // A malformed subscription key, a DNS failure or a transport error. One
@@ -621,7 +819,11 @@ export async function deliverPush(
     status: "sent",
     delivered,
     retired: gone.length,
-    failed: failed.length,
+    // Every attempt that did not land is still visible as a failure. Exempting
+    // the DEVICE from a strike must never quietly exempt the RUN from saying it
+    // failed — that would turn a diagnostic improvement into a success claim.
+    failed: failed.length + unauthenticated.length,
+    deviceStrikes: failed.length,
     diagnostics: Object.freeze(diagnostics.map((entry) => Object.freeze(entry))),
     subject: subjectCategory,
   });

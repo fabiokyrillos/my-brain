@@ -15167,3 +15167,175 @@ permitted work is **read-only**.
 
 **A phase ends when its owner says so, and every artifact in this repository is
 built to make that the only way it can end.**
+
+---
+
+## §138 — The push `403` is reopened by owner authorization, and the first thing the diagnosis found was that diagnosing it again would have destroyed the device (2026-08-28)
+
+**ADR-140.** An owner authorization, taken with Phase 2S closed and **no
+successor phase active, started, planned or named**. It reopens exactly one
+residual — the `HTTP 403` ADR-107 deferred out of Phase 2M — and allocates **zero
+migrations**, with any need for one a stop condition. Parity is unchanged at
+`202608240102`, **102 local = 102 hosted**.
+
+### The sentence this section must be read with
+
+**Push still does not work.** The `403` from Apple Web Push is **unexplained**,
+**no root cause is asserted anywhere in this repository**, and the owner's iPhone
+has **never received a push**. Nothing below changes any of that. It may not be
+recorded as resolved by a document, by an offline test, by a `2xx` from an
+internal call, or by any verdict the new probe returns. **Only a notification
+physically arriving on the device closes it.**
+
+### What the read-only diagnosis measured
+
+Read live against the hosted project, reported as verdicts, never as values:
+
+| claim | verdict | how |
+|---|---|---|
+| either VAPID half has moved since the subscription was created | **no** | both secrets carry `updated_at = 2026-08-12T10:16:28Z` |
+| the subscription was created after the deployed key was set | **yes**, by 3h13m | `push_subscriptions.created_at = 2026-08-12T13:29:14Z` |
+| `VAPID_PRIVATE_KEY` reachable from the application | **no** | only the public half exists on Vercel, marked *Sensitive* |
+| the deployed sender is the sender in `main` | **byte-identical** | the deployed source downloaded over the working tree; `git diff --numstat` reported **no rows at all** |
+| the stored subscription is structurally usable | **yes** | host `web.push.apple.com`; `p256dh` 87 canonical base64url chars decoding to a `0x04`-prefixed point; `auth` 16 bytes |
+| the delivery ledger still holds the two failed runs | **no** | `notification_deliveries` is empty across every channel |
+
+Together these **eliminate the stale-key-binding reading of hypothesis 2**: there
+has only ever been one key generation and it predates the subscription.
+
+### The thing that had to be fixed before anything could be asked
+
+`finish_push_delivery` increments `push_subscriptions.failure_count` for every id
+in `p_failed_subscription_ids`, and **the third strike sets `state = 'expired'`
+and the consent follows the last device out**. The subscription stood at
+**`failure_count = 2` of 3**, `last_delivered_at` still null.
+
+**The next diagnostic run would have destroyed the only device this residual can
+be investigated with.**
+
+The sender had already reasoned its way to the right rule and stopped one layer
+short. Its own comment says a rejected signature "is our configuration being
+wrong rather than the user's browser having discarded anything", and retirement
+was correctly held to exactly `404`/`410` — but `failed.push(subscription.id)`
+charged the device anyway, through a column, three attempts later. **Retirement
+was not the only way that table retires a subscription**, and the code that knew
+the difference did not know that.
+
+> **A rule enforced on one path is not enforced. A device can be retired by a
+> counter as surely as by a status.**
+
+The exemption is exactly `unauthorized` and the mutation controls say so: `500`
+still charges a strike, `404`/`410` still retire, and the delivery row still
+spends its own `attempts` so the per-message ceiling is untouched.
+
+### The observation nobody had ever taken
+
+Two hardware runs spent two strikes to learn the number `403`. **The push service
+says which check failed, in a small JSON document, and this sender fetched it and
+threw it away on every run.** §56 added the status and stopped there; the reason
+was left on the table for sixteen days while four hypotheses stayed unseparated.
+
+It is read now through a **closed vocabulary**: parsed as JSON, one of two named
+fields taken, admitted only on **exact equality** with a list this repository
+chose. A body that is not JSON, not an object, too large, or naming something
+absent collapses to `vendor_unknown`; no body at all is `vendor_absent`; and both
+sentinels are excluded from wire matching so a service cannot forge either.
+
+The control that makes this worth trusting was **already in the file**: the
+pre-existing leak fixture is a valid reason token (`BadJwtToken`) planted in
+**plain prose**. A scanning parser would have lifted it out. The assertion is now
+that it yields `vendor_unknown` — and a second control plants the endpoint, a
+JWT, an address, the subscription id, `p256dh`, `auth` and the public key *inside
+the parsed document* and asserts none reaches the outcome or the console.
+
+### The probe, and what it is not allowed to conclude
+
+`mode: "vapid_probe"` signs a real token against a **fabricated** resource with an
+ephemeral recipient generated per call. It takes a config and a `fetch` and is
+handed **no database client, no user and no subscription** — it cannot charge a
+strike, finish a delivery, produce a notification or name a device, structurally
+rather than by promise.
+
+Its negative control corrupts **only the signature**, and the corruption is
+**verified rather than assumed**: an unmutated header reports
+`mutation: "not_applied"` and concludes nothing, because a control that silently
+failed to mutate agrees with everything.
+
+**`vapid_rejected` is asserted only when the service NAMES an authentication
+failure from the closed set, about the real token.** Two `403`s are
+**inconclusive** — a fabricated path can produce one on its own, and inferring a
+cause from a status is what this residual is made of. Anything the fabricated
+path could itself have caused is inconclusive too, **including the
+`BadSubscription`-shaped answers that look most like an exoneration.**
+
+### A recorded fact was wrong, and the defect that made it wrong
+
+§57 recorded *"the owner re-subscribed after 14:47 UTC"*. The row's `created_at`
+is `13:29Z`; only `updated_at` moved, to `17:11Z`. The upsert resets
+`failure_count` on conflict, so **re-registration of the same endpoint is exactly
+what those timestamps look like.**
+
+And a genuine re-subscription was never possible: `push-controls.tsx` reuses
+whatever subscription the browser holds and **never compares its
+`applicationServerKey`** to the configured key. If the two ever diverge, every
+send fails permanently and **pressing the button again cannot fix it** — the
+branch that would re-subscribe is unreachable while a subscription exists.
+
+> **A claim about a user action is a claim about what the code permits.**
+
+That defect is **real, separate, and NOT this `403`** — the keys never diverged.
+It is filed unfunded at §3.6 of the backlog and deliberately not repaired here,
+on the owner's instruction, unless later evidence shows it participates.
+
+### Gates
+
+`typecheck` zero errors. `lint` **zero errors** in the CI scope — the six reported
+locally are all inside an untracked `.worktrees/` checkout that `npm ci` will not
+create. Worker suite **201 assertions green**, of which **48 in `send-push`** (39
+before). Vitest **9697 of 9699 passing, zero `AssertionError`**: the two failures
+are 5000ms timeouts in repository-wide scans (A13's start-signal sweep and the
+markdown-link resolver), and both pass **63 of 63 in 3.4s** with a generous
+timeout — this machine carries three git worktrees, so a repo walk under full
+parallel load does not fit in five seconds. Three further files fail at load:
+`hosted-auth-parity.test.ts` needs a hosted environment, and two `scripts/*.mjs`
+lose to a shebang in vitest's SSR transform. **All five are byte-identical to
+`origin/main`, whose CI is green.** `npm run build` exit 0.
+
+### The gate I reported before I had read it
+
+**CI was right and I was wrong, and the way I was wrong is the part worth
+keeping.** I ran the full suite as `npm test 2>&1 | tail -25` and then asserted
+"zero `AssertionError` in the whole run" — from a log that contained
+**twenty-five lines**. The summary line survived the truncation and the evidence
+did not, which is the worst shape a truncated log can take: *it looks like a
+result.* CI found the assertion that had been failing the whole time —
+`BYOK-GUARD-005`, which pins the exact set of files permitted to touch
+`crypto.subtle` and which the probe's ephemeral-recipient generation had joined
+without being named. It was in my own local output. I had thrown it away.
+
+> **A log you read through `tail` is a log you did not read. A summary line is
+> not evidence, and a pipe that discards the evidence still prints the summary.**
+
+The claim is corrected here, in `STATE.md`, in the changelog and in the pull
+request rather than quietly amended, because the numbers above were published
+before they were true. The guard itself was not weakened to accommodate the new
+files: both are named individually, with the reason each earned the entry, and
+the stricter assertion beside it — which admits only the two crypto cores and the
+push crypto module for a KEYED operation — still refuses them.
+
+Both push-boundary guards gained the two sender-side files **by name**, in both
+places the list is pinned, and the **application half is still exactly three
+files** asserted separately — a sender that grows cannot buy room for a fourth
+artifact the browser could load.
+
+### Where the next session starts
+
+**THE LOOP STOPS AT THE OWNER'S CHECKPOINT.** No new real send to the owner's
+subscription until they run it. The probe is device-free and costs nothing; the
+device send is theirs to authorize.
+
+**Nothing else is authorized.** No successor phase is started, planned or named.
+No other residual is resumed. Signup stays closed and the rollout gate untouched.
+
+**The `403` is still unexplained, and the next run will say more than the last two
+did without asking the device to pay for it.**

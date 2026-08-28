@@ -6,6 +6,7 @@ import {
   inspectSenderConfiguration,
   parseDeliveryRequest,
 } from "./deliver.ts";
+import { probeVapid } from "./probe.ts";
 
 /**
  * `2M-NOTIFY-011` — the push sender's entrypoint.
@@ -91,6 +92,27 @@ Deno.serve(async (request) => {
   // the same, because a configuration report is still ours.
   if (typeof body === "object" && body !== null && (body as { mode?: unknown }).mode === "selfcheck") {
     return Response.json({ ok: true, status: "selfcheck", ...await inspectSenderConfiguration(vapidConfig) });
+  }
+
+  // The self-check's companion, and the same operational argument one layer out.
+  //
+  // The self-check answers "are our two halves a pair", offline. It cannot
+  // answer "does the push service accept the token those halves produce",
+  // because only the push service can. That question has been asked twice, both
+  // times by pushing to the owner's real iPhone, and each answer cost one of
+  // three strikes against the owner's ONLY subscription while leaving the next
+  // reading exactly as ambiguous as the last.
+  //
+  // This asks it against a FABRICATED resource instead. It is handed no
+  // database client, so it cannot charge a strike, finish a delivery or name a
+  // subscription; it is handed no user, so there is nothing for it to be about;
+  // and its recipient keys are generated per call and discarded. It reaches the
+  // network, which is the entire point, and it reaches nothing else.
+  if (typeof body === "object" && body !== null && (body as { mode?: unknown }).mode === "vapid_probe") {
+    return Response.json({
+      ok: true,
+      ...await probeVapid({ config: vapidConfig, fetch, nowSeconds: () => Math.floor(Date.now() / 1000) }),
+    });
   }
 
   const parsed = parseDeliveryRequest(body);
