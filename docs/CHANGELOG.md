@@ -3,6 +3,37 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-28 - A push notification physically arrived on the owner's iPhone (ADR-140)
+
+**Zero migrations.** Parity unchanged at `202608240102`.
+
+**The residual ADR-107 deferred out of Phase 2M on 2026-08-12 is closed on the
+only evidence that could close it.** Lock screen, 18:34 local, carrying exactly
+the contracted copy -- *"Voce tem um lembrete" / "Abra o app para ver qual."* --
+with no task title, no name, no date and no count.
+
+**Cause: Apple rejected the configured VAPID `sub`.** The repair was
+configuration only -- `VAPID_SUBJECT` set to the canonical production origin. No
+key rotation, no re-subscription, no migration, and no change to the JWT, which
+was proved correct against RFC 8292's published vector by a verifier sharing no
+code with the signer.
+
+The configured subject was `operational`/`mailto` by this repository's own
+categoriser and Apple refused it anyway. The proven fact stays narrow: *that
+specific value* was rejected while a control subject was accepted.
+
+**One retry along the way proved nothing and looked like a failure.** After the
+first accepted-but-unseen push the owner reinstalled the PWA and retried; the
+retry reused the previous dedupe hash and the cooldown -- scoped to
+`dedupe_hash`, not to the user -- refused it with `attempts: 0`. The device was
+never asked.
+
+**Not proved, and not recorded as passed:** the tap destination, revocation on
+the current subscription, Android, VoiceOver.
+
+**Remainder opened:** Apple's `BadWebPushToken` is not in the closed vendor
+vocabulary, so a legitimate `400` reads as `vendor_unknown`.
+
 ## 2026-08-28 - Apple refuses a VAPID subject on a reserved TLD, and the sender was warning about it and sending anyway (ADR-140)
 
 **Zero migrations.** Parity unchanged at `202608240102`.
