@@ -841,33 +841,90 @@ Deno.test("the VAPID subject is categorised, and the shipped DEFAULT is reserved
   assertEquals(categoriseVapidSubject(DEFAULT_VAPID_SUBJECT), "reserved");
 });
 
-Deno.test("a reserved subject is surfaced in the outcome, without the address", async () => {
+Deno.test("a subject no push service will accept REFUSES, before anything is begun", async () => {
+  /*
+   * Measured rather than assumed, against Apple's own Web Push endpoint with a
+   * valid signature and everything else held fixed: a `sub` on a reserved TLD
+   * draws `403 BadJwtToken`, while the SAME request carrying a real-TLD address
+   * gets past authentication and is refused on the resource instead. `.invalid`,
+   * `.example`, `.localhost` and `.test` were each rejected; `.com` was not; and
+   * `mailto:` and `https:` behaved identically, so the scheme is not what
+   * decides it.
+   *
+   * This used to WARN and send anyway. Sending spends the dedupe slot and an
+   * attempt on a request that CANNOT succeed, which is exactly what this
+   * module's header promises not to do for a missing VAPID key.
+   */
   const keys = await realSubscriptionKeys();
-  const { client } = recordingClient({
-    begin_push_delivery: {
-      data: {
-        permitted: true,
-        delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
-        subscriptions: [{ id: "2f4b0001-0000-4000-8000-0000000000c1", endpoint: "https://push.example.test/a", ...keys }],
+  for (const subject of [
+    "mailto:ops@my-brain.invalid", // the shipped DEFAULT
+    "mailto:ops@thing.test",
+    "mailto:ops@thing.localhost",
+    "mailto:admin@example.com",
+    "https://my-brain.invalid",
+    "not-a-uri-at-all",
+  ]) {
+    const { client, calls } = recordingClient({
+      begin_push_delivery: {
+        data: {
+          permitted: true,
+          delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+          subscriptions: [{ id: "2f4b0001-0000-4000-8000-0000000000c1", endpoint: "https://push.example.test/a", ...keys }],
+        },
       },
-    },
-  });
-  const config = { ...(await vapidPair()), vapidSubject: "mailto:ops@my-brain.invalid" };
-  const outcome = await deliverPush(REQUEST, {
-    client,
-    config,
-    fetch: (async () => new Response(null, { status: 403 })) as unknown as typeof fetch,
-    nowSeconds: () => 1_800_000_000,
-    allowedHosts: ALLOWED_TEST_HOSTS,
-  });
+    });
+    let fetched = 0;
+    const outcome = await deliverPush(REQUEST, {
+      client,
+      config: { ...(await vapidPair()), vapidSubject: subject },
+      fetch: (() => {
+        fetched += 1;
+        return Promise.resolve(new Response(null, { status: 201 }));
+      }) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
 
-  // The two readings that together are an answer rather than a symptom.
-  assertEquals(sent(outcome).subject, "reserved");
-  // No body at all is its own answer, and a different one from an unreadable body.
-  assertEquals(sent(outcome).diagnostics, [{ category: "unauthorized", status: 403, reason: "vendor_absent" }]);
-  // The address itself never travels.
-  assertEquals(JSON.stringify(outcome).includes("my-brain.invalid"), false);
-  assertEquals(JSON.stringify(outcome).includes("ops@"), false);
+    assertEquals(outcome, { status: "refused", code: "vapid_subject_unusable" }, subject);
+    // BEFORE anything is begun: no delivery row, no dedupe slot, no egress.
+    assertEquals(calls, [], subject);
+    assertEquals(fetched, 0, subject);
+    // The address itself never travels, in the outcome or anywhere else.
+    const observed = JSON.stringify(outcome);
+    assertEquals(observed.includes("my-brain.invalid"), false, subject);
+    assertEquals(observed.includes("ops@"), false, subject);
+    assertEquals(observed.includes(subject), false, subject);
+  }
+});
+
+Deno.test("MUTATION CONTROL: an operational subject is NOT refused", async () => {
+  /*
+   * Without this, the refusal above would pass just as happily against a sender
+   * that refused every subject — which would take push down entirely while
+   * looking like a fix.
+   */
+  const keys = await realSubscriptionKeys();
+  for (const subject of ["mailto:ops@real-domain.app", "https://real-domain.app/contact"]) {
+    const { client, calls } = recordingClient({
+      begin_push_delivery: {
+        data: {
+          permitted: true,
+          delivery_id: "2f4b0001-0000-4000-8000-0000000000d1",
+          subscriptions: [{ id: "2f4b0001-0000-4000-8000-0000000000c1", endpoint: "https://push.example.test/a", ...keys }],
+        },
+      },
+    });
+    const outcome = await deliverPush(REQUEST, {
+      client,
+      config: { ...(await vapidPair()), vapidSubject: subject },
+      fetch: (async () => new Response(null, { status: 201 })) as unknown as typeof fetch,
+      nowSeconds: () => 1_800_000_000,
+      allowedHosts: ALLOWED_TEST_HOSTS,
+    });
+    assertEquals(sent(outcome).delivered, 1, subject);
+    assertEquals(sent(outcome).subject, "operational", subject);
+    assertEquals(calls.map((call) => call.name), ["begin_push_delivery", "finish_push_delivery"], subject);
+  }
 });
 
 Deno.test("a successful delivery reports no diagnostics at all", async () => {

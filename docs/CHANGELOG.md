@@ -3,6 +3,42 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-28 - Apple refuses a VAPID subject on a reserved TLD, and the sender was warning about it and sending anyway (ADR-140)
+
+**Zero migrations.** Parity unchanged at `202608240102`.
+
+**The cause is measured, not inferred.** Against Apple's own Web Push endpoint,
+one variable at a time with the same throwaway key pair and everything else held
+fixed, a `sub` on a reserved TLD draws **`403 BadJwtToken`** -- `.invalid`,
+`.example`, `.localhost` and `.test` each rejected -- while the identical request
+carrying a real-TLD address gets past authentication and is refused on the
+resource instead with `400 BadWebPushToken`. `mailto:` and `https:` behave
+identically, so the scheme is not what decides it; the domain is.
+
+**There is nothing to copy from the reference implementation.** `web-push` 3.6.7
+was compared field by field: same protected header segment, same claim keys in
+the same order, same `, k=` separator, same 64-byte signature, same uncompressed
+`k=`, same 12-hour `exp`, and no `iat` either.
+
+**Why it hid for sixteen days.** Every local experiment used a real-TLD subject.
+Every hosted probe variant carried the configured subject -- including the
+freshly-keyed ones -- so the one variable that mattered was held constant across
+the whole matrix, and it is deliberately never printed.
+
+**The sender refuses now instead of warning.** A subject no push service will
+accept is a missing VAPID key in the only sense that matters, and sending spends
+the dedupe slot and an attempt on a request that cannot succeed. `deliverPush`
+returns `vapid_subject_unusable` before `begin_push_delivery` -- no delivery row,
+no dedupe slot, no egress -- asserted across six subjects including the shipped
+`DEFAULT_VAPID_SUBJECT` (`mailto:ops@my-brain.invalid`, RFC 2606 reserved), with
+a mutation control proving an operational subject is still delivered.
+
+**The probe gains a sixth variant.** `subject_control` uses the same fresh key,
+the same `exp` and the same `aud`, and differs only in the subject. If it gets
+through while `ephemeral` is rejected, the configured subject is proved to be the
+cause without ever being printed. The report carries `subject` and
+`subjectScheme` as categories.
+
 ## 2026-08-28 - The VAPID token is correct, and the probe that blamed it was missing its control (ADR-140)
 
 **Zero migrations.** Parity unchanged at `202608240102`. `deliver.ts` is
