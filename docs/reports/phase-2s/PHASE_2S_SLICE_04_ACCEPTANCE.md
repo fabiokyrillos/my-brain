@@ -4,8 +4,9 @@
 the phase's honesty requirements disposed against what was actually built.**
 
 - **Authorization:** implementation of slices 2S.0 … 2S.4, **ADR-138**
-  (2026-08-24). **Closure is NOT authorized** and this record does not close the
-  phase — §6.
+  (2026-08-24). **This record does not close the phase, and never did** — §7.
+  Closure came later and separately, by **ADR-139 (2026-08-28)**, after the
+  owner's device checkpoint. That separation is `2S-CLOSE-010`'s whole content.
 - **Requirements:** `2S-TRUST-001` … `-013` and `2S-CLOSE-001` … `-013`
   (**26** of 99).
 - **Migration:** **none.** The phase's one migration was spent by slice 2S.1.
@@ -162,7 +163,7 @@ a requirement nobody exercised.**
 
 | | |
 |---|---|
-| close the phase | **not done, and not authorized.** `2S-CLOSE-010` needs an owner decision recorded as an ADR after a closing device checkpoint. A green pipeline is not that, and neither is this record |
+| close the phase | **not done by this record, then or now.** `2S-CLOSE-010` needs an owner decision recorded as an ADR after a closing device checkpoint; the phase was closed by **ADR-139** on 2026-08-28. A green pipeline is not that, and neither is this record |
 | name or start a successor | **none.** No `2T-*` declaration, no `phase-2t` directory; refusal 16 checks all three shapes |
 | a screen-reader run | **not performed**, and waived by the owner again on 2026-08-27 |
 | the open device items | **`/app/notifications` with a real notice row was validated on 2026-08-27** and is no longer open (slice 2S.3 §12). **Two remain**: the heartbeat producing a notice on the owner's own account — recorded by the owner as a **non-blocking residual**, and the fixtures are **not** offered as evidence of it — and a notice **answered in real use**. Kept distinct; neither substitutes for the other |
@@ -195,7 +196,7 @@ a requirement nobody exercised.**
 | `2S-CLOSE-007` | **built** | `PHASE_2S_THREAT_MODEL.md` — every threat re-dispositioned against what was built, and a threat closes only when its mitigation **exists and has been exercised**: eighteen closed, one carried, and one raised that the owner decided on 2026-08-27 |
 | `2S-CLOSE-008` | **built** | Refusal 17 — the nineteen inherited remainders of PRD §7.1 are each looked for in the closing record by name, and a missing one refuses |
 | `2S-CLOSE-009` | **not-built-by-rule** | The rule is *a hardware proof is never discharged by a document*, and it is enforced twice: refusal 15 refuses `2S-MOBILE-003` classified without naming an owner device session, and no record in this phase reports the device checkpoint as anything but held by a person. Destination: the owner, who held it on 2026-08-27 |
-| `2S-CLOSE-010` | **partial** | The mechanism is built — closure requires an owner ADR after a closing device checkpoint, refusal 14 refuses a decision called signed with no ADR naming it, and this record explicitly does not close the phase. **Remainder: the owner's closing device checkpoint and the closing ADR. Destination: the owner.** Neither has happened and neither is claimed |
+| `2S-CLOSE-010` | **built** | **ADR-139, 2026-08-28** — and by nothing else. It stood at `partial` for exactly as long as it should have: the mechanism was built here, and the remainder was the owner's. It is `built` now only by the **combination** the requirement itself names — the completed device checkpoint (slice 2S.3 §11 and §12, on real hardware, in two sittings) **and** the owner's authorization recorded as an ADR. Neither half alone would have done it, and a green pipeline is neither half |
 | `2S-CLOSE-011` | **built** | Refusal 16 — a successor requirement in the PRD, a `docs/initiatives/phase-2t` directory and a `docs/reports/phase-2t` directory are each refused; none exists |
 | `2S-CLOSE-012` | **built** | §5 — the query re-run against the deployed database, the result recorded **including the half that did not move**, and the mechanism read from the deployed function rather than the migration file |
 | `2S-CLOSE-013` | **built** | §3 — the closing record names the authority each inline verb dispatches to, and refusal 21 refuses a record that omits one while refusal 20 refuses a writer absent from the 2S.0 baseline |

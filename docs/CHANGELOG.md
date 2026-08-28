@@ -3,6 +3,54 @@
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
 
+## 2026-08-28 - Phase 2S is CLOSED (ADR-139), by an owner decision after the checkpoint on real hardware
+
+**Zero migrations.** The budget closes where it opened — 1 allocated · 1 spent ·
+1 created · 1 applied — parity `202608240102`, **102 local = 102 hosted**,
+re-read live.
+
+**A green pipeline did not close this phase.** `2S-CLOSE-010` reserves closure for
+an owner decision recorded as an ADR **after a device checkpoint**, and
+`2S-CLOSE-009` adds that a hardware proof is never discharged by a document. Both
+held for the whole phase: every gate had been green since slice 2S.4 merged, and
+none of them could close it.
+
+**`2S-CLOSE-010` becomes `built` by the combination and by nothing else** — the
+completed device checkpoint **and** the owner's authorization. It stood at
+`partial` for exactly as long as it should have, and neither half alone would have
+moved it.
+
+**Final delivery: 99 declared · 99 classified · zero unclassified · zero
+`undelivered`** — 73 `built`, 20 `baseline`, 6 `not-built-by-rule`, 0 `partial`.
+The reconciliation came back clean in the direction that matters: **all eighteen
+declared `baseline` were delivered `baseline`**, where Phase 2R had five taking
+credit for work nobody did since its first slice.
+
+**The defect the phase existed for has ended on the rows it was measured on.**
+Three notices per day for eighteen unbroken days became **zero** on the day slice
+2S.1's migration landed — with the producer still running, the subject tasks
+unchanged, no suppression involved, and the ladder read from the deployed
+function rather than the file.
+
+**The owner confirmed the terminal silence as the intended semantics:** initial
+notice → +1 day → +3 days → +7 days → nothing further until the subject changes,
+with the subject still reachable on the attention surfaces. `OD-2S-4` A stands
+exactly as signed.
+
+**Closure discharges no residual and no waiver.** The heartbeat producing a real
+notice on the owner's own account stays **NOT EXECUTED — a non-blocking
+residual**; **the two synthetic notices planted in this phase are not evidence of
+the heartbeat and never may be described as such**; a notice **answered in real
+use** stays open **as an adoption observation**, which does not invalidate what
+was built and tested; and `2S-ACCESS-005` (VoiceOver) stays **NOT EXECUTED —
+OWNER WAIVED**, never to be classified as passed. Nineteen inherited remainders
+are carried out intact, checked by name.
+
+**The successor is not started, not planned and not named as active.** ADR-139
+authorizes none and retargets no guard toward one; a separate owner authorization
+is required before anything about one may be written.
+
+
 ## 2026-08-27 - Phase 2S: /app/notifications validated on the device, and the owner decides the ladder's terminal silence
 
 **Zero migrations.** Parity untouched at `202608240102`, 102 local = 102 hosted.
