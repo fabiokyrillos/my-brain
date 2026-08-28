@@ -237,6 +237,16 @@ describe("BYOK-GUARD-005: crypto locality", () => {
         // idempotency digest, keyless, exactly as `product-events.ts` does.
         "supabase/functions/send-push/deliver.ts",
         "supabase/functions/send-push/deliver.test.ts",
+        // The device-free VAPID probe and its test generate an EPHEMERAL P-256
+        // recipient — `generateKey` and `exportKey`, so that the body it sends
+        // is a real `aes128gcm` record encrypted to a key nobody holds. They
+        // reach the subtle surface and stop there: neither performs a keyed
+        // operation (the assertion above still admits only the cores and the
+        // push crypto module) and neither names `AES-GCM` or `HMAC`. The keys
+        // exist for the length of one call and are never stored, returned or
+        // logged, which is what keeps this an exception rather than a hole.
+        "supabase/functions/send-push/probe.ts",
+        "supabase/functions/send-push/probe.test.ts",
       ].sort(),
     );
   });
