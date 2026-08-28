@@ -86,8 +86,14 @@ const PUSH_APIS: ReadonlyArray<readonly [string, RegExp]> = [
  *   VAPID signing, the only code that ever touches the private key.
  * - `send-push/index.ts` and `send-push/deliver.ts` and its test — the
  *   entrypoint and the delivery orchestration.
+ * - `send-push/probe.ts` and its test — the device-free VAPID probe. It signs a
+ *   real token and makes a real request, so it genuinely performs push and
+ *   belongs HERE rather than among the tests that merely assert about it. It
+ *   earns the entry the same way the sender does and is confined to the same
+ *   runtime: it takes a config and a `fetch` and is handed no database client,
+ *   no user and no subscription, so it cannot reach a device even by mistake.
  *
- * That these six live under `supabase/functions/` rather than `src/` is the
+ * That every one of them lives under `supabase/functions/` rather than `src/` is the
  * point rather than an accident: the private key is reachable ONLY from a
  * runtime the browser cannot load, and the `src`-and-`public` sweep below
  * asserts it never crossed over.
@@ -106,6 +112,8 @@ const ALLOWED: readonly string[] = [
   "supabase/functions/send-push/index.ts",
   "supabase/functions/send-push/deliver.ts",
   "supabase/functions/send-push/deliver.test.ts",
+  "supabase/functions/send-push/probe.ts",
+  "supabase/functions/send-push/probe.test.ts",
 ];
 
 /**
@@ -310,6 +318,8 @@ describe("2M-NOTIFY-006/-007: push exists now, and only where it was authorized"
       "supabase/functions/send-push/deliver.test.ts",
       "supabase/functions/send-push/deliver.ts",
       "supabase/functions/send-push/index.ts",
+      "supabase/functions/send-push/probe.test.ts",
+      "supabase/functions/send-push/probe.ts",
     ]);
   });
 
