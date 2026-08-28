@@ -173,6 +173,40 @@ rather than warning and sending anyway.
 
 ---
 
+## 2.4 RESOLVED: the notification arrived on the owner's iPhone (2026-08-28)
+
+**The `HTTP 403` is fixed and push is delivered.** On 2026-08-28 at 18:34 local
+(`21:34:19Z`) a push notification appeared on the owner's real iPhone lock
+screen, carrying exactly the contracted copy -- *"Voce tem um lembrete" / "Abra o
+app para ver qual."* -- with no task title, no name, no date and no count.
+
+**Cause: Apple rejected the configured VAPID `sub`.** The repair was to set
+`VAPID_SUBJECT` to the canonical production origin. **No key rotation, no
+re-subscription, no migration, and no change to the JWT construction** -- which
+was proved correct against RFC 8292's published vector by a verifier sharing no
+code with the signer.
+
+**The nuance matters and must not be flattened:** the configured subject was
+classified `operational`/`mailto` by this repository's own categoriser and Apple
+refused it anyway. The proven fact is that *that specific value* was rejected
+while a control subject was accepted. A reserved TLD is one measured sufficient
+condition; it is not what was in play here.
+
+**Section 1's opening sentence -- "Push fails on the owner's real iPhone, with
+`HTTP 403`" -- is superseded by this section.** Sections 2, 2.1, 2.2 and 2.3 are
+retained as the record of how it was narrowed, and none of them may be read as
+current status.
+
+### What section 3.2 still owes
+
+Delivery with the app in the **foreground**, the **tap destination**
+(`/app/reminders`), **revocation** stopping delivery on the current
+subscription, and quiet hours / daily cap / cooldown observed on the device
+rather than only in the ledger. Section 3.3 (Android) and 3.4 (screen readers)
+are untouched.
+
+---
+
 ## 3. The work, when it is authorized
 
 Nothing here may be closed by writing a document, and nothing here may be closed

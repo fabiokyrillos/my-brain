@@ -15568,3 +15568,89 @@ the probe again, and only then one real send.
 
 **Push still does not work and the owner's iPhone has still never received a
 push.** Neither may be recorded as resolved by this section.
+
+---
+
+## §141 — A push notification physically arrived on the owner's iPhone (2026-08-28)
+
+Under ADR-140. **Zero migrations**, parity unchanged at `202608240102`.
+
+**The residual ADR-107 deferred out of Phase 2M on 2026-08-12 is closed on the
+only evidence that could close it: the notification appeared on the owner's real
+device.** Lock screen, 18:34 local (`2026-08-28 21:34:19Z`), carrying exactly the
+contracted copy — *"Você tem um lembrete" / "Abra o app para ver qual."* — with
+no task title, no name, no date and no count. `2M-NOTIFY-006`'s content
+prohibition held on the surface it was written for.
+
+### The cause, and it was configuration
+
+**Apple rejected the configured VAPID `sub`.** Nothing in the token construction
+was wrong. The repair was to set `VAPID_SUBJECT` to the canonical production
+origin — **no key rotation, no re-subscription, no migration, no code change to
+the JWT**.
+
+The chain that got there, each step refusing to conclude more than it had:
+
+1. **The strike ceiling had to be fixed first.** `finish_push_delivery`
+   increments `failure_count` for every id reported failed, and the third strike
+   expires the subscription and takes the consent with it. The owner's only
+   device stood at **2 of 3** with `last_delivered_at` null: the next diagnostic
+   run would have destroyed the thing under investigation. A `401`/`403` is now
+   reported to nobody.
+2. **The refusal document was being fetched and discarded.** Reading Apple's own
+   `reason` through a closed vocabulary turned `403` into `BadJwtToken`.
+3. **The JWT was proved correct** by an ECDSA P-256 verifier written from the
+   curve equations, pinned against RFC 8292 §2.4's published token, in a second
+   runtime and crypto library. Header, algorithm, audience, subject *form*,
+   expiry, signature, DER↔JOSE, base64url and `Authorization` construction: all
+   eliminated. `web-push` 3.6.7 was compared field by field and builds an
+   equivalent request.
+4. **The probe's first verdict was withdrawn.** Every variant carried a token, so
+   a service answering `BadJwtToken` to anything it cannot find gave the same
+   reading. Adding `absent`, `ephemeral` and `expired` fixed that.
+5. **The subject was isolated.** Holding everything else fixed and varying only
+   `sub`: a reserved TLD draws `403 BadJwtToken`; a real-TLD address gets past
+   authentication. Then `subject_control` proved it in the hosted deployment
+   without the configured value ever being printed.
+
+> **The configured subject was `operational`/`mailto` by our own categoriser and
+> Apple refused it anyway.** The proven fact is narrow and must stay narrow: *that
+> specific value* was rejected while the control was accepted. A reserved TLD is
+> one sufficient condition, measured — it is not what was in play here, and
+> `categoriseVapidSubject` has a blind spot it cannot see.
+
+### What the reinstall actually did, and the attempt that proved nothing
+
+After the first accepted-but-unseen push the owner disabled notifications,
+deleted the PWA, reinstalled it and re-enabled — then retried, and nothing
+appeared. **That retry produced zero egress.** It reused the previous dedupe
+hash, and the cooldown — scoped to `dedupe_hash`, not to the user — refused it
+with `attempts: 0`. The device was never asked.
+
+The reinstall itself worked correctly: **new endpoint, new `p256dh`, new `auth`,
+new row**, old subscription `revoked`, exactly one active. The
+`applicationServerKey` defect at §3.6 did not bite, because deleting the PWA
+destroys the browser subscription and `getSubscription()` returns null —
+**deleting the PWA is that defect's manual workaround**, and the defect stands.
+
+### What is proved, and what is not
+
+**Proved:** permission after an explicit gesture; delivery to a real iPhone with
+the app not in the foreground; the content-free contract on a lock screen; the
+sender's refusals and ledger behaving exactly as designed across four deliveries
+(two `delivered`, two `suppressed/cooldown`, zero strikes charged).
+
+**NOT proved, and not to be recorded as passed:** the tap destination
+(`/app/reminders`); revocation stopping delivery on the *new* subscription;
+Android, still never executed; VoiceOver, still owner-waived.
+
+### Small remainder opened here
+
+Apple's `BadWebPushToken` — its healthy answer to a fabricated resource — is not
+in the closed vendor vocabulary, so a legitimate `400` reads as
+`vendor_unknown`. It cost nothing this time and it will cost clarity next time.
+
+### Where the next session starts
+
+Nothing is authorized beyond confirming the tap destination. **Push works on
+iOS; that sentence is now true and it was not true this morning.**
