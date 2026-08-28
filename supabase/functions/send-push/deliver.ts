@@ -605,14 +605,28 @@ export async function deliverPush(
   const payload = buildWirePayload(request.type, request.locale);
   if (payload === null) return Object.freeze({ status: "refused", code: "payload_unavailable" });
 
-  // The subject's CATEGORY, once per delivery, never its value. A `reserved`
-  // reading beside a `401`/`403` in the same run is the whole answer; a
-  // `operational` reading beside one rules the subject out and points elsewhere.
+  // The subject's CATEGORY, once per delivery, never its value.
+  //
+  // This used to WARN and send anyway, and that was the wrong shape for a
+  // module whose header promises to fail closed. It is now measured rather than
+  // suspected: against Apple's own Web Push endpoint, with a valid signature and
+  // everything else held fixed, a `sub` on a reserved TLD draws
+  // `403 BadJwtToken` while the SAME request with a real-TLD address gets past
+  // authentication — for `mailto:` and `https:` alike, so the scheme is not what
+  // decides it. `.invalid`, `.example`, `.localhost` and `.test` were each
+  // rejected; `.com` was not.
+  //
+  // So a non-operational subject is not a warning. It is a request no push
+  // service can authenticate, and sending it spends the dedupe slot and an
+  // attempt on something that cannot succeed. Refusing here — BEFORE
+  // `begin_push_delivery`, beside the key-pair check and for exactly the same
+  // reason — is what this module already promised for a missing VAPID key.
   const subjectCategory = categoriseVapidSubject(config.vapidSubject);
   if (subjectCategory !== "operational") {
-    console.warn("[send-push] VAPID subject is not an address a push service could use", {
+    console.error("[send-push] the VAPID subject is not an address a push service will accept", {
       subject: subjectCategory,
     });
+    return Object.freeze({ status: "refused", code: "vapid_subject_unusable" });
   }
 
   // The last configuration check, and it happens BEFORE anything is begun.

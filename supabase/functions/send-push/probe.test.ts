@@ -1,7 +1,13 @@
 import { assertEquals, assertNotEquals } from "jsr:@std/assert@1";
 
-import { base64UrlEncode, createVapidAuthorization } from "../_shared/web-push.ts";
-import { APPLE_PUSH_ORIGIN, corruptVapidSignature, probeVapid, probeVariants } from "./probe.ts";
+import { base64UrlDecode, base64UrlEncode, createVapidAuthorization } from "../_shared/web-push.ts";
+import {
+  APPLE_PUSH_ORIGIN,
+  corruptVapidSignature,
+  PROBE_CONTROL_SUBJECT,
+  probeVapid,
+  probeVariants,
+} from "./probe.ts";
 import type { SenderConfig } from "./deliver.ts";
 
 /**
@@ -52,7 +58,7 @@ function scriptedFetch(answers: readonly Response[] | ((index: number) => Respon
 const json = (reason: string, status: number) => new Response(JSON.stringify({ reason }), { status });
 
 /** The five, in the order `probeVapid` sends them. */
-const ORDER = ["real", "corrupted", "absent", "ephemeral", "expired"] as const;
+const ORDER = ["real", "corrupted", "absent", "ephemeral", "expired", "subject_control"] as const;
 const at = (variant: (typeof ORDER)[number]) => ORDER.indexOf(variant);
 
 function probed(report: Awaited<ReturnType<typeof probeVapid>>) {
@@ -76,15 +82,15 @@ function run(answers: (index: number) => Response) {
   })();
 }
 
-Deno.test("the five variants are sent in a known order, and only ONE of them omits the token", async () => {
+Deno.test("the six variants are sent in a known order, and only ONE of them omits the token", async () => {
   const { report, seen } = await run(() => json("BadSubscription", 404));
   assertEquals(report.answers.map((answer) => answer.variant), [...ORDER]);
-  assertEquals(seen.length, 5);
+  assertEquals(seen.length, 6);
 
   // The control that decides whether any other reading means anything must
   // differ from `real` in exactly one way: no Authorization header.
   assertEquals(seen[at("absent")].authorization, null);
-  for (const variant of ["real", "corrupted", "ephemeral", "expired"] as const) {
+  for (const variant of ["real", "corrupted", "ephemeral", "expired", "subject_control"] as const) {
     assertEquals(typeof seen[at(variant)].authorization, "string", variant);
   }
   // Everything else about the request is identical, including the endpoint.
@@ -300,4 +306,103 @@ Deno.test("a malformed VAPID pair refuses before any request is made", async () 
 Deno.test("the variant vocabulary is closed and matches what is actually sent", async () => {
   assertEquals([...probeVariants], [...ORDER]);
   assertEquals(new Set(probeVariants).size, probeVariants.length);
+});
+
+Deno.test("the subject control differs from `ephemeral` in the SUBJECT and in nothing else", async () => {
+  const { seen } = await run(() => json("BadJwtToken", 403));
+  const eph = seen[at("ephemeral")].authorization!;
+  const ctl = seen[at("subject_control")].authorization!;
+
+  // Same signing key advertised, so the comparison is not about the key.
+  assertEquals(eph.split(", k=")[1], ctl.split(", k=")[1]);
+  // Same protected header.
+  assertEquals(eph.slice("vapid t=".length).split(".")[0], ctl.slice("vapid t=".length).split(".")[0]);
+
+  const claimsOf = (authorization: string) =>
+    JSON.parse(new TextDecoder().decode(base64UrlDecode(authorization.slice("vapid t=".length).split(".")[1])));
+  const a = claimsOf(eph);
+  const b = claimsOf(ctl);
+  assertEquals(a.aud, b.aud);
+  assertEquals(a.exp, b.exp);
+  assertNotEquals(a.sub, b.sub);
+  assertEquals(b.sub, PROBE_CONTROL_SUBJECT);
+  // And the control's own subject is on a real TLD, which is the whole point of
+  // it — a control that was itself `reserved` would agree with the thing it is
+  // supposed to contradict.
+  assertEquals(PROBE_CONTROL_SUBJECT.endsWith(".invalid"), false);
+});
+
+Deno.test("the SUBJECT is blamed when the same request with a real-TLD address gets through", async () => {
+  /*
+   * Measured against Apple before this branch existed: a `sub` on a reserved
+   * TLD draws `403 BadJwtToken`, while the identical request carrying a
+   * real-TLD address is refused on the fabricated RESOURCE instead. This is
+   * that observation, made into a decision the probe can reach on its own.
+   */
+  const { report } = await run((index) =>
+    index === at("absent")
+      ? json("MissingProviderToken", 401)
+      : index === at("expired")
+      ? json("ExpiredProviderToken", 403)
+      : index === at("subject_control")
+      ? json("BadSubscription", 404)
+      : json("BadJwtToken", 403)
+  );
+  assertEquals(report.verdict, "subject_rejected");
+  assertEquals(report.signals.includes("subject_control_accepted"), true);
+  // And it takes precedence over the construction reading, which the same run
+  // would otherwise satisfy — the subject is the narrower explanation and the
+  // one whose control varied a single field.
+  assertEquals(report.signals.includes("ephemeral_rejected_as_vapid"), true);
+});
+
+Deno.test("MUTATION CONTROL: the subject is NOT blamed when nothing was rejected in the first place", async () => {
+  /*
+   * "A token nobody rejected was also not rejected" is not evidence. Without
+   * this, any run where the service accepted everything would report the
+   * subject control as meaningful.
+   */
+  const { report } = await run((index) =>
+    index === at("absent") ? json("MissingProviderToken", 401) : json("BadSubscription", 404)
+  );
+  assertEquals(report.signals.includes("subject_control_accepted"), false);
+  assertNotEquals(report.verdict, "subject_rejected");
+});
+
+Deno.test("MUTATION CONTROL: a subject control rejected the same way blames the CONSTRUCTION, not the subject", async () => {
+  const { report } = await run((index) =>
+    index === at("absent")
+      ? json("MissingProviderToken", 401)
+      : index === at("expired")
+      ? json("ExpiredProviderToken", 403)
+      : json("BadJwtToken", 403)
+  );
+  assertEquals(report.verdict, "construction_rejected");
+  assertEquals(report.signals.includes("subject_control_accepted"), false);
+});
+
+Deno.test("the configured subject travels as a CATEGORY and a SCHEME, never as an address", async () => {
+  for (
+    const [subject, category, scheme] of [
+      ["mailto:ops@my-brain.invalid", "reserved", "mailto"],
+      ["mailto:ops@real-domain.app", "operational", "mailto"],
+      ["https://real-domain.app/contact", "operational", "https"],
+      ["not-a-uri-at-all", "malformed", "other"],
+    ] as const
+  ) {
+    const { fetch } = scriptedFetch(() => json("BadJwtToken", 403));
+    const base = await vapidConfig();
+    const report = probed(await probeVapid({
+      config: { ...base, vapidSubject: subject },
+      fetch,
+      nowSeconds: () => 1_800_000_000,
+    }));
+    assertEquals(report.subject, category, subject);
+    assertEquals(report.subjectScheme, scheme, subject);
+    // The address itself is nowhere in the report.
+    const observed = JSON.stringify(report);
+    assertEquals(observed.includes(subject), false, subject);
+    assertEquals(observed.includes("ops@"), false, subject);
+    assertEquals(observed.includes("my-brain.invalid"), false, subject);
+  }
 });

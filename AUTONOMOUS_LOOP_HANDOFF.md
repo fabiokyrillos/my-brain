@@ -15457,3 +15457,114 @@ investigation with different evidence.
 **Push still does not work, the `403` is still unexplained, and the owner's
 iPhone has still never received a push.** No real send may happen until the probe
 stops returning `BadJwtToken`.
+
+---
+
+## §140 — The cause is found and reproduced: Apple refuses a VAPID subject on a reserved TLD, and the sender was warning about it and sending anyway (2026-08-28)
+
+Under ADR-140. **Zero migrations**, parity unchanged at `202608240102`.
+
+### The measurement
+
+Against **Apple's own Web Push endpoint**, one variable at a time, with the same
+throwaway key pair, the same audience, the same fabricated endpoint shape, the
+same body and the same headers — only the `sub` claim differing:
+
+| `sub` | Apple |
+|---|---|
+| `mailto:…@my-brain-example.com` | `400 BadWebPushToken` — **past authentication** |
+| `https://my-brain-example.com` | `400 BadWebPushToken` — **past authentication** |
+| `mailto:…@my-brain.invalid` | **`403 BadJwtToken`** |
+| `mailto:…@my-brain.example` | **`403 BadJwtToken`** |
+| `mailto:…@my-brain.localhost` | **`403 BadJwtToken`** |
+| `https://my-brain.invalid` | **`403 BadJwtToken`** |
+| `https://my-brain.test` | **`403 BadJwtToken`** |
+
+**A `sub` on a reserved TLD is refused with the exact symptom this residual has
+carried since 2026-08-12.** The scheme is irrelevant — `mailto:` and `https:`
+behave identically. The **domain** decides.
+
+`400 BadWebPushToken` is the healthy answer: authentication passed and the
+fabricated resource does not exist.
+
+### Why nothing found it for sixteen days
+
+The reference implementation was compared field by field. `web-push` 3.6.7 —
+what working Apple deployments use — builds an **equivalent** request: same
+protected header segment, same claim keys in the same order, same `, k=`
+separator, same 64-byte signature, same uncompressed `k=`, same 12-hour `exp`,
+and **no `iat`** either. There is nothing to copy from it.
+
+Every local experiment used `mailto:push@example.com` and drew `400`. Every
+hosted probe variant carried `config.vapidSubject` — **including the
+freshly-keyed ones**, because `withFreshKey` passed the configured subject
+through. That was the single variable differing between the two environments,
+and it was invisible because the subject is deliberately never printed.
+
+Every answer in the hosted run is explained by it: `absent` → `Forbidden`;
+`expired` → `ExpiredProviderToken`, because Apple checks `exp` first and
+short-circuits before the subject; everything with a valid `exp` →
+`BadJwtToken`.
+
+> **A control that holds the suspect constant is not a control.** The probe
+> varied the key, the signature, the expiry and the presence of the token, and
+> passed the same subject through all of them.
+
+### The defect in the sender, and it was already written down
+
+`deliverPush` computed the subject's category, **warned**, and sent anyway:
+
+```ts
+if (subjectCategory !== "operational") { console.warn(...); }   // and then proceeds
+```
+
+That is the wrong shape for a module whose own header promises "a missing VAPID
+key ... refuses BEFORE `begin_push_delivery`, so a misconfigured deployment
+records nothing rather than recording a refusal it did not really evaluate." A
+subject no push service will accept is a missing VAPID key in the only sense that
+matters, and sending spends the dedupe slot and an attempt on a request that
+**cannot** succeed.
+
+It now refuses with `vapid_subject_unusable`, before anything is begun — no
+delivery row, no dedupe slot, no egress — asserted across six subjects including
+the shipped default. A **mutation control** asserts an operational subject is
+still delivered, because a sender that refused every subject would pass the
+refusal test while taking push down entirely.
+
+**`DEFAULT_VAPID_SUBJECT` is `mailto:ops@my-brain.invalid`** — RFC 2606 reserved,
+and now measured as the exact thing Apple rejects. The categoriser already called
+that class `reserved`; nothing acted on it.
+
+### The probe's sixth variant
+
+`subject_control` — same fresh key, same `exp`, same `aud`, **only the subject
+differs**, and it uses a real TLD. If it gets through while `ephemeral` is
+rejected, the configured subject is proved to be the cause **without the
+configured subject ever being printed, logged or returned**. The report now
+carries `subject` and `subjectScheme` as categories, and `subject_rejected` takes
+precedence over `construction_rejected` because its control varied one field.
+
+Three mutation controls hold it: the control must differ from `ephemeral` in the
+subject and nothing else; a run where nothing was rejected must not report the
+control as meaningful; and a control rejected the same way must still blame the
+construction.
+
+### Gates
+
+`typecheck` zero errors · `lint` zero errors in the CI scope · worker suite
+**214 assertions green** (was 208), of which **58 in `send-push`** · vitest
+**9697 of 9699, zero `AssertionError`** in an untruncated log, the two failures
+being 5000ms timeouts in repository-wide scans · `npm run build` exit 0.
+
+`deliver.ts`'s strike protection and closed reason vocabulary are untouched in
+substance: `401`/`403` still report no subscription to the database.
+
+### Where the next session starts
+
+**Run the probe again after this deploy.** If it answers `subject_rejected` with
+`subject: "reserved"`, the repair is to set `VAPID_SUBJECT` to an address on a
+real domain — an **owner configuration action, not a key rotation** — and then
+the probe again, and only then one real send.
+
+**Push still does not work and the owner's iPhone has still never received a
+push.** Neither may be recorded as resolved by this section.

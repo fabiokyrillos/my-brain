@@ -137,6 +137,42 @@ the same answer as the real token.
 
 ---
 
+## 2.3 The cause, measured against Apple (2026-08-28)
+
+**Apple refuses a VAPID `sub` on a reserved TLD with exactly `403 BadJwtToken`.**
+One variable at a time, same throwaway key pair, same audience, same fabricated
+endpoint, same body and headers:
+
+| `sub` | Apple |
+|---|---|
+| `mailto:...@my-brain-example.com` | `400 BadWebPushToken` -- **past authentication** |
+| `https://my-brain-example.com` | `400 BadWebPushToken` -- **past authentication** |
+| `mailto:...@my-brain.invalid` | **`403 BadJwtToken`** |
+| `mailto:...@my-brain.example` | **`403 BadJwtToken`** |
+| `mailto:...@my-brain.localhost` | **`403 BadJwtToken`** |
+| `https://my-brain.invalid` | **`403 BadJwtToken`** |
+| `https://my-brain.test` | **`403 BadJwtToken`** |
+
+The scheme is irrelevant; the domain decides. `400 BadWebPushToken` is the
+healthy answer -- authentication passed, the fabricated resource does not exist.
+
+**The reference implementation was compared field by field and there is nothing
+to copy from it.** `web-push` 3.6.7 builds an equivalent request: same protected
+header segment, same claim keys in the same order, same `, k=` separator, same
+64-byte signature, same uncompressed `k=`, same 12-hour `exp`, and no `iat`.
+
+**Hypothesis 1 is resolved** -- the Apple-specific requirement is on the `sub`
+claim's domain, and RFC 8292 does not carry it. Hypotheses 2 and 4 are not
+implicated. **This settles nothing about the deployed configuration until the
+probe reports it**: what the deployment's own subject category is remains an
+owner-run reading, and `DEFAULT_VAPID_SUBJECT` (`mailto:ops@my-brain.invalid`) is
+the shipped fallback that produces exactly this symptom.
+
+The sender now **refuses** a non-operational subject before `begin_push_delivery`
+rather than warning and sending anyway.
+
+---
+
 ## 3. The work, when it is authorized
 
 Nothing here may be closed by writing a document, and nothing here may be closed

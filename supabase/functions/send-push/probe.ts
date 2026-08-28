@@ -1,5 +1,7 @@
 import { base64UrlDecode, base64UrlEncode, createVapidAuthorization, encryptPushPayload } from "../_shared/web-push.ts";
 import {
+  categoriseVapidSubject,
+  categoriseVapidSubjectScheme,
   isAllowedPushHost,
   readVendorReason,
   subscriptionRejectionReasons,
@@ -61,10 +63,42 @@ import {
 export const APPLE_PUSH_ORIGIN = "https://web.push.apple.com";
 
 /** The request shapes, each isolating exactly one variable. */
-export const probeVariants = ["real", "corrupted", "absent", "ephemeral", "expired"] as const;
+export const probeVariants = [
+  "real",
+  "corrupted",
+  "absent",
+  "ephemeral",
+  "expired",
+  "subject_control",
+] as const;
 export type ProbeVariant = (typeof probeVariants)[number];
 
+/**
+ * A contact URI on a REAL top-level domain, used for exactly one variant.
+ *
+ * Measured against Apple's own endpoint with everything else held fixed: a `sub`
+ * on a reserved TLD (`.invalid`, `.example`, `.localhost`, `.test`) draws
+ * `403 BadJwtToken`, while the same request carrying a real-TLD address gets
+ * past authentication and is refused on the fabricated resource instead — for
+ * `mailto:` and `https:` alike. The scheme is not what decides it; the domain is.
+ *
+ * So this variant differs from `ephemeral` in the SUBJECT and in nothing else.
+ * If it stops being rejected while `ephemeral` is still rejected, the configured
+ * subject is the cause — proved without the configured subject ever being
+ * printed, logged or returned.
+ *
+ * It is a probe fixture rather than a claim of ownership: nothing is delivered
+ * to it, and it appears only in a diagnostic request aimed at a resource that
+ * does not exist.
+ */
+export const PROBE_CONTROL_SUBJECT = "mailto:vapid-probe@my-brain.app";
+
 export type ProbeVerdict =
+  /**
+   * The configured SUBJECT is what the service refuses: the identical request
+   * carrying a real-TLD contact address gets past authentication.
+   */
+  | "subject_rejected"
   /** Apple validates tokens on their own terms AND rejects what this code BUILDS. */
   | "construction_rejected"
   /** Apple validates tokens on their own terms AND rejects the key we HOLD. */
@@ -83,6 +117,8 @@ export type ProbeSignal =
   | "real_rejected_as_vapid"
   /** ...and for a freshly generated, provably valid one too. */
   | "ephemeral_rejected_as_vapid"
+  /** The SAME request carrying a real-TLD subject was NOT rejected as VAPID. */
+  | "subject_control_accepted"
   /** The service answered the real token by complaining about the RESOURCE. */
   | "real_answered_about_resource"
   /** The corrupted-signature control was not actually mutated. */
@@ -95,6 +131,9 @@ export type ProbeAnswer = Readonly<{ variant: ProbeVariant; status: number; reas
 export type VapidProbeReport = Readonly<{
   status: "vapid_probe";
   origin: string;
+  /** The CONFIGURED subject's category and scheme — never the address itself. */
+  subject: "operational" | "reserved" | "malformed";
+  subjectScheme: "mailto" | "https" | "other";
   answers: readonly ProbeAnswer[];
   mutation: "applied" | "not_applied";
   signals: readonly ProbeSignal[];
@@ -225,9 +264,19 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
 
   let ephemeral: string;
   let expired: string;
+  let subjectControl: string;
   try {
     ephemeral = await withFreshKey(nowSeconds() + PROBE_VAPID_TTL_SECONDS);
     expired = await withFreshKey(nowSeconds() + PROBE_EXPIRED_OFFSET_SECONDS);
+    // The same fresh key and the same expiry as `ephemeral`. Only the subject
+    // differs, which is what makes the comparison worth making.
+    subjectControl = await createVapidAuthorization({
+      endpoint,
+      publicKey: fresh.publicKey,
+      privateKey: fresh.privateKey,
+      subject: PROBE_CONTROL_SUBJECT,
+      expiresAtSeconds: nowSeconds() + PROBE_VAPID_TTL_SECONDS,
+    });
   } catch {
     return Object.freeze({ status: "vapid_probe" as const, refused: "probe_key_failed" });
   }
@@ -270,12 +319,14 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
   answers.push(await ask("absent", null));
   answers.push(await ask("ephemeral", ephemeral));
   answers.push(await ask("expired", expired));
+  answers.push(await ask("subject_control", subjectControl));
 
   const of = (variant: ProbeVariant) => answers.find((answer) => answer.variant === variant);
   const realAnswer = of("real")!;
   const absentAnswer = of("absent")!;
   const ephemeralAnswer = of("ephemeral")!;
   const expiredAnswer = of("expired")!;
+  const subjectAnswer = of("subject_control")!;
 
   const signals: ProbeSignal[] = [];
   if (corrupted === null) signals.push("mutation_not_applied");
@@ -294,6 +345,11 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
   if (vapidRejectionReasons.includes(realAnswer.reason)) signals.push("real_rejected_as_vapid");
   if (vapidRejectionReasons.includes(ephemeralAnswer.reason)) signals.push("ephemeral_rejected_as_vapid");
   if (subscriptionRejectionReasons.includes(realAnswer.reason)) signals.push("real_answered_about_resource");
+  // The subject control only means something when the request it differs from
+  // WAS rejected: "a token nobody rejected was also not rejected" is not news.
+  const subjectControlAccepted = vapidRejectionReasons.includes(ephemeralAnswer.reason)
+    && !vapidRejectionReasons.includes(subjectAnswer.reason);
+  if (subjectControlAccepted) signals.push("subject_control_accepted");
   if (signals.length === 0) signals.push("no_vapid_signal");
 
   /*
@@ -307,7 +363,13 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
    */
   let verdict: ProbeVerdict = "inconclusive";
   if (answerIsAboutTheToken && corrupted !== null && vapidRejectionReasons.includes(realAnswer.reason)) {
-    if (vapidRejectionReasons.includes(ephemeralAnswer.reason)) verdict = "construction_rejected";
+    // The subject is checked FIRST, because it is the one variable whose control
+    // differs from its comparison in exactly one field. A run where the fresh
+    // key is rejected under the configured subject and accepted under a
+    // real-TLD one has isolated the subject and nothing else — and the
+    // construction is then NOT at fault, however much it looks it.
+    if (subjectControlAccepted) verdict = "subject_rejected";
+    else if (vapidRejectionReasons.includes(ephemeralAnswer.reason)) verdict = "construction_rejected";
     else if (subscriptionRejectionReasons.includes(ephemeralAnswer.reason)) verdict = "configured_key_rejected";
     else verdict = "vapid_rejected_cause_unresolved";
   }
@@ -315,6 +377,8 @@ export async function probeVapid(dependencies: ProbeDependencies): Promise<Vapid
   return Object.freeze({
     status: "vapid_probe" as const,
     origin,
+    subject: categoriseVapidSubject(config.vapidSubject),
+    subjectScheme: categoriseVapidSubjectScheme(config.vapidSubject),
     answers: Object.freeze(answers),
     mutation: corrupted === null ? ("not_applied" as const) : ("applied" as const),
     signals: Object.freeze(signals),
