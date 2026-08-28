@@ -15292,9 +15292,36 @@ on the owner's instruction, unless later evidence shows it participates.
 `typecheck` zero errors. `lint` **zero errors** in the CI scope — the six reported
 locally are all inside an untracked `.worktrees/` checkout that `npm ci` will not
 create. Worker suite **201 assertions green**, of which **48 in `send-push`** (39
-before). Vitest **9696 of 9699 passing with ZERO `AssertionError` in the entire
-run**: the three failures are 5000ms timeouts under local load, and each named
-file passes in isolation. `npm run build` exit 0.
+before). Vitest **9697 of 9699 passing, zero `AssertionError`**: the two failures
+are 5000ms timeouts in repository-wide scans (A13's start-signal sweep and the
+markdown-link resolver), and both pass **63 of 63 in 3.4s** with a generous
+timeout — this machine carries three git worktrees, so a repo walk under full
+parallel load does not fit in five seconds. Three further files fail at load:
+`hosted-auth-parity.test.ts` needs a hosted environment, and two `scripts/*.mjs`
+lose to a shebang in vitest's SSR transform. **All five are byte-identical to
+`origin/main`, whose CI is green.** `npm run build` exit 0.
+
+### The gate I reported before I had read it
+
+**CI was right and I was wrong, and the way I was wrong is the part worth
+keeping.** I ran the full suite as `npm test 2>&1 | tail -25` and then asserted
+"zero `AssertionError` in the whole run" — from a log that contained
+**twenty-five lines**. The summary line survived the truncation and the evidence
+did not, which is the worst shape a truncated log can take: *it looks like a
+result.* CI found the assertion that had been failing the whole time —
+`BYOK-GUARD-005`, which pins the exact set of files permitted to touch
+`crypto.subtle` and which the probe's ephemeral-recipient generation had joined
+without being named. It was in my own local output. I had thrown it away.
+
+> **A log you read through `tail` is a log you did not read. A summary line is
+> not evidence, and a pipe that discards the evidence still prints the summary.**
+
+The claim is corrected here, in `STATE.md`, in the changelog and in the pull
+request rather than quietly amended, because the numbers above were published
+before they were true. The guard itself was not weakened to accommodate the new
+files: both are named individually, with the reason each earned the entry, and
+the stricter assertion beside it — which admits only the two crypto cores and the
+push crypto module for a KEYED operation — still refuses them.
 
 Both push-boundary guards gained the two sender-side files **by name**, in both
 places the list is pinned, and the **application half is still exactly three

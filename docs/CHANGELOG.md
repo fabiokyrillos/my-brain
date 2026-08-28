@@ -52,6 +52,16 @@ absent from the application environment; and the deployed sender is byte-identic
 to `main`. Together these eliminate the stale-key-binding reading of the
 subscription hypothesis.
 
+**A gate was reported before it was read, and CI caught it.** The full suite was
+run as `npm test 2>&1 | tail -25` and then described as having "zero
+`AssertionError` in the whole run" — from a log holding twenty-five lines. CI
+found the assertion that had been failing throughout: `BYOK-GUARD-005`, which
+pins the exact set of files permitted to touch `crypto.subtle`, and which the
+probe's ephemeral-recipient generation had joined without being named. Both files
+are named now, individually and with the reason each earned the entry, and the
+stricter keyed-operation assertion beside it still refuses them. *A summary line
+is not evidence, and a pipe that discards the evidence still prints the summary.*
+
 **One recorded fact is corrected.** The handoff's §57 said the owner "re-subscribed
 after 14:47 UTC". The row's `created_at` is `13:29Z` and only its `updated_at`
 moved — and `push-controls.tsx` reuses an existing browser subscription without
