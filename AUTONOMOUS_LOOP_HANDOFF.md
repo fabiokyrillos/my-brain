@@ -15072,3 +15072,98 @@ there is no more implementation to do.
 
 **A phase ends when its owner says so, and every artifact in this repository is
 built to make that the only way it can end.**
+
+---
+
+## §137 — Phase 2S is CLOSED (ADR-139), and the requirement that reserved closure held for the whole phase (2026-08-28)
+
+Merge SHA `9fc7e8f709216825759ce862e2b580f787ceb9cc` (PR #325), CI green 3/3 on
+the PR head `cf113b5` (run `33179949683`) and green 3/3 again on that exact merge
+SHA (run `33180705913`) — three completed jobs each time. **Zero migrations**;
+the budget closes where it opened — 1 allocated · 1 spent · 1 created · 1
+applied — parity `202608240102`, **102 local = 102 hosted**, re-read live.
+
+### The requirement did its job, which was to make a green pipeline insufficient
+
+`2S-CLOSE-010` reserves closure for an owner decision recorded as an ADR **after
+a device checkpoint**; `2S-CLOSE-009` adds that a hardware proof is never
+discharged by a document. Every gate had been green since slice 2S.4 merged, and
+**none of them could close the phase.**
+
+**`2S-CLOSE-010` became `built` by the combination and by nothing else** — the
+completed checkpoint **and** the authorization. It stood at `partial` through the
+whole closeout, which is exactly how long it should have, and neither half alone
+would have moved it. **A requirement that names two conditions is not satisfied
+by the one you already have.**
+
+### Final delivery
+
+**99 declared · 99 classified · zero unclassified · ZERO `undelivered`** —
+**73 `built` · 20 `baseline` · 6 `not-built-by-rule` · 0 `partial`** — from a
+matrix **regenerated from source** and proved byte for byte by `--check`. The
+reconciliation came back clean in the direction that matters: **all eighteen
+declared `baseline` were delivered `baseline`**, where Phase 2R had five taking
+credit for work nobody did since its first slice.
+
+And the defect the phase existed for **ended on the rows it was measured on**:
+three notices a day for eighteen unbroken days became **zero**, on the day the
+cadence migration landed, with the producer still running and the subjects
+unchanged.
+
+### What closure deliberately did NOT do
+
+**It discharged nothing.** The residuals and the waiver come out of the phase
+worded exactly as they went in:
+
+- the **heartbeat producing a real notice on the owner's own account**: **NOT
+  EXECUTED — a non-blocking residual**, its cadence and function proved by pgTAP
+  and by the hosted re-measurement, its hardware evidence never gathered and
+  never claimed;
+- **the two synthetic notices planted in this phase are NOT evidence of the
+  heartbeat**, anywhere, ever. A planted row proves a surface renders and a
+  control behaves; **it proves nothing about what produces the row**;
+- **a notice answered in real use**: **OPEN, as an adoption observation.** `read`,
+  `dismissed` and `notification_suppressions` are all zero in production. That is
+  recorded as *nobody has used it yet*, **not** as a defect, and it does not
+  invalidate what was built and tested;
+- **`2S-ACCESS-005` (VoiceOver): NOT EXECUTED — OWNER WAIVED**, never to be
+  classified as passed.
+
+Nineteen inherited remainders carried out intact, each looked for by name by a
+refusal. **Closing a phase does not close what it carried.**
+
+### The successor
+
+**Not started, not planned, not named as active.** ADR-139 authorizes none,
+retargets no guard toward one, and **its heading names none** — the rule this
+repository learned when an authorizing ADR's heading named the phase it was
+about to unlock. The phase-start detector, the generator's successor refusal and
+the declaration guard's forbidden successor directories all remain in force.
+
+### The four findings that outlive the phase
+
+1. **The RSC boundary is only drawn by Next.** A pure predicate exported from a
+   `"use client"` module took `/app` down for **every owner with an unanswered
+   notice**, and three hundred green component assertions said nothing, because
+   jsdom renders both kinds of component as the same function in the same bundle.
+   There is an executable guard now.
+2. **A checklist handed over without checking whose account will open it is a
+   checklist about somebody else's data.**
+3. **A requirement that says "exercised" and is checked by reading the mechanism
+   is a requirement nobody exercised.** `2S-TRUST-011` spent the whole phase in
+   that condition.
+4. **A closeout is worth exactly what it can refuse** — and both of the things
+   this one found had already been merged, reviewed and green.
+
+The fourth is the direct descendant of Phase 2R's: *a contract stated in prose is
+not a contract anybody enforces.* So make the reconciliation an exit code, **and
+watch it fire before you trust it.**
+
+### Where the next session starts
+
+**Nothing is authorized.** Phase 2S is closed; there is no active phase. A
+successor requires its own owner authorization, and until one exists the only
+permitted work is **read-only**.
+
+**A phase ends when its owner says so, and every artifact in this repository is
+built to make that the only way it can end.**
