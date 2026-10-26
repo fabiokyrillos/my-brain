@@ -5,7 +5,6 @@
 - The owner superseded the generic content-free reminder copy. `send-push` now accepts a `reminderId`, resolves the title by both owner and id inside the trusted runtime, bounds it to 240 characters and sends `Lembrete` / the real title. Caller-provided `title` and `body` are discarded.
 - Missing, blank or foreign reminders fail closed before egress. Other notification kinds retain their generic copy. No migration, VAPID rotation, AI call or automatic scheduler was added.
 - The 2026-08-28 iPhone result remains historical evidence and does not validate this changed payload. A fresh hardware send remains gated on deployment and explicit owner confirmation.
-- The database CI job now authenticates its Supabase image pulls to GHCR with the job's ephemeral read-only `GITHUB_TOKEN`. This follows three anonymous registry rate-limit failures that occurred before the local stack or any database test could start; no long-lived secret or package write access was added.
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
