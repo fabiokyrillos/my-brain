@@ -208,14 +208,14 @@ describe("public/sw.js: what it will and will not intercept", () => {
   });
 });
 
-describe("2M-NOTIFY-010/-006: the push surface exists, and it trusts nothing", () => {
+describe("the push surface exists, and it trusts nothing", () => {
   it("registers the two handlers slice 2M.4b authorized", () => {
     const worker = loadWorker();
     expect(worker.listeners.has("push")).toBe(true);
     expect(worker.listeners.has("notificationclick")).toBe(true);
   });
 
-  it("renders the server's content-free payload as sent", async () => {
+  it("renders the owner-scoped reminder title sent by the server", async () => {
     const worker = loadWorker();
     const shown: Array<{ title: string; options: Record<string, unknown> }> = [];
     worker.registration[SHOW] = (title: string, options: Record<string, unknown>) => {
@@ -225,11 +225,12 @@ describe("2M-NOTIFY-010/-006: the push surface exists, and it trusts nothing", (
     const waited: unknown[] = [];
     worker.listeners.get("push")!({
       waitUntil: (value: unknown) => waited.push(value),
-      data: { json: () => ({ title: "Você tem um lembrete", body: "Abra o app para ver qual.", destination: "/app/reminders", type: "reminder" }) },
+      data: { json: () => ({ title: "Lembrete", body: "Comprar remédio", destination: "/app/reminders", type: "reminder" }) },
     });
     await settle(waited);
     expect(shown).toHaveLength(1);
-    expect(shown[0].title).toBe("Você tem um lembrete");
+    expect(shown[0].title).toBe("Lembrete");
+    expect(shown[0].options.body).toBe("Comprar remédio");
     expect(shown[0].options.data).toEqual({ destination: "/app/reminders" });
     // The tag is the KIND, never a record id: a tag is readable in the OS and
     // an id there would be the identifier leak `2M-NOTIFY-006` forbids.

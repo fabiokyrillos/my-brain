@@ -18,11 +18,11 @@ export type NotificationSettingsCopy = {
   readonly heading: string;
   /** `2M-NOTIFY-003`: the benefit, explained **before** any prompt exists. */
   readonly benefit: string;
-  /** What the payload will and will not carry, said plainly rather than implied. */
+  /** What each alert will and will not carry, said plainly rather than implied. */
   readonly contentPromise: string;
   readonly stateHeading: string;
   readonly states: Readonly<Record<NotificationConsentState, string>>;
-  /** Where content still lives, which is the in-app list on this same page. */
+  /** Where the complete details still live. */
   readonly inAppNote: string;
   /**
    * The honest statement for the case where the controls genuinely cannot work.
@@ -137,7 +137,7 @@ export type NotificationSettingsCopy = {
 const PT_BR: NotificationSettingsCopy = {
   heading: "Notificações no aparelho",
   benefit: "Se você quiser, o Brain pode avisar no aparelho quando houver um lembrete, algo para acompanhar ou uma revisão pronta — sem que você precise abrir o app para descobrir.",
-  contentPromise: "O aviso nunca carrega o conteúdo: nada de título de tarefa, descrição, nome de pessoa, projeto ou texto do seu registro. Ele diz que há algo esperando, e o que é fica aqui dentro, atrás do seu login.",
+  contentPromise: "Os avisos de lembrete mostram o título do lembrete para você saber do que se trata. Descrições, nomes de pessoas, projetos e textos de registros não são enviados no aviso.",
   stateHeading: "Situação atual",
   states: {
     granted: "Você autorizou os avisos neste aparelho. Pode retirar a autorização quando quiser.",
@@ -146,7 +146,7 @@ const PT_BR: NotificationSettingsCopy = {
     revoked: "Você retirou a autorização. Pode autorizar de novo quando quiser.",
     expired: "A inscrição deste aparelho expirou. Não foi você que desligou — dá para renovar.",
   },
-  inAppNote: "As notificações com conteúdo continuam nesta página, atrás do seu login.",
+  inAppNote: "Os detalhes completos continuam nesta página, atrás do seu login.",
   notAvailableYet: "Este navegador não oferece avisos, ou o envio ainda não está configurado neste ambiente. Por isso os controles não aparecem — em vez de aparecerem sem fazer nada.",
   noPromptYet: "Nada será perguntado ao navegador até que você peça, nesta página.",
   enableAction: "Ativar avisos neste aparelho",
@@ -209,7 +209,7 @@ const PT_BR: NotificationSettingsCopy = {
   historyHeading: "Avisos recebidos",
 
   inviteHeading: "Quer ser avisado quando chegar a hora?",
-  inviteBody: "Você acabou de agendar algo. Se quiser, o Brain pode avisar no aparelho quando chegar a hora — sem carregar o conteúdo no aviso.",
+  inviteBody: "Você acabou de agendar algo. Se quiser, o Brain pode avisar no aparelho quando chegar a hora e mostrar o título do lembrete.",
   inviteAction: "Ver como funciona",
   inviteDismiss: "Agora não",
   unreadBadge: "Não lida",
@@ -224,7 +224,7 @@ const PT_BR: NotificationSettingsCopy = {
 const EN: NotificationSettingsCopy = {
   heading: "Notifications on this device",
   benefit: "If you want it, Brain can tell you on your device when there is a reminder, something to follow up, or a review ready — without you having to open the app to find out.",
-  contentPromise: "The alert never carries the content: no task title, no description, no person, no project, no text from your records. It says something is waiting, and what it is stays in here, behind your login.",
+  contentPromise: "Reminder alerts show the reminder title so you know what they are about. Descriptions, person names, projects, and record text are not sent in the alert.",
   stateHeading: "Current state",
   states: {
     granted: "You allowed alerts on this device. You can withdraw that whenever you want.",
@@ -233,7 +233,7 @@ const EN: NotificationSettingsCopy = {
     revoked: "You withdrew permission. You can allow it again whenever you want.",
     expired: "This device's subscription expired. You did not turn it off — it can be renewed.",
   },
-  inAppNote: "Notifications with content stay on this page, behind your login.",
+  inAppNote: "Full details stay on this page, behind your login.",
   notAvailableYet: "This browser does not offer alerts, or delivery is not configured in this environment. That is why the controls are absent — rather than present and doing nothing.",
   noPromptYet: "Nothing will be asked of the browser until you ask for it, on this page.",
   enableAction: "Turn on alerts on this device",
@@ -296,7 +296,7 @@ const EN: NotificationSettingsCopy = {
   historyHeading: "Alerts you received",
 
   inviteHeading: "Want to be told when the time comes?",
-  inviteBody: "You have just scheduled something. If you want it, Brain can tell you on your device when the time comes — without carrying the content in the alert.",
+  inviteBody: "You have just scheduled something. If you want it, Brain can tell you on your device when the time comes and show the reminder title.",
   inviteAction: "See how it works",
   inviteDismiss: "Not now",
   unreadBadge: "Unread",

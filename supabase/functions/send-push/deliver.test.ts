@@ -10,6 +10,7 @@ import {
   inspectSenderConfiguration,
   isAllowedPushHost,
   parseDeliveryRequest,
+  resolveDeliveryRequest,
   recordSuppression,
   subscriptionRejectionReasons,
   vapidRejectionReasons,
@@ -84,6 +85,8 @@ const REQUEST = {
   type: "reminder",
   locale: "pt-BR",
   dedupeHash: "a".repeat(64),
+  reminderId: "2f4b0001-0000-4000-8000-0000000000a1",
+  reminderTitle: "Comprar remédio",
 } as const;
 
 Deno.test("the request boundary is parsed, not trusted", () => {
@@ -96,6 +99,7 @@ Deno.test("the request boundary is parsed, not trusted", () => {
   assertEquals(parseDeliveryRequest({ ...REQUEST, dedupeHash: "reminder:7f3c" }), null);
   assertEquals(parseDeliveryRequest({ ...REQUEST, type: "recurrence" }), null);
   assertEquals(parseDeliveryRequest({ ...REQUEST, locale: "fr" }), null);
+  assertEquals(parseDeliveryRequest({ ...REQUEST, reminderId: "not-a-uuid" }), null);
 });
 
 Deno.test("a title offered alongside a valid request is discarded, not forwarded", () => {
@@ -105,8 +109,26 @@ Deno.test("a title offered alongside a valid request is discarded, not forwarded
     body: "leaked",
   });
   assertEquals(parsed !== null, true);
-  assertEquals(Object.keys(parsed!).sort(), ["dedupeHash", "locale", "type", "userId"]);
+  assertEquals(Object.keys(parsed!).sort(), ["dedupeHash", "locale", "reminderId", "type", "userId"]);
   assertEquals(JSON.stringify(parsed).includes("remédio"), false);
+});
+
+Deno.test("the sender resolves reminder content by both owner and reminder id", async () => {
+  const parsed = parseDeliveryRequest(REQUEST)!;
+  const seen: unknown[] = [];
+  const resolved = await resolveDeliveryRequest(parsed, (userId, reminderId) => {
+    seen.push({ userId, reminderId });
+    return Promise.resolve("Comprar remédio");
+  });
+
+  assertEquals(seen, [{ userId: REQUEST.userId, reminderId: REQUEST.reminderId }]);
+  assertEquals(resolved, REQUEST);
+});
+
+Deno.test("a reminder that does not belong to the owner is refused before delivery", async () => {
+  const parsed = parseDeliveryRequest(REQUEST)!;
+  const resolved = await resolveDeliveryRequest(parsed, () => Promise.resolve(null));
+  assertEquals(resolved, null);
 });
 
 /**

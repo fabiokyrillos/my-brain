@@ -1,6 +1,6 @@
 /**
- * `2M-NOTIFY-006` and `-007` — the payload carries no content, and it carries
- * none **by construction**.
+ * Reminder alerts carry the owner-visible reminder title and no caller-supplied
+ * description or related-record content. Other alert types remain generic.
  *
  * The structural half of `-007` is in
  * `phase-2m-notification-boundary-guard.test.ts`, which fails the build if the
@@ -17,19 +17,20 @@ import {
   serialiseNotificationPayload,
 } from "./payload";
 
-describe("2M-NOTIFY-006: what leaves carries no content", () => {
+describe("the reminder push says which reminder fired", () => {
   it("serialises to exactly three fields", () => {
     const payload = buildNotificationPayload({ type: "reminder", destination: "/app/reminders", locale: "pt-BR" })!;
-    expect(Object.keys(serialiseNotificationPayload(payload)).sort())
+    expect(Object.keys(serialiseNotificationPayload(payload, "Consulta amanhã")!).sort())
       .toEqual(["body", "destination", "title"]);
   });
 
-  it("says the same words for every item of a kind, so no item is identifiable", () => {
-    // Two different reminders produce byte-identical payloads. That is the whole
-    // requirement: what reaches the push service cannot distinguish them.
+  it("renders the reminder title instead of hiding it behind generic copy", () => {
     const first = buildNotificationPayload({ type: "reminder", destination: "/app/reminders", locale: "en" })!;
-    const second = buildNotificationPayload({ type: "reminder", destination: "/app/reminders", locale: "en" })!;
-    expect(serialiseNotificationPayload(first)).toEqual(serialiseNotificationPayload(second));
+    expect(serialiseNotificationPayload(first, "Take the medication")).toEqual({
+      title: "Reminder",
+      body: "Take the medication",
+      destination: "/app/reminders",
+    });
   });
 
   it("sends the user to a surface, never to a record", () => {
@@ -54,24 +55,18 @@ describe("2M-NOTIFY-006: what leaves carries no content", () => {
     expect(buildNotificationPayload({ type: "reminder", destination: "/app", locale: "de" })).toBeNull();
   });
 
-  it("contains no count, no date and no name in any produced copy", () => {
-    for (const locale of ["pt-BR", "en"] as const) {
-      for (const type of ["reminder", "follow_up", "review", "digest"] as const) {
-        const copy = notificationCopy(locale, type);
-        const text = `${copy.title} ${copy.body}`;
-        expect(text, `${locale}/${type} carries a number`).not.toMatch(/\d/);
-        expect(text.length, `${locale}/${type} is empty`).toBeGreaterThan(0);
-      }
-    }
+  it("refuses a reminder without a usable title", () => {
+    const payload = buildNotificationPayload({ type: "reminder", destination: "/app/reminders", locale: "pt-BR" })!;
+    expect(serialiseNotificationPayload(payload, "   ")).toBeNull();
   });
 });
 
-describe("2M-NOTIFY-007: the copy has nowhere to receive content", () => {
-  it("takes two arguments, both closed vocabularies", () => {
-    // A third parameter is how a task title would arrive. The guard refuses one
-    // structurally; this states the current arity so a change is visible here
-    // too.
-    expect(notificationCopy.length).toBe(2);
+describe("the content-bearing reminder contract stays bounded", () => {
+  it("trims and bounds the reminder title before it reaches the OS", () => {
+    const copy = notificationCopy("pt-BR", "reminder", `  ${"a".repeat(300)}  `)!;
+    expect(copy.title).toBe("Lembrete");
+    expect(copy.body.length).toBe(240);
+    expect(copy.body.endsWith("…")).toBe(true);
   });
 
   it("returns a frozen object, so a caller cannot decorate it before sending", () => {

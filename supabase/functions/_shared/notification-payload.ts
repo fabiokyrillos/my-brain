@@ -18,14 +18,9 @@
  * so a copy that drifts is a red build rather than a lock screen in the wrong
  * language.
  *
- * ## The content prohibition survives the copy
- *
- * `2M-NOTIFY-007` requires the prohibition to be structural, and it still is
- * here: `buildWirePayload` takes a type, a destination and a locale, all
- * validated against closed sets, and there is no parameter a task title could
- * arrive through. The sender holds a `dedupe_hash` and a user id and nothing
- * else that could be interpolated — it never reads a task, a reminder or an
- * entry, so there is no content in its process to leak.
+ * Reminder content is an explicit later owner decision. Only a title resolved
+ * inside the trusted sender may enter this builder; the external request
+ * carries a reminder id and cannot supply text. Other kinds retain fixed copy.
  */
 
 export const notificationTypes = ["reminder", "follow_up", "review", "digest"] as const;
@@ -43,19 +38,18 @@ export const notificationLocales = ["pt-BR", "en"] as const;
 export type NotificationLocale = (typeof notificationLocales)[number];
 
 /**
- * One sentence per locale per type, saying that something is waiting and
- * nothing about what. Byte-identical to `payload.ts`'s `COPY`, and the parity
- * test is what keeps it so.
+ * Fixed copy for non-reminder kinds and the fixed heading for reminders.
+ * Byte-identical to `payload.ts`'s `COPY`, enforced by the parity test.
  */
 const COPY: Record<NotificationLocale, Record<NotificationType, { title: string; body: string }>> = {
   "pt-BR": {
-    reminder: { title: "Você tem um lembrete", body: "Abra o app para ver qual." },
+    reminder: { title: "Lembrete", body: "" },
     follow_up: { title: "Há algo para acompanhar", body: "Abra o app para ver o quê." },
     review: { title: "Sua revisão está pronta", body: "Abra o app para lê-la." },
     digest: { title: "Você tem um resumo", body: "Abra o app para vê-lo." },
   },
   en: {
-    reminder: { title: "You have a reminder", body: "Open the app to see which." },
+    reminder: { title: "Reminder", body: "" },
     follow_up: { title: "There is something to follow up", body: "Open the app to see what." },
     review: { title: "Your review is ready", body: "Open the app to read it." },
     digest: { title: "You have a summary", body: "Open the app to see it." },
@@ -100,12 +94,21 @@ export function isNotificationLocale(value: unknown): value is NotificationLocal
  * sends something, and the something it sends is a notification of a kind the
  * user did not consent to.
  */
-export function buildWirePayload(type: unknown, locale: unknown): WirePayload | null {
+function boundedReminderTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.trim();
+  if (title.length === 0) return null;
+  return title.length <= 240 ? title : `${title.slice(0, 239)}…`;
+}
+
+export function buildWirePayload(type: unknown, locale: unknown, reminderTitle?: unknown): WirePayload | null {
   if (!isNotificationType(type) || !isNotificationLocale(locale)) return null;
   const copy = COPY[locale][type];
+  const body = type === "reminder" ? boundedReminderTitle(reminderTitle) : copy.body;
+  if (body === null) return null;
   return Object.freeze({
     title: copy.title,
-    body: copy.body,
+    body,
     destination: DESTINATION_FOR_TYPE[type],
     type,
   });

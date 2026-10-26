@@ -29,9 +29,10 @@ self.addEventListener("activate", (event) => {
  * anything the message chose. There is no `eval`, no HTML, and no field whose
  * value becomes a URL.
  *
- * The server only ever sends `serialiseNotificationPayload`'s three fields
- * (`2M-NOTIFY-006`), so the validation below is not defence against our own
- * sender -- it is defence against everything else that can reach this handler.
+ * Reminder pushes intentionally carry the owner-scoped reminder title. The
+ * sender resolves that title from `(user_id, reminder_id)`; the caller cannot
+ * provide it. This worker still bounds both visible strings and accepts
+ * navigation only from a closed set.
  */
 
 /** The four notification kinds. Anything else renders the neutral fallback. */

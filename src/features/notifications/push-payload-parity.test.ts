@@ -63,16 +63,19 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
     expect([...workerDestinations].sort()).toEqual([...notificationDestinations].sort());
   });
 
-  it("produces the SAME title and body for every locale and every type", () => {
+  it("produces the SAME reminder content in both runtimes", () => {
     const locales: readonly NotificationLocale[] = ["pt-BR", "en"];
     let compared = 0;
     for (const locale of locales) {
       for (const type of notificationTypes as readonly NotificationType[]) {
-        const application = notificationCopy(locale, type);
-        const worker = buildWirePayload(type, locale);
+        const reminderTitle = type === "reminder" ? "Consulta amanhã às 9" : undefined;
+        const application = notificationCopy(locale, type, reminderTitle);
+        const worker = buildWirePayload(type, locale, reminderTitle);
         expect(worker, `${locale}/${type}`).not.toBeNull();
-        expect(worker!.title, `${locale}/${type} title`).toBe(application.title);
-        expect(worker!.body, `${locale}/${type} body`).toBe(application.body);
+        expect(application, `${locale}/${type} application`).not.toBeNull();
+        if (worker === null || application === null) throw new Error(`missing payload for ${locale}/${type}`);
+        expect(worker.title, `${locale}/${type} title`).toBe(application.title);
+        expect(worker.body, `${locale}/${type} body`).toBe(application.body);
         compared += 1;
       }
     }
@@ -83,9 +86,10 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
 
   it("sends a destination the application also recognises, for every type", () => {
     for (const type of notificationTypes as readonly NotificationType[]) {
-      const worker = buildWirePayload(type, "en");
+      const worker = buildWirePayload(type, "en", type === "reminder" ? "Call Ana" : undefined);
+      if (worker === null) throw new Error(`missing payload for ${type}`);
       expect(
-        (notificationDestinations as readonly string[]).includes(worker!.destination),
+        (notificationDestinations as readonly string[]).includes(worker.destination),
         `${type} destination`,
       ).toBe(true);
     }
@@ -100,9 +104,10 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
       type: "reminder",
       destination: "/app/reminders",
       locale: "pt-BR",
-    });
-    const worker = buildWirePayload("reminder", "pt-BR");
-    expect(Object.keys(worker!).sort()).toEqual(["body", "destination", "title", "type"]);
+    }, "Comprar remédio");
+    const worker = buildWirePayload("reminder", "pt-BR", "Comprar remédio");
+    if (worker === null || application === null) throw new Error("missing reminder payload");
+    expect(Object.keys(worker).sort()).toEqual(["body", "destination", "title", "type"]);
     expect(Object.keys(application).sort()).toEqual(["body", "destination", "title"]);
   });
 
@@ -111,13 +116,12 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
     // something, and the something it sends is a notification of a kind the user
     // did not consent to.
     expect(buildWirePayload("recurrence", "en")).toBeNull();
-    expect(buildWirePayload("reminder", "fr")).toBeNull();
+    expect(buildWirePayload("reminder", "fr", "Comprar remédio")).toBeNull();
     expect(buildWirePayload(null, "en")).toBeNull();
+    expect(buildWirePayload("reminder", "pt-BR", "   ")).toBeNull();
   });
 
-  it("has no parameter through which a record's text could arrive", () => {
-    // The structural half of `2M-NOTIFY-007`, asserted about the worker copy the
-    // same way the boundary guard asserts it about the application's.
-    expect(buildWirePayload.length).toBe(2);
+  it("requires the resolved reminder title explicitly", () => {
+    expect(buildWirePayload("reminder", "pt-BR")).toBeNull();
   });
 });
