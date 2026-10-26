@@ -113,6 +113,9 @@ jobs:
     name: database and journey (migrations, pgTAP, db lint, foundation e2e)
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -124,6 +127,14 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.106.0
+
+      # `supabase start` pulls the local stack from GHCR. Anonymous pulls hit
+      # the shared registry limit three times in a row before any database test
+      # could start. Authenticate with this job's ephemeral, read-only token;
+      # no long-lived package secret is needed and no write permission is
+      # granted.
+      - name: Authenticate Docker to GHCR for Supabase images
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Start the local Supabase stack
         # Studio, image proxy, mail catcher, log pipeline and the edge runtime
