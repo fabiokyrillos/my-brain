@@ -1,24 +1,11 @@
 /**
- * `2M-NOTIFY-006` and `-007` — what leaves the application, and why it cannot
- * carry anything else.
+ * The notification payload contract shared by the application and the push
+ * sender.
  *
- * ## The requirement, and the word "construction"
- *
- * *"Any payload that leaves the application's control carries **no content**: no
- * task title, no reminder title, no description, no person, no project, no entry
- * text, no count that could identify an item. It carries `notificationCopy(locale)`
- * and a destination, and nothing else."*
- *
- * And then `-007`: *"the content prohibition is enforced **by construction** —
- * the payload type has nowhere to put content — and a guard fails the build if a
- * content-carrying parameter is added."*
- *
- * So this is not a sanitizer. A sanitizer is a function somebody can forget to
- * call, and the failure is silent and irreversible: the content is already on a
- * third party's server by the time anyone notices. Instead the payload type has
- * **three fields, all closed vocabularies or a bounded path**, and there is no
- * builder that accepts a string from a task, a reminder or an entry. A caller
- * holding a task title has nowhere to put it.
+ * The owner later superseded Phase 2M's content-free reminder copy: a reminder
+ * push should say which reminder fired. The trust boundary remains structural:
+ * the external sender request carries only a reminder id, and the trusted
+ * sender resolves the visible title by `(user_id, reminder_id)`.
  *
  * ## Why the destination is a route and not a URL
  *
@@ -28,13 +15,9 @@
  * accessibility tree — which is content, in the only sense that matters. The
  * user lands on the surface and finds the thing there, behind their session.
  *
- * ## What the user actually sees
- *
- * One sentence per locale, per type, saying that something is waiting and
- * nothing about what. That is a genuine product cost and it is the signed
- * trade: OD-2M-4 option B authorized push **content-free**, so the lock screen
- * says "you have a reminder waiting" and the app says which one, behind
- * authentication, where the in-app rows already live (`2M-NOTIFY-008`).
+ * The reminder title is trimmed and bounded before it reaches the OS. Other
+ * notification kinds keep fixed generic copy. No description, related entity,
+ * entry text or arbitrary caller-provided string is admitted.
  */
 
 import { notificationTypes, type NotificationType } from "./consent-contract";
@@ -57,7 +40,8 @@ export const notificationDestinations = [
 export type NotificationDestination = (typeof notificationDestinations)[number];
 
 /**
- * The complete payload. **Three fields, and nowhere to put a fourth.**
+ * The routing payload. Visible reminder content is resolved separately inside
+ * the trusted sender rather than accepted from this caller-controlled object.
  *
  * `Readonly` and exact: TypeScript's excess-property check refuses an object
  * literal with a `title`, and `notification-payload-guard.test.ts` refuses the
@@ -73,13 +57,13 @@ export type NotificationPayload = Readonly<{
 
 const COPY: Record<NotificationLocale, Record<NotificationType, { title: string; body: string }>> = {
   "pt-BR": {
-    reminder: { title: "Você tem um lembrete", body: "Abra o app para ver qual." },
+    reminder: { title: "Lembrete", body: "" },
     follow_up: { title: "Há algo para acompanhar", body: "Abra o app para ver o quê." },
     review: { title: "Sua revisão está pronta", body: "Abra o app para lê-la." },
     digest: { title: "Você tem um resumo", body: "Abra o app para vê-lo." },
   },
   en: {
-    reminder: { title: "You have a reminder", body: "Open the app to see which." },
+    reminder: { title: "Reminder", body: "" },
     follow_up: { title: "There is something to follow up", body: "Open the app to see what." },
     review: { title: "Your review is ready", body: "Open the app to read it." },
     digest: { title: "You have a summary", body: "Open the app to see it." },
@@ -87,19 +71,26 @@ const COPY: Record<NotificationLocale, Record<NotificationType, { title: string;
 };
 
 /**
- * The words a notification carries, **derived from the type and the locale and
- * from nothing else**.
- *
- * The signature is the enforcement: there is no parameter a record's text could
- * arrive through, so no call site can interpolate one. `2M-NOTIFY-007`'s guard
- * asserts exactly that about this function's parameter list, because a future
- * `notificationCopy(locale, type, taskTitle)` would satisfy every test about the
- * *payload* while defeating the requirement entirely.
+ * Build visible copy. Reminder text is explicit, trimmed and bounded; a missing
+ * title fails closed instead of falling back to the old generic message.
  */
+function boundedReminderTitle(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const title = value.trim();
+  if (title.length === 0) return null;
+  return title.length <= 240 ? title : `${title.slice(0, 239)}…`;
+}
+
 export function notificationCopy(
   locale: NotificationLocale,
   type: NotificationType,
-): Readonly<{ title: string; body: string }> {
+  reminderTitle?: unknown,
+): Readonly<{ title: string; body: string }> | null {
+  if (type === "reminder") {
+    const body = boundedReminderTitle(reminderTitle);
+    if (body === null) return null;
+    return Object.freeze({ title: COPY[locale].reminder.title, body });
+  }
   return Object.freeze({ ...COPY[locale][type] });
 }
 
@@ -134,11 +125,12 @@ export function buildNotificationPayload(input: {
  * sender exists**, which is the whole ordering this slice is built on: 2M.4b may
  * not invent a wire format, it consumes this one.
  */
-export function serialiseNotificationPayload(payload: NotificationPayload): Readonly<{
+export function serialiseNotificationPayload(payload: NotificationPayload, reminderTitle?: unknown): Readonly<{
   title: string;
   body: string;
   destination: string;
-}> {
-  const copy = notificationCopy(payload.locale, payload.type);
+}> | null {
+  const copy = notificationCopy(payload.locale, payload.type, reminderTitle);
+  if (copy === null) return null;
   return Object.freeze({ title: copy.title, body: copy.body, destination: payload.destination });
 }

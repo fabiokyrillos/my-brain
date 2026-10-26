@@ -101,6 +101,11 @@ describe("2M-NOTIFY-003: the benefit is explained and nothing is asked", () => {
     expect(screen.getByText(copy.contentPromise)).toBeTruthy();
   });
 
+  it("tells the owner that reminder alerts show the reminder title", () => {
+    mount();
+    expect(screen.getByText(/Reminder alerts show the reminder title/)).toBeTruthy();
+  });
+
   it("states that nothing will be asked until the user asks", () => {
     mount();
     expect(screen.getByText(copy.noPromptYet)).toBeTruthy();

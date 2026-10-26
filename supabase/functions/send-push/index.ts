@@ -5,6 +5,7 @@ import {
   deliverPush,
   inspectSenderConfiguration,
   parseDeliveryRequest,
+  resolveDeliveryRequest,
 } from "./deliver.ts";
 import { probeVapid } from "./probe.ts";
 
@@ -126,7 +127,21 @@ Deno.serve(async (request) => {
     { auth: { persistSession: false } },
   );
 
-  const outcome = await deliverPush(parsed, {
+  const resolved = await resolveDeliveryRequest(parsed, async (userId, reminderId) => {
+    const { data, error } = await service
+      .from("reminders")
+      .select("title")
+      .eq("user_id", userId)
+      .eq("id", reminderId)
+      .maybeSingle();
+    if (error || typeof data?.title !== "string") return null;
+    return data.title;
+  });
+  if (resolved === null) {
+    return Response.json({ error: "Reminder unavailable", code: "reminder_unavailable" }, { status: 404 });
+  }
+
+  const outcome = await deliverPush(resolved, {
     client: service,
     config: vapidConfig,
     fetch,

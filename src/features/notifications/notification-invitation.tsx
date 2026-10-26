@@ -5,7 +5,7 @@
  *
  * The browser permission prompt is raised in exactly one file in this
  * repository and this is not it. `2O-NOTIFY-003` requires the ask to state
- * what will be sent, that payloads carry no content, and how to stop — and a
+ * what will be sent, which bounded content reminder alerts carry, and how to stop — and a
  * banner that stated all three would have become the settings page. So this
  * carries the reason and a link, and the page it links to carries the ask.
  *

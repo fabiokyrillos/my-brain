@@ -33,11 +33,11 @@ import {
  *
  * ## What it holds, and what it therefore cannot leak
  *
- * A user id, a notification TYPE, a locale and a 64-character digest. It never
- * loads a task, a reminder, an entry or a person, so `2M-NOTIFY-006`'s content
- * prohibition is not enforced here by care — there is no content in this
- * process to be careless with. The payload comes from `buildWirePayload`, which
- * takes a type and a locale and has no parameter a title could arrive through.
+ * A user id, notification type, locale, dedupe digest and (for reminders) a
+ * reminder id. The trusted sender resolves that reminder by both owner and id,
+ * then gives the payload builder only its bounded title. Caller-supplied visible
+ * text is discarded; descriptions and related-record content never enter this
+ * process.
  *
  * ## Fail closed, and say which
  *
@@ -88,12 +88,19 @@ const ALLOWED_PUSH_HOSTS: readonly RegExp[] = [
   /^([a-z0-9-]+\.)*wns\.windows\.com$/,
 ];
 
-export type DeliveryRequest = Readonly<{
+export type ParsedDeliveryRequest = Readonly<{
   userId: string;
   type: NotificationType;
   locale: NotificationLocale;
   dedupeHash: string;
+  reminderId: string | null;
 }>;
+
+export type DeliveryRequest = ParsedDeliveryRequest & Readonly<{
+  reminderTitle: string | null;
+}>;
+
+export type ReminderTitleLoader = (userId: string, reminderId: string) => Promise<string | null>;
 
 /**
  * Why a single attempt did not land, as a CLOSED vocabulary.
@@ -325,12 +332,11 @@ const DEDUPE_HASH = /^[0-9a-f]{64}$/;
  * Parses the request rather than trusting it.
  *
  * The caller is secret-authenticated, which authorises the REQUEST; it does not
- * make the body well-formed. `2M-NOTIFY-006` is enforced structurally here too:
- * there is no field in this type a caller could put text into, so a caller that
- * wanted to smuggle a title has nowhere to put it, and any extra key is
- * discarded rather than forwarded.
+ * make the body well-formed. A caller can name a reminder but cannot provide
+ * visible text. The title is loaded later by `(user_id, reminder_id)` inside
+ * the trusted sender; extra `title` or `body` keys are discarded.
  */
-export function parseDeliveryRequest(input: unknown): DeliveryRequest | null {
+export function parseDeliveryRequest(input: unknown): ParsedDeliveryRequest | null {
   if (input === null || typeof input !== "object") return null;
   const source = input as Record<string, unknown>;
   const userId = typeof source.userId === "string" && UUID.test(source.userId) ? source.userId : null;
@@ -339,7 +345,31 @@ export function parseDeliveryRequest(input: unknown): DeliveryRequest | null {
     : null;
   if (userId === null || dedupeHash === null) return null;
   if (!isNotificationType(source.type) || !isNotificationLocale(source.locale)) return null;
-  return Object.freeze({ userId, type: source.type, locale: source.locale, dedupeHash });
+  const reminderId = typeof source.reminderId === "string" && UUID.test(source.reminderId)
+    ? source.reminderId
+    : null;
+  if (source.type === "reminder" && reminderId === null) return null;
+  if (source.type !== "reminder" && source.reminderId !== undefined) return null;
+  return Object.freeze({ userId, type: source.type, locale: source.locale, dedupeHash, reminderId });
+}
+
+/**
+ * Resolve user-visible reminder text inside the trusted sender. The request may
+ * identify a reminder, but it may never supply the text shown on the lock
+ * screen. The loader must match both owner and reminder id; a missing match is
+ * a refusal rather than generic copy that would hide a broken association.
+ */
+export async function resolveDeliveryRequest(
+  request: ParsedDeliveryRequest,
+  loadReminderTitle: ReminderTitleLoader,
+): Promise<DeliveryRequest | null> {
+  if (request.type !== "reminder") {
+    return Object.freeze({ ...request, reminderTitle: null });
+  }
+  if (request.reminderId === null) return null;
+  const reminderTitle = await loadReminderTitle(request.userId, request.reminderId);
+  if (typeof reminderTitle !== "string" || reminderTitle.trim().length === 0) return null;
+  return Object.freeze({ ...request, reminderTitle });
 }
 
 export function isAllowedPushHost(endpoint: string, allowed: readonly RegExp[] = ALLOWED_PUSH_HOSTS): boolean {
@@ -602,7 +632,7 @@ export async function deliverPush(
 
   // The payload is built BEFORE the delivery is begun. An unknown type must not
   // consume the dedupe slot and then fail to produce anything to send.
-  const payload = buildWirePayload(request.type, request.locale);
+  const payload = buildWirePayload(request.type, request.locale, request.reminderTitle ?? undefined);
   if (payload === null) return Object.freeze({ status: "refused", code: "payload_unavailable" });
 
   // The subject's CATEGORY, once per delivery, never its value.
