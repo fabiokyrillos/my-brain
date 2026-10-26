@@ -225,13 +225,13 @@ describe("the push surface exists, and it trusts nothing", () => {
     const waited: unknown[] = [];
     worker.listeners.get("push")!({
       waitUntil: (value: unknown) => waited.push(value),
-      data: { json: () => ({ title: "Lembrete", body: "Comprar remédio", destination: "/app/reminders", type: "reminder" }) },
+      data: { json: () => ({ title: "Lembrete", body: "Comprar remédio", destination: "/pt-BR/app/reminders", type: "reminder" }) },
     });
     await settle(waited);
     expect(shown).toHaveLength(1);
     expect(shown[0].title).toBe("Lembrete");
     expect(shown[0].options.body).toBe("Comprar remédio");
-    expect(shown[0].options.data).toEqual({ destination: "/app/reminders" });
+    expect(shown[0].options.data).toEqual({ destination: "/pt-BR/app/reminders" });
     // The tag is the KIND, never a record id: a tag is readable in the OS and
     // an id there would be the identifier leak `2M-NOTIFY-006` forbids.
     expect(shown[0].options.tag).toBe("my-brain-reminder");
@@ -255,7 +255,7 @@ describe("the push surface exists, and it trusts nothing", () => {
       data: { json: () => ({ title: "x", body: "y", destination: "https://evil.test/steal", type: "reminder" }) },
     });
     await settle(waited);
-    expect(shown[0].data).toEqual({ destination: "/app/notifications" });
+    expect(shown[0].data).toEqual({ destination: "/pt-BR/app/notifications" });
   });
 
   it("falls back to a neutral notice when the body is unreadable", async () => {
@@ -288,6 +288,20 @@ describe("the push surface exists, and it trusts nothing", () => {
       notification: { close: () => {}, data: { destination: "https://evil.test" } },
     });
     await settle(waited);
-    expect(opened).toEqual(["/app/notifications"]);
+    expect(opened).toEqual(["/pt-BR/app/notifications"]);
+  });
+
+  it("opens the real locale-prefixed reminders route rather than the unmounted /app path", async () => {
+    const worker = loadWorker();
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const waited: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => waited.push(value),
+      notification: { close: () => {}, data: { destination: "/pt-BR/app/reminders" } },
+    });
+    await settle(waited);
+    expect(opened).toEqual(["/pt-BR/app/reminders"]);
   });
 });

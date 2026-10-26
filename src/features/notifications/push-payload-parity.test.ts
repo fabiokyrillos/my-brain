@@ -89,7 +89,9 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
       const worker = buildWirePayload(type, "en", type === "reminder" ? "Call Ana" : undefined);
       if (worker === null) throw new Error(`missing payload for ${type}`);
       expect(
-        (notificationDestinations as readonly string[]).includes(worker.destination),
+        (notificationDestinations as readonly string[]).some(
+          (destination) => worker.destination === `/en${destination}`,
+        ),
         `${type} destination`,
       ).toBe(true);
     }

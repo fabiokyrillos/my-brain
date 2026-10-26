@@ -74,7 +74,7 @@ const DESTINATION_FOR_TYPE: Record<NotificationType, NotificationDestination> = 
 export type WirePayload = Readonly<{
   title: string;
   body: string;
-  destination: NotificationDestination;
+  destination: `/${NotificationLocale}${NotificationDestination}`;
   type: NotificationType;
 }>;
 
@@ -109,7 +109,7 @@ export function buildWirePayload(type: unknown, locale: unknown, reminderTitle?:
   return Object.freeze({
     title: copy.title,
     body,
-    destination: DESTINATION_FOR_TYPE[type],
+    destination: `/${locale}${DESTINATION_FOR_TYPE[type]}`,
     type,
   });
 }

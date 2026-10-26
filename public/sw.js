@@ -43,7 +43,18 @@ const NOTIFICATION_TYPES = ["reminder", "follow_up", "review", "digest"];
  * the message: a destination taken from the payload would let whoever can reach
  * this handler choose where a tap goes.
  */
-const DESTINATIONS = ["/app", "/app/notifications", "/app/reminders", "/app/reviews"];
+const DESTINATIONS = [
+  "/pt-BR/app",
+  "/pt-BR/app/notifications",
+  "/pt-BR/app/reminders",
+  "/pt-BR/app/reviews",
+  "/en/app",
+  "/en/app/notifications",
+  "/en/app/reminders",
+  "/en/app/reviews",
+];
+
+const FALLBACK_DESTINATION = "/pt-BR/app/notifications";
 
 const FALLBACK = { title: "My Brain", body: "Você tem algo esperando." };
 
@@ -59,7 +70,7 @@ function readPush(event) {
   const source = raw && typeof raw === "object" ? raw : {};
   const title = typeof source.title === "string" && source.title.length <= 120 ? source.title : FALLBACK.title;
   const body = typeof source.body === "string" && source.body.length <= 240 ? source.body : FALLBACK.body;
-  const destination = DESTINATIONS.includes(source.destination) ? source.destination : "/app/notifications";
+  const destination = DESTINATIONS.includes(source.destination) ? source.destination : FALLBACK_DESTINATION;
   const type = NOTIFICATION_TYPES.includes(source.type) ? source.type : "reminder";
   return { title, body, destination, type };
 }
@@ -86,7 +97,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data;
-  const destination = data && DESTINATIONS.includes(data.destination) ? data.destination : "/app/notifications";
+  const destination = data && DESTINATIONS.includes(data.destination) ? data.destination : FALLBACK_DESTINATION;
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       // Focus an open tab rather than opening a second one: a notification that
