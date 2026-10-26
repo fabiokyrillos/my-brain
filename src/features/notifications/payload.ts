@@ -132,5 +132,9 @@ export function serialiseNotificationPayload(payload: NotificationPayload, remin
 }> | null {
   const copy = notificationCopy(payload.locale, payload.type, reminderTitle);
   if (copy === null) return null;
-  return Object.freeze({ title: copy.title, body: copy.body, destination: payload.destination });
+  return Object.freeze({
+    title: copy.title,
+    body: copy.body,
+    destination: `/${payload.locale}${payload.destination}`,
+  });
 }

@@ -29,8 +29,19 @@ describe("the reminder push says which reminder fired", () => {
     expect(serialiseNotificationPayload(first, "Take the medication")).toEqual({
       title: "Reminder",
       body: "Take the medication",
-      destination: "/app/reminders",
+      destination: "/en/app/reminders",
     });
+  });
+
+  it("serialises a real locale-prefixed route instead of the 404-producing logical path", () => {
+    const payload = buildNotificationPayload({
+      type: "reminder",
+      destination: "/app/reminders",
+      locale: "pt-BR",
+    })!;
+
+    expect(serialiseNotificationPayload(payload, "Comprar remédio")?.destination)
+      .toBe("/pt-BR/app/reminders");
   });
 
   it("sends the user to a surface, never to a record", () => {

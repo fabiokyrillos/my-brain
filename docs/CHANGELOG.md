@@ -4,7 +4,8 @@
 
 - The owner superseded the generic content-free reminder copy. `send-push` now accepts a `reminderId`, resolves the title by both owner and id inside the trusted runtime, bounds it to 240 characters and sends `Lembrete` / the real title. Caller-provided `title` and `body` are discarded.
 - Missing, blank or foreign reminders fail closed before egress. Other notification kinds retain their generic copy. No migration, VAPID rotation, AI call or automatic scheduler was added.
-- The 2026-08-28 iPhone result remains historical evidence and does not validate this changed payload. A fresh hardware send remains gated on deployment and explicit owner confirmation.
+- The fresh hardware send reached the owner's iPhone lock screen and Apple Watch with the correct real reminder title. Its one delivery had zero failures, retirements, strikes or diagnostics.
+- The same run found a navigation defect: tapping opened `/app/reminders`, which does not exist because authenticated routes are mounted below `/{locale}/app`. Destinations are now localized before egress and the service worker admits only the eight real Portuguese/English app surfaces. Delivery and content passed; the original tap failed, and the corrected tap still needs a post-deploy device proof.
 
 All notable technical changes are recorded here. The format follows Keep a Changelog principles without assigning a public semantic version before the product has a release policy.
 
