@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
-import { getResendCopy, getSignInCopy } from "@/features/auth/copy";
+import { getAuthSubmitCopy, getResendCopy } from "@/features/auth/copy";
 import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { safeReturnPath } from "@/features/entry/return-path";
@@ -43,7 +43,7 @@ export default async function LoginPage({
   const query = await searchParams;
   const returnPath = safeReturnPath(query.next, locale);
   const pt = locale === "pt-BR";
-  const signInCopy = getSignInCopy(locale);
+  const signInCopy = getAuthSubmitCopy("signIn", locale);
   const message = successMessages[query.message as keyof typeof successMessages]?.[locale];
 
   return (

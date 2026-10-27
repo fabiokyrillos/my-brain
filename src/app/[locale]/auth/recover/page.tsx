@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { recoverPassword } from "@/features/auth/actions";
+import { getAuthSubmitCopy } from "@/features/auth/copy";
 import { authErrorMessage } from "@/features/auth/flow";
+import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
@@ -17,6 +19,7 @@ export default async function RecoverPage({
   const locale = candidate;
   const { error } = await searchParams;
   const pt = locale === "pt-BR";
+  const submit = getAuthSubmitCopy("recover", locale);
 
   return (
     <div className="auth-card">
@@ -31,7 +34,7 @@ export default async function RecoverPage({
           <input name="email" type="email" required maxLength={254} autoComplete="email" />
         </label>
         <TurnstileWidget />
-        <button>{pt ? "Enviar link" : "Send link"}</button>
+        <AuthSubmitButton label={submit.submit} pendingLabel={submit.submitPending} />
       </form>
       <Link href={`/${locale}/auth/login`}>{pt ? "Voltar ao login" : "Back to sign in"}</Link>
     </div>

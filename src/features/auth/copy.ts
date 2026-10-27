@@ -25,6 +25,8 @@ export type ResendCopy = {
   readonly lead: string;
   readonly emailLabel: string;
   readonly submit: string;
+  /** `AUTH-SIGNIN-PENDING-STATE`. Shown and announced while the request is out. */
+  readonly submitPending: string;
   readonly backToLogin: string;
   /** The entry point from the sign-in surface. */
   readonly linkFromLogin: string;
@@ -37,6 +39,7 @@ const copy: Readonly<Record<Locale, ResendCopy>> = {
     lead: "Se houver uma conta aguardando confirmação para este e-mail, enviaremos um novo link.",
     emailLabel: "E-mail",
     submit: "Reenviar link",
+    submitPending: "Reenviando link…",
     backToLogin: "Voltar ao login",
     linkFromLogin: "Reenviar confirmação",
   },
@@ -46,6 +49,7 @@ const copy: Readonly<Record<Locale, ResendCopy>> = {
     lead: "If an account is waiting to be confirmed for this address, we will send a new link.",
     emailLabel: "Email",
     submit: "Resend link",
+    submitPending: "Resending link…",
     backToLogin: "Back to sign in",
     linkFromLogin: "Resend confirmation",
   },
@@ -56,23 +60,44 @@ export function getResendCopy(locale: Locale): ResendCopy {
 }
 
 /**
- * `AUTH-SIGNIN-PENDING-STATE` — the sign-in button's two states.
+ * `AUTH-SIGNIN-PENDING-STATE` — every auth submit button's two states.
  *
- * Here rather than as a `pt ? …` in the page for the reason this module opens
+ * Here rather than as a `pt ? …` in each page for the reason this module opens
  * with: `locale-ternary-guard.test.ts` holds a ceiling that adding one would
- * break. Moving the existing label in lowers the count rather than raising it.
+ * break. Moving the existing labels in lowers the count rather than raising it.
+ *
+ * `resend` is deliberately absent. Its label already lives on `ResendCopy`
+ * beside the rest of that surface's words, and naming it again here would be a
+ * second source for one sentence — the shape this repository has been bitten
+ * by before. It carries its own `submitPending` instead.
  */
-export type SignInCopy = {
+export type AuthSubmitCopy = {
   readonly submit: string;
-  /** Shown on the button, and announced politely, while the grant is in flight. */
+  /** Shown on the button, and announced politely, while the request is out. */
   readonly submitPending: string;
 };
 
-const signInCopy: Readonly<Record<Locale, SignInCopy>> = {
-  "pt-BR": { submit: "Entrar", submitPending: "Entrando…" },
-  en: { submit: "Sign in", submitPending: "Signing in…" },
+export type AuthSubmitForm = "signIn" | "signUp" | "recover" | "reset";
+
+const submitCopy: Readonly<Record<AuthSubmitForm, Readonly<Record<Locale, AuthSubmitCopy>>>> = {
+  signIn: {
+    "pt-BR": { submit: "Entrar", submitPending: "Entrando…" },
+    en: { submit: "Sign in", submitPending: "Signing in…" },
+  },
+  signUp: {
+    "pt-BR": { submit: "Criar conta", submitPending: "Criando conta…" },
+    en: { submit: "Create account", submitPending: "Creating account…" },
+  },
+  recover: {
+    "pt-BR": { submit: "Enviar link", submitPending: "Enviando link…" },
+    en: { submit: "Send link", submitPending: "Sending link…" },
+  },
+  reset: {
+    "pt-BR": { submit: "Atualizar senha", submitPending: "Atualizando senha…" },
+    en: { submit: "Update password", submitPending: "Updating password…" },
+  },
 };
 
-export function getSignInCopy(locale: Locale): SignInCopy {
-  return signInCopy[locale];
+export function getAuthSubmitCopy(form: AuthSubmitForm, locale: Locale): AuthSubmitCopy {
+  return submitCopy[form][locale];
 }
