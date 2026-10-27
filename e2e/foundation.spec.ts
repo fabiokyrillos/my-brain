@@ -106,6 +106,36 @@ test("canonical and legacy daily routes remain protected in both locales", async
 });
 
 /*
+ * An app path with no locale prefix is this product's own older vocabulary.
+ *
+ * Every push notification delivered before `57ea2d0` carries `/app/...`, and
+ * the service worker that turns a tap into a navigation is cached on the
+ * device — it updates when the device chooses to, which on an iPhone was not
+ * when the owner force-closed and reopened the app. Until the proxy learned
+ * this, the product answered a real 404 to a destination it had itself sent.
+ *
+ * `Accept-Language` is stated on every request so the expected locale does not
+ * depend on whatever language the test agent happens to advertise.
+ */
+test("an app path with no locale prefix is localized rather than lost", async ({ request }) => {
+  for (const [language, source, target] of [
+    ["pt-BR,pt;q=0.9", "/app/reminders", "/pt-BR/app/reminders"],
+    ["pt-BR,pt;q=0.9", "/app/notifications", "/pt-BR/app/notifications"],
+    ["pt-BR,pt;q=0.9", "/app", "/pt-BR/app"],
+    ["en-GB,en;q=0.9", "/app/reminders", "/en/app/reminders"],
+  ] as const) {
+    const response = await request.get(source, {
+      maxRedirects: 0,
+      headers: { "accept-language": language },
+    });
+    expect(response.status(), `${source} was not redirected`).toBe(307);
+    const location = response.headers().location;
+    expect(location, `${source} redirected without a destination`).toBeDefined();
+    expect(new URL(location!, "http://localhost:3000").pathname).toBe(target);
+  }
+});
+
+/*
  * ============================================================================
  * Slice 2O.1 — the public entry path.
  *
