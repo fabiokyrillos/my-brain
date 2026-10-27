@@ -113,6 +113,9 @@ jobs:
     name: database and journey (migrations, pgTAP, db lint, foundation e2e)
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -124,6 +127,26 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: 2.106.0
+
+      # `supabase start` pulls the local stack from GHCR. Anonymous pulls are
+      # rate-limited per runner IP, which is shared, and that limit has now
+      # stopped this job three times in a row on 2026-10-26 and three more on
+      # 2026-10-27 — every time before the stack or any database test could
+      # start. An authenticated pull is counted against the user instead, so
+      # this job's ephemeral, read-only token is enough; no long-lived package
+      # secret and no write permission are added.
+      #
+      # `continue-on-error` is the whole difference from the first attempt at
+      # this (`3079ef6`, reverted six minutes later as `b3f66b6`). The step is
+      # an OPTIMISATION, not a requirement: the images are public and the
+      # anonymous pull still works whenever the limit has room. Without this
+      # line a failed `docker login` — a token shape, an actor the registry
+      # will not take, a GHCR hiccup — fails the whole job, which is strictly
+      # worse than not authenticating at all. With it, the worst case is the
+      # behaviour we have today.
+      - name: Authenticate Docker to GHCR for Supabase images
+        continue-on-error: true
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Start the local Supabase stack
         # Studio, image proxy, mail catcher, log pipeline and the edge runtime

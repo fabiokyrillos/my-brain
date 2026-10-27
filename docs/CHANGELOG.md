@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-10-27 — CI authenticates its Supabase image pulls
+
+- The `database and journey` job now logs in to GHCR with the job's ephemeral, read-only `GITHUB_TOKEN` before `supabase start`. Anonymous pulls of `ghcr.io/supabase/postgres` are rate-limited per runner IP, which is shared; that limit stopped this job three times in a row on 2026-10-26 and three more on 2026-10-27, every time at "Start the local Supabase stack" and before the stack or any database test could run. An authenticated pull is counted against the user instead. No long-lived secret and no package write permission are added.
+- This is the second attempt. `3079ef6` did the same thing and was reverted six minutes later as `b3f66b6`, with no note of why. The one difference here is `continue-on-error: true`: the step is an optimisation over a public image, not a requirement, so a failed `docker login` must fall back to the anonymous pull rather than fail the job — which would be strictly worse than not authenticating at all. With that line the worst case is today's behaviour.
+- CI configuration only. No product code, no test, no migration.
+
 ## 2026-10-26 — Reminder pushes identify the reminder
 
 - The owner superseded the generic content-free reminder copy. `send-push` now accepts a `reminderId`, resolves the title by both owner and id inside the trusted runtime, bounds it to 240 characters and sends `Lembrete` / the real title. Caller-provided `title` and `body` are discarded.
