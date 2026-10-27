@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-10-27 — The corrected tap is proved on hardware, and two adjacent defects are closed
+
+- Two authorized sends of the same reminder, ten minutes apart, closed the proof the previous entry left open. The first (`18:41:18Z`) was answered by the **stale** service worker and opened the unprefixed `/app/notifications` — a literal that appears zero times in the deployed worker, which identifies which worker ran and shows the corrected payload was arriving and being refused. The second (`18:51:27Z`) was answered by the current worker and reached `/pt-BR/app/reminders` with no 404. Each recorded exactly one delivered attempt, zero failures, retirements, strikes or diagnostics.
+- The worker refreshed between the two sends because `RegisterServiceWorker` is mounted in the root layout, so the 404 page itself ran `register("/sw.js")`. Force-closing the app from the switcher and reopening it beforehand had not been enough.
+- `src/app/manifest.ts` now declares `scope: "/"`. Without the key the specification assumes the directory of `start_url`, so the installed app had a scope of `/pt-BR/`; iOS hands a navigation outside an installed app's scope to an embedded browser with its own cookie store, which put every unprefixed path — and the whole English product — outside the app and signed out. `start_url` stays a literal because deriving it per visitor needs a request-time API and this file is a Route Handler cached by default.
+- `src/proxy.ts` now localizes an app path that arrives with no locale prefix, negotiating the locale from `Accept-Language` with the same pure helper the front door uses. `/app/*` matched no route and returned a real 404, and that is the vocabulary every push delivered before `57ea2d0` still carries. `307` rather than `308` so a browser cannot pin a locale negotiated once, and `no-store` because the answer varies by a request header. The auth boundary is unchanged: the destination returns through the same function.
+- Not explained and not claimed as solved: the second tap asked for a password although the session was alive, unrevoked and still held by the app. The `scope` defect does not account for it — that destination was inside the inherited scope. Separately recorded and uninvestigated: one sign-in created two sessions three seconds apart.
+- The `scope` change cannot be verified on an existing install. iOS reads the manifest when the app is added to the home screen, so proving it requires removing and re-adding the app.
+- Zero migrations, no VAPID rotation, no subscription change, no AI call.
+
 ## 2026-10-26 — Reminder pushes identify the reminder
 
 - The owner superseded the generic content-free reminder copy. `send-push` now accepts a `reminderId`, resolves the title by both owner and id inside the trusted runtime, bounds it to 240 characters and sends `Lembrete` / the real title. Caller-provided `title` and `body` are discarded.
