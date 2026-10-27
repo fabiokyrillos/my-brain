@@ -444,16 +444,63 @@ test("2O-ACCESS-002: the login form is completable from the keyboard alone", asy
  * -------------------------------------------------------------------------- */
 
 test("2O-ACCESS-003: every status region states its meaning in words", async ({ page }) => {
-  // The failure this catches is a tone that reads as an error only because it
-  // is red. Asserted over the live regions the phase's surfaces use, because a
-  // region with no text is the shape that can only be understood by colour.
+  /*
+   * The failure this catches is a tone that reads as an error only because it
+   * is red. Asserted over the live regions the phase's surfaces use, because a
+   * visible region with no text is the shape that can only be understood by
+   * colour.
+   *
+   * ## Narrowed on 2026-10-27, by measurement rather than by name
+   *
+   * A region that renders no pixels renders no colour, so "understood by
+   * colour alone" cannot be said of it. The exclusion is therefore a measured
+   * property — a box at most one pixel in each direction — and **not** a class
+   * name: exempting `.sr-only` by name would excuse whatever else took that
+   * name later, and this repository has already paid for an exemption granted
+   * to a name instead of to a property.
+   *
+   * It had to be narrowed because the only screen-reader announcement that
+   * works has this shape. A live region created in the same render as its text
+   * is never announced, so the region must exist, empty, before the text
+   * arrives. `deletion-surface.tsx` has carried exactly that shape for some
+   * time; `AUTH-SIGNIN-PENDING-STATE` is simply the first to bring it onto a
+   * surface this guard walks.
+   *
+   * An empty region a sighted user CAN see is still caught: unstyled, it keeps
+   * its container's width and fails the one-pixel test. That is not asserted
+   * by hope — each surface plants one and requires this very detector to name
+   * it, because a count of zero proves nothing until the thing that counts has
+   * been shown able to report one.
+   */
+  const scan = (plant: boolean) => {
+    let probe: HTMLElement | null = null;
+    if (plant) {
+      probe = document.createElement("div");
+      probe.setAttribute("role", "status");
+      probe.className = "planted-control";
+      document.body.append(probe);
+    }
+    const found = [
+      ...document.querySelectorAll("[role='status'], [role='alert'], [data-tone], [data-status]"),
+    ]
+      .filter((element) => (element.textContent ?? "").trim().length === 0)
+      .filter((element) => {
+        const box = element.getBoundingClientRect();
+        return box.width > 1 || box.height > 1;
+      })
+      .map((element) => `${element.tagName.toLowerCase()}.${element.className || "—"}`);
+    probe?.remove();
+    return found;
+  };
+
   for (const surface of PUBLIC_SURFACES) {
     await open(page, surface.path);
-    const silent = await page.evaluate(() =>
-      [...document.querySelectorAll("[role='status'], [role='alert'], [data-tone], [data-status]")]
-        .filter((element) => (element.textContent ?? "").trim().length === 0)
-        .map((element) => `${element.tagName.toLowerCase()}.${element.className || "—"}`),
-    );
+
+    const planted = await page.evaluate(scan, true);
+    expect(planted, `${surface.name}: the detector cannot see an empty visible region`)
+      .toContain("div.planted-control");
+
+    const silent = await page.evaluate(scan, false);
     expect(silent, `${surface.name} carries a toned region with no words in it`).toEqual([]);
   }
 });
