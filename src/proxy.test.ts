@@ -248,3 +248,74 @@ describe("without provider configuration, in production", () => {
     expect(body).not.toContain("NEXT_PUBLIC");
   });
 });
+
+function requestWithLanguage(path: string, acceptLanguage?: string) {
+  return new NextRequest(new URL(`http://localhost:3000${path}`), {
+    headers: acceptLanguage === undefined ? {} : { "accept-language": acceptLanguage },
+  });
+}
+
+/**
+ * An app path with no locale prefix.
+ *
+ * This is not a hypothetical URL: it is the vocabulary this product's own
+ * older clients still emit. Every push notification delivered before `57ea2d0`
+ * carries `/app/...`, and the service worker that reads it lives cached on the
+ * device, updating whenever the device feels like it. Until this branch,
+ * `/app/...` matched no route at all — `parts[1]` is `app`, so it was neither
+ * `inApp` nor `inAuth` — and the product answered 404 to a destination it had
+ * itself chosen. The owner hit exactly that on an iPhone.
+ */
+describe("an app path that arrives without a locale prefix", () => {
+  it("is localized instead of becoming a 404", async () => {
+    const result = await proxy(requestWithLanguage("/app/reminders"));
+    expect(result.status).toBe(307);
+    expect(new URL(result.headers.get("location") ?? "").pathname).toBe("/pt-BR/app/reminders");
+  });
+
+  it("carries the query, so the requested surface is not dropped", async () => {
+    const result = await proxy(requestWithLanguage("/app/inbox?view=needs-you"));
+    const location = new URL(result.headers.get("location") ?? "");
+    expect(location.pathname).toBe("/pt-BR/app/inbox");
+    expect(location.searchParams.get("view")).toBe("needs-you");
+  });
+
+  it("answers in English when that is what the client asked for", async () => {
+    const result = await proxy(requestWithLanguage("/app/reminders", "en-GB,en;q=0.9"));
+    expect(new URL(result.headers.get("location") ?? "").pathname).toBe("/en/app/reminders");
+  });
+
+  it("falls back to pt-BR when no language is stated", async () => {
+    const result = await proxy(requestWithLanguage("/app/reminders"));
+    expect(new URL(result.headers.get("location") ?? "").pathname).toBe("/pt-BR/app/reminders");
+  });
+
+  it("redirects the bare app root too", async () => {
+    const result = await proxy(requestWithLanguage("/app"));
+    expect(new URL(result.headers.get("location") ?? "").pathname).toBe("/pt-BR/app");
+  });
+
+  it("cannot be stored, so one visitor's language is not pinned for the next", async () => {
+    // The response varies by a request header. A cached redirect here would
+    // hand the next visitor a locale that was negotiated for somebody else.
+    const result = await proxy(requestWithLanguage("/app/reminders", "en"));
+    expect(result.headers.get("cache-control")).toBe("no-store, max-age=0, must-revalidate");
+  });
+
+  it("decides without consulting the provider, because no session is needed to localize", async () => {
+    await proxy(requestWithLanguage("/app/reminders"));
+    expect(createServerClient).not.toHaveBeenCalled();
+  });
+
+  it("leaves an already-prefixed path alone, so the redirect cannot loop", async () => {
+    session("user-1");
+    const result = await proxy(requestWithLanguage("/pt-BR/app/reminders"));
+    expect(result.headers.get("location")).toBeNull();
+  });
+
+  it("does not claim a path that merely begins with the same letters", async () => {
+    session(null);
+    const result = await proxy(requestWithLanguage("/application/x"));
+    expect(result.headers.get("location")).toBeNull();
+  });
+});
