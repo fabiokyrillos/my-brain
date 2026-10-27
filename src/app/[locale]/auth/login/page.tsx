@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
-import { getResendCopy } from "@/features/auth/copy";
+import { getResendCopy, getSignInCopy } from "@/features/auth/copy";
+import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { safeReturnPath } from "@/features/entry/return-path";
 import { isLocale } from "@/lib/preferences";
@@ -42,6 +43,7 @@ export default async function LoginPage({
   const query = await searchParams;
   const returnPath = safeReturnPath(query.next, locale);
   const pt = locale === "pt-BR";
+  const signInCopy = getSignInCopy(locale);
   const message = successMessages[query.message as keyof typeof successMessages]?.[locale];
 
   return (
@@ -85,7 +87,13 @@ export default async function LoginPage({
           rollout it was written for.
         */}
         <TurnstileWidget />
-        <button>{pt ? "Entrar" : "Sign in"}</button>
+        {/*
+          `AUTH-SIGNIN-PENDING-STATE`. A component of its own because
+          `useFormStatus` reports only from inside the submitting form — which
+          also keeps this page a server component instead of turning the whole
+          form, hidden fields and CAPTCHA widget included, into client code.
+        */}
+        <AuthSubmitButton label={signInCopy.submit} pendingLabel={signInCopy.submitPending} />
       </form>
       <div className="auth-links">
         <Link href={`/${locale}/auth/recover`}>{pt ? "Esqueci minha senha" : "Forgot password"}</Link>

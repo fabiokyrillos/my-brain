@@ -54,3 +54,25 @@ const copy: Readonly<Record<Locale, ResendCopy>> = {
 export function getResendCopy(locale: Locale): ResendCopy {
   return copy[locale];
 }
+
+/**
+ * `AUTH-SIGNIN-PENDING-STATE` — the sign-in button's two states.
+ *
+ * Here rather than as a `pt ? …` in the page for the reason this module opens
+ * with: `locale-ternary-guard.test.ts` holds a ceiling that adding one would
+ * break. Moving the existing label in lowers the count rather than raising it.
+ */
+export type SignInCopy = {
+  readonly submit: string;
+  /** Shown on the button, and announced politely, while the grant is in flight. */
+  readonly submitPending: string;
+};
+
+const signInCopy: Readonly<Record<Locale, SignInCopy>> = {
+  "pt-BR": { submit: "Entrar", submitPending: "Entrando…" },
+  en: { submit: "Sign in", submitPending: "Signing in…" },
+};
+
+export function getSignInCopy(locale: Locale): SignInCopy {
+  return signInCopy[locale];
+}
