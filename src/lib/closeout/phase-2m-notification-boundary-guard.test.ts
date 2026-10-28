@@ -107,6 +107,15 @@ const PURE_MODULES = [
    * always have been.
    */
   "src/features/notifications/destination.ts",
+  /*
+   * `NOTIFY-CONSENT-STATE-IS-SERVER-ONLY`. A pure function of two facts — the
+   * stored consent and what the device reports about itself — with no client,
+   * no fetch, no writer and no React. It belongs on THIS list rather than the
+   * delivery one precisely because it must NOT reach a push client: it decides
+   * what the surface may claim, and `push-controls.tsx` remains the only file
+   * that may read the browser in order to answer it.
+   */
+  "src/features/notifications/device-reconciliation.ts",
 ];
 
 /** The modules slice 2M.4b earned, by name, plus slice 2O.6's two surfaces. */
