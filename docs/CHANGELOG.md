@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-10-28 — The tap is proved end to end; the login prompt did not recur
+
+- PR #333 merged as `31b6345`, green on all three CI jobs. The owner reinstalled the PWA and re-created the push subscription — genuinely new, different endpoint, created `12:56:41Z`, with the previous row no longer active — and two authorized sends (`12:57:50Z`, then `12:59:09Z` because the first was dismissed by accident) each recorded one delivered attempt with zero failures, retirements, strikes or diagnostics.
+- Reported from the device: no error, opened **inside the PWA** on the reminders surface, and the account was already signed in. The destination correction is proved end to end.
+- **The session question did not reproduce, and that is not a diagnosis.** Nothing established why the 2026-10-27 tap asked for a password. The reinstall, the new subscription and the current service worker changed together, so nothing isolates which mattered. It is recorded as not reproducing, not as solved.
+- New finding, open: the tap lands on the reminders list at its default pending filter rather than on the reminder the notification named, so it does not read as a successful click. Fixing it meets a deliberate constraint — the service worker admits a closed set of destinations precisely so the payload cannot choose where a tap goes — and `src/app/[locale]/app/reminders/` has no detail route, so this is a design decision rather than a patch.
+- The manifest's `scope: "/"` is now in `main` but was not in the build the owner installed from, so it stays unverified on their device until another remove-and-re-add.
+
 ## 2026-10-27 — The corrected tap is proved on hardware, and two adjacent defects are closed
 
 - Two authorized sends of the same reminder, ten minutes apart, closed the proof the previous entry left open. The first (`18:41:18Z`) was answered by the **stale** service worker and opened the unprefixed `/app/notifications` — a literal that appears zero times in the deployed worker, which identifies which worker ran and shows the corrected payload was arriving and being refused. The second (`18:51:27Z`) was answered by the current worker and reached `/pt-BR/app/reminders` with no 404. Each recorded exactly one delivered attempt, zero failures, retirements, strikes or diagnostics.
