@@ -58,6 +58,37 @@ const FALLBACK_DESTINATION = "/pt-BR/app/notifications";
 
 const FALLBACK = { title: "My Brain", body: "Você tem algo esperando." };
 
+/**
+ * The item a notification is about, turned into a path BY THIS WORKER.
+ *
+ * `NOTIFY-TAP-LANDS-ON-THE-LIST`: a notification names one reminder and used
+ * to open a list, at a filter that could exclude the very reminder it was
+ * about. The payload still does NOT choose a destination — that is the whole
+ * point of the closed set above and it is unchanged. It names a KIND and an
+ * ID, and the worker, which owns the vocabulary, builds the path.
+ *
+ * So the property the closed set protects still holds: a caller cannot steer
+ * a tap to a surface this worker does not already know how to open. The most
+ * it can do is name a record inside one, and that record's page enforces its
+ * own access — a forged id reaches a page that shows nothing.
+ *
+ * The locale is taken from the ALREADY-VALIDATED base destination rather than
+ * from the message, so it too stays out of the payload's hands.
+ */
+const TARGET_SEGMENTS = { task: "work", reminder: "reminders" };
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function resolveDestination(source) {
+  const base = DESTINATIONS.includes(source.destination) ? source.destination : FALLBACK_DESTINATION;
+  const target = source.target;
+  if (!target || typeof target !== "object") return base;
+  const segment = TARGET_SEGMENTS[target.kind];
+  if (typeof segment !== "string") return base;
+  if (typeof target.id !== "string" || !RECORD_ID.test(target.id)) return base;
+  const locale = base.startsWith("/en/") ? "en" : "pt-BR";
+  return `/${locale}/app/${segment}/${target.id}`;
+}
+
 function readPush(event) {
   let raw = null;
   try {
@@ -72,7 +103,11 @@ function readPush(event) {
   const body = typeof source.body === "string" && source.body.length <= 240 ? source.body : FALLBACK.body;
   const destination = DESTINATIONS.includes(source.destination) ? source.destination : FALLBACK_DESTINATION;
   const type = NOTIFICATION_TYPES.includes(source.type) ? source.type : "reminder";
-  return { title, body, destination, type };
+  // `destination` stays the closed-set value and `target` travels beside it,
+  // unresolved. The click handler then validates from scratch through the same
+  // function rather than trusting a path it finds in notification data.
+  const target = resolveDestination(source) === destination ? undefined : source.target;
+  return { title, body, destination, type, target };
 }
 
 self.addEventListener("push", (event) => {
@@ -97,7 +132,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data;
-  const destination = data && DESTINATIONS.includes(data.destination) ? data.destination : FALLBACK_DESTINATION;
+  const destination = resolveDestination(data && typeof data === "object" ? data : {});
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
       // Focus an open tab rather than opening a second one: a notification that

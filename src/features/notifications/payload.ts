@@ -125,16 +125,57 @@ export function buildNotificationPayload(input: {
  * sender exists**, which is the whole ordering this slice is built on: 2M.4b may
  * not invent a wire format, it consumes this one.
  */
-export function serialiseNotificationPayload(payload: NotificationPayload, reminderTitle?: unknown): Readonly<{
+export const notificationTargetKinds = ["task", "reminder"] as const;
+export type NotificationTargetKind = (typeof notificationTargetKinds)[number];
+
+export type NotificationTarget = Readonly<{
+  kind: NotificationTargetKind;
+  id: string;
+}>;
+
+/**
+ * What the notification is ABOUT — `NOTIFY-TAP-LANDS-ON-THE-LIST`.
+ *
+ * The payload still does not choose a destination: that stays a function of
+ * the kind, which is the property this module has held since 2M.4a. It may
+ * name the ITEM, and the service worker builds the path from a kind it already
+ * knows how to open.
+ *
+ * The task wins when there is one — a reminder attached to a task is about the
+ * task's work, and that surface says more than the reminder row does. Ids are
+ * shape-checked because what they become is a path segment on a device.
+ */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function reminderTarget(subject: unknown): NotificationTarget | undefined {
+  if (subject === null || typeof subject !== "object") return undefined;
+  const { reminderId, taskId } = subject as Record<string, unknown>;
+  if (typeof taskId === "string" && RECORD_ID.test(taskId)) {
+    return Object.freeze({ kind: "task" as const, id: taskId });
+  }
+  if (typeof reminderId === "string" && RECORD_ID.test(reminderId)) {
+    return Object.freeze({ kind: "reminder" as const, id: reminderId });
+  }
+  return undefined;
+}
+
+export function serialiseNotificationPayload(
+  payload: NotificationPayload,
+  reminderTitle?: unknown,
+  subject?: unknown,
+): Readonly<{
   title: string;
   body: string;
   destination: string;
+  target?: NotificationTarget;
 }> | null {
   const copy = notificationCopy(payload.locale, payload.type, reminderTitle);
   if (copy === null) return null;
+  const target = payload.type === "reminder" ? reminderTarget(subject) : undefined;
   return Object.freeze({
     title: copy.title,
     body: copy.body,
     destination: `/${payload.locale}${payload.destination}`,
+    ...(target === undefined ? {} : { target }),
   });
 }

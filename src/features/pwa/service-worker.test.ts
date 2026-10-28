@@ -305,3 +305,81 @@ describe("the push surface exists, and it trusts nothing", () => {
     expect(opened).toEqual(["/pt-BR/app/reminders"]);
   });
 });
+
+/**
+ * `NOTIFY-TAP-LANDS-ON-THE-LIST` — the worker builds the path for an item.
+ *
+ * The payload may now name WHAT the notification is about. It still may not
+ * name where a tap goes: the kind comes from a closed map and the id must be a
+ * record id, so the furthest a message can reach is a record inside a surface
+ * this worker already knows. Every refusal below falls back to the validated
+ * closed-set destination rather than to nothing, because a tap that does
+ * nothing is worse than a tap that opens the list.
+ */
+describe("the item a notification is about", () => {
+  const ID = "3f1a9c22-5d41-4c0e-9b77-2a6d8e0f41bc";
+
+  async function tap(data: Record<string, unknown>) {
+    const worker = loadWorker();
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const waited: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => waited.push(value),
+      notification: { close: () => {}, data },
+    });
+    await settle(waited);
+    return opened;
+  }
+
+  it("opens the task a reminder hangs off", async () => {
+    expect(await tap({ destination: "/pt-BR/app/reminders", target: { kind: "task", id: ID } }))
+      .toEqual([`/pt-BR/app/work/${ID}`]);
+  });
+
+  it("opens the reminder itself when there is no task", async () => {
+    expect(await tap({ destination: "/pt-BR/app/reminders", target: { kind: "reminder", id: ID } }))
+      .toEqual([`/pt-BR/app/reminders/${ID}`]);
+  });
+
+  it("keeps the locale of the destination it was given", async () => {
+    expect(await tap({ destination: "/en/app/reminders", target: { kind: "task", id: ID } }))
+      .toEqual([`/en/app/work/${ID}`]);
+  });
+
+  it("takes the locale from the validated destination, never from the message", async () => {
+    // A rejected destination falls back to the pt-BR notifications surface, so
+    // the locale that survives is the fallback's and not the sender's wish.
+    expect(await tap({ destination: "/fr/app/reminders", target: { kind: "task", id: ID } }))
+      .toEqual([`/pt-BR/app/work/${ID}`]);
+  });
+
+  it("refuses a kind it does not know, and still opens something", async () => {
+    expect(await tap({ destination: "/pt-BR/app/reminders", target: { kind: "settings", id: ID } }))
+      .toEqual(["/pt-BR/app/reminders"]);
+  });
+
+  it("refuses an id that is not a record id", async () => {
+    for (const id of ["../../admin", "", "1", `${ID}/../../x`]) {
+      expect(await tap({ destination: "/pt-BR/app/reminders", target: { kind: "task", id } }))
+        .toEqual(["/pt-BR/app/reminders"]);
+    }
+  });
+
+  it("refuses a target that is not an object", async () => {
+    for (const target of ["task", 7, null, []]) {
+      expect(await tap({ destination: "/pt-BR/app/reminders", target }))
+        .toEqual(["/pt-BR/app/reminders"]);
+    }
+  });
+
+  it("cannot be used to reach a surface outside the app", async () => {
+    expect(await tap({ destination: "https://evil.test", target: { kind: "task", id: ID } }))
+      .toEqual([`/pt-BR/app/work/${ID}`]);
+  });
+
+  it("opens the plain destination when no target is named at all", async () => {
+    expect(await tap({ destination: "/pt-BR/app/reminders" })).toEqual(["/pt-BR/app/reminders"]);
+  });
+});

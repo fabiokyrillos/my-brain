@@ -127,3 +127,65 @@ describe("2M-NOTIFY-006: the sender's payload copy matches the application's", (
     expect(buildWirePayload("reminder", "pt-BR")).toBeNull();
   });
 });
+
+/**
+ * `NOTIFY-TAP-LANDS-ON-THE-LIST` — the target exists twice too.
+ *
+ * It is a third thing that can drift, and drifting costs the same as the
+ * others did: a tap that opens the wrong record, or opens nothing while the
+ * other copy says it should. Asserted by running BOTH implementations over the
+ * same inputs and requiring the same answer, which is what the rest of this
+ * file already does for copy, destinations, types and locales.
+ */
+describe("the item a reminder notification is about, in both implementations", () => {
+  const REMINDER = "3f1a9c22-5d41-4c0e-9b77-2a6d8e0f41bc";
+  const TASK = "7c2e4411-88aa-4f3b-9d10-5be6cf0a2d93";
+
+  function both(subject: unknown) {
+    const worker = buildWirePayload("reminder", "pt-BR", "Comprar remédio", subject);
+    const app = serialiseNotificationPayload(
+      { type: "reminder", destination: "/app/reminders", locale: "pt-BR" },
+      "Comprar remédio",
+      subject,
+    );
+    return { worker: worker?.target, app: app?.target };
+  }
+
+  it("prefers the task, because a reminder on a task is about the task's work", () => {
+    const { worker, app } = both({ reminderId: REMINDER, taskId: TASK });
+    expect(worker).toEqual({ kind: "task", id: TASK });
+    expect(app).toEqual(worker);
+  });
+
+  it("falls back to the reminder, which now has a page of its own", () => {
+    const { worker, app } = both({ reminderId: REMINDER, taskId: null });
+    expect(worker).toEqual({ kind: "reminder", id: REMINDER });
+    expect(app).toEqual(worker);
+  });
+
+  it("carries no target at all when neither id is usable", () => {
+    // Not a failure: the payload simply says nothing, and every worker — old
+    // or new — falls back to `destination`.
+    const { worker, app } = both({ reminderId: "not-an-id", taskId: "../../admin" });
+    expect(worker).toBeUndefined();
+    expect(app).toBeUndefined();
+  });
+
+  it("carries no target for a kind that is not a reminder", () => {
+    expect(buildWirePayload("review", "en", undefined, { taskId: TASK })?.target).toBeUndefined();
+    expect(
+      serialiseNotificationPayload(
+        { type: "review", destination: "/app/reviews", locale: "en" },
+        undefined,
+        { taskId: TASK },
+      )?.target,
+    ).toBeUndefined();
+  });
+
+  it("leaves `destination` exactly as it was, so an older worker is unaffected", () => {
+    // The field a cached service worker reads must not change shape when a
+    // newer field appears beside it.
+    expect(buildWirePayload("reminder", "pt-BR", "Comprar remédio", { taskId: TASK })?.destination)
+      .toBe("/pt-BR/app/reminders");
+  });
+});

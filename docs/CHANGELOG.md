@@ -1,12 +1,27 @@
 # Technical Changelog
 
-## 2026-10-28 — The tap is proved end to end; the login prompt did not recur
+## 2026-10-28 — The tap is proved on hardware, and now opens the item it is about (ADR-143 + ADR-144)
+
+### The proof, in the morning
 
 - PR #333 merged as `31b6345`, green on all three CI jobs. The owner reinstalled the PWA and re-created the push subscription — genuinely new, different endpoint, created `12:56:41Z`, with the previous row no longer active — and two authorized sends (`12:57:50Z`, then `12:59:09Z` because the first was dismissed by accident) each recorded one delivered attempt with zero failures, retirements, strikes or diagnostics.
 - Reported from the device: no error, opened **inside the PWA** on the reminders surface, and the account was already signed in. The destination correction is proved end to end.
 - **The session question did not reproduce, and that is not a diagnosis.** Nothing established why the 2026-10-27 tap asked for a password. The reinstall, the new subscription and the current service worker changed together, so nothing isolates which mattered. It is recorded as not reproducing, not as solved.
-- New finding, open: the tap lands on the reminders list at its default pending filter rather than on the reminder the notification named, so it does not read as a successful click. Fixing it meets a deliberate constraint — the service worker admits a closed set of destinations precisely so the payload cannot choose where a tap goes — and `src/app/[locale]/app/reminders/` has no detail route, so this is a design decision rather than a patch.
+- New finding from the same session, **closed later the same day** by the work below: the tap landed on the reminders list at its default pending filter rather than on the reminder the notification named, so it did not read as a successful click.
 - The manifest's `scope: "/"` is now in `main` but was not in the build the owner installed from, so it stays unverified on their device until another remove-and-re-add.
+
+### The correction, in the afternoon
+
+- The tap opened the reminders list at its default `pending` view, which admits only `scheduled` and `snoozed` — so a reminder that had just been delivered was absent from the screen its own notification opened. The owner reported it as the tap not feeling like a successful click, and that reading was exact.
+- The payload now names the **item**: a `kind` from a closed map plus a record id. `public/sw.js` builds the path. ADR-142's property is kept — a message still cannot choose a destination; the furthest it reaches is a record inside a surface the worker already knows, whose page enforces its own access. The locale comes from the already-validated destination, never from the message.
+- `destination` is unchanged, deliberately. A cached service worker updates when the device chooses to, so an older one ignores `target` and behaves exactly as before. The new field can add precision; it cannot break a tap.
+- A reminder with a task opens the task. One without opens `app/reminders/[reminderId]`, which this change creates because otherwise half the owner's reminders had nowhere to land. The page renders `ReminderList` with one row and `loadReminder` narrows the list's own query, so neither the presentation nor the projection exists twice. The three zone-bound formatters moved to `reminders/formatters.ts` for the same reason.
+- The heartbeat half followed in the same change (ADR-144, migration `202610280103`, applied — parity **103 local = 103 hosted**). It builds its own reminder destination in SQL and pointed at the list; it now points at the task when there is one and at the reminder's page when there is not. It was found by Phase 2S's own recorded refusal firing the moment a per-reminder route appeared — that phase declined this *because no such route existed* and pinned the refusal to fail when one did — and it is closed by that refusal's own terms.
+- `CREATE OR REPLACE` rewrites the whole function, so the body was extracted mechanically from `202608240102` rather than retyped, and `heartbeat-destination-parity.test.ts` asserts the differing lines are exactly the old expression leaving and the new one arriving. It was proved able to fail by mutating an unrelated line. The deployed function was then read back: `security definer` and the empty `search_path` intact, grants still `postgres` and `service_role` only, and no new lint finding against the baseline.
+- No application change was needed: `isOwnerScopedDestination` validates shape — a path, a served locale, then `app` — and both destinations satisfy it. `notifications.action_url` carries no CHECK, so no vocabulary was widened. The pgTAP suite asserts the written URLs satisfy that same shape anyway, because a control that lives only on the side that reads is half a control.
+- The Phase 2S guard now **derives** the latest migration defining the heartbeat instead of naming its own file. Migrations are append-only, so a guard pinned to that file would have kept passing while the deployed function said something else — green about a superseded file looks like coverage and is not.
+- The route-reachability inventory refused the new page until it was enumerated, which is the second guard this change tripped on purpose.
+- **One migration, the one ADR-144 authorized** (`202610280103`, applied; parity 103 local = 103 hosted). A second would be a stop condition. The `send-push` function also changed, so it needs deploying and `verify:edge-parity`.
 
 ## 2026-10-27 — The corrected tap is proved on hardware, and two adjacent defects are closed
 

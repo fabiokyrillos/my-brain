@@ -580,9 +580,21 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
     const laterPhase2s = migrations.filter((name) => /phase[_-]?2s/i.test(name));
     expect(laterPhase2s, `Phase 2S is allocated exactly one migration: ${laterPhase2s.join(", ")}`)
       .toHaveLength(1);
+    // ADR-144 spent ONE migration after this phase closed, and it belongs to no
+    // phase: it is a correction — the heartbeat's reminder notice points at the
+    // item rather than the list. Counted in a bucket of its own for the reason
+    // every bucket here has one: bumping the total instead would let an
+    // unattributed migration hide inside the new number.
+    const laterNotifyHeartbeat = migrations.filter(
+      (name) => /notify_heartbeat_destination/i.test(name),
+    );
+    expect(
+      laterNotifyHeartbeat,
+      `ADR-144 is allocated exactly one migration: ${laterNotifyHeartbeat.join(", ")}`,
+    ).toHaveLength(1);
     expect(migrations).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
-      + laterPhase2s.length,
+      + laterPhase2s.length + laterNotifyHeartbeat.length,
     );
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);

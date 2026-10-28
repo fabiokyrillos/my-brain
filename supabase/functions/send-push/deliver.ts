@@ -98,9 +98,27 @@ export type ParsedDeliveryRequest = Readonly<{
 
 export type DeliveryRequest = ParsedDeliveryRequest & Readonly<{
   reminderTitle: string | null;
+  /**
+   * The task this reminder hangs off, when it has one — `NOTIFY-TAP-LANDS-ON-THE-LIST`.
+   *
+   * Read inside the trusted sender from the same owner-scoped row as the
+   * title, for the same reason: the request identifies a reminder, it does not
+   * get to say what that reminder is attached to.
+   */
+  reminderTaskId: string | null;
 }>;
 
-export type ReminderTitleLoader = (userId: string, reminderId: string) => Promise<string | null>;
+/**
+ * Resolves a reminder the sender is allowed to speak about.
+ *
+ * Returns both facts the payload needs from that row, because they come from
+ * one read and splitting them into two loaders would be two chances for one of
+ * them to be fetched without the owner predicate.
+ */
+export type ReminderTitleLoader = (
+  userId: string,
+  reminderId: string,
+) => Promise<Readonly<{ title: string; taskId: string | null }> | null>;
 
 /**
  * Why a single attempt did not land, as a CLOSED vocabulary.
@@ -364,12 +382,17 @@ export async function resolveDeliveryRequest(
   loadReminderTitle: ReminderTitleLoader,
 ): Promise<DeliveryRequest | null> {
   if (request.type !== "reminder") {
-    return Object.freeze({ ...request, reminderTitle: null });
+    return Object.freeze({ ...request, reminderTitle: null, reminderTaskId: null });
   }
   if (request.reminderId === null) return null;
-  const reminderTitle = await loadReminderTitle(request.userId, request.reminderId);
+  const reminder = await loadReminderTitle(request.userId, request.reminderId);
+  const reminderTitle = reminder?.title;
   if (typeof reminderTitle !== "string" || reminderTitle.trim().length === 0) return null;
-  return Object.freeze({ ...request, reminderTitle });
+  return Object.freeze({
+    ...request,
+    reminderTitle,
+    reminderTaskId: typeof reminder?.taskId === "string" ? reminder.taskId : null,
+  });
 }
 
 export function isAllowedPushHost(endpoint: string, allowed: readonly RegExp[] = ALLOWED_PUSH_HOSTS): boolean {
@@ -632,7 +655,12 @@ export async function deliverPush(
 
   // The payload is built BEFORE the delivery is begun. An unknown type must not
   // consume the dedupe slot and then fail to produce anything to send.
-  const payload = buildWirePayload(request.type, request.locale, request.reminderTitle ?? undefined);
+  const payload = buildWirePayload(
+    request.type,
+    request.locale,
+    request.reminderTitle ?? undefined,
+    { reminderId: request.reminderId, taskId: request.reminderTaskId },
+  );
   if (payload === null) return Object.freeze({ status: "refused", code: "payload_unavailable" });
 
   // The subject's CATEGORY, once per delivery, never its value.

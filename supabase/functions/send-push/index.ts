@@ -130,12 +130,14 @@ Deno.serve(async (request) => {
   const resolved = await resolveDeliveryRequest(parsed, async (userId, reminderId) => {
     const { data, error } = await service
       .from("reminders")
-      .select("title")
+      // `task_id` travels with the title because the tap's destination depends
+      // on it, and both come from the one owner-scoped read.
+      .select("title, task_id")
       .eq("user_id", userId)
       .eq("id", reminderId)
       .maybeSingle();
     if (error || typeof data?.title !== "string") return null;
-    return data.title;
+    return { title: data.title, taskId: typeof data.task_id === "string" ? data.task_id : null };
   });
   if (resolved === null) {
     return Response.json({ error: "Reminder unavailable", code: "reminder_unavailable" }, { status: 404 });

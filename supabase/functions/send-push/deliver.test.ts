@@ -87,6 +87,8 @@ const REQUEST = {
   dedupeHash: "a".repeat(64),
   reminderId: "2f4b0001-0000-4000-8000-0000000000a1",
   reminderTitle: "Comprar remédio",
+  // A reminder with no task. The target it produces is the reminder itself.
+  reminderTaskId: null,
 } as const;
 
 Deno.test("the request boundary is parsed, not trusted", () => {
@@ -118,11 +120,25 @@ Deno.test("the sender resolves reminder content by both owner and reminder id", 
   const seen: unknown[] = [];
   const resolved = await resolveDeliveryRequest(parsed, (userId, reminderId) => {
     seen.push({ userId, reminderId });
-    return Promise.resolve("Comprar remédio");
+    return Promise.resolve({ title: "Comprar remédio", taskId: null });
   });
 
   assertEquals(seen, [{ userId: REQUEST.userId, reminderId: REQUEST.reminderId }]);
   assertEquals(resolved, REQUEST);
+});
+
+Deno.test("the task a reminder hangs off is read by the sender, not supplied by the caller", async () => {
+  const taskId = "2f4b0001-0000-4000-8000-0000000000b2";
+  const parsed = parseDeliveryRequest({ ...REQUEST, taskId: "anything the caller likes" })!;
+  // The request shape admits no `taskId` at all, so there is nothing for a
+  // caller to set: it comes back from the owner-scoped read or not at all.
+  assertEquals("taskId" in parsed, false);
+
+  const resolved = await resolveDeliveryRequest(
+    parsed,
+    () => Promise.resolve({ title: "Comprar remédio", taskId }),
+  );
+  assertEquals(resolved?.reminderTaskId, taskId);
 });
 
 Deno.test("a reminder that does not belong to the owner is refused before delivery", async () => {
