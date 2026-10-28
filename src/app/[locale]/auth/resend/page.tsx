@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { resendConfirmation } from "@/features/auth/actions";
 import { getResendCopy } from "@/features/auth/copy";
 import { authErrorMessage } from "@/features/auth/flow";
+import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { isLocale } from "@/lib/preferences";
 
@@ -47,7 +48,7 @@ export default async function ResendPage({
           <input name="email" type="email" required maxLength={254} autoComplete="email" />
         </label>
         <TurnstileWidget />
-        <button>{copy.submit}</button>
+        <AuthSubmitButton label={copy.submit} pendingLabel={copy.submitPending} />
       </form>
       <Link href={`/${locale}/auth/login`}>{copy.backToLogin}</Link>
     </div>

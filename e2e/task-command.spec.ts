@@ -51,23 +51,48 @@ test("the cancelled-task recovery route is protected in both locales", async ({ 
 
 test("a locale-less recovery URL is not a way around the auth boundary", async ({ request }) => {
   /*
-   * `src/proxy.ts` reads the locale from `parts[1]` and the section from
-   * `parts[2]`, so a locale-less `/app/...` path is not an app path to it at
-   * all — `inApp` is false, no redirect is issued, and Next.js answers 404
-   * because no route exists there. That is the pre-existing contract, and the
-   * only thing this slice must prove is that its nested route joins it rather
-   * than opening a hole beside it.
+   * `src/proxy.ts` used to read the locale from `parts[1]` and the section
+   * from `parts[2]`, so a locale-less `/app/...` path was not an app path to
+   * it at all — `inApp` was false, no redirect was issued, and Next.js
+   * answered 404 because no route exists there.
    *
-   * Asserted against an existing route rather than against a literal status,
-   * so the test states the invariant ("the same as every other app path") and
-   * cannot pass by accident if that contract is ever deliberately changed.
+   * **That contract changed deliberately, and this test caught the change,
+   * which is exactly what its previous form was written to do.** Every push
+   * notification delivered before `57ea2d0` points at an unprefixed path, so
+   * answering 404 there meant the product refused a destination it had itself
+   * chosen, and a tapped notification was a dead end. The proxy now localizes
+   * such a path.
+   *
+   * What this test defends did NOT change, and is now asserted far more
+   * directly than a bare 404 ever did. A 404 proved the surface was out of
+   * reach only by accident of there being no route; it would have said nothing
+   * had a route appeared. So the invariant stays ("the same as every other app
+   * path") and the redirect is now **followed**, to prove it arrives at the
+   * login form rather than at the command surface.
+   *
+   * `Accept-Language` is stated because the locale is negotiated from it; an
+   * unstated header would make the expected destination depend on whatever the
+   * test agent advertises.
    */
+  const headers = { "accept-language": "pt-BR,pt;q=0.9" };
   const [existing, added] = await Promise.all([
-    request.get("/app/work", { maxRedirects: 0 }),
-    request.get("/app/work/cancelled", { maxRedirects: 0 }),
+    request.get("/app/work", { maxRedirects: 0, headers }),
+    request.get("/app/work/cancelled", { maxRedirects: 0, headers }),
   ]);
   expect(added.status()).toBe(existing.status());
-  expect(added.status()).toBe(404);
+  expect(added.status()).toBe(307);
+
+  const localized = new URL(added.headers().location!, "http://localhost:3000");
+  expect(localized.pathname).toBe("/pt-BR/app/work/cancelled");
+
+  // The hole this test exists to refuse. The localized destination must still
+  // demand a session, and must carry the requested surface into the login so
+  // the redirect is a detour rather than a loss.
+  const followed = await request.get(localized.pathname, { maxRedirects: 0, headers });
+  expect(followed.status()).toBe(307);
+  const login = new URL(followed.headers().location!, "http://localhost:3000");
+  expect(login.pathname).toBe("/pt-BR/auth/login");
+  expect(login.searchParams.get("next")).toBe("/pt-BR/app/work/cancelled");
 });
 
 test("no command surface is reachable without a session", async ({ page }) => {

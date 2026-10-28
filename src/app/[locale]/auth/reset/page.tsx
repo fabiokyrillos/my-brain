@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updatePassword } from "@/features/auth/actions";
+import { getAuthSubmitCopy } from "@/features/auth/copy";
 import { authErrorMessage } from "@/features/auth/flow";
+import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { isLocale } from "@/lib/preferences";
 
 export default async function ResetPasswordPage({
@@ -16,6 +18,7 @@ export default async function ResetPasswordPage({
   const locale = candidate;
   const { error } = await searchParams;
   const pt = locale === "pt-BR";
+  const submit = getAuthSubmitCopy("reset", locale);
 
   return (
     <div className="auth-card">
@@ -38,7 +41,7 @@ export default async function ResetPasswordPage({
           {pt ? "Confirme a nova senha" : "Confirm new password"}
           <input name="passwordConfirmation" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
         </label>
-        <button>{pt ? "Atualizar senha" : "Update password"}</button>
+        <AuthSubmitButton label={submit.submit} pendingLabel={submit.submitPending} />
       </form>
       <Link href={`/${locale}/auth/recover`}>{pt ? "Solicitar outro link" : "Request another link"}</Link>
     </div>

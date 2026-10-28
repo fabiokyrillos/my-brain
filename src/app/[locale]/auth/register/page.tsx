@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { signUp } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
+import { getAuthSubmitCopy } from "@/features/auth/copy";
 import { isSignupOpenIn } from "@/features/auth/signup-policy";
+import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { getEntryCopy } from "@/features/entry/copy";
 import { getLegalCopy } from "@/features/legal/copy";
 import { getLegalDocument } from "@/features/legal/documents";
@@ -23,6 +25,7 @@ export default async function RegisterPage({
   const { error } = await searchParams;
   const pt = locale === "pt-BR";
   const consent = getLegalCopy(locale).consentControl;
+  const submit = getAuthSubmitCopy("signUp", locale);
   /*
    * `2O-ENTRY-005` and `2O-ENTRY-006`.
    *
@@ -120,7 +123,7 @@ export default async function RegisterPage({
           </span>
         </label>
         <TurnstileWidget />
-        <button>{pt ? "Criar conta" : "Create account"}</button>
+        <AuthSubmitButton label={submit.submit} pendingLabel={submit.submitPending} />
       </form>
       {/*
         `2O-ENTRY-008`. Two ways out, whatever the door is doing: on to sign-in

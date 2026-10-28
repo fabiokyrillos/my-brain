@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAuthSessionContinuation } from "@/features/auth/flow";
+import { negotiateEntryLocale } from "@/features/entry/locale-negotiation";
 import type { Locale } from "@/lib/preferences";
 
 /**
@@ -48,6 +49,46 @@ function isProductionRuntime(): boolean {
 }
 
 export async function proxy(request: NextRequest) {
+  /*
+   * An app path with no locale prefix, localized rather than lost.
+   *
+   * Where a notification tap goes is decided by the service worker, which is
+   * cached on the device and updates when the device chooses to. Every push
+   * delivered before `57ea2d0` carries `/app/...`, and `/app/...` matched no
+   * route: `parts[1]` is `app`, so the request was neither `inApp` nor
+   * `inAuth` and fell through to a 404. The product answered 404 to the
+   * vocabulary it had itself emitted — confirmed on an iPhone, twice.
+   *
+   * The locale comes from `Accept-Language` rather than `profiles.locale`
+   * because reading the profile here would be a database round trip on the
+   * request edge, which is the cost `getClaims()` exists to avoid. Someone
+   * whose stored locale differs from their browser's language arrives in the
+   * browser's language: a divergence, not a defect, on a path whose whole job
+   * is to not be a dead end.
+   *
+   * 307 and not 308: a permanent redirect would sit in the browser's cache and
+   * pin a locale that was negotiated once.
+   *
+   * This runs before the provider client is built because localizing a path
+   * needs no session, and the destination comes straight back through this
+   * same function, where `inApp && !authenticated` still applies. The auth
+   * boundary is unchanged.
+   */
+  const segments = request.nextUrl.pathname.split("/");
+  if (segments[1] === "app") {
+    const locale = negotiateEntryLocale(request.headers.get("accept-language"));
+    const localized = new URL(
+      `/${locale}${request.nextUrl.pathname}${request.nextUrl.search}`,
+      request.url,
+    );
+    const redirected = NextResponse.redirect(localized);
+    // The same posture as every other redirect here, with one reason more: the
+    // answer varies by a request header, so a stored copy would hand the next
+    // visitor a language chosen for somebody else.
+    redirected.headers.set("Cache-Control", NO_STORE);
+    return redirected;
+  }
+
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
