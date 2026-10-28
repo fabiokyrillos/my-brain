@@ -154,6 +154,16 @@ const PUSH_ASSERTING_TESTS: readonly string[] = [
   "src/features/interpretations/deno-parity.test.ts",
   "src/features/notifications/consent-reader.test.ts",
   "src/features/notifications/notification-settings.test.tsx",
+  /*
+   * `NOTIFY-CONSENT-STATE-IS-SERVER-ONLY`. It stands in for a browser in order
+   * to assert what the surface RENDERS when the stored consent and the device
+   * disagree, so it has to name the subscription reader. It performs nothing:
+   * it never subscribes, never renders a notification and never requests
+   * permission — the last of those is asserted positively inside the file,
+   * because the effect it tests runs on mount and that is exactly the property
+   * `2M-NOTIFY-003` would lose first.
+   */
+  "src/features/notifications/push-controls.test.tsx",
   "src/features/notifications/push-encoding.test.ts",
   "src/lib/byok/guards.test.ts",
   // The governance guard mirrors this file's allowlist so the two watch each
@@ -386,6 +396,7 @@ describe("2M-NOTIFY-006/-007: push exists now, and only where it was authorized"
       "src/features/interpretations/deno-parity.test.ts",
       "src/features/notifications/consent-reader.test.ts",
       "src/features/notifications/notification-settings.test.tsx",
+      "src/features/notifications/push-controls.test.tsx",
       "src/features/notifications/push-encoding.test.ts",
       "src/lib/byok/guards.test.ts",
       "src/lib/closeout/phase-2m-notification-boundary-guard.test.ts",

@@ -55,6 +55,19 @@ export type NotificationSettingsCopy = {
   readonly saveFailed: string;
   readonly permissionRefused: string;
 
+  /*
+   * `NOTIFY-CONSENT-STATE-IS-SERVER-ONLY` — what the surface says when the
+   * account's consent and the device in front of the user disagree.
+   *
+   * Two sentences and not one, because the repair differs: a device that simply
+   * lost its subscription is fixed from this page, a browser that has blocked
+   * notifications can only be fixed in the browser's own settings. Telling the
+   * second group to press a button here would be a control that cannot work.
+   */
+  readonly deviceSilent: string;
+  readonly deviceSilentAction: string;
+  readonly deviceBlocked: string;
+
   /* ---- Slice 2O.6 ------------------------------------------------------- */
 
   /** `2O-NOTIFY-007` — the three facts, each with its own row and its own word. */
@@ -175,6 +188,9 @@ const PT_BR: NotificationSettingsCopy = {
   saved: "Preferências salvas.",
   saveFailed: "Não foi possível salvar. Nada foi alterado.",
   permissionRefused: "O navegador não autorizou. Nada foi ativado.",
+  deviceSilent: "Os avisos estão ligados na sua conta, mas este aparelho não tem uma inscrição ativa — então nada chega aqui. Isso acontece depois de reinstalar o app ou limpar os dados do site. Reativar neste aparelho resolve.",
+  deviceSilentAction: "Reativar avisos neste aparelho",
+  deviceBlocked: "Os avisos estão ligados na sua conta, mas este navegador está bloqueando as notificações. Isso só pode ser liberado nas configurações do próprio navegador — esta página não consegue.",
 
   factsHeading: "Três coisas diferentes",
   factsIntro: "Estas três não são a mesma coisa, e uma pode estar certa enquanto as outras não estão. Por isso aparecem separadas.",
@@ -262,6 +278,9 @@ const EN: NotificationSettingsCopy = {
   saved: "Preferences saved.",
   saveFailed: "Could not save. Nothing was changed.",
   permissionRefused: "The browser did not allow it. Nothing was turned on.",
+  deviceSilent: "Alerts are on for your account, but this device holds no active subscription, so nothing arrives here. It happens after reinstalling the app or clearing the site's data. Turning them on again on this device fixes it.",
+  deviceSilentAction: "Turn alerts on again on this device",
+  deviceBlocked: "Alerts are on for your account, but this browser is blocking notifications. Only the browser's own settings can allow them again — this page cannot.",
 
   factsHeading: "Three different things",
   factsIntro: "These three are not the same thing, and one can be true while the others are not. That is why they are shown separately.",
