@@ -71,11 +71,37 @@ const DESTINATION_FOR_TYPE: Record<NotificationType, NotificationDestination> = 
   digest: "/app",
 };
 
+/**
+ * What the notification is ABOUT — `NOTIFY-TAP-LANDS-ON-THE-LIST`.
+ *
+ * The payload still may not choose a destination; that is the property
+ * `DESTINATION_FOR_TYPE` above exists to hold, and it is unchanged. What the
+ * payload may now do is name the ITEM, and the service worker — which owns the
+ * destination vocabulary — builds the path from a kind it already knows how to
+ * open. A caller cannot steer a tap to an arbitrary surface by naming an id
+ * any more than it could by naming a type.
+ *
+ * `destination` is kept beside it, exactly as before, and that is deliberate:
+ * a service worker cached on a device updates when the device chooses to, so
+ * an older one ignores `target`, reads `destination` and behaves as it does
+ * today. The new field can only add precision, never break a tap.
+ */
+export const notificationTargetKinds = ["task", "reminder"] as const;
+export type NotificationTargetKind = (typeof notificationTargetKinds)[number];
+
+export type NotificationTarget = Readonly<{
+  kind: NotificationTargetKind;
+  /** An owner-scoped record id. Opaque here; the surface it opens enforces access. */
+  id: string;
+}>;
+
 export type WirePayload = Readonly<{
   title: string;
   body: string;
   destination: `/${NotificationLocale}${NotificationDestination}`;
   type: NotificationType;
+  /** Present for reminders only; absent for every other kind. */
+  target?: NotificationTarget;
 }>;
 
 export function isNotificationType(value: unknown): value is NotificationType {
@@ -101,15 +127,50 @@ function boundedReminderTitle(value: unknown): string | null {
   return title.length <= 240 ? title : `${title.slice(0, 239)}…`;
 }
 
-export function buildWirePayload(type: unknown, locale: unknown, reminderTitle?: unknown): WirePayload | null {
+/**
+ * Which record a reminder notification is about.
+ *
+ * The task wins when there is one, because a reminder attached to a task is
+ * about the task's work and that surface says more than the reminder row
+ * does. With no task the reminder itself is the subject, and it now has a page
+ * of its own to be the subject on.
+ *
+ * Both ids are shape-checked rather than trusted: they arrive from a database
+ * read, but what they become is a path segment on a device, and a value that
+ * becomes a path is validated at every boundary it crosses.
+ */
+const RECORD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function reminderTarget(subject: unknown): NotificationTarget | undefined {
+  if (subject === null || typeof subject !== "object") return undefined;
+  const { reminderId, taskId } = subject as Record<string, unknown>;
+  if (typeof taskId === "string" && RECORD_ID.test(taskId)) {
+    return Object.freeze({ kind: "task" as const, id: taskId });
+  }
+  if (typeof reminderId === "string" && RECORD_ID.test(reminderId)) {
+    return Object.freeze({ kind: "reminder" as const, id: reminderId });
+  }
+  // No usable id is not a failure: the payload simply carries no target and
+  // every worker, old and new, falls back to `destination`.
+  return undefined;
+}
+
+export function buildWirePayload(
+  type: unknown,
+  locale: unknown,
+  reminderTitle?: unknown,
+  subject?: unknown,
+): WirePayload | null {
   if (!isNotificationType(type) || !isNotificationLocale(locale)) return null;
   const copy = COPY[locale][type];
   const body = type === "reminder" ? boundedReminderTitle(reminderTitle) : copy.body;
   if (body === null) return null;
+  const target = type === "reminder" ? reminderTarget(subject) : undefined;
   return Object.freeze({
     title: copy.title,
     body,
     destination: `/${locale}${DESTINATION_FOR_TYPE[type]}`,
     type,
+    ...(target === undefined ? {} : { target }),
   });
 }

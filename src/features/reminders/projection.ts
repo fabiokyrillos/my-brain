@@ -173,6 +173,16 @@ export async function loadReminderPage(
     readonly page: number;
     readonly view: ReminderView;
     readonly now: Date;
+    /**
+     * One reminder instead of a page, for `loadReminder` below.
+     *
+     * Added here rather than given its own query and its own mapping: a detail
+     * surface that decided `overdue`, or which actions are offered, by its own
+     * reasoning would be a second authority on the same questions, and the two
+     * would drift. The filter narrows the same query; everything after it is
+     * the code the list already runs.
+     */
+    readonly reminderId?: string;
   },
 ): Promise<ReminderPage> {
   const { from, to } = pageRange(options.page);
@@ -186,6 +196,9 @@ export async function loadReminderPage(
     .order("remind_at", { ascending })
     .range(from, to);
   if (statuses !== null) query = query.in("status", [...statuses]);
+  // Ownership is still proved twice: `user_id` above is the belt, RLS the
+  // braces. The id narrows, it does not authorise.
+  if (options.reminderId !== undefined) query = query.eq("id", options.reminderId);
 
   const result = await query;
   const { items, hasNext } = paginateRows(
@@ -256,6 +269,39 @@ export async function loadReminderPage(
   });
 
   return { reminders, hasNext };
+}
+
+/**
+ * One reminder, by id — the surface a notification tap lands on.
+ *
+ * Until this existed a tap opened the LIST, at its default `pending` view, and
+ * `pending` admits only `scheduled` and `snoozed`. A reminder that had just
+ * been delivered was therefore absent from the very screen its own
+ * notification had opened, which is why the owner reported that tapping "não
+ * dá impressão de ser um clique com sucesso".
+ *
+ * `view: "all"` because a detail lookup has no business filtering by status —
+ * the id already names exactly one row, and narrowing by status could only
+ * turn a reminder that exists into one that appears not to.
+ */
+export async function loadReminder(
+  supabase: SupabaseClient,
+  options: {
+    readonly userId: string;
+    readonly locale: Locale;
+    readonly reminderId: string;
+    readonly now: Date;
+  },
+): Promise<ReminderViewModel | null> {
+  const { reminders } = await loadReminderPage(supabase, {
+    userId: options.userId,
+    locale: options.locale,
+    page: 1,
+    view: "all",
+    now: options.now,
+    reminderId: options.reminderId,
+  });
+  return reminders[0] ?? null;
 }
 
 /**

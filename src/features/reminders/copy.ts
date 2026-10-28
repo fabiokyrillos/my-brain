@@ -47,6 +47,21 @@ type ReminderCopy = {
   /** Takes the assistant's configured name — never a hardcoded "Brain". */
   readonly emptyBody: (agentName: string) => string;
 
+  /**
+   * The one-reminder surface a notification tap opens.
+   *
+   * The heading is the kind, not the reminder's own title: the title is
+   * governed content and the row below already renders it, under the masking
+   * rules that apply to it. Repeating it in an `h1` would be a second
+   * rendering of the same sentence, outside those rules.
+   */
+  readonly detail: {
+    readonly eyebrow: string;
+    readonly heading: string;
+    readonly intro: string;
+    readonly backToList: string;
+  };
+
   readonly statusLabel: Readonly<Record<ReminderStatus, string>>;
   readonly statusHint: Readonly<Record<ReminderStatus, string>>;
   readonly viewLabel: Readonly<Record<ReminderView, string>>;
@@ -300,6 +315,13 @@ const COPY = {
     emptyBody: (agentName: string) =>
       `Crie um lembrete acima ou peça ao ${agentName} durante uma captura.`,
 
+    detail: {
+      eyebrow: "NÃO ESQUECER",
+      heading: "Lembrete",
+      intro: "Este lembrete e o que acontece com ele.",
+      backToList: "Ver todos os lembretes",
+    },
+
     statusLabel: {
       scheduled: "Agendado",
       sent: "Entregue",
@@ -534,6 +556,13 @@ const COPY = {
     intro: "Internal alerts that respect your timezone and quiet hours.",
     emptyTitle: "No reminders",
     emptyBody: (agentName: string) => `Create one above or ask ${agentName} during capture.`,
+
+    detail: {
+      eyebrow: "DON'T FORGET",
+      heading: "Reminder",
+      intro: "This reminder and what happens to it.",
+      backToList: "See all reminders",
+    },
 
     statusLabel: {
       scheduled: "Scheduled",

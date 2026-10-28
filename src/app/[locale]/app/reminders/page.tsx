@@ -15,6 +15,7 @@ import { createReminderOrSeries } from "@/features/reminders/series-actions";
 import { ReminderComposer } from "@/features/reminders/reminder-composer";
 import { loadReminderTaskOptions } from "@/features/reminders/task-options";
 import { getReminderCopy } from "@/features/reminders/copy";
+import { reminderFormatters } from "@/features/reminders/formatters";
 import {
   ReminderFeedbackBanner,
   ReminderFeedbackProvider,
@@ -82,61 +83,19 @@ export default async function RemindersPage({
       : defaultAgentPreferences.timezone;
 
   /**
-   * One formatter for the whole page, bound to the owner's zone.
+   * The page's three formatters, all bound to the owner's zone.
    *
-   * Passed down rather than constructed per row: twenty rows building their own
-   * `Intl.DateTimeFormat` is twenty chances for one of them to be built without
-   * the `timeZone` option and quietly render in the server's zone instead.
+   * Built once and their *results* passed down: twenty rows constructing their
+   * own `Intl.DateTimeFormat` is twenty chances for one to be built without
+   * `timeZone` and quietly render in the server's zone. They moved into
+   * `reminders/formatters.ts` when the detail page arrived, because two pages
+   * each doing their own construction is that same hazard one level up and
+   * `2R-TIME-005` asks for one authority rather than several.
    */
-  const formatter = new Intl.DateTimeFormat(locale, {
-    dateStyle: "long",
-    timeStyle: "short",
-    timeZone: timezone,
-  });
-  const formatInstant = (iso: string) => formatter.format(new Date(iso));
-
-  /**
-   * The same instants as `datetime-local` values, in the owner's zone.
-   *
-   * Built from `Intl` parts rather than through
-   * `formatInstantForDateTimeLocal`: that helper's parser once accepted only
-   * instants whose seconds were literally `:00` with no fractional part, while
-   * every reminder this surface reads carries whatever `now()` had, so calling
-   * it threw inside the client render and took the page to its error boundary.
-   * The parser now accepts the full stored grammar; this stays server-side
-   * because a throwing parser has no business in client render. `en-CA` gives
-   * ISO-ordered date parts, so the pieces assemble without a locale assumption.
-   */
-  const localInputFormatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  });
-  const localParts = (iso: string) => {
-    const parts = localInputFormatter.formatToParts(new Date(iso));
-    return (type: Intl.DateTimeFormatPartTypes) =>
-      parts.find((candidate) => candidate.type === type)?.value ?? "";
-  };
-  const formatLocalInput = (iso: string) => {
-    const part = localParts(iso);
-    return `${part("year")}-${part("month")}-${part("day")}T${part("hour")}:${part("minute")}`;
-  };
-  /**
-   * The wall clock alone, for slice 2R.2's series time field.
-   *
-   * Built from the **same** zone-bound formatter as everything else on this
-   * page, which is the whole of `2R-TIME-005`'s "one timezone authority, not
-   * several" as it applies to this surface: a second `Intl.DateTimeFormat` here
-   * would be a second authority even if it were given the same zone today.
-   */
-  const formatLocalTime = (iso: string) => {
-    const part = localParts(iso);
-    return `${part("hour")}:${part("minute")}`;
-  };
+  const { formatInstant, formatLocalInput, formatLocalTime } = reminderFormatters(
+    locale,
+    timezone,
+  );
 
   const taskOptions = await loadReminderTaskOptions(
     supabase,

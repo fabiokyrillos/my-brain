@@ -212,6 +212,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // rule and the notice destination. Named here rather than tolerated,
       // for the same reason as every entry above it.
       "202608240102_phase_2s_slice_1_notification_suppressions.sql",
+      // ADR-144. The heartbeat's reminder notice points at the item rather than
+      // the list, finishing the half ADR-143 recorded as a remainder. It
+      // redefines `run_user_heartbeat` with ONE expression changed and nothing
+      // else — asserted by `heartbeat-destination-parity.test.ts`, not promised
+      // — and touches no schedule, no retention job and no grant. Named here
+      // rather than tolerated, because the property this assertion protects is
+      // "nothing follows that somebody did not deliberately account for".
+      "202610280103_notify_heartbeat_destination.sql",
     ]);
   });
 });

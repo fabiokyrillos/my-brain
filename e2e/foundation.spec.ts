@@ -83,6 +83,15 @@ test("canonical and legacy daily routes remain protected in both locales", async
     ["/pt-BR/app/today?page=3", "/pt-BR/auth/login"],
     ["/en/app/tasks?page=2", "/en/auth/login"],
     ["/pt-BR/app/waiting?page=4", "/pt-BR/auth/login"],
+    /*
+     * `NOTIFY-TAP-LANDS-ON-THE-LIST`. The two surfaces a notification tap can
+     * now build a path to. A tapped notification arrives with no session more
+     * often than most links do — the device had the app closed — so the one
+     * property worth proving here is that the new destinations are behind the
+     * same boundary as everything else, carrying the surface into the login.
+     */
+    ["/pt-BR/app/reminders/3f1a9c22-5d41-4c0e-9b77-2a6d8e0f41bc", "/pt-BR/auth/login"],
+    ["/en/app/work/7c2e4411-88aa-4f3b-9d10-5be6cf0a2d93", "/en/auth/login"],
   ] as const) {
     const response = await request.get(source, { maxRedirects: 0 });
     expect(response.status()).toBe(307);

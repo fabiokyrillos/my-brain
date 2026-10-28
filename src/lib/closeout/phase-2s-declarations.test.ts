@@ -483,8 +483,9 @@ describe("Phase 2S: allocated is not created, and the ceiling did not move", () 
     expect(mine, "a SECOND Phase 2S migration is a stop condition").toEqual([
       "202608240102_phase_2s_slice_1_notification_suppressions.sql",
     ]);
+    // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and Phase 2S's allocation of exactly one is untouched above.
     expect(migrations.length, "an unattributed migration arrived beside the allocated one")
-      .toBe(102);
+      .toBe(103);
     // The migration names the allocation it consumes, so a budget line nobody
     // can trace back to a signature cannot exist.
     const header = read(`supabase/migrations/${mine[0]}`).slice(0, 4000);

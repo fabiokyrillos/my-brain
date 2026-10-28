@@ -59,7 +59,11 @@ function fixture({
     closing: null,
     handlers: null,
     documents: [],
-    migrations: { local: 1, phase: 1 },
+    // `atParity` is the chain as it stood when this phase closed. Refusal 13
+    // measures the closing record against THAT rather than against today's
+    // total, so a later authorized migration cannot make a true historical
+    // record read as a defect. See `migrationCounts` in the generator.
+    migrations: { local: 1, atParity: 1, phase: 1 },
   };
 }
 
@@ -165,7 +169,7 @@ describe("the generator refuses, and every refusal has been seen to fire", () =>
   });
 
   it("refusal 12 — more migrations than the allocation", () => {
-    expect(refusals({ ...fixture(), migrations: { local: 3, phase: 2 } }).join(" ")).toMatch(
+    expect(refusals({ ...fixture(), migrations: { local: 3, atParity: 3, phase: 2 } }).join(" ")).toMatch(
       /2 migrations against an allocation of 1/,
     );
   });
@@ -178,7 +182,7 @@ describe("the generator refuses, and every refusal has been seen to fire", () =>
     expect(refusals({ ...base, closing: clean.replace("1 local = 1 hosted", "1 local = 2 hosted") }).join(" "))
       .toMatch(/1 local against 2 hosted/);
     expect(refusals({ ...base, closing: clean.replace("1 local = 1 hosted", "9 local = 9 hosted") }).join(" "))
-      .toMatch(/states 9 local migrations and 1 are on disk/);
+      .toMatch(/states 9 local migrations and 1 stood at parity/);
   });
 
   it("refusal 17 — an inherited remainder dropped from the closing record", () => {
