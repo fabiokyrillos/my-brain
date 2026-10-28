@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
-import { asReminderView, loadReminderPage } from "./projection";
+import { asReminderView, loadReminder, loadReminderPage } from "./projection";
 
 /**
  * The read half (UX-12).
@@ -410,5 +410,58 @@ describe("reactivating a cancelled occurrence", () => {
     expect(probe).toBeDefined();
     expect(probe?.in).toEqual(["series_id", [SERIES_ID]]);
     expect(probe?.eq).toContainEqual(["user_id", USER_ID]);
+  });
+});
+
+/**
+ * One reminder, by id — the surface a notification tap lands on.
+ *
+ * It exists because the tap used to land on the LIST, at its default `pending`
+ * view, and a reminder that has already been delivered is not in that view at
+ * all: the owner was sent to a screen that could not show the thing they had
+ * just been told about.
+ *
+ * Projected through the same code as a page row rather than a second mapping
+ * of its own. A detail view that decided `overdue`, or which actions are
+ * offered, by its own reasoning would be a second authority on the same
+ * question, and the two would drift.
+ */
+describe("one reminder, loaded by id", () => {
+  async function loadOne(rows: Row[], extra: Record<string, Row[]> = {}) {
+    const { supabase, calls } = client({ reminders: rows, ...extra });
+    const found = await loadReminder(supabase, {
+      userId: USER_ID,
+      locale: "pt-BR",
+      reminderId: "44444444-4444-4444-8444-444444444444",
+      now: NOW,
+    });
+    return { found, calls };
+  }
+
+  it("proves ownership twice, the posture the page query already takes", async () => {
+    const { calls } = await loadOne([reminder()]);
+    const query = calls.find((call) => call.table === "reminders" && !isLiveOccurrenceProbe(call));
+    expect(query?.eq).toContainEqual(["user_id", USER_ID]);
+    expect(query?.eq).toContainEqual(["id", "44444444-4444-4444-8444-444444444444"]);
+  });
+
+  it("returns the row projected exactly as the list projects it", async () => {
+    const { found } = await loadOne([reminder({ status: "sent", sent_at: "2026-12-05T09:00:01+00:00" })]);
+    expect(found?.id).toBe("44444444-4444-4444-8444-444444444444");
+    expect(found?.title).toBe("Ligar para o contador");
+    expect(found?.status).toBe("sent");
+    expect(found?.sentAt).toBe("2026-12-05T09:00:01+00:00");
+  });
+
+  it("finds a delivered reminder, which the default list view cannot show", async () => {
+    // The whole reason this loader exists: `pending` admits only `scheduled`
+    // and `snoozed`, so the tap's own subject was invisible where it landed.
+    const { found } = await loadOne([reminder({ status: "sent" })]);
+    expect(found).not.toBeNull();
+  });
+
+  it("returns null rather than throwing when nothing comes back", async () => {
+    const { found } = await loadOne([]);
+    expect(found).toBeNull();
   });
 });
