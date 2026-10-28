@@ -701,12 +701,26 @@ select ok(
   '2S-REACH-005: a reminder notice is produced for the first time rather than assumed'
 );
 
+-- 2S-REACH-003, SUPERSEDED BY ADR-144.
+--
+-- This asserted the destination was the LIST, with its reason stated: there was
+-- no per-reminder route, so anything else would have been a link to nothing.
+-- The refusal was pinned to fail when a route appeared, and it did -- twice,
+-- here and in `phase-2s-suppression-guard.test.ts`, because the same refusal
+-- had been recorded in two places and only one was found first.
+--
+-- The destination is composed from the reminder's own row rather than written
+-- as a literal: the id is generated, and comparing against the composed value
+-- proves the notice points at THIS reminder instead of merely at something
+-- shaped like a reminder path.
 select is(
   (select notification.action_url from public.notifications as notification
    where notification.user_id = 'f1000001-0000-4000-8000-000000000001'
      and notification.type = 'reminder'),
-  '/pt-BR/app/reminders',
-  '2S-REACH-003: the reminder destination is the list, because no per-reminder route exists'
+  (select '/pt-BR/app/reminders/' || reminder.id::text
+   from public.reminders as reminder
+   where reminder.user_id = 'f1000001-0000-4000-8000-000000000001'),
+  '2S-REACH-003 as revised by ADR-144: the destination is the reminder itself, which now has a page'
 );
 
 -- Section 9 -- a reminder outranks a stale nudge for a capped slot
