@@ -337,6 +337,14 @@ const INVENTORY: readonly RouteEntry[] = [
     ],
   },
   { route: "reminders", sections: [] },
+  /*
+   * One reminder's own page — the surface a notification tap opens.
+   * `sections: []` for the same reason `reviews/[reviewId]` below carries it:
+   * it renders **no collection of its own**. It reads one `reminders` row and
+   * hands it to `ReminderList`, whose controls are the list page's controls
+   * and reach the writers that page already enumerates.
+   */
+  { route: "reminders/[reminderId]", sections: [] },
   { route: "reviews", sections: [] },
   /*
    * A generated review's own page. `sections: []` because it renders **no

@@ -194,19 +194,42 @@ describe("2S-REACH-001/-003: the destination points at the subject", () => {
     expect(body, "no task branch may still point at the list").not.toContain("'/en/app/tasks'");
   });
 
-  it("leaves the reminder destination alone, and that is a recorded refusal", () => {
+  it("still sends the heartbeat's reminder notices to the list, now as a NAMED REMAINDER", () => {
     /*
-     * There is no `/app/reminders/[reminderId]` route in this repository, so a
-     * per-reminder destination would be a link to nothing. The list is the
-     * correct answer today and this asserts it stays the answer until a route
-     * exists — a refusal with a name, rather than an omission.
+     * ## The refusal this replaces, kept because it was right
+     *
+     * Phase 2S refused a per-reminder destination with a reason: *"There is no
+     * `/app/reminders/[reminderId]` route in this repository, so a
+     * per-reminder destination would be a link to nothing."* It asserted the
+     * list stayed the answer **until a route exists**, and it fired the moment
+     * one did. That is the guard working, not the guard being in the way.
+     *
+     * ## What changed, and what did not
+     *
+     * The route exists now, so the refusal's condition is lifted. The
+     * heartbeat's destination, however, is built in SQL inside
+     * `run_all_heartbeats`, so revisiting it needs a **migration** — and none
+     * is authorised. The push path was the half that could be done without
+     * one, and it was: the payload names the item and the service worker
+     * builds the path.
+     *
+     * So this stops being a refusal and becomes a remainder with a name,
+     * `NOTIFY-HEARTBEAT-DESTINATION`. The guard stays a live tripwire rather
+     * than a muted one: it asserts the heartbeat is still pointing at the list
+     * — the true state — AND that the remainder is still written down. Delete
+     * the record and this fails, which is the only way a pendency survives the
+     * person who found it.
      */
     expect(heartbeatBody(MINE)).toContain("'/en/app/reminders' else '/pt-BR/app/reminders' end");
+
     const routes = readdirSync(join(REPO, "src/app/[locale]/app/reminders"));
+    const perReminderRoute = routes.filter((name) => name.startsWith("["));
+    expect(perReminderRoute, "the route the push path now opens").toEqual(["[reminderId]"]);
+
     expect(
-      routes.filter((name) => name.startsWith("[")),
-      "a per-reminder route now exists, so the destination above must be revisited",
-    ).toEqual([]);
+      read("docs/TODO.md"),
+      "the heartbeat remainder must stay named while it is open",
+    ).toContain("NOTIFY-HEARTBEAT-DESTINATION");
   });
 });
 

@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-10-28 — A notification opens the item it is about (ADR-143)
+
+- The tap opened the reminders list at its default `pending` view, which admits only `scheduled` and `snoozed` — so a reminder that had just been delivered was absent from the screen its own notification opened. The owner reported it as the tap not feeling like a successful click, and that reading was exact.
+- The payload now names the **item**: a `kind` from a closed map plus a record id. `public/sw.js` builds the path. ADR-142's property is kept — a message still cannot choose a destination; the furthest it reaches is a record inside a surface the worker already knows, whose page enforces its own access. The locale comes from the already-validated destination, never from the message.
+- `destination` is unchanged, deliberately. A cached service worker updates when the device chooses to, so an older one ignores `target` and behaves exactly as before. The new field can add precision; it cannot break a tap.
+- A reminder with a task opens the task. One without opens `app/reminders/[reminderId]`, which this change creates because otherwise half the owner's reminders had nowhere to land. The page renders `ReminderList` with one row and `loadReminder` narrows the list's own query, so neither the presentation nor the projection exists twice. The three zone-bound formatters moved to `reminders/formatters.ts` for the same reason.
+- **Not delivered, and named:** `NOTIFY-HEARTBEAT-DESTINATION`. The heartbeat builds its own reminder destination in SQL and still points at the list; changing it needs a migration, which is a stop condition. Found by Phase 2S's own recorded refusal firing the moment a per-reminder route appeared — it declined this *because no such route existed* and was pinned to fail when one did. The guard is re-aimed to hold the remainder and fails if the remainder's record is deleted.
+- The route-reachability inventory refused the new page until it was enumerated, which is the second guard this change tripped on purpose.
+- Zero migrations. The `send-push` function changed, so it needs deploying and `verify:edge-parity`.
+
 ## 2026-10-27 — The corrected tap is proved on hardware, and two adjacent defects are closed
 
 - Two authorized sends of the same reminder, ten minutes apart, closed the proof the previous entry left open. The first (`18:41:18Z`) was answered by the **stale** service worker and opened the unprefixed `/app/notifications` — a literal that appears zero times in the deployed worker, which identifies which worker ran and shows the corrected payload was arriving and being refused. The second (`18:51:27Z`) was answered by the current worker and reached `/pt-BR/app/reminders` with no 404. Each recorded exactly one delivered attempt, zero failures, retirements, strikes or diagnostics.
