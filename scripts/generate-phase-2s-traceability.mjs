@@ -289,10 +289,30 @@ export function bundledWriters(source = read(HANDLERS)) {
   return [...block[1].matchAll(/:\s*([A-Za-z_$][\w$]*)/g)].map((m) => m[1]);
 }
 
-/** Local migration files, and the ones this phase is responsible for. */
+/**
+ * Local migration files, the ones this phase is responsible for, and the chain
+ * AS IT STOOD when this phase closed.
+ *
+ * `atParity` exists because the closing record is a historical statement. It
+ * said "102 local = 102 hosted, both re-read live at closeout", and that was
+ * true when written. Comparing it against the CURRENT total made the record
+ * go false the moment any later authorized migration landed — which happened
+ * with `202610280103` (ADR-144) — and the only ways to go green would have
+ * been to edit a closed phase's record, which is falsifying history, or to
+ * delete the check.
+ *
+ * Counting up to the parity the phase itself moved to keeps the check
+ * non-vacuous in the way that matters: a closing record that misstated its own
+ * chain still fails, and a later migration no longer makes a true record read
+ * as a defect.
+ */
 export function migrationCounts() {
   const files = readdirSync(join(REPO, "supabase/migrations")).filter((f) => f.endsWith(".sql"));
-  return { local: files.length, phase: files.filter((f) => /phase_2s/i.test(f)).length };
+  return {
+    local: files.length,
+    atParity: files.filter((f) => f.slice(0, 12) <= PARITY).length,
+    phase: files.filter((f) => /phase_2s/i.test(f)).length,
+  };
 }
 
 /** Every refusal this generator can raise, as sentences a reader can act on. */
@@ -449,9 +469,11 @@ export function refusals({
       found.push("the closing record does not state the local and hosted migration counts.");
     } else if (stated[1] !== stated[2]) {
       found.push(`the closing record states ${stated[1]} local against ${stated[2]} hosted; they must agree.`);
-    } else if (Number.parseInt(stated[1], 10) !== migrations.local) {
+    } else if (Number.parseInt(stated[1], 10) !== migrations.atParity) {
+      // Measured against the chain as it stood at this phase's parity, not
+      // against today's. See `migrationCounts` for why.
       found.push(
-        `the closing record states ${stated[1]} local migrations and ${migrations.local} are on disk.`,
+        `the closing record states ${stated[1]} local migrations and ${migrations.atParity} stood at parity ${PARITY}.`,
       );
     }
   }

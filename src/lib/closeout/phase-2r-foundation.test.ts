@@ -130,7 +130,8 @@ describe("2R-FOUNDATION-001: recurrence is absent, re-proved rather than inherit
     expect(migrations.filter((name) => /phase[_-]?2r/i.test(name)))
       .toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
         // Chain head moved to 102 by Phase 2S slice 2S.1's ONE authorized migration (ADR-137 OD-2S-7 A / ADR-138 Decision 3: the suppression model, the cadence rule and the notice destination). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2S migration is a stop condition and fails here.
-expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(102);
+    // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and Phase 2R's own claim is untouched.
+    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(103);
   });
 
   it("is not vacuous: the column reader really reads, and the closed list really closes", () => {
@@ -214,10 +215,22 @@ describe("2R-FOUNDATION-002: the heartbeat's rules, as they are before anything 
    * check rather than a claim. A rewrite that dropped the advisory lock, the
    * cap, the 24-hour cooldown or the reminder key fails here.
    */
+  /*
+   * **Moved again by ADR-144, in the commit that redefines the function.**
+   *
+   * `202610280103` recreates it so the heartbeat's reminder notice points at
+   * the item rather than the list. The pin moves for the same reason it moved
+   * before, and everything below it is again the point: the ten preserved
+   * clauses are asserted against THIS definition, so "the rules did not
+   * change" stays a check. That those ten still pass is the independent
+   * evidence that the one-expression claim is true — a rewrite that dropped
+   * the advisory lock, the cap, the 24-hour cooldown or the reminder key would
+   * fail here regardless of what the parity test said.
+   */
   it("defines the function last in the migration the chain actually applies last", () => {
     const { file } = latestHeartbeatDefinition();
     expect(file).toBe(
-      "supabase/migrations/202608240102_phase_2s_slice_1_notification_suppressions.sql",
+      "supabase/migrations/202610280103_notify_heartbeat_destination.sql",
     );
   });
 

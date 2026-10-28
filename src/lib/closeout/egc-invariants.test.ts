@@ -151,7 +151,12 @@ const REPO = resolve(__dirname, "../../..");
 // Chain head moved to 202608240102 by Phase 2S slice 2S.1's ONE authorized
 // migration (OD-2S-7 A; ADR-137, ADR-138 Decision 3). Moved in the commit
 // that adds it, deliberately and visibly. EGC still adds none.
-const AUTHORIZED_MIGRATION_HEAD = "202608240102";
+// Chain head moved to 202610280103 by ADR-144's ONE authorized migration: the
+// heartbeat's reminder notice points at the item rather than the list. Same
+// reasoning as every move before it — moved in the commit that adds the
+// migration, visibly, and Entity Graph Completion still spends nothing, which
+// is the only claim this constant makes.
+const AUTHORIZED_MIGRATION_HEAD = "202610280103";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

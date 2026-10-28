@@ -214,8 +214,20 @@ describe("Phase 2P declarations", () => {
     const laterPhase2s = migrations.filter((name) => /phase[_-]?2s/i.test(name));
     expect(laterPhase2s, `Phase 2S is allocated exactly one migration: ${laterPhase2s.join(", ")}`)
       .toHaveLength(1);
+    // ADR-144 spent ONE migration after this phase closed, and it belongs to no
+    // phase: it is a correction — the heartbeat's reminder notice points at the
+    // item rather than the list. Counted in a bucket of its own so an
+    // unattributed migration cannot hide inside a bumped number.
+    const laterNotifyHeartbeat = migrations.filter(
+      (name) => /notify_heartbeat_destination/i.test(name),
+    );
+    expect(
+      laterNotifyHeartbeat,
+      `ADR-144 is allocated exactly one migration: ${laterNotifyHeartbeat.join(", ")}`,
+    ).toHaveLength(1);
     expect(migrations).toHaveLength(
-      99 + laterPhase2q.length + laterPhase2r.length + laterPhase2s.length,
+      99 + laterPhase2q.length + laterPhase2r.length + laterPhase2s.length
+      + laterNotifyHeartbeat.length,
     );
   });
 

@@ -340,13 +340,27 @@ describe("Phase 2N budget: nothing is spent and nothing may be created", () => {
     const laterPhase2s = migrations.filter((name) => /phase[_-]?2s/i.test(name));
     expect(laterPhase2s, `Phase 2S is allocated exactly one migration: ${laterPhase2s.join(", ")}`)
       .toHaveLength(1);
+    // ADR-144 spent ONE migration after this phase closed, and it belongs to no
+    // phase at all: it is a correction — the heartbeat's reminder notice points
+    // at the item rather than the list — rather than a slice of anything. It
+    // gets a bucket of its own for the reason every bucket above has one: the
+    // total must keep failing for an UNATTRIBUTED migration, which a bumped
+    // number would stop doing. A SECOND under this decision is a stop condition
+    // and fails here.
+    const laterNotifyHeartbeat = migrations.filter(
+      (name) => /notify_heartbeat_destination/i.test(name),
+    );
+    expect(
+      laterNotifyHeartbeat,
+      `ADR-144 is allocated exactly one migration: ${laterNotifyHeartbeat.join(", ")}`,
+    ).toHaveLength(1);
     expect(
       migrations,
       "a migration appeared that belongs to neither the pre-phase baseline nor this phase",
     ).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2N + mine.length + 3
       + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
-      + laterPhase2s.length,
+      + laterPhase2s.length + laterNotifyHeartbeat.length,
     );
   });
 
