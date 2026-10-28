@@ -343,6 +343,138 @@ describe("the item a notification is about", () => {
       .toEqual([`/pt-BR/app/reminders/${ID}`]);
   });
 
+  it("carries the target from the push all the way to the tap", async () => {
+    /*
+     * THE SEAM, and the defect it exists for.
+     *
+     * Every test above hands `notification.data` to the click handler by hand,
+     * so they prove that `resolveDestination` can build an item path. The test
+     * at "renders the owner-scoped reminder title" asserted the push handler
+     * stored `{ destination }` and NOTHING else — which pinned the defect in
+     * place rather than catching it. Both halves were green and the product
+     * could never work: `readPush` computed a `target` and `showNotification`
+     * dropped it, so by the time a tap arrived there was no target left to
+     * resolve and every notification opened the list.
+     *
+     * Measured on the owner's iPhone on 2026-10-28: a delivered reminder whose
+     * task existed opened `/pt-BR/app/reminders` at its default pending view.
+     *
+     * So this test refuses to write the data itself. It pushes, takes whatever
+     * the push handler actually stored, and taps THAT.
+     */
+    const worker = loadWorker();
+    const shown: Array<Record<string, unknown>> = [];
+    worker.registration[SHOW] = (_title: string, options: Record<string, unknown>) => {
+      shown.push(options);
+      return Promise.resolve();
+    };
+    const pushed: unknown[] = [];
+    worker.listeners.get("push")!({
+      waitUntil: (value: unknown) => pushed.push(value),
+      data: {
+        json: () => ({
+          title: "Lembrete",
+          body: "x",
+          destination: "/pt-BR/app/reminders",
+          type: "reminder",
+          target: { kind: "task", id: ID },
+        }),
+      },
+    });
+    await settle(pushed);
+    expect(shown).toHaveLength(1);
+
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const clicked: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => clicked.push(value),
+      // Not a literal: whatever the push handler really put there.
+      notification: { close: () => {}, data: shown[0].data },
+    });
+    await settle(clicked);
+    expect(opened).toEqual([`/pt-BR/app/work/${ID}`]);
+  });
+
+  it("carries a reminder target through the same seam", async () => {
+    // The other branch of the same join, because a fix that only threaded the
+    // task kind would leave the reminder's own page unreachable and this file
+    // would still be green.
+    const worker = loadWorker();
+    const shown: Array<Record<string, unknown>> = [];
+    worker.registration[SHOW] = (_title: string, options: Record<string, unknown>) => {
+      shown.push(options);
+      return Promise.resolve();
+    };
+    const pushed: unknown[] = [];
+    worker.listeners.get("push")!({
+      waitUntil: (value: unknown) => pushed.push(value),
+      data: {
+        json: () => ({
+          title: "Lembrete",
+          body: "x",
+          destination: "/pt-BR/app/reminders",
+          type: "reminder",
+          target: { kind: "reminder", id: ID },
+        }),
+      },
+    });
+    await settle(pushed);
+
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const clicked: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => clicked.push(value),
+      notification: { close: () => {}, data: shown[0].data },
+    });
+    await settle(clicked);
+    expect(opened).toEqual([`/pt-BR/app/reminders/${ID}`]);
+  });
+
+  it("stores no target when the message named none, so the tap still opens the list", async () => {
+    /*
+     * The other direction, and it is what keeps the fix from being a hole: a
+     * message that names no item must leave the destination exactly as it was.
+     * `readPush` already drops a target it cannot resolve; this asserts the
+     * push handler does not invent one.
+     */
+    const worker = loadWorker();
+    const shown: Array<Record<string, unknown>> = [];
+    worker.registration[SHOW] = (_title: string, options: Record<string, unknown>) => {
+      shown.push(options);
+      return Promise.resolve();
+    };
+    const pushed: unknown[] = [];
+    worker.listeners.get("push")!({
+      waitUntil: (value: unknown) => pushed.push(value),
+      data: {
+        json: () => ({
+          title: "Lembrete",
+          body: "x",
+          destination: "/pt-BR/app/reminders",
+          type: "reminder",
+          target: { kind: "settings", id: ID },
+        }),
+      },
+    });
+    await settle(pushed);
+    expect((shown[0].data as { target?: unknown }).target).toBeUndefined();
+
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const clicked: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => clicked.push(value),
+      notification: { close: () => {}, data: shown[0].data },
+    });
+    await settle(clicked);
+    expect(opened).toEqual(["/pt-BR/app/reminders"]);
+  });
+
   it("keeps the locale of the destination it was given", async () => {
     expect(await tap({ destination: "/en/app/reminders", target: { kind: "task", id: ID } }))
       .toEqual([`/en/app/work/${ID}`]);
