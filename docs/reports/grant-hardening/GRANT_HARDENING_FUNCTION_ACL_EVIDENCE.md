@@ -170,6 +170,21 @@ filtered on `grantee = 'anon'`:
 was wrong; `prosecdef` is `false`. No trigger function in the set is a definer. Every one of
 the eleven sets a safe `search_path`.
 
+**Why that error is worth recording as a method, not just a corrected row.** Two sessions
+reached the same wrong answer independently, both by grepping the migration, before the
+catalogue settled it. A migration file declares several functions in sequence, and
+`security definer` sits on its own line between a `create function` header and the body —
+so a grep for the clause, or a windowed `-A`/`-B` read around a function name, attributes
+it to **whichever function happens to be nearest in the file**, not to the one that owns
+it. The text gives no reliable boundary to anchor on.
+
+`pg_proc.prosecdef` is the only answer that cannot be mis-attributed, and it costs one
+query. The same holds for `proconfig` (the `search_path`), `prorettype` (which decided the
+entire severity question here) and `proacl`. **Read the catalogue, not the migration, for
+any property of a function that is actually deployed** — the migration says what was
+intended at one moment in the chain; the catalogue says what is true now, after every later
+`create or replace`, `alter` and default privilege has had its say.
+
 ### The uncallability is proved, not asserted
 
 A direct-call probe was run against production inside a `DO` block that catches each error
