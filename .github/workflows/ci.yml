@@ -121,9 +121,29 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Pinned, and bumped from 2.106.0 (published 2026-06-11) on 2026-10-29.
+      #
+      # The old pin had no fallback between image registries: `supabase start`
+      # pulled from ghcr.io, and when GHCR answered `toomanyrequests` the CLI
+      # retried the SAME registry twice and gave up. The job then died in
+      # `Start the local Supabase stack` after ~1-3 minutes having executed no
+      # test at all -- six times across 2026-10-28 and 2026-10-29, on images
+      # `ghcr.io/supabase/gotrue` and `ghcr.io/supabase/postgres`.
+      #
+      # Reported behaviour is that 2.108+ falls back ECR Public -> GHCR ->
+      # Docker Hub on its own. That comes from practitioner reports rather than
+      # Supabase's documentation, which does not cover the registry at all, so
+      # this bump is a HYPOTHESIS with a falsifiable test: a run whose log shows
+      # the CLI trying a SECOND registry after the first refuses confirms it,
+      # and a run that dies the old way refutes it.
+      #
+      # Deliberately NOT done: setting `SUPABASE_INTERNAL_IMAGE_REGISTRY` at a
+      # mirror. The same reports say the override DISABLES the fallback, so one
+      # unavailable image would fail the start outright -- a change that could
+      # make this worse while looking like a fix.
       - uses: supabase/setup-cli@v1
         with:
-          version: 2.106.0
+          version: 2.122.0
 
       - name: Start the local Supabase stack
         # Studio, image proxy, mail catcher, log pipeline and the edge runtime

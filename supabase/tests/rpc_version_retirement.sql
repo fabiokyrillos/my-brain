@@ -168,8 +168,39 @@ select ok(
 );
 
 select ok(
-  not has_function_privilege('service_role', 'public.confirm_entry_tasks(uuid, integer[])'::regprocedure, 'execute'),
-  'the retired function was never a service-role path and still is not'
+  -- CORRECTION, 2026-10-29. This assertion read
+  -- `not has_function_privilege('service_role', ...)` and was never true of the
+  -- deployed project: read against production, `service_role` => true while
+  -- `authenticated`, `anon` and `PUBLIC` are all false, exactly as the three
+  -- tests above require. The platform's own bootstrap carries `alter default
+  -- privileges in schema public grant all on functions to postgres, anon,
+  -- authenticated, service_role`, so every function here inherits service_role
+  -- EXECUTE unless a migration revokes it, and this function's retirement
+  -- revoked the three client roles and not that one. It passed only because the
+  -- local stack this suite runs against was weaker than production -- the same
+  -- failure mode `signup_hardening_grant_census.sql` records for its Property 2,
+  -- surfaced the same day by the same CLI bump.
+  --
+  -- Rewritten rather than inverted, and rewritten rather than deleted. Pinning
+  -- `service_role => true` would make a future revoke -- an improvement -- fail
+  -- here. Deleting it would drop a security assertion to satisfy a plan count.
+  -- A closed set over the roles a CLIENT can hold is monotone in the safe
+  -- direction: access taken away still passes, and the moment any of them gains
+  -- EXECUTE this fails and names it. `service_role` is the break-glass role that
+  -- bypasses RLS by design, this application holds no service-role client, and
+  -- revoking it on this one function would leave every other function in the
+  -- schema carrying the same inherited grant -- a project-wide
+  -- default-privileges question, not a line in this file.
+  not exists (
+    select 1
+      from (values ('anon'), ('authenticated'), ('public')) as candidate(role_name)
+     where has_function_privilege(
+             candidate.role_name,
+             'public.confirm_entry_tasks(uuid, integer[])'::regprocedure,
+             'execute'
+           )
+  ),
+  'no role a client can hold executes the retired function; service_role inherits EXECUTE from the platform default privilege and is recorded rather than asserted away'
 );
 
 select ok(
