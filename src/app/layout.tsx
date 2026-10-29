@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Newsreader } from "next/font/google";
 import { APPEARANCE_SCRIPT } from "@/features/appearance/contracts";
+import { NavigateOnNotificationTap } from "@/features/pwa/navigate-on-notification-tap";
 import { RegisterServiceWorker } from "@/features/pwa/register-service-worker";
 import "./globals.css";
 import "./mobile-navigation.css";
@@ -107,6 +108,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
       <body className="min-h-full flex flex-col">
         <RegisterServiceWorker />
+        <NavigateOnNotificationTap />
         {children}
       </body>
     </html>

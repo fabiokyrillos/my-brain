@@ -165,6 +165,16 @@ const PUSH_ASSERTING_TESTS: readonly string[] = [
    */
   "src/features/notifications/push-controls.test.tsx",
   "src/features/notifications/push-encoding.test.ts",
+  /*
+   * The click handler's path and the page's listener hold two copies of one
+   * message type, because `public/sw.js` is a classic script and cannot import
+   * the module that declares it. This test is what fails when they drift, so it
+   * has to locate the handler inside the worker source — which means writing
+   * the listener's name. It performs nothing: it reads `public/sw.js` as text
+   * and asserts about strings, never registering a listener or rendering a
+   * notification, which the bound below proves rather than assumes.
+   */
+  "src/features/pwa/navigate-message.test.ts",
   "src/lib/byok/guards.test.ts",
   // The governance guard mirrors this file's allowlist so the two watch each
   // other, which means it must spell the sender's filenames out. It previously
@@ -398,6 +408,7 @@ describe("2M-NOTIFY-006/-007: push exists now, and only where it was authorized"
       "src/features/notifications/notification-settings.test.tsx",
       "src/features/notifications/push-controls.test.tsx",
       "src/features/notifications/push-encoding.test.ts",
+      "src/features/pwa/navigate-message.test.ts",
       "src/lib/byok/guards.test.ts",
       "src/lib/closeout/phase-2m-notification-boundary-guard.test.ts",
     ]);
