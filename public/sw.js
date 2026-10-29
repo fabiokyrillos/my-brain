@@ -140,6 +140,47 @@ self.addEventListener("push", (event) => {
   );
 });
 
+/**
+ * Navigate an open page, or reject so the caller can hand the path over.
+ *
+ * `WindowClient.navigate()` fails in three different ways: it is absent in
+ * WebKit, the specification requires a rejection for a client this worker does
+ * not control, and a synchronous throw is permitted too. All three mean the
+ * same thing -- the page did not move -- so all three arrive at one branch.
+ */
+function navigateOpenPage(page, destination) {
+  try {
+    const navigating = typeof page.navigate === "function" ? page.navigate(destination) : null;
+    if (!navigating || typeof navigating.then !== "function") {
+      return Promise.reject(new Error("navigate unavailable"));
+    }
+    return navigating;
+  } catch {
+    return Promise.reject(new Error("navigate threw"));
+  }
+}
+
+/**
+ * Ask an open page to route itself to `destination`.
+ *
+ * Focusing alone was the defect: it brought the app to the front at whatever
+ * page it was already showing, discarding the path the tap had just resolved.
+ * Measured on the owner's iPhone on 2026-10-29, with the app open.
+ *
+ * `destination` has already been through `resolveDestination`, and the page
+ * re-validates it again before routing -- see
+ * `src/features/pwa/navigate-message.ts`, which holds the other copy of this
+ * type string and whose parity test fails if the two disagree.
+ */
+function askOpenPageToNavigate(page, destination) {
+  if (typeof page.postMessage !== "function") return;
+  try {
+    page.postMessage({ type: "my-brain/navigate", destination: destination });
+  } catch {
+    // A page that cannot be messaged is still better focused than left alone.
+  }
+}
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const data = event.notification.data;
@@ -153,10 +194,16 @@ self.addEventListener("notificationclick", (event) => {
       }
       const existing = clients.find((client) => "focus" in client);
       if (existing) {
-        // `navigate` can reject when the client is cross-origin or unloading;
-        // focusing anyway is better than the tap doing nothing at all.
-        return existing.navigate(destination).then((client) => (client ? client.focus() : existing.focus()))
-          .catch(() => existing.focus());
+        // Where `navigate` works, the page moves and needs no message. Where it
+        // does not, hand the path to the page rather than dropping it: focusing
+        // without navigating is indistinguishable from the tap doing nothing,
+        // which is exactly how this shipped broken.
+        return navigateOpenPage(existing, destination)
+          .then((client) => (client ? client.focus() : existing.focus()))
+          .catch(() => {
+            askOpenPageToNavigate(existing, destination);
+            return existing.focus();
+          });
       }
       return self.clients.openWindow(destination);
     }),

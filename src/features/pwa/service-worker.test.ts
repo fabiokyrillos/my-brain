@@ -515,3 +515,133 @@ describe("the item a notification is about", () => {
     expect(await tap({ destination: "/pt-BR/app/reminders" })).toEqual(["/pt-BR/app/reminders"]);
   });
 });
+
+/**
+ * The tap when a page is ALREADY OPEN.
+ *
+ * Every tap test above stubs `matchAll` to return `[]`, so all of them exercise
+ * `openWindow` and **none** of them reaches the branch the browser takes when
+ * the app is open. That branch shipped with
+ *
+ *     existing.navigate(destination).then(...).catch(() => existing.focus())
+ *
+ * and on 2026-10-29 an authorized push to the owner's iPhone, tapped with the
+ * app open, focused the app and went nowhere: `WindowClient.navigate()` is
+ * unimplemented in WebKit and the specification requires it to reject for a
+ * client the worker does not control, so the `catch` focused the window and
+ * dropped the path the tap had just resolved.
+ *
+ * This is the same defect shape as the one repaired the day before — a value
+ * computed correctly and then discarded — one layer further out. These tests
+ * cover the branch itself, with `navigate` failing in each of the three ways a
+ * browser can fail it.
+ */
+describe("the tap when the app is already open", () => {
+  const ID = "3f1a9c22-5d41-4c0e-9b77-2a6d8e0f41bc";
+  const TASK_TAP = { destination: "/pt-BR/app/reminders", target: { kind: "task", id: ID } };
+
+  type PageOverrides = Record<string, unknown>;
+
+  async function tapWithOpenPage(data: unknown, overrides: PageOverrides = {}) {
+    const worker = loadWorker();
+    const focused: string[] = [];
+    const navigated: string[] = [];
+    const posted: unknown[] = [];
+    const opened: string[] = [];
+
+    const page: Record<string, unknown> = {
+      url: "https://app.test/pt-BR/app",
+      focus: () => { focused.push("focus"); return Promise.resolve(page); },
+      navigate: (url: string) => { navigated.push(url); return Promise.resolve(page); },
+      postMessage: (message: unknown) => { posted.push(message); },
+      ...overrides,
+    };
+
+    worker.clients.matchAll = () => Promise.resolve([page]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+
+    const waited: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => waited.push(value),
+      notification: { close: () => {}, data },
+    });
+    await settle(waited);
+    return { focused, navigated, posted, opened };
+  }
+
+  const NAVIGATE_FAILURES: ReadonlyArray<readonly [string, PageOverrides]> = [
+    ["rejects", { navigate: () => Promise.reject(new Error("unimplemented")) }],
+    ["is absent entirely", { navigate: undefined }],
+    ["throws synchronously", { navigate: () => { throw new TypeError("not controlled"); } }],
+    ["returns something that is not a promise", { navigate: () => undefined }],
+  ];
+
+  it("navigates the open page where the browser implements navigate", async () => {
+    const result = await tapWithOpenPage(TASK_TAP);
+    expect(result.navigated).toEqual([`/pt-BR/app/work/${ID}`]);
+    expect(result.posted, "a page that navigated needs no message").toEqual([]);
+    expect(result.opened, "a tap must never spawn a second window").toEqual([]);
+  });
+
+  for (const [how, overrides] of NAVIGATE_FAILURES) {
+    it(`hands the path to the page when navigate ${how}`, async () => {
+      const result = await tapWithOpenPage(TASK_TAP, overrides);
+      expect(result.posted).toEqual([
+        { type: "my-brain/navigate", destination: `/pt-BR/app/work/${ID}` },
+      ]);
+      expect(result.focused, "the page must still come to the front").toEqual(["focus"]);
+      expect(result.opened, "a tap must never spawn a second window").toEqual([]);
+    });
+  }
+
+  it("hands over the reminder path too, so a one-sided repair still fails", async () => {
+    const result = await tapWithOpenPage(
+      { destination: "/pt-BR/app/reminders", target: { kind: "reminder", id: ID } },
+      { navigate: () => Promise.reject(new Error("unimplemented")) },
+    );
+    expect(result.posted).toEqual([
+      { type: "my-brain/navigate", destination: `/pt-BR/app/reminders/${ID}` },
+    ]);
+  });
+
+  it("hands over only a destination from the closed set, never the payload's own", async () => {
+    const result = await tapWithOpenPage(
+      { destination: "https://evil.test" },
+      { navigate: () => Promise.reject(new Error("unimplemented")) },
+    );
+    expect(result.posted).toEqual([
+      { type: "my-brain/navigate", destination: "/pt-BR/app/notifications" },
+    ]);
+  });
+
+  it("focuses a page already showing the destination without messaging it", async () => {
+    const result = await tapWithOpenPage(TASK_TAP, { url: `https://app.test/pt-BR/app/work/${ID}` });
+    expect(result.focused).toEqual(["focus"]);
+    expect(result.navigated).toEqual([]);
+    expect(result.posted).toEqual([]);
+  });
+
+  it("still focuses, and opens no window, when the page cannot be messaged", async () => {
+    const result = await tapWithOpenPage(TASK_TAP, {
+      navigate: () => Promise.reject(new Error("unimplemented")),
+      postMessage: undefined,
+    });
+    expect(result.focused).toEqual(["focus"]);
+    expect(result.opened).toEqual([]);
+  });
+
+  it("still opens a window when nothing is open at all", async () => {
+    const worker = loadWorker();
+    const opened: string[] = [];
+    worker.clients.matchAll = () => Promise.resolve([]);
+    worker.clients.openWindow = (url: string) => { opened.push(url); return Promise.resolve(null); };
+    const waited: unknown[] = [];
+    worker.listeners.get("notificationclick")!({
+      waitUntil: (value: unknown) => waited.push(value),
+      notification: { close: () => {}, data: TASK_TAP },
+    });
+    await settle(waited);
+    expect(opened, "the closed-app path must be untouched by this repair")
+      .toEqual([`/pt-BR/app/work/${ID}`]);
+  });
+});
