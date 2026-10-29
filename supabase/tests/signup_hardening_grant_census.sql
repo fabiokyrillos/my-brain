@@ -20,7 +20,9 @@
 --   1. `anon` holds zero explicit table privileges in `public` -- every
 --      table-creating migration revokes it, and a future table that forgets
 --      fails here by name.
---   2. `anon` carries zero explicit function grants in `public`.
+--   2. `anon` can INVOKE no public function beyond three named ones. Stated as
+--      "carries zero explicit function grants" until 2026-10-29, which was a
+--      claim this census could not actually make -- see Property 2.
 --   3. Exactly three public tables carry ZERO grants of any kind to
 --      `service_role`: the RPC-only ledgers whose migrations revoke it
 --      explicitly (`product_events` at `202607170024:76`,
@@ -60,7 +62,7 @@
 -- Written in pure ASCII, following `signup_hardening_cascade_drill.sql`.
 
 begin;
-select plan(11);
+select plan(12);
 
 set local timezone to 'UTC';
 
@@ -100,12 +102,39 @@ select is(
 );
 
 -- ---------------------------------------------------------------------------
--- Property 2 -- anon carries zero explicit function grants in public (1)
+-- Property 2 -- anon can invoke no public function beyond the named three (2)
 -- ---------------------------------------------------------------------------
 --
 -- Explicit ACL entries only: a function whose acl is NULL (default) grants
 -- PUBLIC execute implicitly, and that case is exposure 6 below, carried by
 -- name rather than folded in here.
+--
+-- CALLABLE functions only, and the exclusion is the point rather than a
+-- convenience (2026-10-29, grant-hardening; see
+-- `docs/reports/grant-hardening/GRANT_HARDENING_FUNCTION_ACL_EVIDENCE.md`).
+--
+-- `alter default privileges in schema public grant all on functions to postgres,
+-- anon, authenticated, service_role` is in the platform's own bootstrap, so
+-- EVERY function created here inherits an explicit `anon` entry unless a
+-- migration revokes it -- measured on the deployed project, 0 of 149 public
+-- functions still carry a NULL acl. That reaches trigger functions too, and
+-- seven of ours carry the entry: `audit_task_change`, `create_due_task_reminder`,
+-- `link_interpreted_entities`, `mark_historical_summaries_outdated`,
+-- `normalize_pending_questions`, `protect_entry_original`, `set_updated_at`.
+--
+-- The grant on those is INERT, and provably so: PostgreSQL refuses a direct call
+-- to a trigger-returning function with `0A000 trigger functions can only be
+-- called as triggers`, on the return type, BEFORE any privilege is consulted and
+-- whoever holds EXECUTE. PostgREST never exposes one either. A revoke sweep
+-- would buy nothing and would have to be repeated for every trigger function
+-- this schema ever gains.
+--
+-- So the filter makes this property STRICTER in the only direction that carries
+-- meaning -- a reachable function opened to `anon` still fails here by name --
+-- and makes it true of the DEPLOYED project for the first time. Until the local
+-- stack began reproducing the platform's default privileges, this assertion
+-- passed because the environment was weaker than production, not because the
+-- property held. That is the failure mode the exclusion closes.
 
 -- SH.5 (`202608040075`, ADR-080) made this list non-empty for the first time,
 -- and that is a decision rather than a drift, so the two functions are named.
@@ -150,9 +179,27 @@ select is(
     cross join lateral aclexplode(proc.proacl) as acl
     where namespace.nspname = 'public'
       and acl.grantee = 'anon'::regrole::oid
+      -- A trigger or event-trigger function cannot be invoked directly by
+      -- anyone, so a grant on one opens nothing. See the note above.
+      and proc.prorettype not in ('trigger'::regtype, 'event_trigger'::regtype)
   ),
   'claim_auth_event_slot, finalize_auth_event_attempt, record_error_event',
-  'exactly the two pre-session throttle RPCs and the error sink''s writer carry an explicit anon grant -- offenders are named'
+  'exactly the two pre-session throttle RPCs and the error sink''s writer carry an explicit anon grant on a CALLABLE function -- offenders are named'
+);
+
+-- The exclusion above rests entirely on the engine's refusal, and the note
+-- calls that refusal provable -- so it is proved here rather than asserted in
+-- prose. `set_updated_at` is a trigger function present in every slice of this
+-- schema and takes no arguments, and it is one of the seven carrying the
+-- inherited `anon` entry. Calling it directly must fail with `0A000` whoever
+-- holds EXECUTE. If a future PostgreSQL ever permits the call, the filter
+-- stops being safe and THIS test is what says so -- before the filter can
+-- hide a grant that has become reachable.
+select throws_ok(
+  $$ select public.set_updated_at() $$,
+  '0A000',
+  null,
+  'a trigger function cannot be invoked directly, which is what makes the inherited anon grant on one inert'
 );
 
 -- ---------------------------------------------------------------------------
