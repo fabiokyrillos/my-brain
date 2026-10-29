@@ -124,7 +124,18 @@ self.addEventListener("push", (event) => {
       tag: `my-brain-${notice.type}`,
       // The destination travels in `data`, chosen from the closed set above and
       // never taken raw from the message.
-      data: { destination: notice.destination },
+      //
+      // `target` travels BESIDE it, and leaving it out was the whole defect:
+      // `readPush` validated an item and this line dropped it, so by the time a
+      // tap arrived there was nothing left to resolve and every notification
+      // opened the list. Measured on the owner's iPhone on 2026-10-28.
+      //
+      // It is still not a path. The click handler re-validates both fields from
+      // scratch through `resolveDestination`, so what is stored here is a claim
+      // to be checked rather than an instruction to be followed -- which is why
+      // persisting it costs none of ADR-142's property. `readPush` has already
+      // replaced an unresolvable target with `undefined`.
+      data: { destination: notice.destination, target: notice.target },
     }),
   );
 });
