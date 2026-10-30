@@ -70,21 +70,56 @@
   --font-ui: var(--font-plex-sans), system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
 
-  --type-display: 400 40px/1.06 var(--font-reading);
-  --type-title-1: 400 30px/1.1 var(--font-reading);
-  --type-title-2: 400 26px/1.2 var(--font-reading);
+  /* Life Brain slice A.0 (ADR-145 Decision 3) raised the scale: the 13.5px
+     body, 12.5px label and 12px caption the first cut codified were below the
+     comfortable reading floor on a phone, and the eyebrow leaves the mono face
+     so that ordinary metadata stops reading like a log. The before values are
+     in docs/initiatives/life-brain/DESIGN_DIRECTION.md §3.1. */
+  --type-display: 400 34px/1.1 var(--font-reading);
+  --type-title-1: 400 28px/1.15 var(--font-reading);
+  --type-title-2: 400 24px/1.2 var(--font-reading);
   --type-reading-lg: 400 19px/1.6 var(--font-reading);
   --type-reading: 400 17px/1.65 var(--font-reading);
   --type-reading-sm: 400 15px/1.5 var(--font-reading);
-  --type-lead: 400 15.5px/1.55 var(--font-ui);
-  --type-heading: 600 15px/1.35 var(--font-ui);
-  --type-section: 600 13px/1 var(--font-ui);
-  --type-body: 400 13.5px/1.6 var(--font-ui);
-  --type-label: 500 12.5px/1 var(--font-ui);
-  --type-caption: 400 12px/1.45 var(--font-ui);
-  --type-mono: 500 12px/1 var(--font-mono);
-  --type-eyebrow: 500 11px/1 var(--font-mono);
-  --eyebrow-tracking: 0.12em;
+  --type-lead: 400 16px/1.5 var(--font-ui);
+  --type-heading: 600 16px/1.35 var(--font-ui);
+  --type-section: 600 13px/1.2 var(--font-ui);
+  --type-body: 400 15px/1.55 var(--font-ui);
+  --type-label: 500 13.5px/1.2 var(--font-ui);
+  --type-caption: 400 12.5px/1.45 var(--font-ui);
+  --type-mono: 500 13px/1.3 var(--font-mono);
+  --type-eyebrow: 500 11.5px/1 var(--font-ui);
+  --eyebrow-tracking: 0.08em;
+
+  /* ---- controls, icons, layering, rhythm (Life Brain A.0) ---------------- */
+  --control-sm: 36px;
+  --control-md: 44px;
+  --control-lg: 52px;
+  --icon-sm: 16px;
+  --icon-md: 20px;
+  --icon-lg: 24px;
+  --z-raised: 1;
+  --z-sticky: 10;
+  --z-bottom-bar: 20;
+  --z-sheet: 30;
+  --z-dialog: 40;
+  --z-toast: 50;
+  --section-gap: 32px;
+  --card-padding: 20px;
+  --card-padding-compact: 16px;
+
+  /* One warm accent for selected states and the assistant's own voice. The
+     baseline had no affirmative colour: selected pills were black on one page
+     and link-blue on another. */
+  --accent: #9e4520;
+  --accent-soft: #f6e9e1;
+  --accent-text: #ffffff;
+
+  /* The boundary of a control the user must find — an input, a secondary
+     button. `--border-strong` is a decorative hairline at 1.7:1; a control
+     boundary needs 3:1 (WCAG 1.4.11), so it gets its own token and
+     `src/components/ui/contrast.test.ts` holds it there in both themes. */
+  --control-border: #857e73;
 
   /* ---- space ------------------------------------------------------------ */
   --space-1: 4px;
@@ -178,13 +213,20 @@
   --link: #7aa5d1;
   --link-hover: #9dbde0;
 
-  /* In dark, elevation is carried by border and by a lighter surface. A shadow
-     on a near-black canvas reads as dirt, not as height. */
-  --elevation-1: none;
-  --elevation-2: none;
+  /* In dark, elevation is carried by border AND by a shadow that is faint but
+     not absent. The first cut set these to `none`, so in the theme most
+     iPhones run by default every card was separated by a hairline alone
+     (Life Brain A.0, ADR-145 Decision 3). */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 4px 14px rgba(0, 0, 0, 0.55);
   --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
   --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
   --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+  --accent: #e07a4f;
+  --accent-soft: #3a2518;
+  --accent-text: #141311;
+  --control-border: #8a8378;
 
   /* Heavier in dark: the canvas is already near-black, so a light scrim would
      not separate the dialog from the page behind it. */
@@ -222,11 +264,16 @@
     --link: #7aa5d1;
     --link-hover: #9dbde0;
 
-    --elevation-1: none;
-    --elevation-2: none;
+    --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --elevation-2: 0 4px 14px rgba(0, 0, 0, 0.55);
     --elevation-3: 0 26px 60px rgba(0, 0, 0, 0.55);
     --elevation-sheet: 0 -12px 40px rgba(0, 0, 0, 0.5);
     --elevation-undo: 0 8px 20px rgba(0, 0, 0, 0.5);
+
+    --accent: #e07a4f;
+    --accent-soft: #3a2518;
+    --accent-text: #141311;
+    --control-border: #8a8378;
 
     /* Heavier in dark: the canvas is already near-black, so a light scrim would
        not separate the dialog from the page behind it. */
