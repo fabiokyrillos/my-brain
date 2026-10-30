@@ -66,6 +66,7 @@ fails the build on an addition to it.
 
 | Directory | Contents |
 | --- | --- |
+| [`initiatives/life-brain/`](./initiatives/life-brain/) | `PRD.md`, `IMPLEMENTATION_PLAN.md`, `DESIGN_DIRECTION.md`, `INFORMATION_ARCHITECTURE.md`, `LIFE_DATA_MODEL.md` — the whole-life initiative opened 2026-10-30 (ADR-145): design system, chat with memory, life data model. Record in `reports/life-brain/`. |
 | [`initiatives/sprint-1-5/`](./initiatives/sprint-1-5/) | `SPRINT_1_5_REPORT.md` — foundation hardening, closed 2026-07-17. |
 | [`initiatives/phase-2/`](./initiatives/phase-2/) | `PHASE_2_PLAN.md`, `PHASE_2_ARCHITECTURE_REVIEW.md`, `PHASE_2B_REPORT.md` — the Phase 2 umbrella (2A/2B) the lettered phases descend from. |
 | [`initiatives/phase-2x/`](./initiatives/phase-2x/) | PRD, implementation plan, closing report. |

@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-10-30 — Life Brain opens: the investigation, the plan and the first visual instrument (ADR-145)
+
+- **Investigation executed, not inferred.** Three parallel audits over the repository — UX/components, chat retrieval, work bias — filed under `docs/reports/life-brain/` with file:line citations, plus `e2e/online-life-brain-baseline.spec.ts`, which signs in as the test account, photographs every list route at iPhone 390 and desktop 1440 and writes `measurements.json` (horizontal overflow, sub-44px targets, distinct button class signatures, underlined links, technical vocabulary) per route. 86 screenshots. No route overflowed; the worst pages by evidence are Trabalho (first task below the fold, a two-line "Adicionar" button, a broken desktop row), Notificações (50 notices × 3 buttons = 103 buttons on a 14,000px page), Relações (prose before the drawing), Calendário/Planejar (15 controls before the first event) and Conversar (a form, not a conversation, behind "Mais").
+- **The premise was wrong and the record says so.** The brief assumed Tailwind + `cva`; the product uses neither (0 `cva` callers, 6 of 303 TSX files with a utility class). Styling is 28 hand-written sheets, 11,023 lines, 1,166 selectors. There is no component layer to restyle.
+- **What the chat cannot see** is now a table (`INVESTIGATION.md` §2.2): tasks, reminders, people, projects, files, summaries, prior messages and the calendar are all outside `match_internal_knowledge`; the prompt carries the timezone but not the date; the model is billed on zero sources.
+- **Why the app reads as work-only** is three mechanisms, not one: a corporate prompt plus a worker that links but never creates contexts (so "Saúde" is dead), a data model with no event, period, place or area, and navigation/copy that names Trabalho, Empresas and "Aguardando outras pessoas".
+- **Planning package** written: PRD (43 requirements), implementation plan (20 slices, ≈25 session-days, 3 migrations allocated), design direction (tokens, primitives, before/after of the five weakest pages), information architecture (22 destinations → 6), life data model (extend `contexts.kind`, add `events`, no tables for facts/trips/ideas).
+- **Not done, and named:** detail pages were not photographed (empty test account; seeding refused by the permission classifier); the four life questions were traced through code, not executed against the model; nothing was applied to the hosted project.
+
+
 ## 2026-10-29 — The database job's CLI had no registry to fall back to
 
 - **Hypothesis under test, not a finished claim.** The `database and journey` job died in `Start the local Supabase stack` six times across 2026-10-28 and 2026-10-29, after ~1-3 minutes, **having executed no test at all** — on `ghcr.io/supabase/gotrue:v2.189.0` and `ghcr.io/supabase/postgres:17.6.1.134`, both answering `toomanyrequests`. The log shows the CLI retrying the **same** registry (4s, then 8s) and giving up; it never tries another.
