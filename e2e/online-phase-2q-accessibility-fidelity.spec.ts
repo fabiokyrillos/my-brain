@@ -61,7 +61,7 @@ const FIXTURE_URL = "http://localhost:3000/__accessibility-fidelity-fixture__";
  * the kind of list it was written for.
  */
 const STYLESHEETS = [
-  "tokens.css", "experience.css", "globals.css", "palette.css", "operations.css",
+  "tokens.css", "experience.css", "ui.css", "globals.css", "palette.css", "operations.css",
   "mobile-navigation.css", "pagination.css", "conversation-cards.css", "chat.css",
   "assistant.css", "brain.css", "timelines.css", "entities.css", "memories.css", "history.css",
 ] as const;

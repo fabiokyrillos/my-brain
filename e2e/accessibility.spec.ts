@@ -67,6 +67,7 @@ const STYLESHEETS = [
   // measure default black-on-white and pass for the wrong reason.
   "tokens.css",
   "experience.css",
+  "ui.css",
   "globals.css",
   "palette.css",
   "operations.css",

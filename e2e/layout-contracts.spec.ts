@@ -30,6 +30,7 @@ const STYLESHEETS = [
   // below measures the wrong thing.
   "tokens.css",
   "experience.css",
+  "ui.css",
   "globals.css",
   "operations.css",
   "chat.css",
