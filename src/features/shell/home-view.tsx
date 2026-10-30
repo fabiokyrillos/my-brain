@@ -1,5 +1,7 @@
+import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { ButtonLink } from "@/components/ui";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
@@ -316,6 +318,20 @@ export function HomeView({
       {/* Capture sits at the top of the content, not inside a hero card
           (`02-arquitetura-e-rotas.md`: *captura → precisa de você → …*). */}
       <div className="today-capture">{capture}</div>
+
+      {/*
+        Life Brain A.1 (ADR-145 Decision 4). The conversation is the product's
+        main surface and Hoje had no door to it: Conversar sat behind "Mais".
+        One call to action under the composer, with three life questions as
+        the hint, so the first thing a new owner learns is that the brain
+        answers back.
+      */}
+      <div className="today-ask">
+        <ButtonLink href={`/${locale}/app/chat`} icon={<MessageCircle />} size="lg" variant="secondary">
+          {copy.ask.action}
+        </ButtonLink>
+        <p className="today-ask-hint">{copy.ask.hint}</p>
+      </div>
 
       {/*
         `2O-ONBOARD-001` — offered, never imposed. It sits *after* capture, and

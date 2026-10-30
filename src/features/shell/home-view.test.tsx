@@ -96,6 +96,19 @@ function renderHome(view: HomeViewModel, locale: Locale = "pt-BR") {
 }
 
 describe("HomeView", () => {
+  it("offers a door to the conversation right under the composer (Life Brain A.1)", () => {
+    const { container } = renderHome(viewModel());
+
+    const door = screen.getByRole("link", { name: "Perguntar ao Brain" });
+    expect(door).toHaveAttribute("href", "/pt-BR/app/chat");
+    // Under the composer and above the first section: capture first (UX-07),
+    // then the question, then the day.
+    const order = [...container.querySelectorAll(".today-capture, .today-ask, .home-section")].map((node) => node.className);
+    expect(order[0]).toBe("today-capture");
+    expect(order[1]).toBe("today-ask");
+    expect(screen.getByText(/Quando fui ao médico\?/)).toBeInTheDocument();
+  });
+
   it("leads with what needs the user and states the day in one line", () => {
     renderHome(viewModel());
 

@@ -1,40 +1,23 @@
 import Link from "next/link";
 
+import { ButtonLink } from "@/components/ui";
 import { destinationHref, type OnboardingPath, type OnboardingStep } from "./contracts";
 import { getOnboardingCopy } from "./copy";
 import type { Locale } from "@/lib/preferences";
 
 /**
- * The guided path, as a panel — `2O-ONBOARD-001` … `-011`.
+ * The guided path, offered on Hoje beneath the composer (`2O-ONBOARD-001`).
  *
- * ## Offered, never imposed
+ * Life Brain A.1 changed its shape, not its contract. The baseline rendered the
+ * whole path as seven stacked cards, each with its own black button — on an
+ * iPhone that was two screens of guide between the composer and the day. The
+ * panel now leads with **the next step** (title, one sentence, one action) and
+ * folds the complete list behind a disclosure. Every row, state attribute and
+ * link is still rendered, so the tests and the reachability census read the
+ * same facts; what changed is what is open by default.
  *
- * It is a `<section>` in the page flow beneath the composer. Not a modal, not a
- * route, not an interstitial and not a gate: every destination the product had
- * before stays exactly as reachable, and the composer sits **above** this in
- * `HomeView` so a first-time owner who wants to type reaches the one
- * interaction this product is built around without passing through anything.
- * `onboarding-guard.test.ts` asserts that ordering rather than trusting it.
- *
- * ## What is rendered for each state, and why it differs
- *
- * **satisfied** — the state, and **no call to action**. `2O-ONBOARD-003` says
- * the path never asks again once a thing is set, and a "done" row carrying a
- * button that still asks is the same nag with a tick beside it.
- *
- * **blocked** — the state, and **no call to action either**, which is
- * `2O-ONBOARD-011` exactly: a step that cannot succeed is not offered as the
- * thing to do. It stays visible so the path does not silently get shorter, and
- * the recovery above offers the one action that unblocks it.
- *
- * **unreadable** — the state, *and* the action. The product could not tell, so
- * it says so and still lets the owner go and look. Withdrawing the action here
- * would turn a failed read into a claim, which is what `2O-ACTIVATION-003`
- * exists to prevent.
- *
- * This component takes the already-derived path and its action, so it stays
- * free of Server Actions and of Supabase, and its test renders it in both
- * locales over every state without a double.
+ * Reads only: the decision of what to show is `onboarding-view.ts`'s, and the
+ * only write this component reaches is the dismissal form it is given.
  */
 
 function StepRow({
@@ -81,24 +64,21 @@ export function OnboardingPanel({
 }: {
   locale: Locale;
   path: OnboardingPath;
-  /** Injected, so this component stays free of Server Actions. */
   dismissAction: (formData: FormData) => Promise<void>;
 }) {
-  // The one place the panel decides not to exist. `offered` already folds
-  // dismissal and completion together, so there is a single answer rather than
-  // two conditions that could disagree at different call sites.
   if (!path.offered) return null;
 
   const copy = getOnboardingCopy(locale);
   const hasUnreadable = path.steps.some((step) => step.state === "unreadable");
   const credentialAbsent = path.credential === "unsatisfied";
+  const next = path.nextStep;
+  const nextText = next ? copy.steps[next.key] : null;
+  const nextOffersAction = next ? next.state === "unsatisfied" || next.state === "unreadable" : false;
 
   return (
-    <section className="onboarding" aria-labelledby="onboarding-title" data-onboarding="offered">
+    <section className="onboarding onboarding--compact" aria-labelledby="onboarding-title" data-onboarding="offered">
       <header className="onboarding-head">
-        <p className="eyebrow">{copy.eyebrow}</p>
         <h2 id="onboarding-title">{copy.title}</h2>
-        <p className="onboarding-intro">{copy.intro}</p>
         <p className="onboarding-progress" data-done={path.satisfiedCount} data-total={path.total}>
           {copy.progress(path.satisfiedCount, path.total)}
         </p>
@@ -108,8 +88,7 @@ export function OnboardingPanel({
         Deliberately **not** `role="status"`. It renders with the page rather
         than in response to an action, so it announces nothing; and Hoje already
         carries one live region for the day's state, which a second one would
-        compete with on every navigation. The heading above gives it its
-        context, which is what a static explanation needs.
+        compete with on every navigation.
       */}
       {hasUnreadable ? (
         <p className="onboarding-notice" data-notice="unreadable">
@@ -118,10 +97,8 @@ export function OnboardingPanel({
       ) : null}
 
       {/*
-        `2O-ONBOARD-011`. It sits above the list rather than inside the blocked
-        row, because it is the answer for every blocked step at once and because
-        an owner with no credential should meet it before scrolling a path they
-        cannot finish.
+        `2O-ONBOARD-011`. The recovery for every blocked step at once, met
+        before the path rather than inside it.
       */}
       {credentialAbsent ? (
         <div className="onboarding-recovery" data-recovery="credential">
@@ -133,17 +110,35 @@ export function OnboardingPanel({
         </div>
       ) : null}
 
-      <ol className="onboarding-steps">
-        {path.steps.map((step) => (
-          <StepRow
-            key={step.key}
-            step={step}
-            locale={locale}
-            isNext={path.nextStep?.key === step.key}
-            copy={copy}
-          />
-        ))}
-      </ol>
+      {next && nextText ? (
+        <div className="onboarding-next" data-next-step={next.key}>
+          <p className="onboarding-next-label">{copy.next.label}</p>
+          <p className="onboarding-next-title">{nextText.title}</p>
+          <p className="onboarding-next-body">{nextText.body}</p>
+          {nextOffersAction ? (
+            <ButtonLink href={destinationHref(next.destination, locale)} size="md" variant="primary">
+              {nextText.action}
+            </ButtonLink>
+          ) : null}
+        </div>
+      ) : (
+        <p className="onboarding-next-body">{copy.next.done}</p>
+      )}
+
+      <details className="onboarding-all">
+        <summary className="onboarding-all-summary">{copy.next.allSteps}</summary>
+        <ol className="onboarding-steps">
+          {path.steps.map((step) => (
+            <StepRow
+              key={step.key}
+              step={step}
+              locale={locale}
+              isNext={path.nextStep?.key === step.key}
+              copy={copy}
+            />
+          ))}
+        </ol>
+      </details>
 
       <form className="onboarding-dismiss" action={dismissAction}>
         <input type="hidden" name="locale" value={locale} />

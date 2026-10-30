@@ -18,10 +18,12 @@
  * *replace* the preview that produced it, not render beside it.
  */
 
-import { LoaderCircle } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { useActionState } from "react";
+
+import { IconButton } from "@/components/ui";
 
 import { ReadOnlyPreview } from "@/features/conversation-cards/read-only-preview";
 import { TaskCommandResult } from "@/features/task-commands/command-console";
@@ -167,7 +169,8 @@ export function AssistantComposer({
         {conversationId === undefined ? null : (
           <input name="conversationId" type="hidden" value={conversationId} />
         )}
-        <label htmlFor={fieldId}>{copy.inputLabel(agentName)}</label>
+        {/* The name stays for assistive technology; visually the placeholder carries it. */}
+        <label className="sr-only" htmlFor={fieldId}>{copy.inputLabel(agentName)}</label>
         <div className="assistant-composer-row">
           <textarea
             aria-describedby={hintId}
@@ -186,12 +189,20 @@ export function AssistantComposer({
             onKeyDown={onKeyDown}
             placeholder={copy.inputPlaceholder}
             required
-            rows={3}
+            rows={2}
           />
-          <button className="assistant-composer-submit" disabled={pending} type="submit">
-            {pending ? <LoaderCircle aria-hidden="true" className="task-command-spin" size={18} /> : null}
-            {pending ? copy.pending : copy.submit}
-          </button>
+          {/*
+            Life Brain A.1: a 44px primary icon button in place of the
+            full-width "Enviar" block. Its accessible name follows the state so
+            "Pensando…" is announced and the control stays findable by name.
+          */}
+          <IconButton
+            aria-label={pending ? copy.pending : copy.submit}
+            icon={<ArrowUp />}
+            loading={pending}
+            type="submit"
+            variant="primary"
+          />
         </div>
         <p className="assistant-composer-hint" id={hintId}>{copy.submitHint}</p>
       </form>

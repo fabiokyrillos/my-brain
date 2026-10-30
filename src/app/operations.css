@@ -190,6 +190,10 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
  */
 .today-hero{max-width:var(--width-reading)}
 .today-capture{margin-top:var(--space-8)}
+/* Life Brain A.1 — the door from Hoje to Conversar, under the composer. */
+.today-ask{display:grid;gap:var(--space-2);justify-items:start;margin-top:var(--space-5)}
+.today-ask-hint{margin:0;font:var(--type-caption);color:var(--text-muted);max-width:var(--width-reading)}
+@media(max-width:899px){.today-ask>.ui-button{width:100%}}
 .today-columns{display:grid;gap:var(--space-4);margin-top:var(--space-10)}
 .today-main,.today-side{display:grid;gap:var(--space-4);align-content:start;min-width:0}
 @media(min-width:1080px){
