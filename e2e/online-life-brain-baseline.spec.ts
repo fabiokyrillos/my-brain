@@ -18,7 +18,15 @@ import { onlineEnvironment, signInOnline } from "./support/online-session";
  * a gate — the gate is the initiative's acceptance criteria, slice by slice.
  */
 
-const EVIDENCE = "docs/reports/life-brain/evidence/baseline";
+/**
+ * Where the evidence lands and which routes to visit. The defaults are the
+ * baseline; a slice re-runs the same instrument on the routes it touched:
+ *   LIFE_BRAIN_EVIDENCE=docs/reports/life-brain/evidence/slice-a1  *   LIFE_BRAIN_ROUTES=home,chat,capture npm run test:e2e:online -- …
+ */
+const EVIDENCE = process.env.LIFE_BRAIN_EVIDENCE?.trim() || "docs/reports/life-brain/evidence/baseline";
+const ROUTE_FILTER = (process.env.LIFE_BRAIN_ROUTES ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+const onlyNamed = <T extends { readonly name: string }>(routes: readonly T[]): readonly T[] =>
+  ROUTE_FILTER.length === 0 ? routes : routes.filter((route) => ROUTE_FILTER.includes(route.name));
 const EMAIL = process.env.ONLINE_AUTH_TEST_EMAIL ?? "";
 
 const VIEWPORTS = [
@@ -176,7 +184,7 @@ test.describe("Life Brain — baseline route audit", () => {
       mkdirSync(EVIDENCE, { recursive: true });
       const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
       const page = await context.newPage();
-      for (const route of PUBLIC_ROUTES) {
+      for (const route of onlyNamed(PUBLIC_ROUTES)) {
         for (const locale of route.en ? (["pt-BR", "en"] as const) : (["pt-BR"] as const)) {
           const status = await capture(page, route, route.path, locale, viewport);
           expect(status, `${route.path} answered`).toBeLessThan(500);
@@ -197,7 +205,7 @@ test.describe("Life Brain — baseline route audit", () => {
       const page = await context.newPage();
       await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });
 
-      for (const route of ROUTES) {
+      for (const route of onlyNamed(ROUTES)) {
         const locales = route.en ? (["pt-BR", "en"] as const) : (["pt-BR"] as const);
         for (const locale of locales) {
           const status = await capture(page, route, route.path, locale, viewport);

@@ -42,6 +42,7 @@ import {
 import { ATTACHMENT_LIMITS } from "@/lib/quotas";
 
 import { Composer, type CaptureAction } from "./composer";
+import { composerCopy } from "./composer-copy";
 import { draftKey, readDraft } from "./composer-draft";
 import type { TranscribeAction } from "./voice-composer";
 import type { AgentFormAction } from "@/features/agent/forms";
@@ -207,7 +208,7 @@ describe("2P-CAPTURE-002: text is ready immediately, with no mode choice first",
   it("still classifies nothing before capture", () => {
     renderComposer();
     expect(screen.queryByRole("combobox")).toBeNull();
-    expect(screen.getByText(/Não precisa classificar nada antes/)).toBeInTheDocument();
+    expect(screen.getByText(composerCopy["pt-BR"].noClassification)).toBeInTheDocument();
   });
 });
 

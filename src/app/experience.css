@@ -476,8 +476,9 @@
   display: inline-grid;
   place-items: center;
   position: relative;
-  width: 40px;
-  height: 40px;
+  /* The touch floor (Life Brain A.1): 40px measured under 44 on every capture surface. */
+  width: var(--control-md);
+  height: var(--control-md);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
@@ -492,8 +493,8 @@
 .composer-mic {
   display: inline-grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: var(--control-md);
+  height: var(--control-md);
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;

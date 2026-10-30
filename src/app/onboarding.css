@@ -243,3 +243,40 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* Life Brain A.1 — the compact shape: next step first, the rest folded.
+   Tokens only; state by text and border, never colour alone (see above). */
+.onboarding--compact { gap: var(--space-4); padding: var(--card-padding); }
+.onboarding--compact .onboarding-head > h2 { font: var(--type-heading); }
+.onboarding-next {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-inline-start: 3px solid var(--text-primary);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+.onboarding-next-label {
+  margin: 0;
+  font: var(--type-eyebrow);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.onboarding-next-title { margin: 0; font: var(--type-heading); color: var(--text-primary); }
+.onboarding-next-body { margin: 0; font: var(--type-body); color: var(--text-secondary); }
+.onboarding-all { display: grid; gap: var(--space-3); }
+.onboarding-all-summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  cursor: pointer;
+  font: var(--type-label);
+  color: var(--link);
+  list-style: none;
+}
+.onboarding-all-summary::-webkit-details-marker { display: none; }
+.onboarding-all-summary:hover { color: var(--link-hover); text-decoration: underline; }
+.onboarding-all-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }

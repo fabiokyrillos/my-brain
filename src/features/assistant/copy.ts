@@ -10,10 +10,18 @@
 import type { Locale } from "@/lib/preferences";
 
 type AssistantCopy = {
-  /** The page's own framing, which the composer replaces three headers with. */
-  readonly eyebrow: string;
+  /** The page's own framing — one compact header since Life Brain A.1. */
   readonly title: (agent: string) => string;
   readonly description: string;
+  readonly recentTitle: string;
+  readonly emptyTitle: (agent: string) => string;
+  readonly emptyDescription: string;
+  readonly startersLabel: string;
+  /** Four life questions the empty surface offers; each seeds the composer. */
+  readonly starters: readonly string[];
+  readonly backToConversations: string;
+  readonly speakerYou: string;
+  readonly modelDetail: string;
   /** The single field. */
   readonly inputLabel: (agent: string) => string;
   readonly inputPlaceholder: string;
@@ -69,17 +77,27 @@ type AssistantCopy = {
 
 export const assistantCopy = {
   "pt-BR": {
-    eyebrow: "CONVERSA COM CONTEXTO",
-    title: (agent) => `Fale com o ${agent}`,
-    description:
-      "Pergunte, mude uma tarefa ou diga o que quer guardar — no mesmo lugar. Você não precisa escolher o tipo antes de escrever.",
+    title: () => "Conversar",
+    description: "Pergunte sobre o que você já registrou, mude uma tarefa ou diga o que quer guardar.",
+    recentTitle: "Conversas recentes",
+    emptyTitle: (agent) => `O ${agent} responde com o que você já registrou`,
+    emptyDescription: "Comece por uma pergunta. Cada resposta diz de onde veio — e quando não há registro, diz isso também.",
+    startersLabel: "Experimente",
+    starters: [
+      "Quando fui ao médico pela última vez?",
+      "O que tenho essa semana?",
+      "O que falei sobre a viagem?",
+      "Quais exames estão pendentes?",
+    ],
+    backToConversations: "Conversas",
+    speakerYou: "Você",
+    modelDetail: "Modelo",
     inputLabel: (agent) => `O que você quer dizer ao ${agent}?`,
-    inputPlaceholder:
-      "ex.: o que combinei com Marina? · mude a prioridade da tarefa do relatório · lembre disso sempre",
+    inputPlaceholder: "Pergunte ou registre algo…",
     submit: "Enviar",
     pending: "Pensando…",
     submitHint: "Enter envia · Shift+Enter quebra a linha",
-    pendingAnnouncement: "Interpretando o que você escreveu.",
+    pendingAnnouncement: "Lendo o que você escreveu.",
     resultRegionLabel: (agent) => `Resposta do ${agent}`,
     echoLabel: "Você escreveu",
     memoryNextStep: "Criar essa memória em Memórias",
@@ -99,17 +117,27 @@ export const assistantCopy = {
     unexpectedDetail: "Algo na solicitação não foi reconhecido. Tente enviar de novo.",
   },
   en: {
-    eyebrow: "CONTEXTUAL CHAT",
-    title: (agent) => `Talk to ${agent}`,
-    description:
-      "Ask, change a task, or say what you want kept — all in one place. You do not have to pick a type before you write.",
+    title: () => "Talk",
+    description: "Ask about what you have already recorded, change a task, or say what you want kept.",
+    recentTitle: "Recent conversations",
+    emptyTitle: (agent) => `${agent} answers from what you have recorded`,
+    emptyDescription: "Start with a question. Every answer says where it came from — and when there is no record, it says that too.",
+    startersLabel: "Try",
+    starters: [
+      "When did I last see the doctor?",
+      "What do I have this week?",
+      "What did I say about the trip?",
+      "Which exams are still pending?",
+    ],
+    backToConversations: "Conversations",
+    speakerYou: "You",
+    modelDetail: "Model",
     inputLabel: (agent) => `What do you want to tell ${agent}?`,
-    inputPlaceholder:
-      "e.g. what did I agree with Marina? · change the priority of the report task · remember this always",
+    inputPlaceholder: "Ask or note something…",
     submit: "Send",
     pending: "Thinking…",
     submitHint: "Enter sends · Shift+Enter adds a line",
-    pendingAnnouncement: "Interpreting what you wrote.",
+    pendingAnnouncement: "Reading what you wrote.",
     resultRegionLabel: (agent) => `${agent}’s response`,
     echoLabel: "You wrote",
     memoryNextStep: "Create this memory in Memories",

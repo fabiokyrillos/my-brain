@@ -1,8 +1,9 @@
 import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageHeader, TextLink } from "@/components/ui";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { AssistantComposer } from "@/features/assistant/assistant-composer";
+import { getAssistantCopy } from "@/features/assistant/copy";
 import { messageAnchorId } from "@/features/conversation-cards/continuity";
 import { resumeConversationCard } from "@/features/conversation-cards/resume";
 import { ResumedCard } from "@/features/conversation-cards/resumed-card";
@@ -65,7 +66,6 @@ function ThreadMessage({
   /** The owner's zone (`LDC-SEARCH-001`), so a citation and its page agree. */
   timeZone: string;
 }) {
-  const pt = locale === "pt-BR";
   /*
    * `2K-SRC-005`. The block is drawn whenever the message **recorded** anything
    * about its sources — including when what it recorded is "I found nothing".
@@ -92,7 +92,7 @@ function ThreadMessage({
   return (
     <article className={`chat-message ${role}`} data-role={role} id={messageAnchorId(messageId)}>
       <p className="chat-message-meta">
-        <span className="chat-message-speaker">{role === "user" ? (pt ? "Você" : "You") : agentName}</span>
+        <span className="chat-message-speaker">{role === "user" ? getAssistantCopy(locale).speakerYou : agentName}</span>
         <time dateTime={createdAt}>{formatInstant(createdAt, "dayAndTime", locale, timeZone)}</time>
       </p>
       <p className="chat-message-body">{content}</p>
@@ -123,7 +123,7 @@ export default async function ConversationPage({
   const { locale: candidate, conversationId } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const pt = locale === "pt-BR";
+  const copy = getAssistantCopy(locale);
   const { supabase, user } = await requireUser(locale);
   const agentName = await getAgentName();
   // `LDC-SEARCH-001`. A cited source must not be dated differently from the page
@@ -171,13 +171,11 @@ export default async function ConversationPage({
 
   return (
     <div className="content-page chat-thread">
-      <Link href={`/${locale}/app/chat`} className="back-link">
-        <ArrowLeft size={16} />{pt ? "Conversas" : "Conversations"}
-      </Link>
-      <header>
-        <p className="eyebrow">{pt ? "BRAIN COM FONTES" : "BRAIN WITH SOURCES"}</p>
-        <h1>{conversation.title}</h1>
-      </header>
+      <TextLink className="back-link" href={`/${locale}/app/chat`} tone="muted">
+        <ArrowLeft aria-hidden="true" size={16} />{copy.backToConversations}
+      </TextLink>
+      {/* Life Brain A.1: one compact header; the eyebrow "BRAIN COM FONTES" is retired. */}
+      <PageHeader size="compact" title={conversation.title} />
 
       {resumed === null ? null : <ResumedCard locale={locale} resumption={resumed} />}
 

@@ -105,6 +105,8 @@ export type HomeCopy = {
   readonly hideLabel: string;
   readonly viewAllRecords: string;
   readonly answerQuestion: string;
+  /** Life Brain A.1: the door from Hoje to the conversation. */
+  readonly ask: { readonly action: string; readonly hint: string };
 };
 
 export const homeCopy = {
@@ -179,6 +181,10 @@ export const homeCopy = {
     hideLabel: "Ocultar",
     viewAllRecords: "Ver todos os registros",
     answerQuestion: "Responder",
+    ask: {
+      action: "Perguntar ao {agent}",
+      hint: "Quando fui ao médico? O que tenho essa semana? O que falei sobre a viagem?",
+    },
   },
   en: {
     greeting: "Good afternoon.",
@@ -251,6 +257,10 @@ export const homeCopy = {
     hideLabel: "Hide",
     viewAllRecords: "View all records",
     answerQuestion: "Answer",
+    ask: {
+      action: "Ask {agent}",
+      hint: "When did I last see the doctor? What do I have this week? What did I say about the trip?",
+    },
   },
 } as const satisfies Record<Locale, HomeCopy>;
 

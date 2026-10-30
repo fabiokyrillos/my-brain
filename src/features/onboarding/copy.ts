@@ -33,6 +33,8 @@ export type OnboardingCopy = Readonly<{
   /** `2O-ACTIVATION-003` surfacing in the UI: a read that failed says so. */
   unreadableNotice: string;
   dismiss: Readonly<{ action: string; hint: string }>;
+  /** Life Brain A.1: the panel leads with the next step and folds the rest. */
+  next: Readonly<{ label: string; allSteps: string; done: string }>;
   /** `2O-ONBOARD-010`'s reversal, mounted on the preferences surface. */
   restore: Readonly<{ title: string; body: string; action: string }>;
 }>;
@@ -56,17 +58,17 @@ const PT: OnboardingCopy = {
     },
     ai_credential: {
       title: "Sua chave de IA",
-      body: "A interpretação usa a sua própria chave. Ela é guardada cifrada e só você a usa.",
+      body: "O Brain usa a sua própria chave. Ela é guardada cifrada e só você a usa.",
       action: "Configurar a chave",
     },
     entry_captured: {
       title: "A primeira captura",
-      body: "Escreva do seu jeito. Suas palavras são guardadas antes de qualquer modelo rodar, e a tela devolve o controle na hora — a interpretação acontece depois, em segundo plano.",
+      body: "Escreva do seu jeito. Suas palavras são guardadas antes de qualquer modelo rodar, e a tela devolve o controle na hora — o Brain organiza depois, em segundo plano.",
       action: "Capturar agora",
     },
     interpretation_reviewed: {
-      title: "Revisar a primeira interpretação",
-      body: "Quando a interpretação ficar pronta, você decide o que vira tarefa. Nada é criado sem esse seu ato.",
+      title: "Revisar a primeira leitura do Brain",
+      body: "Quando a leitura ficar pronta, você decide o que vira tarefa. Nada é criado sem esse seu ato.",
       action: "Ver o que chegou",
     },
     task_confirmed: {
@@ -88,7 +90,7 @@ const PT: OnboardingCopy = {
   },
   recovery: {
     title: "Configure a chave para seguir",
-    body: "Sem uma chave de IA ativa, a interpretação não roda. O que você capturar fica guardado e aguardando — nada se perde.",
+    body: "Sem uma chave de IA ativa, o Brain não organiza nada. O que você capturar fica guardado e aguardando — nada se perde.",
     action: "Ir para a configuração",
   },
   unreadableNotice:
@@ -96,6 +98,11 @@ const PT: OnboardingCopy = {
   dismiss: {
     action: "Dispensar este guia",
     hint: "Você pode trazê-lo de volta em Configurações.",
+  },
+  next: {
+    label: "Próximo passo",
+    allSteps: "Ver todos os passos",
+    done: "Todos os passos concluídos.",
   },
   restore: {
     title: "Guia de primeiros passos",
@@ -123,17 +130,17 @@ const EN: OnboardingCopy = {
     },
     ai_credential: {
       title: "Your AI key",
-      body: "Interpretation runs on your own key. It is stored encrypted, and only you use it.",
+      body: "Brain runs on your own key. It is stored encrypted, and only you use it.",
       action: "Set up the key",
     },
     entry_captured: {
       title: "Your first capture",
-      body: "Write it however you like. Your words are stored before any model runs, and the screen hands control straight back — interpretation happens afterwards, in the background.",
+      body: "Write it however you like. Your words are stored before any model runs, and the screen hands control straight back — Brain organizes it afterwards, in the background.",
       action: "Capture now",
     },
     interpretation_reviewed: {
-      title: "Review the first interpretation",
-      body: "When the interpretation is ready, you decide what becomes a task. Nothing is created without that act of yours.",
+      title: "Review Brain’s first reading",
+      body: "When the reading is ready, you decide what becomes a task. Nothing is created without that act of yours.",
       action: "See what arrived",
     },
     task_confirmed: {
@@ -155,7 +162,7 @@ const EN: OnboardingCopy = {
   },
   recovery: {
     title: "Set up the key to continue",
-    body: "Without an active AI key, interpretation does not run. Anything you capture is stored and waiting — nothing is lost.",
+    body: "Without an active AI key, Brain organizes nothing. Anything you capture is stored and waiting — nothing is lost.",
     action: "Go to the setup",
   },
   unreadableNotice:
@@ -163,6 +170,11 @@ const EN: OnboardingCopy = {
   dismiss: {
     action: "Dismiss this guide",
     hint: "You can bring it back from Settings.",
+  },
+  next: {
+    label: "Next step",
+    allSteps: "Show every step",
+    done: "Every step is done.",
   },
   restore: {
     title: "First-steps guide",

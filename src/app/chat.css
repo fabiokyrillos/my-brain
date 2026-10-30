@@ -37,10 +37,6 @@ body .side-rail { overflow-y: auto }
   text-transform: uppercase;
   color: var(--text-secondary);
 }
-.conversation-list .list-row { border-top: 1px solid var(--border-default) }
-.conversation-list .list-row:last-child { border-bottom: 1px solid var(--border-default) }
-.conversation-list .list-row strong { font: var(--type-reading-sm); color: var(--text-primary) }
-.conversation-list .list-row p { margin: var(--space-1) 0 0; font: var(--type-mono); color: var(--text-muted) }
 
 /*
  * The empty state is a block, not a centred card.
@@ -58,7 +54,6 @@ body .side-rail { overflow-y: auto }
 
 .chat-thread { max-width: 900px }
 .chat-thread > header { margin-bottom: var(--space-8) }
-.chat-thread > header h1 { font: var(--type-display); letter-spacing: -.035em; margin: var(--space-2) 0 }
 
 /* One column. No `justify-self`, no percentage width, no fill. */
 .message-stream { display: grid; gap: 0; margin-bottom: var(--space-6) }
@@ -76,7 +71,7 @@ body .side-rail { overflow-y: auto }
   align-items: baseline;
   gap: var(--space-3);
   margin: 0 0 var(--space-2);
-  font: var(--type-mono);
+  font: var(--type-caption);
   color: var(--text-muted);
 }
 .chat-message-speaker { text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary) }
@@ -99,7 +94,7 @@ body .side-rail { overflow-y: auto }
 .chat-message[data-role="user"] .chat-message-body { color: var(--text-secondary) }
 
 /* The model that answered — provenance, in the smallest register there is. */
-.chat-message > small { display: block; margin-top: var(--space-3); color: var(--text-muted); font: var(--type-mono) }
+.chat-message > small { display: block; margin-top: var(--space-3); color: var(--text-muted); font: var(--type-caption) }
 
 /*
  * The sources under an answer.
@@ -123,3 +118,7 @@ body .side-rail { overflow-y: auto }
 @media (max-width: 600px) {
   .chat-message { padding-block: var(--space-5) }
 }
+
+/* Life Brain A.1 — the four starter questions under the empty state. */
+.chat-starters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chat-starters > .ui-button { white-space: normal; text-align: start; min-height: var(--control-md); }

@@ -36,7 +36,7 @@ export type ComposerCopy = {
 export const composerCopy: Record<Locale, ComposerCopy> = {
   "pt-BR": {
     entryLabel: "Nova entrada",
-    placeholder: "Registre uma tarefa, decisão, conversa ou ideia…",
+    placeholder: "O que aconteceu, o que você precisa, ou o que quer lembrar?",
     send: "Registrar",
     sending: "Salvando…",
     attach: "Anexar arquivo",
@@ -51,11 +51,11 @@ export const composerCopy: Record<Locale, ComposerCopy> = {
     discard: "Descartar",
     offline:
       "Você está offline. O texto continua nesta aba como rascunho, mas nada é enviado nem fica na fila — quando voltar a conexão, envie você mesmo.",
-    noClassification: "Não precisa classificar nada antes. Escreva e confirme.",
+    noClassification: "Saúde, viagem, casa, dinheiro, trabalho — escreva do seu jeito; o resto é com o Brain.",
   },
   en: {
     entryLabel: "New entry",
-    placeholder: "Capture a task, decision, conversation, or idea…",
+    placeholder: "What happened, what do you need, or what do you want to remember?",
     send: "Capture",
     sending: "Saving…",
     attach: "Attach a file",
@@ -70,6 +70,6 @@ export const composerCopy: Record<Locale, ComposerCopy> = {
     discard: "Discard",
     offline:
       "You are offline. The text stays in this tab as a draft, but nothing is sent and nothing is queued — send it yourself when the connection is back.",
-    noClassification: "Nothing needs classifying first. Write it and confirm.",
+    noClassification: "Health, travel, home, money, work — write it your way; the rest is on Brain.",
   },
 };
