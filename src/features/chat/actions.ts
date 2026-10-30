@@ -7,6 +7,8 @@ import { getByokCopy } from "@/features/byok/copy";
 import { admitRateLimitedOperation } from "@/features/rate-limits/server";
 import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type ChatSource } from "@/lib/ai";
+import { CHAT_HISTORY_TURNS } from "@/lib/ai/knowledge-prompt";
+import type { ChatTurn } from "@/lib/ai/types";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
@@ -125,10 +127,29 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   await assertActiveAccount(supabase, user.id, parsed.data.locale);
   let conversationId = parsed.data.conversationId || undefined;
 
+  /**
+   * Life Brain B.0 (`LB-B-004`). The earlier turns of this conversation, read
+   * BEFORE the new question is inserted so the question is never its own
+   * history. Bounded to the last `CHAT_HISTORY_TURNS` and oldest-first, which
+   * is the order a reader — and the model — expects. A read failure here is
+   * not fatal: the answer is worse without context, not wrong, so the turn
+   * proceeds with no history rather than refusing.
+   */
+  let history: ChatTurn[] = [];
   if (conversationId) {
     const { data: ownedConversation, error: conversationError } = await supabase.from("conversations").select("id").eq("id", conversationId).maybeSingle();
     if (conversationError) return { status: "error", message: copy.conversationUnavailable };
     if (!ownedConversation) return { status: "error", message: copy.conversationNotFound };
+    const { data: earlierTurns } = await supabase
+      .from("conversation_messages")
+      .select("role,content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: false })
+      .limit(CHAT_HISTORY_TURNS);
+    history = (earlierTurns ?? [])
+      .filter((turn): turn is { role: "user" | "assistant"; content: string } => turn.role === "user" || turn.role === "assistant")
+      .reverse()
+      .map((turn) => ({ role: turn.role, content: turn.content }));
   } else {
     const { data: conversation, error } = await supabase.from("conversations").insert({
       user_id: user.id,
@@ -274,6 +295,9 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       question: parsed.data.question,
       locale: parsed.data.locale,
       timezone: profile?.timezone ?? defaultAgentPreferences.timezone,
+      // `LB-B-003`: the model finally learns what day it is.
+      now: new Date().toISOString(),
+      history,
       sources,
       responseDetail: preferences?.response_detail ?? "short",
       agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,

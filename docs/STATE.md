@@ -241,6 +241,8 @@ Previously: 2026-08-05 (**Phase 2G — Conversational Creation is AUTHORIZED and
 
 **An initiative, not a phase.** Three tracks delivered as interleaved vertical slices (`docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md` §0): A design system + redesign, B chat with memory, C whole life. Record under `docs/reports/life-brain/`: `INVESTIGATION.md`, `AUDIT_UX_COMPONENTS.md`, `AUDIT_CHAT_RETRIEVAL.md`, `AUDIT_WORK_BIAS.md`, `evidence/baseline/` (86 PNG + `measurements.json`, produced by `e2e/online-life-brain-baseline.spec.ts`).
 
+**Slices A.0, A.1 and B.0 shipped 2026-10-30** (PRs #344 and the A.1/B.0 PR). The primitive layer exists (`src/components/ui/`, `src/app/ui.css`), the type scale rose, dark elevation returned, Hoje has a door to Conversar, Conversar reads as a conversation with four life-question starters, and the chat prompt carries the current time and the last six turns. Zero migrations. Nothing deployed by these sessions.
+
 **What is true now.** Zero product code changed by the investigation. Migrations: 3 allocated · 0 created · 0 applied. The baseline instrument runs against the dev server and the linked project with the test account; it captured every list route in pt-BR on iPhone 390 and desktop 1440 (en for home, capture, inbox, work, calendar, chat, settings) and **no detail route**, because the test account holds no entries, people, projects, memories, reminders or conversations and the dense-fixture seed was refused by the session's permission classifier.
 
 **Decisions the owner still has to take** are listed at the end of the opening report to the owner and in `docs/TODO.md` under "Life Brain"; the recommendation for each is recorded there so a later session does not re-derive it.
