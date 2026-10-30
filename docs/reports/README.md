@@ -42,6 +42,7 @@ that phase's directory (`scripts/generate-*-traceability.mjs`).
 
 | Directory | Initiative | Status |
 | --- | --- | --- |
+| [`life-brain/`](./life-brain/) | Life Brain — investigation, three filed audits, baseline evidence (86 screenshots + per-route measurements), slice acceptances | **ACTIVE** — opened 2026-10-30 by ADR-145; slices A.0/A.1 in implementation; 3 migrations allocated · 0 created |
 | [`phase-2x/`](./phase-2x/) | Phase 2X — asynchronous capture, projections, hotfixes | historical, closed |
 | [`phase-2c/`](./phase-2c/) | Phase 2C — candidate confirmation and task materialization | historical, closed |
 | [`phase-2d/`](./phase-2d/) | Phase 2D — daily cycle | historical, closed |
