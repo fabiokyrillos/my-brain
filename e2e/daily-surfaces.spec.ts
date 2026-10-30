@@ -52,7 +52,7 @@ const ROOT = join(__dirname, "..");
  * makes the 375px touch-target test below fail on the first option row, which
  * is how that was established rather than assumed.
  */
-const STYLESHEETS = ["tokens.css", "experience.css", "globals.css", "operations.css", "task-commands.css", "calendar.css", "reviews.css", "settings-extended.css"] as const;
+const STYLESHEETS = ["tokens.css", "experience.css", "ui.css", "globals.css", "operations.css", "task-commands.css", "calendar.css", "reviews.css", "settings-extended.css"] as const;
 
 const css = STYLESHEETS.map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
   .join("\n")
