@@ -80,6 +80,8 @@ Successor status: **the roadmap successor — the phase after Phase 2S — is NO
 
 Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → A.1 → B.0 → A.2 → B.1 → C.0 → A.3 → B.2 → C.1(M1) → A.4 → B.3(M3) → C.2 → C.3(M2) → A.5 → C.4 → B.4 → C.5 → A.6 → B.5.
 
+- **Shipped 2026-10-30:** A.0 (tokens + primitives, PR #344), A.1 (Hoje + Conversar), B.0 (date + history in the chat prompt). **Next in order:** A.2 (bar), B.1 (deterministic agenda, "não encontrei" without a model call), C.0 (life copy).
+
 ### Owner decisions (each with the recorded recommendation)
 
 - **LB-OD-1 — Mobile bar.** Recommendation: `Hoje · Conversar · [+] · Agenda · Memória`; Registros and Tarefas leave the bar and stay one tap away from Hoje. Alternative: keep Registros and drop Memória. Lands in slice A.2.

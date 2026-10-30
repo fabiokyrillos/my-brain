@@ -43,6 +43,16 @@ export type ChatSource = {
   similarity: number;
 };
 
+/**
+ * One earlier turn of the same conversation (Life Brain B.0, `LB-B-004`).
+ * The assistant's own prior answers travel back as context; the user's prior
+ * questions are user content and are framed as such in the prompt.
+ */
+export type ChatTurn = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type ChatInput = {
   question: string;
   locale: "pt-BR" | "en";
@@ -50,6 +60,14 @@ export type ChatInput = {
   sources: ChatSource[];
   responseDetail?: "short" | "balanced" | "detailed";
   agentStyle?: string;
+  /**
+   * The current instant as ISO-8601 (`LB-B-003`). Without it the model cannot
+   * answer "última vez", "amanhã" or "essa semana" — the extraction prompt has
+   * always sent it and the chat prompt never did.
+   */
+  now?: string;
+  /** The most recent turns of this conversation, oldest first, bounded by the caller. */
+  history?: readonly ChatTurn[];
 };
 
 export type ChatResult = AIUsageDetails & {
