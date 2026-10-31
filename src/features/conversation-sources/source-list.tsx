@@ -36,7 +36,7 @@ import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
 import { ConversationAnswerShown } from "@/features/product-analytics/interaction-events";
 import type { Locale } from "@/lib/preferences";
 
-import type { ParsedCitations } from "./contracts";
+import { reachScope, type ParsedCitations } from "./contracts";
 import { formatInstant } from "@/lib/time/instant-format";
 import { getConversationSourcesCopy } from "./copy";
 import { ExplanationPanel } from "./explanation-panel";
@@ -114,6 +114,8 @@ export function SourceList({
    * and those are different facts (measured in slice 2K.0).
    */
   const insufficient = citations.evidence === "no_qualifying_evidence";
+  // Life Brain B.1. Which place the answer looked in, from its own envelope.
+  const agenda = reachScope(citations.reach) === "agenda";
 
   // An old row recorded neither. It gets the honest "I do not know" rather than
   // either claim, and nothing else — no reach, no insufficiency.
@@ -131,7 +133,7 @@ export function SourceList({
       data-evidence={insufficient ? "insufficient" : citations.legacy ? "unknown" : "evidenced"}
     >
       {insufficient ? (
-        <p className="conversation-sources-insufficient">{copy.insufficient}</p>
+        <p className="conversation-sources-insufficient">{agenda ? copy.agendaInsufficient : copy.insufficient}</p>
       ) : (
         <>
           <strong className="conversation-sources-title">{copy.title}</strong>
@@ -160,7 +162,9 @@ export function SourceList({
         sentence that turns "I found nothing" from a shrug into information.
         Withheld only for a legacy row, which never recorded a reach.
       */}
-      {citations.legacy ? null : <p className="conversation-sources-reach">{copy.reach}</p>}
+      {citations.legacy ? null : (
+        <p className="conversation-sources-reach">{agenda ? copy.agendaReach : copy.reach}</p>
+      )}
 
       {/*
         `2K-EXPL-001`. Last, closed, and drawn only when there is something to
