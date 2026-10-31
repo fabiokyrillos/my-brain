@@ -68,15 +68,20 @@ const ICON = '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"
  * renders. `shell-mirror-guard.test.ts` now derives both from `capabilities.ts`
  * and fails when they diverge.
  */
-const PRIMARY = ["Hoje", "Registros", "Trabalho", "Brain"] as const;
+const PRIMARY = ["Hoje", "Conversar", "Agenda", "Memória"] as const;
+/**
+ * The rail's secondary pair (Life Brain A.2), mirroring `secondaryNavigationKeys`:
+ * rendered under a rule below capture, and never a bar slot.
+ */
+const SECONDARY = ["Registros", "Trabalho"] as const;
 /**
  * The mobile bar, mirroring `mobileBarSlots` (UX-14, DEC-1).
  *
- * Five slots with capture in the middle. Registros returned to the bar with the
- * redesign; Brain is the destination that sits in `Mais` instead, which
- * `mobileDemotedKeys` derives rather than lists.
+ * Five slots with capture in the middle. Life Brain A.2 (LB-OD-1) made them
+ * Hoje · Conversar · Agenda · Memória; `shell-mirror-guard` derives this list
+ * from the registry and fails when the two diverge.
  */
-const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Brain"] as const;
+const MOBILE_BAR = ["Hoje", "Conversar", "Captura rápida", "Agenda", "Memória"] as const;
 /*
  * The overflow disclosure's five groups.
  *
@@ -92,9 +97,11 @@ const MOBILE_BAR = ["Hoje", "Registros", "Captura rápida", "Trabalho", "Brain"]
  * `messages.ts` too, with a planted-divergence control per group.
  */
 const GROUPS = [
-  ["Contexto", ["Conversar", "Projetos", "Pessoas", "Empresas", "Contextos", "Memórias", "Arquivos", "Relações"]],
+  // Conversar and Calendário (Agenda) left these two groups' copies in Life
+  // Brain A.2: both are primary now, while keeping their registry groups.
+  ["Contexto", ["Projetos", "Pessoas", "Empresas", "Contextos", "Memórias", "Arquivos", "Relações"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
-  ["Organização", ["Calendário", "Lembretes"]],
+  ["Organização", ["Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],
   ["Preferências", ["Configurações"]],
 ] as const;
@@ -118,13 +125,16 @@ function navLink(label: string, className = "nav-item") {
 
 function sideNav() {
   const primary = PRIMARY.map((label) => navLink(label)).join("");
+  const secondary = SECONDARY.map((label) => navLink(label)).join("");
   const groups = GROUPS.map(
     ([label, items]) =>
       `<div class="nav-group" role="group" aria-label="${label}"><span class="nav-group-label" aria-hidden="true">${label}</span><div class="nav-group-items">${items
         .map((item) => navLink(item))
         .join("")}</div></div>`,
   ).join("");
-  return `<div class="nav-group nav-group-primary" role="group" aria-label="Principal"><div class="nav-group-items">${primary}</div></div>${navLink("Captura rápida", "capture-fab")}${groups}`;
+  // Primary, capture, the secondary pair under its rule, then the groups —
+  // the order `navigation-links.tsx` renders since Life Brain A.2.
+  return `<div class="nav-group nav-group-primary" role="group" aria-label="Principal"><div class="nav-group-items">${primary}</div></div>${navLink("Captura rápida", "capture-fab")}<div class="nav-group nav-group-secondary" role="group" aria-label="Secundário"><div class="nav-group-items">${secondary}</div></div>${groups}`;
 }
 
 /**
@@ -337,7 +347,7 @@ test.describe("mobile bottom navigation", () => {
        * capture control sat third of six and no distribution can put slot 3 of 6 on
        * the centre line — making it exact required deciding how many destinations
        * the bar carries, which a stylesheet may not decide. That decision is taken:
-       * five slots, capture in the middle, Brain in `Mais`. Five equal grid
+       * five slots, capture in the middle, no `Mais`. Five equal grid
        * columns put the third column's centre on the bar's centre, so the tolerance
        * is now sub-pixel rounding rather than a third of the screen.
        */

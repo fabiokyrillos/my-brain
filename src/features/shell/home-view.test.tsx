@@ -109,6 +109,28 @@ describe("HomeView", () => {
     expect(screen.getByText(/Quando fui ao médico\?/)).toBeInTheDocument();
   });
 
+  /**
+   * Life Brain A.2 (LB-OD-1). Registros and Trabalho left the mobile bar, so
+   * Hoje must reach both on a day that has nothing to show — every other link
+   * to them on this page is gated on a count. The calendar left the strip for
+   * the opposite reason: it is a bar slot now.
+   */
+  it("reaches Registros and Trabalho from the destination strip on an empty day", () => {
+    renderHome(viewModel({
+      status: { kind: "saved" },
+      attention: [], notices: [], today: [], priorities: [], organizing: [], agenda: [],
+      waitingCount: 0, openQuestion: null,
+    }));
+
+    const strip = screen.getByRole("navigation", { name: "Ir para" });
+    expect(within(strip).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+      ["Registros", "/pt-BR/app/inbox"],
+      ["Trabalho", "/pt-BR/app/work"],
+      ["Lembretes", "/pt-BR/app/reminders"],
+      ["Revisões", "/pt-BR/app/reviews"],
+    ]);
+  });
+
   it("leads with what needs the user and states the day in one line", () => {
     renderHome(viewModel());
 

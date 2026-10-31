@@ -58,7 +58,7 @@ test.describe("Brain's lenses are one space", () => {
 
     for (const lens of LENSES) {
       await page.goto(`/pt-BR/app/${lens.route}`);
-      const strip = page.getByRole("navigation", { name: "Lentes do Brain" });
+      const strip = page.getByRole("navigation", { name: "Lentes da Memória" });
 
       await expect(strip, `${lens.route} does not carry the lens strip`).toBeVisible({ timeout: 30_000 });
       // Nine links on every one of the nine surfaces: the strip is the same
@@ -76,7 +76,7 @@ test.describe("Brain's lenses are one space", () => {
     await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });
 
     await page.goto("/pt-BR/app/library");
-    const strip = page.getByRole("navigation", { name: "Lentes do Brain" });
+    const strip = page.getByRole("navigation", { name: "Lentes da Memória" });
     await expect(strip).toBeVisible({ timeout: 30_000 });
 
     await strip.getByRole("link", { name: "Memórias" }).click();

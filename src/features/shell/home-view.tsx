@@ -35,7 +35,7 @@ import { getHomeCopy, withCount } from "./home-copy";
  * and the fixture drift this same session had to repair on Hoje is what that
  * costs when it is not done.
  */
-const TODAY_DESTINATION_KEYS = ["calendar", "reminders", "reviews"] as const;
+const TODAY_DESTINATION_KEYS = ["inbox", "work", "reminders", "reviews"] as const;
 
 /**
  * Hoje's presentation, with no data access of its own.
@@ -369,15 +369,19 @@ export function HomeView({
         its bookkeeping and arranging it around its owner are different things**,
         and only the first was refused.
 
-        ## Why these three, and why not a sixth bar slot
+        ## Why these four, and why not a sixth bar slot
 
-        Calendário, Lembretes and Revisões are the *time and attention* family,
-        and Hoje is the time-and-attention surface — so this is one tap from a
-        bar slot rather than a new one. The bar stays five, odd, with capture at
-        its midpoint, which `mobile-bar-centring.test.ts` pins; the owner asked
-        for a coherent solution rather than more buttons in the footer, and a row
-        that can take a fourth destination without touching the bar is the
-        scalable half of that.
+        Lembretes and Revisões are the *time and attention* family, and Hoje is
+        the time-and-attention surface — so this is one tap from a bar slot
+        rather than a new one. Calendário was the third until Life Brain A.2 made
+        it a slot (Agenda); Registros and Trabalho took its place the same day,
+        because they left the bar (LB-OD-1) and every other link to them on this
+        page is gated on a count — an empty day would have had no path at all.
+        `mobile-reachability-guard` asserts the strip is unconditional. The bar
+        stays five, odd, with capture at its midpoint; the owner asked for a
+        coherent solution rather than more buttons in the footer, and a row that
+        can take a fourth destination without touching the bar is the scalable
+        half of that.
 
         Nothing about the data moves. A reminder is still a reminder, and this
         adds no relationship to a task or a project.

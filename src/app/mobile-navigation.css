@@ -24,6 +24,17 @@
   margin-top: 14px;
 }
 
+/*
+ * Life Brain A.2: the rail's secondary pair (Registros, Trabalho) sits under a
+ * rule rather than a heading — a quieter separation than the groups inside
+ * `Mais`, because these two are still rail destinations, not an index.
+ */
+.nav-group-secondary {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-divider);
+}
+
 .nav-group-items {
   display: grid;
   gap: 4px;

@@ -1,13 +1,14 @@
 /**
- * What the mobile bar's fifth slot costs — measured, not argued.
+ * What the mobile bar's composition costs — measured, not argued.
  *
  * ## The decision this guard holds
  *
- * `02-arquitetura-e-rotas.md` retires `Mais` and puts Brain in the fifth slot.
- * This repository keeps `Mais`, and the honest question is not whether the
- * handoff is right but **which destinations would actually be stranded**. That
- * number was fourteen when part two wrote it down. It is one now, and the one is
- * the account — see `capabilities.ts`'s `mobileBarSlots`.
+ * Life Brain A.2 (ADR-145 Decision 4, LB-OD-1) made the bar `Hoje · Conversar
+ * · [Capturar] · Agenda · Memória`. Two destinations left it — Registros and
+ * Trabalho — and the honest question is the one this file has always asked:
+ * **which destinations would actually be stranded** on a phone. The answer is
+ * none, and each row below is the path that makes it none, re-derived from the
+ * component that emits it. See `capabilities.ts`'s `mobileBarSlots`.
  *
  * ## What this file can and cannot prove
  *
@@ -34,7 +35,11 @@ import {
   accountCentreLinks,
 } from "../../features/account-centre/contracts";
 import { BRAIN_DOMAIN_LENSES } from "../../features/library/lenses";
-import { mobileBarSlots, mobileDemotedKeys } from "../../features/shell/capabilities";
+import {
+  mobileBarSlots,
+  mobileDemotedKeys,
+  secondaryNavigationKeys,
+} from "../../features/shell/capabilities";
 import { TRANSPARENCY_LENSES } from "../../features/transparency/contracts";
 
 const REPO = process.cwd();
@@ -52,12 +57,12 @@ const code = (relative: string) =>
  */
 const SETTINGS_SECTIONS_MODULE = "src/features/settings/settings-section-content.tsx";
 
-/** The four the bar carries beside capture. */
-const BAR_DESTINATIONS = ["home", "inbox", "work"] as const;
+/** The four the bar carries beside capture (Life Brain A.2). */
+const BAR_DESTINATIONS = ["home", "chat", "calendar", "library"] as const;
 
 describe("the bar is what it says it is", () => {
   it("holds five slots with capture at the midpoint", () => {
-    expect(mobileBarSlots).toEqual(["home", "inbox", "capture", "work", "library"]);
+    expect(mobileBarSlots).toEqual(["home", "chat", "capture", "calendar", "library"]);
     expect(mobileBarSlots.length % 2).toBe(1);
     expect(mobileBarSlots[(mobileBarSlots.length - 1) / 2]).toBe("capture");
   });
@@ -75,9 +80,15 @@ describe("the bar is what it says it is", () => {
    * disclosure coming back — which is what stops this from being a rubber stamp
    * on whatever `capabilities.ts` currently says.
    */
-  it("carries every primary destination, Brain included, and no disclosure", () => {
-    for (const key of [...BAR_DESTINATIONS, "library"] as const) {
+  it("carries every primary destination, Memória included, and no disclosure", () => {
+    for (const key of BAR_DESTINATIONS) {
       expect(mobileBarSlots, `${key} left the bar`).toContain(key);
+    }
+    // The secondary pair is off the bar by design (LB-OD-1), and this is
+    // where that design is a failing test if someone adds a sixth slot.
+    expect(secondaryNavigationKeys).toEqual(["inbox", "work"]);
+    for (const key of secondaryNavigationKeys) {
+      expect(mobileBarSlots, `${key} is on the bar and secondary at once`).not.toContain(key);
     }
     expect(
       mobileBarSlots,
@@ -108,11 +119,34 @@ describe("every context lens is reached from Brain, not only from the disclosure
 });
 
 describe("the rest of the census, path by path", () => {
-  it("Trabalho reaches the calendar and the planner", () => {
+  /**
+   * Life Brain A.2 — the two destinations that left the bar, and the one
+   * place that reaches both without a condition.
+   *
+   * Hoje's own links to Registros and Trabalho are gated (`pendingCount`,
+   * `dayCount`, `organizing.length`): an empty day renders none of them, and a
+   * link that appears only once there is something to see is not a path.
+   * The destination strip (`2P-MOBILE-001`) is unconditional, and it is where
+   * the pair now sits. The calendar left the strip because it became a slot.
+   */
+  it("Hoje's destination strip reaches Registros and Trabalho whatever the day holds", () => {
+    const home = code("src/features/shell/home-view.tsx");
+    expect(home).toMatch(/TODAY_DESTINATION_KEYS = \[\s*"inbox",\s*"work",/);
+    expect(home).not.toMatch(/TODAY_DESTINATION_KEYS = \[[^\]]*"calendar"/);
+    // The strip renders outside every section's conditional: the text just
+    // before it is JSX whitespace, not a ternary or an `&&`.
+    const before = preceding(home, 'className="today-destinations"', 80);
+    expect(before.length).toBeGreaterThan(20);
+    expect(before, "the destination strip became conditional").not.toMatch(/\?\s*\(|&&\s*\(/);
+  });
+
+  it("Agenda reaches Trabalho and the planner through the mode tabs", () => {
     const modes = code("src/features/daily-cycle/work-modes.tsx");
-    expect(modes).toContain("/app/calendar");
+    expect(modes).toContain("/app/work");
     expect(modes).toContain("/app/calendar/plan");
-    // …and Trabalho mounts it, or the tabs reach nothing.
+    // …and the calendar mounts them, or the tabs reach nothing. Trabalho
+    // mounts them too, so the pair stays two-way.
+    expect(code("src/features/calendar/calendar-view.tsx")).toContain("<WorkModeTabs");
     expect(code("src/features/daily-cycle/work-view.tsx")).toContain("<WorkModeTabs");
   });
 
@@ -194,10 +228,11 @@ describe("the rest of the census, path by path", () => {
    * cockpit to satisfy a census would be arranging the product around its own
    * bookkeeping.
    *
-   * Registros is a bar slot, so this is one tap from the bar. Unconditional is
-   * the whole point — the same standard the reminders link is held to two
-   * assertions above, and for the same reason: a link that appears only once
-   * there is something to see is not a path.
+   * Registros is one tap from Hoje's destination strip since Life Brain A.2
+   * (it was a bar slot before), so this is two taps from the bar.
+   * Unconditional is the whole point — the same standard the reminders link
+   * is held to, and for the same reason: a link that appears only once there
+   * is something to see is not a path.
    */
   it("Registros reaches Perguntas whether or not any are open", () => {
     const records = code("src/app/[locale]/app/inbox/page.tsx");
@@ -234,6 +269,13 @@ describe("the rest of the census, path by path", () => {
     );
     expect(prose, "the census no longer records the Perguntas path").toContain(
       "Registros' header, unconditionally",
+    );
+    // …and the A.2 bar, with the path that replaced the two slots it spent.
+    expect(prose, "the census does not name the A.2 bar").toContain(
+      "Hoje · Conversar · [Capturar] · Agenda · Memória",
+    );
+    expect(prose, "the census does not record where Registros and Trabalho went").toContain(
+      "Hoje's destination strip, unconditionally",
     );
     // …and it must not still be waiting for a condition that has already fired.
     expect(prose).not.toContain("The release condition, stated so nobody has to rediscover it");
@@ -331,7 +373,7 @@ describe("the account moved to the header, and that is what freed the fifth slot
    * whoever did it that the slot was now free) and if the overflow mount
    * vanished without a replacement (because sign-out would have left the phone
    * entirely). Now it fails if the account **leaves** the header while the bar
-   * still carries Brain, which is the same danger from the other side: the fifth
+   * still carries Memória, which is the same danger from the other side: the fifth
    * slot would be spent and the way out gone.
    *
    * Still exactly two mounts of one component, because two implementations are

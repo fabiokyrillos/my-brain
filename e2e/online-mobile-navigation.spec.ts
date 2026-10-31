@@ -63,16 +63,17 @@ test.describe("authenticated converged navigation", () => {
             navigation: testInfo.project.name === "mobile" ? "Navegação móvel" : "Navegação principal",
             primaryGroup: "Principal",
             /*
-              Corrected rather than retargeted: this list claimed "Início" and
-              "Conversar" where the product renders "Hoje" and "Brain", and the
-              lane failed on the baseline for that reason before slice 2P.5
-              touched anything. Measured by running it against a stashed tree.
+              Life Brain A.2 (LB-OD-1): Hoje · Conversar · Agenda · Memória on
+              both surfaces, and Registros · Trabalho as the rail's secondary
+              pair. Every route is unchanged.
             */
-            primary: ["Hoje", "Registros", "Trabalho", "Brain"],
+            primary: ["Hoje", "Conversar", "Agenda", "Memória"],
+            secondaryGroup: "Secundário",
+            secondaryPair: ["Registros", "Trabalho"],
             // The four destinations the five-slot mobile bar carries beside
             // capture (UX-14, DEC-1). `Mais` retired in slice 2P.5, so the bar
-            // and the primary list are now the same four.
-            mobileBar: ["Hoje", "Registros", "Trabalho", "Brain"],
+            // and the primary list are the same four.
+            mobileBar: ["Hoje", "Conversar", "Agenda", "Memória"],
             capture: "Captura rápida",
             more: "Mais",
             groups: ["Contexto", "Reflexão", "Organização", "Transparência", "Preferências"],
@@ -101,8 +102,10 @@ test.describe("authenticated converged navigation", () => {
         : {
             navigation: testInfo.project.name === "mobile" ? "Mobile navigation" : "Main navigation",
             primaryGroup: "Primary",
-            primary: ["Today", "Records", "Work", "Brain"],
-            mobileBar: ["Today", "Records", "Work", "Brain"],
+            primary: ["Today", "Talk", "Agenda", "Memory"],
+            secondaryGroup: "Secondary",
+            secondaryPair: ["Records", "Work"],
+            mobileBar: ["Today", "Talk", "Agenda", "Memory"],
             capture: "Quick capture",
             more: "More",
             groups: ["Context", "Reflection", "Organization", "Transparency", "Preferences"],
@@ -173,6 +176,12 @@ test.describe("authenticated converged navigation", () => {
         const primary = navigation.getByRole("group", { name: labels.primaryGroup });
         for (const destination of labels.primary) {
           await expect(primary.getByRole("link", { name: destination, exact: true })).toBeVisible();
+        }
+        // Life Brain A.2: the secondary pair is on the rail without opening
+        // anything, under its own group.
+        const secondary = navigation.getByRole("group", { name: labels.secondaryGroup });
+        for (const destination of labels.secondaryPair) {
+          await expect(secondary.getByRole("link", { name: destination, exact: true })).toBeVisible();
         }
         // Slice B moved the rail's five secondary groups behind their own
         // disclosure, so on desktop they are hidden until it is opened — exactly as
@@ -252,22 +261,33 @@ test.describe("authenticated converged navigation", () => {
       await page.goto(`/${locale}/app/inbox?view=needs-you`);
       {
         /*
-         * Registros is a bar slot on both surfaces since slice 2P.5, so the same
-         * question is asked the same way on each: the slot itself carries
-         * `aria-current`. On mobile it used to require opening `Mais` first,
-         * because the destination was demoted off the bar.
+         * Registros left the bar in Life Brain A.2 and is the rail's secondary
+         * pair's first member. On desktop that link carries `aria-current`; on a
+         * phone no slot does — the bar lights nothing rather than something
+         * false — which is the honest state of a destination that is one tap
+         * from Hoje rather than a slot.
          */
         const currentNav = page.getByRole("navigation", { name: labels.navigation });
-        await expect(
-          currentNav.getByRole("link", { name: labels.primary[1], exact: true }),
-        ).toHaveAttribute("aria-current", "page");
+        if (testInfo.project.name === "mobile") {
+          await expect(currentNav.locator('[aria-current="page"]')).toHaveCount(0);
+        } else {
+          await expect(
+            currentNav.getByRole("link", { name: labels.secondaryPair[0], exact: true }),
+          ).toHaveAttribute("aria-current", "page");
+        }
       }
 
       await page.goto(`/${locale}/app/work?view=waiting`);
-      await expect(
-        page.getByRole("navigation", { name: labels.navigation })
-          .getByRole("link", { name: labels.primary[2], exact: true }),
-      ).toHaveAttribute("aria-current", "page");
+      {
+        const currentNav = page.getByRole("navigation", { name: labels.navigation });
+        if (testInfo.project.name === "mobile") {
+          await expect(currentNav.locator('[aria-current="page"]')).toHaveCount(0);
+        } else {
+          await expect(
+            currentNav.getByRole("link", { name: labels.secondaryPair[1], exact: true }),
+          ).toHaveAttribute("aria-current", "page");
+        }
+      }
 
       if (testInfo.project.name === "mobile") {
         /*
@@ -284,16 +304,17 @@ test.describe("authenticated converged navigation", () => {
         await expect(accountSummary.locator("xpath=ancestor::details")).not.toHaveAttribute("open", "");
 
         /*
-         * Standing inside Registros (UX-14, DEC-1).
+         * Standing inside a conversation (UX-14, DEC-1; Life Brain A.2).
          *
          * The failure this prevents is unchanged — a phone user reading a
-         * destination sees no active state anywhere — and the answer got simpler:
-         * the destination is a slot, so the slot says it.
+         * destination sees no active state anywhere — and the destination that
+         * proves it is now Conversar: `nested: true`, so a thread keeps the
+         * slot lit.
          */
-        await page.goto(`/${locale}/app/inbox`);
-        const insideRegistros = page.getByRole("navigation", { name: labels.navigation });
+        await page.goto(`/${locale}/app/chat`);
+        const insideConversar = page.getByRole("navigation", { name: labels.navigation });
         await expect(
-          insideRegistros.getByRole("link", { name: labels.primary[1], exact: true }),
+          insideConversar.getByRole("link", { name: labels.primary[1], exact: true }),
         ).toHaveAttribute("aria-current", "page");
 
         // And following it from the bar lands on the destination, with no panel
@@ -301,7 +322,14 @@ test.describe("authenticated converged navigation", () => {
         await page.goto(`/${locale}/app`);
         const fresh = page.getByRole("navigation", { name: labels.navigation });
         await fresh.getByRole("link", { name: labels.primary[1], exact: true }).click();
-        await expect(page).toHaveURL(new RegExp(`/${locale}/app/inbox$`));
+        await expect(page).toHaveURL(new RegExp(`/${locale}/app/chat$`));
+
+        // Registros and Trabalho, which left the bar, are one tap from Hoje's
+        // destination strip on a day with nothing to show.
+        await page.goto(`/${locale}/app`);
+        const strip = page.locator(".today-destinations");
+        await expect(strip.locator('a[href$="/app/inbox"]')).toBeVisible();
+        await expect(strip.locator('a[href$="/app/work"]')).toBeVisible();
 
         // Labels must not overflow their column at either supported width. The bar
         // is five equal columns, so a label wider than its slot would clip.

@@ -11,6 +11,7 @@ import {
   moreNavigationGroups,
   navigationCapabilities,
   primaryNavigationKeys,
+  secondaryNavigationKeys,
   type CapabilityDefinition,
   type ProductCapabilityState,
 } from "./capabilities";
@@ -20,8 +21,9 @@ describe("navigation capabilities", () => {
     const routes = [
       ["/pt-BR/app", "home", "primary"],
       ["/pt-BR/app/capture", "capture", "global"],
-      // Conversar is a lens of Brain since the redesign, so it classifies in the
-      // `context` group beside the other lenses. The route is unchanged.
+      // Conversar keeps its `context` group — that is what Brain's lens strip
+      // reads — while Life Brain A.2 gives it `visibility: "primary"` and a bar
+      // slot. The route is unchanged.
       ["/pt-BR/app/chat", "chat", "context"],
       ["/pt-BR/app/chat/conversation-1", "chat", "context"],
       ["/pt-BR/app/costs", "costs", "transparency"],
@@ -57,10 +59,11 @@ describe("navigation capabilities", () => {
     expect(moreNavigationGroups.flatMap((group) => group.items)).not.toContain("jobs");
 
     const commonCapabilities = navigationCapabilities
-      .filter((item) => item.visibility === "primary" || item.visibility === "more")
+      .filter((item) => ["primary", "secondary", "more"].includes(item.visibility))
       .map((item) => item.key);
     const renderedCapabilities = [
       ...primaryNavigationKeys,
+      ...secondaryNavigationKeys,
       ...moreNavigationGroups.flatMap((group) => group.items),
     ];
     expect(renderedCapabilities).toHaveLength(new Set(renderedCapabilities).size);
@@ -68,9 +71,12 @@ describe("navigation capabilities", () => {
   });
 
   it("defines the same ordered hierarchy for desktop and mobile More", () => {
-    // The four the architecture names: Hoje · Registros · Trabalho · Brain.
-    // `library` is the route; "Brain" is what it is called.
-    expect(primaryNavigationKeys).toEqual(["home", "inbox", "work", "library"]);
+    // Life Brain A.2 (ADR-145 Decision 4, LB-OD-1): Hoje · Conversar · Agenda ·
+    // Memória. `library` and `calendar` are the routes; "Memória" and "Agenda"
+    // are what they are called. Registros and Trabalho stay on the rail as the
+    // secondary pair and leave the bar.
+    expect(primaryNavigationKeys).toEqual(["home", "chat", "calendar", "library"]);
+    expect(secondaryNavigationKeys).toEqual(["inbox", "work"]);
     expect(moreNavigationGroups).toEqual([
       // EGC.1 puts organizations and contexts beside the two entity destinations
       // they relate, and ahead of the two that are stores rather than graph
@@ -80,17 +86,17 @@ describe("navigation capabilities", () => {
       // navigation, and `2I-SHELL-001`'s four are asserted unchanged above.
       {
         key: "context",
-        // `chat` leads the group since the redesign: Conversar is the lens through
-        // which you ask about everything else Brain holds.
-        items: ["chat", "projects", "people", "organizations", "contexts", "memories", "files", "relations"],
+        // `chat` is a `context` member (Brain's first lens) but no longer an
+        // overflow item: Life Brain A.2 made it primary, so the disclosure
+        // lists the seven browse destinations only.
+        items: ["projects", "people", "organizations", "contexts", "memories", "files", "relations"],
       },
       { key: "reflection", items: ["reviews", "questions"] },
-      // `2M-CAL-001` puts the calendar here rather than among the primaries:
-      // `2I-SHELL-001` pins those four as a delivered baseline, and promoting a
-      // destination into the rail is an IA decision Phase 2M was not authorized
-      // to make. It leads the group because a calendar is the surface a reminder
-      // appears *on*.
-      { key: "organization", items: ["calendar", "reminders"] },
+      // `2M-CAL-001` left the calendar here and recorded its promotion as an
+      // owner decision; Life Brain A.2 (LB-OD-1) took it. The calendar keeps
+      // the `organization` group and is primary, so only Lembretes remains in
+      // the disclosure's copy of the group.
+      { key: "organization", items: ["reminders"] },
       { key: "transparency", items: ["history", "costs"] },
       { key: "preferences", items: ["settings"] },
     ]);
@@ -106,18 +112,22 @@ describe("navigation capabilities", () => {
       ["/pt-BR/app/tasks?page=2", "work"],
       ["/pt-BR/app/waiting?page=4", "work"],
       ["/pt-BR/app/library", "library"],
+      // Life Brain A.2: the two newly primary destinations, each with a nested
+      // route that must keep its slot lit.
+      ["/pt-BR/app/chat/conversation-1", "chat"],
+      ["/pt-BR/app/calendar/plan", "calendar"],
     ] as const;
 
     /*
-      `chat` is no longer primary, so it has no primary active state to be
-      deterministic about — and asserting an empty result for it would be
-      asserting nothing. The claim that matters is the inverse: standing inside
-      a lens must not light up a rail destination that does not contain it.
+      Every destination the rail renders without a disclosure — primary and
+      secondary — because both surfaces mark the current one the same way.
+      Standing inside a lens must light up exactly one of them, never two.
     */
-    expect(primaryNavigationKeys.filter((key) => isNavigationActive("/pt-BR/app/chat/conversation-1", key))).toEqual([]);
+    const railKeys = [...primaryNavigationKeys, ...secondaryNavigationKeys];
+    expect(railKeys.filter((key) => isNavigationActive("/pt-BR/app/projects/p1", key))).toEqual([]);
 
     for (const [pathname, expectedKey] of cases) {
-      expect(primaryNavigationKeys.filter((key) => isNavigationActive(pathname, key))).toEqual([
+      expect(railKeys.filter((key) => isNavigationActive(pathname, key))).toEqual([
         expectedKey,
       ]);
     }

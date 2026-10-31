@@ -374,7 +374,21 @@ export type NavigationGroupKey =
   | "global"
   | "advanced";
 
-export type NavigationVisibility = "primary" | "more" | "global" | "context-only";
+/**
+ * Where a destination is rendered without a disclosure.
+ *
+ * `primary` — the desktop rail's first group **and** a mobile bar slot.
+ * `secondary` — Life Brain A.2: the desktop rail's second group, under a
+ * rule, and **not** a bar slot; on a phone it is one tap from Hoje's
+ * destination strip. `more` — behind the rail's disclosure. `global` — the
+ * capture control and the bell. `context-only` — reached from a context,
+ * never listed.
+ *
+ * Visibility is deliberately independent of `group`: `chat` is primary and a
+ * `context` member, because Brain's lens strip reads the group and the bar
+ * reads the visibility, and the two are different questions.
+ */
+export type NavigationVisibility = "primary" | "secondary" | "more" | "global" | "context-only";
 
 export const navigationCapabilities = [
   // `2J-HOJE-001`. `today` is an alias of **home**, not of Work. The word
@@ -383,15 +397,57 @@ export const navigationCapabilities = [
   // alias moved rather than disappearing so the nav still resolves during the
   // redirect and any deep link keeps a truthful active state (`2J-HOJE-002`).
   { key: "home", route: "", group: "primary", visibility: "primary", nested: false, aliases: ["today"] },
-  { key: "inbox", route: "inbox", group: "primary", visibility: "primary", nested: true, aliases: [] },
+  /*
+   * Conversar — primary and a bar slot since Life Brain A.2 (ADR-145 Decision
+   * 4, LB-OD-1). The conversation is the product's main surface; it had been
+   * `more` since the Papel e Console recomposition, one disclosure away on a
+   * phone, and the product recorded zero conversations in its life.
+   *
+   * It keeps `group: "context"`: `LIBRARY_MEMBERS` reads the group, so
+   * Conversar stays Brain's first lens (`OD-2P-7`) while also being the second
+   * slot. `nested: true` so an open thread keeps the slot lit.
+   */
+  { key: "chat", route: "chat", group: "context", visibility: "primary", nested: true, aliases: [] },
+  /*
+   * Agenda — the calendar, primary and a bar slot since Life Brain A.2.
+   *
+   * `2M-CAL-001` built the route and recorded its promotion as *"an
+   * information-architecture decision this phase was not authorized to make,
+   * so it is left to the owner"*. LB-OD-1 is that decision. It keeps
+   * `group: "organization"` beside `reminders`, which is what it is about;
+   * `nested: true` because the planner is a sub-route (slice 2M.2). The day
+   * review is **not** one of them: it lives on `/app/reviews`.
+   */
+  { key: "calendar", route: "calendar", group: "organization", visibility: "primary", nested: true, aliases: [] },
+  /*
+   * Memória — `library`, the fourth slot, called after what it holds.
+   *
+   * The route stays `library`, as it stayed when the destination was renamed
+   * "Brain" in the Papel e Console recomposition: every existing link keeps
+   * working for a change that is entirely about what the destination is
+   * *called*. "Brain" is the assistant's name — the owner can change it in
+   * Settings — and a place cannot share a name with an actor (Life Brain
+   * `INFORMATION_ARCHITECTURE.md`, the same move `chat`/"Conversar" made).
+   *
+   * `nested: false`: `/app/library` has no sub-route. The lenses it opens are
+   * separate destinations with their own keys below.
+   */
+  { key: "library", route: "library", group: "primary", visibility: "primary", nested: false, aliases: [] },
+  /*
+   * The secondary pair — Life Brain A.2. Registros and Trabalho left the bar
+   * and stayed on the rail, under a rule: still one click on desktop, and one
+   * tap from Hoje's destination strip on a phone (`mobile-reachability-guard`).
+   * Slice A.3 reshapes Trabalho as Tarefas; nothing here presumes it.
+   */
+  { key: "inbox", route: "inbox", group: "primary", visibility: "secondary", nested: true, aliases: [] },
   // `2J-HOJE-001`. `today` left this alias list when `/app/today` stopped
   // resolving to Work: the word "Hoje" labels the `home` destination, so a URL
   // saying `today` that landed on a filtered task list was the collision the
   // slice exists to remove. `tasks` and `waiting` are unaffected -- both are
   // genuinely Work views and neither is the name of another destination.
-  { key: "work", route: "work", group: "primary", visibility: "primary", nested: true, aliases: ["tasks", "waiting"] },
+  { key: "work", route: "work", group: "primary", visibility: "secondary", nested: true, aliases: ["tasks", "waiting"] },
   /*
-   * Brain — the fourth primary destination (`02-arquitetura-e-rotas.md`).
+   * (History.) Brain — the fourth primary destination (`02-arquitetura-e-rotas.md`).
    *
    * `2I-SHELL-001` pinned the four primary destinations as a delivered baseline
    * *and said why*: to stop a later slice changing them quietly. This is the
@@ -407,19 +463,10 @@ export const navigationCapabilities = [
    *
    * `nested: false`: `/app/library` has no sub-route. The lenses it opens are
    * separate destinations with their own keys below, so each keeps its own
-   * active state rather than borrowing this one.
+   * active state rather than borrowing this one. The entry itself now sits
+   * above, in bar order, as Memória; this comment stays because the
+   * decision it records — route unchanged, nested false — is unchanged.
    */
-  { key: "library", route: "library", group: "primary", visibility: "primary", nested: false, aliases: [] },
-  /*
-   * Conversar leaves the primary rail.
-   *
-   * Not a demotion of the feature — the route, the grounding, the citations and
-   * every action are untouched. The architecture places it *inside* Brain as the
-   * Conversas lens, and the rail holds four destinations, so it moves to the
-   * `context` group beside the other lenses Brain opens. It is still one click
-   * from the rail, and `mobileBarSlots` still carries it.
-   */
-  { key: "chat", route: "chat", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "projects", route: "projects", group: "context", visibility: "more", nested: true, aliases: [] },
   { key: "people", route: "people", group: "context", visibility: "more", nested: true, aliases: [] },
   // EGC.1. Both tables predate every route in this list; what they never had was
@@ -469,8 +516,11 @@ export const navigationCapabilities = [
    * highlight mid-navigation. The day review is **not** one of them: slice 2M.3
    * put it on `/app/reviews`, the surface reviews already had, so it keeps the
    * `reviews` destination highlighted and needs nothing here.
+   *
+   * (History: the entry this comment described sits above, in bar order, as
+   * Agenda since Life Brain A.2. The restraint it recorded was the owner's to
+   * lift, and LB-OD-1 lifted it.)
    */
-  { key: "calendar", route: "calendar", group: "organization", visibility: "more", nested: true, aliases: [] },
   { key: "reminders", route: "reminders", group: "organization", visibility: "more", nested: false, aliases: [] },
   { key: "history", route: "history", group: "transparency", visibility: "more", nested: false, aliases: [] },
   { key: "costs", route: "costs", group: "transparency", visibility: "more", nested: false, aliases: [] },
@@ -504,6 +554,7 @@ export type MoreNavigationGroupKey = Exclude<
 >;
 
 type PrimaryNavigationCapability = Extract<NavigationCapability, { visibility: "primary" }>;
+type SecondaryNavigationCapability = Extract<NavigationCapability, { visibility: "secondary" }>;
 type MoreNavigationCapability = Extract<NavigationCapability, { visibility: "more" }>;
 
 export const primaryNavigationKeys = navigationCapabilities
@@ -514,77 +565,75 @@ export const primaryNavigationKeys = navigationCapabilities
   .map((capability) => capability.key);
 
 /**
+ * The rail's second group (Life Brain A.2): rendered without a disclosure,
+ * under a rule, and never a bar slot. Derived, so a destination cannot be
+ * secondary on one surface and primary on the other.
+ */
+export const secondaryNavigationKeys = navigationCapabilities
+  .filter(
+    (capability): capability is SecondaryNavigationCapability =>
+      capability.visibility === "secondary",
+  )
+  .map((capability) => capability.key);
+
+/**
  * The mobile bottom bar, as an ordered slot list (UX-14, DEC-1).
  *
  * **The list's length is the bar's column count and its middle element is the
  * capture control.** That is what makes exact centring a structural property
  * rather than a measurement that happens to come out right: five equal columns
  * put the third column's centre on the viewport's centre, and `capture` is the
- * third slot. `mobile-bar-centring.test.ts` pins both halves — odd length, and
- * `capture` at the midpoint — so a future edit that adds a sixth destination to
- * balance geometry fails instead of quietly decentring the button.
+ * third slot. `app-shell.test.tsx` and `shell-mirror-guard` pin both halves —
+ * odd length, and `capture` at the midpoint — so a future edit that adds a sixth
+ * destination to balance geometry fails instead of quietly decentring the button.
  *
- * **Registros returns to the bar**, reversing the 2026-07-30 owner decision that
- * put it in overflow. That decision reasoned Registros was "a complete archive
- * and consultation surface rather than an operational queue" — which was true of
- * the surface as it then was, and is not true of the surface the redesign
- * delivers. `02-arquitetura-e-rotas.md` states the requirement directly:
- * *Registros volta para a barra — é a fila de decisão, e não pode viver em
- * overflow.* Its default view is now the decision queue, so the premise of the
- * old decision is gone with it.
+ * ## Life Brain A.2: `Hoje · Conversar · [Capturar] · Agenda · Memória`
  *
- * ## The bar is now the handoff's bar, and the release condition was met rather
- * than waived
+ * ADR-145 Decision 4 and owner decision LB-OD-1 (2026-10-31). The conversation
+ * is the product's main surface and it sat behind a disclosure; the calendar is
+ * the surface a whole life's commitments appear on and it sat in the overflow's
+ * organization group; Brain is the owner's memory and is now called so. Those
+ * three plus Hoje are the bar. **Registros and Trabalho left it** and became the
+ * rail's secondary pair (`secondaryNavigationKeys`), under a rule rather than a
+ * heading, visible without opening anything.
  *
- * `02-arquitetura-e-rotas.md` specifies `Hoje · Registros · [Capturar] ·
- * Trabalho · Brain`, and adds that *"Mais" deixa de existir*. Slice 2P.5
- * delivers exactly that, closing the remainder `2P-CHAT-004-MOBILE`.
+ * The previous bar — `Hoje · Registros · [Capturar] · Trabalho · Brain`, slice
+ * 2P.5 — reasoned that Registros *"é a fila de decisão, e não pode viver em
+ * overflow"*. It does not live in overflow: it is one tap from the first slot,
+ * and the queue it names is the first section of Hoje. What the bar carries is
+ * the question the owner asks the product, not the queue the product asks the
+ * owner to clear.
  *
- * The previous version of this comment held a **census with a release
- * condition** — the fifth slot stayed `more` because two destinations had no
- * other mobile route. It ended: *"when `AccountMenu` is mounted somewhere a
- * phone can reach without the disclosure, the fifth slot becomes `library` and
- * this comment shrinks to nothing."* Both blockers are now closed, and each is
- * closed by a real path rather than by re-reading the census:
+ * ## The census, re-derived by `mobile-reachability-guard.test.ts`
+ *
+ * Every destination that is not a slot has a path a phone reaches without a
+ * disclosure, and each path is asserted against the module that emits it:
  *
  * | destination | reached from |
  * | --- | --- |
- * | chat, projects, people, organizations, contexts, memories, files, relations | Brain's lens strip and overview — **now a bar slot**, so one tap |
- * | calendar (and the planner) | Trabalho's mode tabs |
- * | reviews | Hoje, unconditionally |
- * | reminders | the calendar's control band, unconditionally |
+ * | **inbox, work** | **Hoje's destination strip, unconditionally** (`TODAY_DESTINATION_KEYS`) |
+ * | projects, people, organizations, contexts, memories, files, relations | Memória's lens strip and overview — a bar slot, so one tap |
+ * | the planner (`calendar/plan`) and work | Agenda's mode tabs, and Trabalho's |
+ * | reviews | Hoje, unconditionally (the closing section, and the destination strip) |
+ * | reminders | Hoje's destination strip, and the calendar's control band, unconditionally |
  * | history, costs, jobs | Ajustes → Dados e IA, and jobs also from a failure on `/app/files` |
  * | notifications | the top bar's bell, **and** Ajustes → Conta e dados (`2O-PREF-002`) |
- * | **settings, and sign-out** | the account disclosure, **now in the top bar on every viewport** |
- * | **questions** | Registros' header, unconditionally |
+ * | settings, and sign-out | the account disclosure in the top bar on every viewport |
+ * | questions | Registros' header, unconditionally — two taps now, via the strip |
  *
- * **The account.** `AccountMenu` mounts twice, as it always has, and one of the
- * two moved: the desktop rail's foot is unchanged, and the mobile overflow panel
- * is replaced by the **top bar**, which every viewport carries. Retiring `more`
- * before that move would have taken Ajustes with it, and with Ajustes the whole
- * of Dados e IA and **sign-out**: not a destination moving one tap away but the
- * way out of the product disappearing.
+ * **The account.** `AccountMenu` mounts twice: the desktop rail's foot, and the
+ * top bar, which every viewport carries — the mobile overflow panel is replaced
+ * by the **top bar** since slice 2P.5. That move is what freed the bar from a
+ * `more` slot, and it is still the condition under which five destinations can
+ * be five destinations: retiring the header mount would take Ajustes with it,
+ * and with Ajustes the whole of Dados e IA and **sign-out**.
  *
- * **Perguntas.** Hoje's only link sits inside `{view.openQuestion ? … : null}`
- * and `conversational-questions.tsx` returns `null` on an empty list, so an
- * owner with no open question had no path but the disclosure. The fix is the one
- * the previous comment named and declined to build here: Perguntas is *a view of
- * Registros*, so Registros' header links to it unconditionally. Hoje is
- * untouched — adding a permanent control to the cockpit to satisfy a census
- * would be arranging the product around its own bookkeeping, which is what that
- * paragraph refused and still refuses.
- *
- * **`more` did not disappear; it stopped being a bar slot.** The desktop rail
- * keeps its `side-more` disclosure with all five groups, and the command palette
- * — an explicit control in the top bar, which on mobile is the only entry point
- * there has ever been for it — reaches every destination by name on both
- * viewports. What retired is a mobile bar slot spent on a menu.
- *
- * `mobile-reachability-guard.test.ts` re-derives every row above from the
- * components on every run, and still fails in **both** directions: a destination
- * losing its path, and the account leaving the header while the slot stays.
+ * **`more` is not a bar slot.** The desktop rail keeps its `side-more`
+ * disclosure with the five secondary groups, and the command palette — an
+ * explicit control in the top bar — reaches every destination by name on both
+ * viewports.
  */
-export const mobileBarSlots = ["home", "inbox", "capture", "work", "library"] as const;
+export const mobileBarSlots = ["home", "chat", "capture", "calendar", "library"] as const;
 
 export type MobileBarSlot = (typeof mobileBarSlots)[number];
 
