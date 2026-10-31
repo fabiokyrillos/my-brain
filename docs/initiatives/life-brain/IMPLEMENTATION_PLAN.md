@@ -50,6 +50,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - Calendário + Planejar + Lembretes como lentes; stepper de data no cabeçalho; filtros em sheet; faixa de eventos preparada (consome C.3 quando existir). `calendar.css` (1.270 linhas) encolhe.
 - Testes: `calendar.spec.ts`, `online-calendar.spec.ts`, `calendar-mirror-guard`.
+- **Decisão do dono (2026-10-31, achado de B.1):** o lembrete automático de uma tarefa com prazo (`tasks_create_due_reminder`, 1 h antes do `due_at`) deixa de aparecer como item separado quando a própria tarefa está na janela. Ele é dobrado na linha da tarefa **na projeção** (`calendar-projection.ts`), para que a Agenda e a resposta de agenda do chat (B.1) mudem juntas. Teste: uma tarefa com prazo amanhã gera um item com o horário do lembrete visível, e `online-agenda-answer.spec.ts` passa a esperar 1 item.
 
 ### A.5 — Registros, Notificações, Memória e listas (2 d)
 
