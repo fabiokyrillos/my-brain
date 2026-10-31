@@ -76,16 +76,17 @@ Previously the active milestone read, retained rather than deleted: **Phase 2N -
 
 Successor status: **the roadmap successor — the phase after Phase 2S — is NOT STARTED, not scoped and not authorized.** No successor requirement or artifact exists anywhere in the repository. Its planning needs its own owner authorization. **The published roadmap ends at Phase 2O**, so there is no roadmap entry after it — Phase 2P, 2Q, 2R and now 2S each derived their subject from a measured census, and what A13 guards is the next name the lettered series would take, protected in advance precisely because nothing has scoped it. **The letter is pinned in SIX places, not one**, enumerated by ADR-136 Decision 9: the A13 detector's three constants and its fixture root, `phase-2o-declarations.test.ts`, `phase-2r-declarations.test.ts`, and refusal checks inside all three of the `generate-phase-2*-traceability.mjs` generators. ADR-131 counted five and five was right when written; Phase 2R then shipped a generator of its own, and its refusal 14 is the sixth. **A13's declared-requirement signal was also inert** — it matched a bullet while this repository declares requirements in PRD table rows — and ADR-136 Decision 8 repaired it in the same commit that moved it.
 
-## Life Brain — OPENED 2026-10-30 (ADR-145) — slices A.0/A.1 in flight, owner decisions OPEN
+## Life Brain — OPENED 2026-10-30 (ADR-145) — A.0/A.1/B.0/A.2 shipped, owner decisions LB-OD-3..9 OPEN
 
 Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → A.1 → B.0 → A.2 → B.1 → C.0 → A.3 → B.2 → C.1(M1) → A.4 → B.3(M3) → C.2 → C.3(M2) → A.5 → C.4 → B.4 → C.5 → A.6 → B.5.
 
-- **Shipped 2026-10-30:** A.0 (tokens + primitives, PR #344), A.1 (Hoje + Conversar), B.0 (date + history in the chat prompt). **Next in order:** A.2 (bar), B.1 (deterministic agenda, "não encontrei" without a model call), C.0 (life copy).
+- **Shipped 2026-10-30:** A.0 (tokens + primitives, PR #344), A.1 (Hoje + Conversar, PR #345), B.0 (date + history in the chat prompt, PR #346). **Shipped 2026-10-31:** A.2 (bar `Hoje · Conversar · [+] · Agenda · Memória`, rail secondary pair, PR #347). **Next in order:** B.1 (deterministic agenda, "não encontrei" without a model call), C.0 (life copy), A.3 (Tarefas).
+- **A.4 inherits from A.2:** the calendar page title ("Calendário"), its "Agenda" layout chip and the bar label "Agenda" are three names for two things; A.4 resolves them together (the signed constraint: the Agenda view may not be renamed into Mês — `phase-2p-reminder-recurrence-guard`).
 
 ### Owner decisions (each with the recorded recommendation)
 
-- **LB-OD-1 — Mobile bar.** Recommendation: `Hoje · Conversar · [+] · Agenda · Memória`; Registros and Tarefas leave the bar and stay one tap away from Hoje. Alternative: keep Registros and drop Memória. Lands in slice A.2.
-- **LB-OD-2 — Routes.** Recommendation: keep every existing route and change labels/grouping only (zero redirects, guards updated); alternative: new `/app/agenda`, `/app/memory` with 308 redirects.
+- **LB-OD-1 — Mobile bar. DECIDED 2026-10-31 (owner: "Sim, A.2 aqui"):** `Hoje · Conversar · [+] · Agenda · Memória`; Registros and Trabalho leave the bar, become the rail's secondary pair and sit in Hoje's destination strip. Shipped in A.2. *(Alternative, preserved: keep Registros and drop Memória.)*
+- **LB-OD-2 — Routes. DECIDED 2026-10-31 as recommended:** every existing route kept, labels and grouping changed only, zero redirects, guards updated. Shipped in A.2. *(Alternative, preserved: new `/app/agenda`, `/app/memory` with 308 redirects.)*
 - **LB-OD-3 — Chat layout.** Recommendation: two-voice thread (user turn in a subtle surface, assistant in plain reading face), composer sticky above the bar. The Phase 2K "transcript, not a chat log" layout is replaced on the evidence that the surface had zero conversations.
 - **LB-OD-4 — Type scale.** Recommendation: body 15px / label 13.5px / caption 12.5px (slice A.0). Alternative: 14px body.
 - **LB-OD-5 — Events.** Recommendation: a real `events` table (LB-M2), superseding OD-2M-3 A; alternative: encode a period in `tasks` (rejected in `LIFE_DATA_MODEL.md` §3).

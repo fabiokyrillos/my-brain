@@ -74,7 +74,7 @@ Risco: o roteador (c) pode capturar uma frase que era pergunta implícita ("méd
 ## 5. Ordem de adoção
 
 1. Slice A.1: porta para Conversar em Hoje; chat redesenhado. Barra inalterada.
-2. Slice A.2: barra **Hoje · Conversar · [+] · Agenda · Memória**; Registros e Tarefas saem da barra; guards atualizados.
+2. Slice A.2 (**entregue 2026-10-31**): barra **Hoje · Conversar · [+] · Agenda · Memória**; Registros e Trabalho saem da barra para o par secundário do rail e para a faixa "Ir para" de Hoje; guards atualizados; rotas intactas. O rótulo "Tarefas" fica para A.3; o título "Calendário" e o chip "Agenda" da página ficam para A.4.
 3. Slice A.3–A.5: Tarefas/Agenda/Memória recebem lentes e absorvem rotas antigas com redirects.
 4. Slice C.5: Áreas da vida em Memória.
 5. Slice B.5: composer único com modo `converse`.
