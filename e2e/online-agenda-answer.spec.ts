@@ -16,6 +16,12 @@ import { signInOnline } from "./support/online-session";
  * provider. One task is seeded for the disposable account only — never for the
  * owner's test account — and the account's deletion cascades it away.
  *
+ * **Two items, not one.** `tasks_create_due_reminder` (`202607160007`) gives
+ * every task inserted with a `due_at` a reminder one hour earlier, and the
+ * calendar projection shows both. The first run of this spec expected one item
+ * and was wrong about the product, not the other way round: the answer must say
+ * what the Agenda shows.
+ *
  * Evidence: set `LIFE_BRAIN_EVIDENCE=docs/reports/life-brain/evidence/slice-b1`
  * to keep the screenshots.
  */
@@ -34,7 +40,9 @@ const strings = {
     submit: "Enviar",
     tomorrow: "O que tenho amanhã?",
     dayAfter: "O que tenho depois de amanhã?",
-    found: "Amanhã, você tem 1 item na agenda:",
+    found: "Amanhã, você tem 2 itens na agenda:",
+    reminderLane: "lembrete",
+    deadlineLane: "prazo",
     empty: "Não encontrei nada na sua agenda depois de amanhã.",
     reach: "Olhei só a sua agenda: tarefas com prazo ou planejadas e lembretes nesse período.",
     insufficient: "Nada na sua agenda nesse período.",
@@ -44,7 +52,9 @@ const strings = {
     submit: "Send",
     tomorrow: "What do I have tomorrow?",
     dayAfter: "What do I have the day after tomorrow?",
-    found: "Tomorrow, you have 1 item on your agenda:",
+    found: "Tomorrow, you have 2 items on your agenda:",
+    reminderLane: "reminder",
+    deadlineLane: "deadline",
     empty: "I found nothing on your agenda the day after tomorrow.",
     reach: "I looked only at your agenda: tasks due or planned and reminders in that period.",
     insufficient: "Nothing on your agenda in that period.",
@@ -119,10 +129,12 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       await expect(page).toHaveURL(new RegExp(`/${locale}/app/chat/[0-9a-f-]+$`), { timeout: 60_000 });
       const answer = page.locator(".chat-message.assistant").last();
       await expect(answer.locator(".chat-message-body")).toContainText(text.found);
-      await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE}`);
+      await expect(answer.locator(".chat-message-body")).toContainText(`14:00 · ${TASK_TITLE} · ${text.reminderLane}`);
+      await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE} · ${text.deadlineLane}`);
       // Where it looked, said for the agenda — not "records and memories only".
       await expect(answer.getByText(text.reach)).toBeVisible();
-      // The task is a navigable source, carrying no title in the card.
+      // The task is a navigable source, carrying no title in the card; the
+      // reminder is listed and not cited (ADR-146 Decision 2).
       await expect(answer.locator(`a[href^="/${locale}/app/work/"]`)).toHaveCount(1);
       // No model answered, so no model id is printed under the message.
       await expect(answer.locator("xpath=./small")).toHaveCount(0);
