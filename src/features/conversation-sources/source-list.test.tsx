@@ -156,6 +156,29 @@ describe("2K-SRC-006: the reach is disclosed on both branches", () => {
   });
 });
 
+describe("Life Brain B.1: an agenda answer says where IT looked", () => {
+  const agenda = (evidence: ParsedCitations["evidence"]): ParsedCitations => ({
+    evidence,
+    reach: ["task"],
+    sources: [],
+    explanation: null,
+    legacy: false,
+  });
+
+  it("names the agenda, never 'records and memories only', beside an agenda answer", () => {
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={agenda("evidenced")} locale="pt-BR" sources={[]} />);
+    expect(screen.getByText(copy.agendaReach)).toBeInTheDocument();
+    expect(screen.queryByText(copy.reach)).not.toBeInTheDocument();
+  });
+
+  it("says the agenda was empty, not that the records and memories were", () => {
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={agenda("no_qualifying_evidence")} locale="en" sources={[]} />);
+    const en = getConversationSourcesCopy("en");
+    expect(screen.getByText(en.agendaInsufficient)).toBeInTheDocument();
+    expect(screen.queryByText(en.insufficient)).not.toBeInTheDocument();
+  });
+});
+
 describe("2K-PRIVACY-004: a legacy row says less rather than guessing", () => {
   const legacy: ParsedCitations = { evidence: "unknown", reach: [], sources: [], explanation: null, legacy: true };
 

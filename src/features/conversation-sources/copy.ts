@@ -30,6 +30,14 @@ export type ConversationSourcesCopy = {
   readonly reach: string;
   /** `2K-SRC-005`. The honest "I had nothing". */
   readonly insufficient: string;
+  /**
+   * Life Brain B.1 — the same two sentences for an answer read from the agenda
+   * (`AGENDA_REACH`). Chosen by `reachScope` from the envelope's own reach, so
+   * the knowledge sentence ("records and memories only") is never stamped on an
+   * answer that looked somewhere else.
+   */
+  readonly agendaReach: string;
+  readonly agendaInsufficient: string;
   /** An old row, which recorded neither reach nor evidence state. */
   readonly legacyUnknown: string;
   readonly freshnessLabel: string;
@@ -69,6 +77,8 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     reach: "Procurei nos seus registros e nas suas memórias — só nesses dois lugares.",
     insufficient:
       "Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros nem das suas memórias.",
+    agendaReach: "Olhei só a sua agenda: tarefas com prazo ou planejadas e lembretes nesse período.",
+    agendaInsufficient: "Nada na sua agenda nesse período.",
     legacyUnknown: "Esta resposta é de antes de eu passar a anotar onde procurei.",
     freshnessLabel: "De",
     freshnessUnknown: "Sem data",
@@ -91,6 +101,8 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     reach: "I looked in your records and your memories — those two places only.",
     insufficient:
       "I found nothing of yours about this. What I answered above does not come from your records or your memories.",
+    agendaReach: "I looked only at your agenda: tasks due or planned and reminders in that period.",
+    agendaInsufficient: "Nothing on your agenda in that period.",
     legacyUnknown: "This answer predates my keeping track of where I looked.",
     freshnessLabel: "From",
     freshnessUnknown: "No date",

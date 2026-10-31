@@ -81,6 +81,11 @@ Successor status: **the roadmap successor — the phase after Phase 2S — is NO
 Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → A.1 → B.0 → A.2 → B.1 → C.0 → A.3 → B.2 → C.1(M1) → A.4 → B.3(M3) → C.2 → C.3(M2) → A.5 → C.4 → B.4 → C.5 → A.6 → B.5.
 
 - **Shipped 2026-10-30:** A.0 (tokens + primitives, PR #344), A.1 (Hoje + Conversar), B.0 (date + history in the chat prompt). **Next in order:** A.2 (bar), B.1 (deterministic agenda, "não encontrei" without a model call), C.0 (life copy).
+- **B.1 implemented 2026-10-31** (branch `life-brain/b1-deterministic-agenda`, PR open). Left open by it:
+  - **A task with a deadline is listed twice** ("14:00 · X · lembrete", "15:00 · X · prazo"): `tasks_create_due_reminder` (`202607160007`) creates a reminder one hour before every `due_at`, and the projection shows both — on the Agenda too. **Owner decision 2026-10-31: fold it in slice A.4.** A reminder whose `task_id` is a task already in the window joins that task's line, in the projection, so the Agenda and the chat answer change together; the item count must still match what the Agenda shows (`2M-PRIVACY-006`). Recorded in `IMPLEMENTATION_PLAN.md` §A.4.
+  - **B.2 must decide `reminder` as a citation type** (`LB-B-006`). B.1 lists reminders in the agenda answer without citing them (ADR-146 Decision 2); `AGENDA_REACH` and `reachScope` change with that decision.
+  - **`LB-B-008` is applied only when the conversation has no earlier turn.** Recommendation: keep it — a follow-up with zero retrieval is answerable from the history B.0 added. Alternative: the PRD's literal rule (fixed answer whenever there are zero sources).
+  - Named months ("dia 3 de dezembro", "em março") deliberately fall to the knowledge path; they belong to B.3's temporal parser.
 
 ### Owner decisions (each with the recorded recommendation)
 
