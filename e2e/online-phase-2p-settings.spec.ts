@@ -343,7 +343,7 @@ test.describe("the mobile bar is the handoff's bar", () => {
     expect(deletion.ok).toBe(true);
   });
 
-  test("`2P-CHAT-004-MOBILE`: five slots, Brain among them, and nothing stranded", async ({ page }) => {
+  test("`2P-CHAT-004-MOBILE`: five slots, Memória among them, and nothing stranded", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/pt-BR/app");
@@ -351,7 +351,8 @@ test.describe("the mobile bar is the handoff's bar", () => {
     const bar = page.getByRole("navigation", { name: "Navegação móvel" });
     await expect(bar.locator(":scope > a")).toHaveCount(5);
     await expect(bar.locator(":scope > details")).toHaveCount(0);
-    await expect(bar.getByRole("link", { name: "Brain" })).toBeVisible();
+    // "Memória" since Life Brain A.2; the slot and the route are the same.
+    await expect(bar.getByRole("link", { name: "Memória" })).toBeVisible();
 
     // The account, in the header, without opening anything else first.
     const account = page.locator(".top-account .account-menu-header");

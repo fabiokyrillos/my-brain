@@ -25,6 +25,9 @@ import { onlineEnvironment, signInOnline } from "./support/online-session";
  */
 const EVIDENCE = process.env.LIFE_BRAIN_EVIDENCE?.trim() || "docs/reports/life-brain/evidence/baseline";
 const ROUTE_FILTER = (process.env.LIFE_BRAIN_ROUTES ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+/** `LIFE_BRAIN_THEME=dark` emulates `prefers-color-scheme: dark` and suffixes every file with `-dark`. */
+const THEME: "light" | "dark" = process.env.LIFE_BRAIN_THEME === "dark" ? "dark" : "light";
+const THEME_SUFFIX = THEME === "dark" ? "-dark" : "";
 const onlyNamed = <T extends { readonly name: string }>(routes: readonly T[]): readonly T[] =>
   ROUTE_FILTER.length === 0 ? routes : routes.filter((route) => ROUTE_FILTER.includes(route.name));
 const EMAIL = process.env.ONLINE_AUTH_TEST_EMAIL ?? "";
@@ -163,9 +166,9 @@ async function capture(page: Page, route: Route, path: string, locale: string, v
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.waitForTimeout(400);
   const status = response?.status() ?? 0;
-  const file = `${EVIDENCE}/${route.name}${suffix}-${locale}-${viewport.name}.png`;
+  const file = `${EVIDENCE}/${route.name}${suffix}-${locale}-${viewport.name}${THEME_SUFFIX}.png`;
   await page.screenshot({ path: file, fullPage: true });
-  measurements.push(await measure(page, `${route.name}${suffix}`, locale, viewport.name, status));
+  measurements.push(await measure(page, `${route.name}${suffix}${THEME_SUFFIX}`, locale, viewport.name, status));
   return status;
 }
 
@@ -175,14 +178,14 @@ test.describe("Life Brain — baseline route audit", () => {
 
   test.afterAll(() => {
     mkdirSync(EVIDENCE, { recursive: true });
-    writeFileSync(`${EVIDENCE}/measurements.json`, JSON.stringify(measurements, null, 2) + "\n");
+    writeFileSync(`${EVIDENCE}/measurements${THEME_SUFFIX}.json`, JSON.stringify(measurements, null, 2) + "\n");
   });
 
   for (const viewport of VIEWPORTS) {
     test(`public routes at ${viewport.name}`, async ({ browser }, testInfo) => {
       testInfo.setTimeout(5 * 60_000);
       mkdirSync(EVIDENCE, { recursive: true });
-      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, colorScheme: THEME });
       const page = await context.newPage();
       for (const route of onlyNamed(PUBLIC_ROUTES)) {
         for (const locale of route.en ? (["pt-BR", "en"] as const) : (["pt-BR"] as const)) {
@@ -201,6 +204,7 @@ test.describe("Life Brain — baseline route audit", () => {
         deviceScaleFactor: viewport.phone ? 2 : 1,
         isMobile: viewport.phone,
         hasTouch: viewport.phone,
+        colorScheme: THEME,
       });
       const page = await context.newPage();
       await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });

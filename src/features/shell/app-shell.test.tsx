@@ -42,11 +42,19 @@ describe("AppShell", () => {
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Hoje",
+      // Life Brain A.2 (ADR-145 Decision 4, LB-OD-1). The conversation is the
+      // product's main surface, so it sits second on both surfaces; the
+      // calendar is Agenda and Brain is Memória. Every route is unchanged.
+      "Conversar",
+      "Agenda",
+      "Memória",
+    ]);
+    // Registros and Trabalho left the bar and stay on the rail, under a
+    // separator, as the secondary pair.
+    const secondary = within(desktopNavigation).getByRole("group", { name: "Secundário" });
+    expect(within(secondary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Registros",
       "Trabalho",
-      // The fourth destination named by `02-arquitetura-e-rotas.md`. Conversar
-      // moves inside it as the Conversas lens; the route is untouched.
-      "Brain",
     ]);
     expect(screen.getAllByRole("link", { name: "Captura rápida" })).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute(
@@ -58,7 +66,7 @@ describe("AppShell", () => {
     expect(screen.getByText("Conteúdo")).toBeInTheDocument();
   });
 
-  it("shows only the primary destinations and capture in the desktop rail", () => {
+  it("shows the primary and secondary destinations and capture in the desktop rail, nothing else", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
     const desktopNavigation = screen.getByRole("navigation", { name: "Navegação principal" });
 
@@ -67,10 +75,16 @@ describe("AppShell", () => {
     // product concepts in front of someone who had not yet captured anything
     // (UX-01) and pushed "Configurações" below the fold at 1440x900 (UX-17).
     const alwaysVisible = Array.from(
-      desktopNavigation.querySelectorAll(":scope > .nav-group-primary a, :scope > .capture-fab"),
+      desktopNavigation.querySelectorAll(
+        ":scope > .nav-group-primary a, :scope > .capture-fab, :scope > .nav-group-secondary a",
+      ),
     ).map((link) => link.textContent);
 
-    expect(alwaysVisible).toEqual(["Hoje", "Registros", "Trabalho", "Brain", "Captura rápida"]);
+    // Primary, then capture, then the secondary pair — the rail's reading
+    // order since Life Brain A.2 (`INFORMATION_ARCHITECTURE.md`).
+    expect(alwaysVisible).toEqual([
+      "Hoje", "Conversar", "Agenda", "Memória", "Captura rápida", "Registros", "Trabalho",
+    ]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
         (summary) => summary.textContent,
@@ -86,12 +100,8 @@ describe("AppShell", () => {
     expect(
       Array.from(more.querySelectorAll("a")).map((link) => link.getAttribute("href")),
     ).toEqual([
-      /*
-        Conversar leads the context group since the redesign. It is a lens of
-        Brain rather than a rail destination (`02-arquitetura-e-rotas.md`), and
-        the route is unchanged — what moved is where it is listed.
-      */
-      "/pt-BR/app/chat",
+      // Conversar left this list in Life Brain A.2: it is a primary rail
+      // destination and a bar slot now, while staying Brain's first lens.
       "/pt-BR/app/projects",
       "/pt-BR/app/people",
       "/pt-BR/app/organizations",
@@ -103,9 +113,8 @@ describe("AppShell", () => {
       "/pt-BR/app/relations",
       "/pt-BR/app/reviews",
       "/pt-BR/app/questions",
-      // `2M-CAL-001`. In the organization group, ahead of reminders: a calendar
-      // is the surface a reminder appears on.
-      "/pt-BR/app/calendar",
+      // The calendar is Agenda, a primary destination, since Life Brain A.2;
+      // Lembretes is what remains of the organization group here.
       "/pt-BR/app/reminders",
       "/pt-BR/app/history",
       "/pt-BR/app/costs",
@@ -256,23 +265,19 @@ describe("AppShell", () => {
      * It has carried five ever since; the redesign changed *which* four
      * destinations, not the geometry.
      *
-     * Registros is back on the bar, because its default view is now the decision
-     * queue and `02-arquitetura-e-rotas.md` says a queue cannot live in overflow.
-     *
-     * **Brain took the fifth slot in slice 2P.5**, when the two destinations
-     * `capabilities.ts` recorded as the release condition got paths that do not
-     * go through a menu: the account reached the top bar, and Perguntas got an
-     * unconditional link in Registros' header.
+     * **Life Brain A.2 (LB-OD-1)** changed the four again: Conversar and
+     * Agenda replace Registros and Trabalho, which keep their rail places and
+     * an unconditional path from Hoje's destination strip. Brain is Memória.
      *
      * DOM order is asserted here and *is* the visual order, because the grid
      * assigns columns in source order and nothing sets `order`.
      */
     expect(topLevelControls).toEqual([
       "Hoje",
-      "Registros",
+      "Conversar",
       "Captura rápida",
-      "Trabalho",
-      "Brain",
+      "Agenda",
+      "Memória",
     ]);
   });
 
@@ -313,35 +318,78 @@ describe("AppShell", () => {
       that used to hold the demoted destination has nothing left to hold.
     */
     expect(mobileDemotedKeys).toEqual([]);
-    expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveTextContent("Brain");
+    expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveTextContent("Memória");
   });
 
-  it("carries Registros on the bar itself, not behind the disclosure", () => {
-    // The requirement in one line: *Registros volta para a barra — é a fila de
-    // decisão, e não pode viver em overflow.*
+  /**
+   * Life Brain A.2 (LB-OD-1). The two destinations that left the bar did not
+   * leave the product's navigation: they are the rail's secondary pair, and
+   * on a phone they are one tap from Hoje (`mobile-reachability-guard`).
+   */
+  it("keeps Registros and Trabalho off the bar and in the rail's secondary group", () => {
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
 
     const onTheBar = Array.from(mobile.querySelectorAll(":scope > a"))
       .map((link) => link.getAttribute("href"));
-    expect(onTheBar).toContain("/pt-BR/app/inbox");
+    expect(onTheBar).toEqual([
+      "/pt-BR/app",
+      "/pt-BR/app/chat",
+      "/pt-BR/app/capture",
+      "/pt-BR/app/calendar",
+      "/pt-BR/app/library",
+    ]);
+
+    const secondary = within(desktop).getByRole("group", { name: "Secundário" });
+    expect(
+      within(secondary).getAllByRole("link").map((link) => link.getAttribute("href")),
+    ).toEqual(["/pt-BR/app/inbox", "/pt-BR/app/work"]);
+    // Not behind the disclosure: the pair is visible without opening anything.
+    expect(desktop.querySelector(":scope > details")!.contains(secondary)).toBe(false);
   });
 
-  it("marks Brain as the current page from the bar itself", () => {
+  it("marks Memória as the current page from the bar itself", () => {
     // The failure this prevents is unchanged: a phone user standing in a
-    // destination sees no active state anywhere. It used to be answered by
-    // marking `Mais` active while Brain hid inside it; Brain is a slot now, so
-    // the slot says it directly.
+    // destination sees no active state anywhere. The slot says it directly.
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app/library");
     render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
 
     const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
     expect(mobile.querySelector('a[href="/pt-BR/app/library"]')).toHaveAttribute("aria-current", "page");
 
-    // Desktop is unchanged: Brain is a primary rail destination, so the rail's own
-    // More disclosure must *not* claim the active state.
+    // Desktop is unchanged: Memória is a primary rail destination, so the
+    // rail's own More disclosure must *not* claim the active state.
     const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
     expect(desktop.querySelector(":scope > details")).not.toHaveClass("active");
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  });
+
+  it("marks Conversar from the bar while a conversation is open, on both surfaces", () => {
+    // `nested: true` on `chat`, so a thread keeps the slot lit — the same
+    // rule Registros' detail pages already follow.
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/chat/conversation-1");
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    expect(mobile.querySelector('a[href="/pt-BR/app/chat"]')).toHaveAttribute("aria-current", "page");
+    const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
+    expect(desktop.querySelector('.nav-group-primary a[href="/pt-BR/app/chat"]')).toHaveAttribute("aria-current", "page");
+    expect(desktop.querySelector(":scope > details")).not.toHaveClass("active");
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  });
+
+  it("marks Registros in the rail's secondary group, and lets no bar slot claim it", () => {
+    // The honest state of a destination that left the bar: the rail says
+    // where you are, and the bar lights nothing rather than something false.
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox?view=needs-you");
+    render(<AppShell locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+    const desktop = screen.getByRole("navigation", { name: "Navegação principal" });
+    expect(desktop.querySelector('.nav-group-secondary a[href="/pt-BR/app/inbox"]')).toHaveAttribute("aria-current", "page");
+    expect(desktop.querySelector(":scope > details")).not.toHaveClass("active");
+    const mobile = screen.getByRole("navigation", { name: "Navegação móvel" });
+    expect(mobile.querySelectorAll('[aria-current="page"]')).toHaveLength(0);
     vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
   });
 
@@ -517,10 +565,15 @@ describe("AppShell", () => {
 
     expect(within(primary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Today",
-      "Records",
-      "Work",
-      "Brain",
+      "Talk",
+      "Agenda",
+      "Memory",
     ]);
+    expect(
+      within(within(desktopNavigation).getByRole("group", { name: "Secondary" }))
+        .getAllByRole("link")
+        .map((link) => link.textContent),
+    ).toEqual(["Records", "Work"]);
     expect(within(desktopNavigation).getByRole("link", { name: "Work" })).toHaveAttribute(
       "href",
       "/en/app/work",

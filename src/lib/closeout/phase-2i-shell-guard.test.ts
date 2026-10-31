@@ -37,7 +37,7 @@ const LINKS = readFileSync(join(REPO, "src/features/shell/navigation-links.tsx")
 const GLOBALS = readFileSync(join(REPO, "src/app/globals.css"), "utf8");
 
 describe("2I-SHELL-001: the primary destinations are the delivered baseline", () => {
-  it("exposes exactly home, inbox, work and library as primary", () => {
+  it("exposes exactly home, chat, calendar and library as primary", () => {
     /*
      * BASELINE, not built. This asserts what the shell delivers and forbids a
      * later slice from quietly changing it.
@@ -49,10 +49,15 @@ describe("2I-SHELL-001: the primary destinations are the delivered baseline", ()
      * route; "Brain" is what it is called. `chat` keeps its route and moves into
      * the `context` group as Brain's Conversas lens.
      *
+     * It changed a second time, in Life Brain A.2 (ADR-145 Decision 4,
+     * LB-OD-1, decided by the owner on 2026-10-31): Hoje · Conversar · Agenda
+     * · Memória. `chat` and `calendar` became primary without leaving their
+     * thematic groups; `inbox` and `work` became the rail's secondary pair.
+     *
      * The guard's job is unchanged: the next change to this list has to be as
      * deliberate as this one.
      */
-    expect([...primaryNavigationKeys].sort()).toEqual(["home", "inbox", "library", "work"]);
+    expect([...primaryNavigationKeys].sort()).toEqual(["calendar", "chat", "home", "library"]);
   });
 
   it("keeps capture as a global action rather than a primary destination", () => {
@@ -144,8 +149,11 @@ describe("2I-SHELL-003: Mais renders the grouping that already exists as data", 
      * `2N-RELATION-006` requires the relations surface to stay out of primary
      * navigation, which `visibility: "more"` is how it does.
      */
-    const context = moreNavigationGroups.find((group) => group.key === "context");
-    expect([...(context?.items ?? [])].sort()).toEqual(
+    // Read off the registry's group rather than the disclosure's copy of it:
+    // since Life Brain A.2 `chat` is a `context` member that the disclosure
+    // does not list, because it is primary.
+    const context = navigationCapabilities.filter((item) => item.group === "context");
+    expect(context.map((item) => item.key).sort()).toEqual(
       ["chat", "contexts", "files", "memories", "organizations", "people", "projects", "relations"].sort(),
     );
   });
@@ -165,10 +173,10 @@ describe("2I-SHELL-004: every existing route stays reachable", () => {
   });
 
   it("keeps every destination visible somewhere", () => {
-    // primary, more, global or context-only — but never nowhere.
+    // primary, secondary, more, global or context-only — but never nowhere.
     for (const capability of navigationCapabilities) {
       expect(
-        ["primary", "more", "global", "context-only"],
+        ["primary", "secondary", "more", "global", "context-only"],
         `${capability.key} has visibility ${capability.visibility}`,
       ).toContain(capability.visibility);
     }

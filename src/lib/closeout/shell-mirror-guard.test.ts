@@ -7,6 +7,7 @@ import {
   mobileDemotedKeys,
   moreNavigationGroups,
   primaryNavigationKeys,
+  secondaryNavigationKeys,
 } from "@/features/shell/capabilities";
 import { getMessages } from "@/i18n/messages";
 
@@ -76,6 +77,11 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
     expect(fixtureList(FIXTURE, "PRIMARY")).toEqual(primaryNavigationKeys.map(label));
   });
 
+  /** Life Brain A.2: the rail's secondary pair, below the separator. */
+  it("lists the rail's secondary destinations, in order", () => {
+    expect(fixtureList(FIXTURE, "SECONDARY")).toEqual(secondaryNavigationKeys.map(label));
+  });
+
   it("lists the mobile bar's slots, in order, capture included", () => {
     expect(fixtureList(FIXTURE, "MOBILE_BAR")).toEqual(mobileBarSlots.map(label));
   });
@@ -133,6 +139,13 @@ describe("the e2e navigation fixture mirrors the navigation the product renders"
     const mutated = FIXTURE.replace(`"${label(first)}"`, '"Alguma outra coisa"');
     expect(mutated).not.toEqual(FIXTURE);
     expect(fixtureList(mutated, "PRIMARY")).not.toEqual(primaryNavigationKeys.map(label));
+  });
+
+  it("fails when the secondary pair's mirror diverges by a single label", () => {
+    const [start, rest] = splitAt(FIXTURE, "const SECONDARY = [");
+    const mutated = start + rest.replace(`"${label(secondaryNavigationKeys[0])}"`, '"Alguma outra coisa"');
+    expect(mutated).not.toEqual(FIXTURE);
+    expect(fixtureList(mutated, "SECONDARY")).not.toEqual(secondaryNavigationKeys.map(label));
   });
 
   it("fails when the bar's mirror diverges by a single label", () => {

@@ -30,14 +30,21 @@ const messages = {
       inbox: "Registros",
       work: "Trabalho",
       /*
-       * `Brain`, not `Biblioteca`.
+       * `Memória`, not `Brain` (Life Brain A.2, `INFORMATION_ARCHITECTURE.md`).
        *
-       * The fourth primary destination, named the way the other three are: after
-       * what it holds rather than after its shelf. The route key stays
-       * `library`, so no URL changes.
+       * "Brain" was doing two jobs: the assistant as an actor — a name the
+       * owner can change in Settings — and this place. A place cannot share a
+       * name with an actor, which is the rule that already took `chat` from
+       * "Brain" to "Conversar". The destination is named after what it holds:
+       * the owner's memory. The route key stays `library`, so no URL changes.
        */
-      library: "Brain",
-      calendar: "Calendário",
+      library: "Memória",
+      /*
+       * `Agenda`, not `Calendário` (Life Brain A.2). A calendar is one view of
+       * the destination; the destination is where a life's commitments are,
+       * and it is a bar slot now. The route key stays `calendar`.
+       */
+      calendar: "Agenda",
       tasks: "Tarefas",
       waiting: "Aguardando",
       projects: "Projetos",
@@ -90,6 +97,7 @@ const messages = {
     },
     navGroups: {
       primary: "Principal",
+      secondary: "Secundário",
       context: "Contexto",
       reflection: "Reflexão",
       organization: "Organização",
@@ -108,9 +116,9 @@ const messages = {
       home: "Today",
       today: "Today",
       inbox: "Records",
-      library: "Brain",
+      library: "Memory",
       work: "Work",
-      calendar: "Calendar",
+      calendar: "Agenda",
       tasks: "Tasks",
       waiting: "Waiting",
       projects: "Projects",
@@ -133,6 +141,7 @@ const messages = {
     },
     navGroups: {
       primary: "Primary",
+      secondary: "Secondary",
       context: "Context",
       reflection: "Reflection",
       organization: "Organization",

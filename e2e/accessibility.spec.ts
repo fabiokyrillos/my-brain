@@ -385,7 +385,7 @@ function brainSurface() {
       + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
   ];
 
-  return `<div class="brain-page"><header class="brain-head"><h1>Brain</h1>`
+  return `<div class="brain-page"><header class="brain-head"><h1>Memória</h1>`
     + `<p>Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p>`
     + `<a class="brain-search-link" href="#">Buscar em tudo</a></header>`
     + strip

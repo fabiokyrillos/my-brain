@@ -46,13 +46,15 @@ export type LibraryCopy = {
 const copy: Record<Locale, LibraryCopy> = {
   "pt-BR": {
     /*
-      "Brain", matching the destination's label in the rail.
-      The page said "Biblioteca" while the navigation that reached it said
-      "Brain" — one destination with two names, which is the naming collision
-      `2I-SHELL-002` removed between "Início" and "Hoje". The route is still
-      `library`; only the name changed.
+      "Memória", matching the destination's label in the rail and the bar
+      (Life Brain A.2). The page said "Brain" while the assistant is also
+      called Brain — a place sharing a name with an actor, the collision
+      `2I-SHELL-002` removed between "Início" and "Hoje" and UX-06 removed
+      between "Brain" and "Conversar". The route is still `library`; only the
+      name changed. The intro still says what the *Brain* knows: that is the
+      actor, and this is where it keeps it.
     */
-    title: "Brain",
+    title: "Memória",
     intro: "Tudo que o Brain sabe sobre o seu mundo, em um lugar só.",
     searchLink: "Buscar em tudo",
     recentLabel: "Recentes",
@@ -71,7 +73,7 @@ const copy: Record<Locale, LibraryCopy> = {
       // mechanism: a conversation is how you ask the Brain about everything above.
       chat: "Perguntar sobre tudo isto.",
     },
-    lensesLabel: "Lentes do Brain",
+    lensesLabel: "Lentes da Memória",
     overviewLens: "Visão geral",
     nothingYet: "Nada aqui ainda.",
     noRecency: "Sem lista recente por aqui.",
@@ -80,7 +82,7 @@ const copy: Record<Locale, LibraryCopy> = {
     holdsHeading: "O que o Brain guarda",
   },
   en: {
-    title: "Brain",
+    title: "Memory",
     intro: "Everything the Brain knows about your world, in one place.",
     searchLink: "Search everything",
     recentLabel: "Recent",
@@ -94,7 +96,7 @@ const copy: Record<Locale, LibraryCopy> = {
       relations: "How these things connect.",
       chat: "Ask about all of this.",
     },
-    lensesLabel: "Brain lenses",
+    lensesLabel: "Memory lenses",
     overviewLens: "Overview",
     nothingYet: "Nothing here yet.",
     noRecency: "No recent list here.",

@@ -39,6 +39,7 @@ import {
   moreNavigationGroups,
   type NavigationKey,
   primaryNavigationKeys,
+  secondaryNavigationKeys,
   type VisibleNavigationKey,
 } from "./capabilities";
 import { useDismissableDisclosure } from "./use-dismissable-disclosure";
@@ -48,8 +49,8 @@ const icons = {
   home: Home,
   inbox: Inbox,
   work: BriefcaseBusiness,
-  /* Brain. `BrainCircuit` is already `memories`, and two destinations sharing a
-     glyph in one rail is a rail you have to read twice. */
+  /* Memória. `BrainCircuit` is already `memories`, and two destinations sharing
+     a glyph in one rail is a rail you have to read twice. */
   library: Library,
   calendar: CalendarDays,
   chat: MessageCircleMore,
@@ -196,12 +197,11 @@ export function NavigationLinks({
   /*
    * `Mais` is active whenever the current destination lives behind it.
    *
-   * On mobile that set is wider than on desktop: `mobileDemotedKeys` — today just
-   * Registros — is on the rail but not on the bar, so a user reading Registros on
-   * a phone must still see the disclosure that contains it marked active.
-   * Computing this per surface rather than once is the whole of what keeps the
-   * demotion from making a destination look unreachable while you are standing in
-   * it.
+   * `mobileDemotedKeys` is empty by construction (every primary destination is
+   * a slot), and the secondary pair is on the rail outside the disclosure, so
+   * neither surface marks `Mais` for them. Kept per surface rather than once so
+   * a future demotion cannot make a destination look unreachable while you are
+   * standing in it.
    */
   const overflowKeys = [
     ...(mobile ? mobileDemotedKeys : []),
@@ -234,6 +234,16 @@ export function NavigationLinks({
           </div>
         </div>
         {renderLink("capture", { capture: true })}
+        {/*
+          Life Brain A.2: Registros and Trabalho, under a rule rather than a
+          heading. Visible without opening anything, below capture so the
+          rail reads question → action → queue (`INFORMATION_ARCHITECTURE.md`).
+        */}
+        <div className="nav-group nav-group-secondary" role="group" aria-label={t.navGroups.secondary}>
+          <div className="nav-group-items">
+            {secondaryNavigationKeys.map((key) => renderLink(key))}
+          </div>
+        </div>
         <NavigationOverflow variant="side-more" active={overflowActive} label={t.nav.more}>
           {overflowGroups}
         </NavigationOverflow>
@@ -254,11 +264,11 @@ export function NavigationLinks({
    * ## Slice 2P.5: five destinations, and no disclosure among them
    *
    * The fifth slot was `Mais`, and it held the account block, the destinations
-   * the bar demoted, and the five secondary groups. It is `library` now — the
-   * bar `02-arquitetura-e-rotas.md` specifies — because the two things that
-   * needed it no longer do: the account moved to the top bar, and Perguntas
-   * became a link in Registros' header. `capabilities.ts` carries the census and
-   * `mobile-reachability-guard` re-derives it on every run.
+   * the bar demoted, and the five secondary groups. It retired because the two
+   * things that needed it no longer do: the account moved to the top bar, and
+   * Perguntas became a link in Registros' header. Life Brain A.2 then changed
+   * *which* four destinations the slots hold — `capabilities.ts` carries the
+   * census and `mobile-reachability-guard` re-derives it on every run.
    *
    * `mobileDemotedKeys` is empty by construction now: every primary destination
    * is a slot. The map has no `more` arm because `MobileBarSlot` no longer has

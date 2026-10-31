@@ -11,7 +11,7 @@ import { BRAIN_LENSES } from "./lenses";
 describe("BrainLensTabs", () => {
   it("offers every lens, in reading order, with the overview first", () => {
     render(<BrainLensTabs active="overview" locale="pt-BR" />);
-    const strip = screen.getByRole("navigation", { name: "Lentes do Brain" });
+    const strip = screen.getByRole("navigation", { name: "Lentes da Memória" });
 
     expect(within(strip).getAllByRole("link").map((link) => link.textContent)).toEqual([
       // `2P-CHAT-004` (`OD-2P-7`). Conversar moved from last to first among the
@@ -31,7 +31,7 @@ describe("BrainLensTabs", () => {
 
   it("keeps every current URL, so no deep link dies at the lens", () => {
     render(<BrainLensTabs active="people" locale="pt-BR" />);
-    const strip = screen.getByRole("navigation", { name: "Lentes do Brain" });
+    const strip = screen.getByRole("navigation", { name: "Lentes da Memória" });
 
     /*
      * The whole compatibility rule, asserted as hrefs rather than as prose.
@@ -57,7 +57,7 @@ describe("BrainLensTabs", () => {
 
   it("marks exactly one lens as current, and it is the one it was told", () => {
     render(<BrainLensTabs active="memories" locale="pt-BR" />);
-    const strip = screen.getByRole("navigation", { name: "Lentes do Brain" });
+    const strip = screen.getByRole("navigation", { name: "Lentes da Memória" });
     const current = within(strip)
       .getAllByRole("link")
       .filter((link) => link.getAttribute("aria-current") === "page");
@@ -69,7 +69,7 @@ describe("BrainLensTabs", () => {
   it("marks the overview when Brain's own route is the one being read", () => {
     render(<BrainLensTabs active="overview" locale="en" />);
     const current = screen
-      .getByRole("navigation", { name: "Brain lenses" })
+      .getByRole("navigation", { name: "Memory lenses" })
       .querySelectorAll('[aria-current="page"]');
 
     expect(current).toHaveLength(1);
@@ -78,11 +78,11 @@ describe("BrainLensTabs", () => {
 
   it("translates the strip rather than reusing one locale's words", () => {
     const { unmount } = render(<BrainLensTabs active="overview" locale="pt-BR" />);
-    const pt = screen.getByRole("navigation", { name: "Lentes do Brain" }).textContent;
+    const pt = screen.getByRole("navigation", { name: "Lentes da Memória" }).textContent;
     unmount();
 
     render(<BrainLensTabs active="overview" locale="en" />);
-    const en = screen.getByRole("navigation", { name: "Brain lenses" }).textContent;
+    const en = screen.getByRole("navigation", { name: "Memory lenses" }).textContent;
 
     expect(pt).not.toBe(en);
   });
@@ -101,7 +101,7 @@ describe("BrainLensTabs", () => {
   it("renders one link per declared lens, so none is dropped in the mapping", () => {
     render(<BrainLensTabs active="overview" locale="pt-BR" />);
     expect(
-      screen.getByRole("navigation", { name: "Lentes do Brain" }).querySelectorAll("a"),
+      screen.getByRole("navigation", { name: "Lentes da Memória" }).querySelectorAll("a"),
     ).toHaveLength(BRAIN_LENSES.length);
   });
 });
