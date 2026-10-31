@@ -23,6 +23,8 @@ import {
 } from "@/features/conversation-sources/contracts";
 import { buildAnswerExplanation } from "@/features/conversation-sources/explanation";
 import { isMemoryInForce } from "@/features/memories/lifecycle";
+import { detectAgendaQuestion, type AgendaSpan } from "@/features/assistant/agenda-intent";
+import { loadAgendaAnswer } from "@/features/assistant/agenda-answer";
 import type { ChatState } from "./chat-state";
 import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
@@ -39,6 +41,14 @@ type ChatCopy = {
   conversationNotFound: string;
   conversationNotStarted: string;
   questionNotSaved: string;
+  /**
+   * Life Brain B.1 (`LB-B-008`). What the answer says when retrieval found
+   * nothing and the conversation has no earlier turn to lean on — written here,
+   * not by a model, because the model's own instruction for that case is
+   * "say that plainly", and a fixed sentence says it for free. It points at the
+   * one composer route that would make the next answer different.
+   */
+  noEvidenceAnswer: string;
   /**
    * `answerUnavailable` is gone (`2P-CHAT-002`).
    *
@@ -63,6 +73,8 @@ const chatCopy = {
     conversationNotFound: "Conversa não encontrada.",
     conversationNotStarted: "Não foi possível iniciar a conversa.",
     questionNotSaved: "Não foi possível salvar sua pergunta.",
+    noEvidenceAnswer:
+      "Não encontrei nada seu sobre isso nos seus registros nem nas suas memórias. Se ainda não registrou, escreva \"registre que…\" e eu guardo.",
   },
   en: {
     invalidQuestion: "Write a valid question.",
@@ -71,6 +83,8 @@ const chatCopy = {
     conversationNotFound: "Conversation not found.",
     conversationNotStarted: "We could not start the conversation.",
     questionNotSaved: "We could not save your question.",
+    noEvidenceAnswer:
+      "I found nothing of yours about this in your records or your memories. If you have not recorded it yet, write \"note that…\" and I will keep it.",
   },
 } satisfies Record<Locale, ChatCopy>;
 
@@ -111,6 +125,74 @@ async function memoriesInForce(
 
   const now = new Date();
   return new Set((data ?? []).filter((row) => isMemoryInForce(row, now)).map((row) => row.id));
+}
+
+/**
+ * Life Brain B.1 (`LB-B-005`) — the agenda answer, persisted and audited.
+ *
+ * It lives in this module, not beside `agenda-answer.ts`, because this module is
+ * the declared `audit_logs` writer for chat (`audit-log-writers.test.ts`) and
+ * the one place a conversation message is written. What it deliberately does
+ * NOT do is what the knowledge path below does first: no BYOK gate, no
+ * rate-limit slot, no provider and no `recordAIUsage` — nothing here is an AI
+ * operation, so there is nothing to admit and nothing to charge.
+ *
+ * A fault is recorded and reported exactly like the knowledge path's, through
+ * the same classifier and sink, so a projection that cannot read the zone is
+ * a quotable failure rather than an answer claiming the day is empty.
+ */
+async function answerAgendaTurn(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: { userId: string; conversationId: string; locale: Locale; span: AgendaSpan },
+): Promise<ChatState | null> {
+  try {
+    const answer = await loadAgendaAnswer(supabase, {
+      userId: input.userId,
+      locale: input.locale,
+      span: input.span,
+      now: new Date(),
+    });
+    const { error: answerError } = await supabase.from("conversation_messages").insert({
+      user_id: input.userId,
+      conversation_id: input.conversationId,
+      role: "assistant",
+      content: answer.content,
+      citations: answer.citations,
+      model: null,
+    });
+    if (answerError) throw answerError;
+
+    const [conversationUpdate, auditInsert] = await Promise.all([
+      supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", input.conversationId),
+      supabase.from("audit_logs").insert({
+        user_id: input.userId,
+        action_type: "chat_answered",
+        entity_type: "conversation",
+        entity_id: input.conversationId,
+        actor: "agent",
+        after_state: { cited_source_ids: [...answer.citedSourceIds], model: null, route: "agenda" },
+        reason: "Deterministic agenda answer from the calendar projection; no model call",
+      }),
+    ]);
+    requireSupabaseSuccess(conversationUpdate, "update conversation timestamp");
+    requireSupabaseSuccess(auditInsert, "record chat audit");
+    return null;
+  } catch (error) {
+    unstable_rethrow(error);
+    const { reason, failure } = classifyChatFailure(error);
+    const { correlationId } = await recordErrorEvent(supabase, {
+      surface: "server_action",
+      operation: "chat_answer",
+      reason,
+    });
+    console.error("Agenda answer failed", { reason, correlationId });
+    return {
+      status: "error",
+      message: chatFailureMessage(input.locale, failure, correlationId),
+      failure,
+      reference: correlationId,
+    };
+  }
 }
 
 export async function sendChatMessage(_state: ChatState, formData: FormData): Promise<ChatState> {
@@ -167,6 +249,24 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     content: parsed.data.question,
   });
   if (userMessageError) return { status: "error", message: copy.questionNotSaved };
+
+  /*
+   * Life Brain B.1. Decided again here, from the text, rather than trusted from
+   * the composer's routing: the decision is pure and cheap, and re-deriving it
+   * means no form field can steer a turn onto the route that skips the gate.
+   */
+  const agendaSpan = detectAgendaQuestion(parsed.data.question);
+  if (agendaSpan !== null && conversationId) {
+    const failed = await answerAgendaTurn(supabase, {
+      userId: user.id,
+      conversationId,
+      locale: parsed.data.locale,
+      span: agendaSpan,
+    });
+    if (failed) return failed;
+    revalidatePath(`/${parsed.data.locale}/app/chat/${conversationId}`);
+    redirect(`/${parsed.data.locale}/app/chat/${conversationId}`);
+  }
 
   /**
    * `2P-CHAT-002`. Which provider call was in flight when a fault arrived.
@@ -289,27 +389,46 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         occurredAt: match.occurred_at,
         similarity: match.similarity,
       }));
-    const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-    const profile = requireSupabaseData(profileResult, "load chat profile");
-    const answer = await provider.answerFromKnowledge({
-      question: parsed.data.question,
-      locale: parsed.data.locale,
-      timezone: profile?.timezone ?? defaultAgentPreferences.timezone,
-      // `LB-B-003`: the model finally learns what day it is.
-      now: new Date().toISOString(),
-      history,
-      sources,
-      responseDetail: preferences?.response_detail ?? "short",
-      agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
-    });
-    await recordAIUsage(supabase, {
-      operation: "chat",
-      model: answer.model,
-      userId: user.id,
-      usage: answer,
-      sourceType: "conversation",
-      sourceId: conversationId,
-    });
+    /*
+     * Life Brain B.1 (`LB-B-008`). Nothing qualified and nothing earlier in the
+     * conversation: the model's instruction for this case is to say the sources
+     * are insufficient, so the fixed sentence says it without the call and
+     * without a `chat` row in the ledger. The embedding row above stays — it is
+     * how "nothing" was learned.
+     *
+     * The history condition is B.0's, and it is the deliberate difference from
+     * the PRD's one-line rule: a follow-up such as "e o segundo?" retrieves
+     * nothing by itself and is answerable from the turns above it, so refusing
+     * it would undo `LB-B-004` for exactly the questions it exists for.
+     */
+    const answeredWithoutModel = sources.length === 0 && history.length === 0;
+    let answer: { answer: string; citedSourceIds: string[]; model: string | null; inputTokens?: number; outputTokens?: number };
+    if (answeredWithoutModel) {
+      answer = { answer: copy.noEvidenceAnswer, citedSourceIds: [], model: null };
+    } else {
+      const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+      const profile = requireSupabaseData(profileResult, "load chat profile");
+      const answered = await provider.answerFromKnowledge({
+        question: parsed.data.question,
+        locale: parsed.data.locale,
+        timezone: profile?.timezone ?? defaultAgentPreferences.timezone,
+        // `LB-B-003`: the model finally learns what day it is.
+        now: new Date().toISOString(),
+        history,
+        sources,
+        responseDetail: preferences?.response_detail ?? "short",
+        agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
+      });
+      await recordAIUsage(supabase, {
+        operation: "chat",
+        model: answered.model,
+        userId: user.id,
+        usage: answered,
+        sourceType: "conversation",
+        sourceId: conversationId,
+      });
+      answer = answered;
+    }
     // The provider strips fabricated ids deterministically, but that invariant
     // crosses the AIProvider portability seam and is not encoded in ChatResult.
     // A non-null assertion here turned any weakening of that filter into a
@@ -394,8 +513,9 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       content: answer.answer,
       citations,
       model: answer.model,
-      input_tokens: answer.inputTokens,
-      output_tokens: answer.outputTokens,
+      // A fixed answer used no tokens; the columns keep their defaults.
+      ...(answer.inputTokens === undefined ? {} : { input_tokens: answer.inputTokens }),
+      ...(answer.outputTokens === undefined ? {} : { output_tokens: answer.outputTokens }),
     });
     if (answerError) throw answerError;
 
@@ -407,8 +527,12 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         entity_type: "conversation",
         entity_id: conversationId,
         actor: "agent",
-        after_state: { cited_source_ids: answer.citedSourceIds, model: answer.model },
-        reason: "Grounded answer generated from internal knowledge",
+        after_state: answeredWithoutModel
+          ? { cited_source_ids: [], model: null, route: "no_evidence" }
+          : { cited_source_ids: answer.citedSourceIds, model: answer.model },
+        reason: answeredWithoutModel
+          ? "No qualifying source and no earlier turn; fixed answer without a model call"
+          : "Grounded answer generated from internal knowledge",
       }),
     ]);
     requireSupabaseSuccess(conversationUpdate, "update conversation timestamp");
