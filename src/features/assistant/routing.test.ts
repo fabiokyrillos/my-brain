@@ -35,6 +35,27 @@ describe("decideAssistantRoute", () => {
     expect(decideAssistantRoute("O que combinei com Jaime?")).toEqual({ kind: "command_first" });
   });
 
+  it("answers an agenda question from the calendar, before any command parse (LB-B-005)", () => {
+    expect(decideAssistantRoute("O que tenho amanhã?")).toEqual({
+      kind: "agenda",
+      span: { kind: "day", offset: 1 },
+    });
+    expect(decideAssistantRoute("What do I have this week?")).toEqual({
+      kind: "agenda",
+      span: { kind: "week", offset: 0 },
+    });
+  });
+
+  it("keeps a command that names a day on the command path", () => {
+    expect(decideAssistantRoute("Mova a tarefa do relatório para amanhã")).toEqual({ kind: "command_first" });
+  });
+
+  it("keeps the explicit filing instruction ahead of the agenda route", () => {
+    // "Registre que…" writes the owner's own sentence; an agenda reading would
+    // silently answer a question nobody asked instead.
+    expect(decideAssistantRoute("Registre que amanhã tenho dentista")).toEqual({ kind: "capture_intent" });
+  });
+
   it("prefers the memory branch over the length skip", () => {
     // A long memory instruction is still an instruction to remember, and the
     // memory branch costs nothing, so it must win.

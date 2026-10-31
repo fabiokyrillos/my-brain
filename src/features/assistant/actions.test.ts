@@ -226,6 +226,25 @@ describe("runAssistantTurn — memory intent proposes and never persists (DEC-5)
   });
 });
 
+describe("runAssistantTurn — an agenda question skips the command parse (Life Brain B.1)", () => {
+  it("goes straight to the chat action, in its thread, with no command parse", async () => {
+    const conversationId = "bbbbbbbb-2222-4222-8222-222222222222";
+    await runAssistantTurn(idleAssistantComposerState, ask("O que tenho amanhã?", { conversationId }));
+
+    expect(commandMock).not.toHaveBeenCalled();
+    expect(chatMock).toHaveBeenCalledTimes(1);
+    const request = chatMock.mock.calls[0]![1];
+    expect(request.get("question")).toBe("O que tenho amanhã?");
+    expect(request.get("conversationId")).toBe(conversationId);
+  });
+
+  it("still parses a command that only mentions a day", async () => {
+    await runAssistantTurn(idleAssistantComposerState, ask("Mova a tarefa do relatório para amanhã"));
+
+    expect(commandMock).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("runAssistantTurn — the bounds", () => {
   it("skips the command parse for text longer than a command can be", async () => {
     // Contractual, not heuristic: `commandTextSchema` caps a command at this

@@ -19,6 +19,7 @@ import type { TaskCommandConsoleState } from "@/features/task-commands/console-s
 // (see its header) precisely so callers outside the provider can share it.
 import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 
+import { detectAgendaQuestion, type AgendaSpan } from "./agenda-intent";
 import { classifyCaptureIntent } from "./capture-intent";
 import { looksLikeMemoryIntent } from "./memory-intent";
 
@@ -26,6 +27,7 @@ export type AssistantDecision =
   | { readonly kind: "memory_intent" }
   | { readonly kind: "capture_intent" }
   | { readonly kind: "capture_ambiguous" }
+  | { readonly kind: "agenda"; readonly span: AgendaSpan }
   | { readonly kind: "knowledge"; readonly reason: "too_long_for_command" }
   | { readonly kind: "command_first" };
 
@@ -63,6 +65,16 @@ export function decideAssistantRoute(text: string): AssistantDecision {
   const capture = classifyCaptureIntent(text);
   if (capture === "capture") return { kind: "capture_intent" };
   if (capture === "ambiguous") return { kind: "capture_ambiguous" };
+  // Life Brain B.1 (`LB-B-005`). Third, and ahead of the command parse, because
+  // an agenda question is answered from the owner's own calendar with no model
+  // at all — sending it to the parser first would buy a `not_a_task_command`
+  // the opener rule already knows. Behind capture and memory because both are
+  // explicit instructions, and "registre que amanhã tenho dentista" is a filing
+  // that merely mentions a day. The knowledge path's residue concern above does
+  // not apply here: this branch only fires on a question-shaped opener, never
+  // on an imperative.
+  const agenda = detectAgendaQuestion(text);
+  if (agenda !== null) return { kind: "agenda", span: agenda };
   if (text.length > MAX_COMMAND_TEXT_LENGTH) {
     return { kind: "knowledge", reason: "too_long_for_command" };
   }
