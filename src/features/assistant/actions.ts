@@ -274,6 +274,14 @@ export async function runAssistantTurn(
     return answerFromKnowledge(text, locale, conversationId);
   }
 
+  // Life Brain B.1 (`LB-B-005`). The same delegation, without the command parse
+  // first: `sendChatMessage` re-derives the span from the text and answers from
+  // the calendar projection with no provider call, so routing it through the
+  // parser would spend a model call to learn what the opener rule already knows.
+  if (decision.kind === "agenda") {
+    return answerFromKnowledge(text, locale, conversationId);
+  }
+
   const request = new FormData();
   request.set("intent", "start");
   request.set("commandText", text);

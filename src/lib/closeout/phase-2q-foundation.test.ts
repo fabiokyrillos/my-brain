@@ -400,11 +400,35 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
     expect(actions, "the task branch must declare the task type").toContain('type: "task" as const');
   });
 
-  it("refuses a hand-written task reference rather than searching memories for it", async () => {
-    const { supabase, asked } = client({
-      tasks: [{ id: TASK, title: "Fechar o contrato", status: "completed" }],
-      memories: [],
-    });
+  /*
+   * INVERTED by Life Brain B.1 (ADR-146). This used to assert that chat's
+   * resolver refused every task and never read `tasks`, on the premise that no
+   * chat envelope could contain one. The deterministic agenda answer
+   * (`LB-B-005`) now cites tasks, so the premise is gone — and what replaces the
+   * refusal keeps everything the refusal protected: the title never reaches a
+   * chat card, the source entry is never read, and the wrong table is never
+   * asked. The columns are asserted, not just the table, because "reads tasks"
+   * is harmless and "reads a task's title" is the defect.
+   */
+  it("resolves a task reference content-free, and never searches memories for it", async () => {
+    const selected: Record<string, string> = {};
+    const asked: string[] = [];
+    const supabase = {
+      from: (table: string) => {
+        asked.push(table);
+        const stub: Record<string, unknown> = {};
+        stub.select = (columns: string) => {
+          selected[table] = columns;
+          return stub;
+        };
+        stub.eq = () => stub;
+        stub.in = () => Promise.resolve({
+          data: table === "tasks" ? [{ id: TASK, created_at: "2026-08-20T10:00:00Z" }] : [],
+          error: null,
+        });
+        return stub;
+      },
+    };
     const [source] = await resolveSources(
       supabase as never,
       USER,
@@ -412,15 +436,12 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
       "pt-BR",
       NOW,
     );
-    // Refused, in the shape a deleted record gets — never resolved into a card
-    // carrying the task's title.
-    expect(source?.card.state).toBe("unavailable");
+    expect(source?.card.state).toBe("previewed");
     expect(source?.card.snippet, "a task's title reached a chat card").toBeNull();
+    expect(selected.tasks, "the chat resolver started reading a task's content").toBe("id,created_at");
     // And it does NOT go looking in the wrong table, which was the whole defect.
     expect(asked, "a task reference is being looked up in memories again")
       .not.toContain("memories");
-    expect(asked, "and it must not read tasks here either — that is 2Q.2's own resolver")
-      .not.toContain("tasks");
   });
 
   it("is not vacuous: an entry citation resolves in the same call", async () => {

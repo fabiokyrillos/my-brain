@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createClient } from "@/lib/supabase/server";
 import { getAIProvider } from "@/lib/ai";
 import { admitRateLimitedOperation } from "@/features/rate-limits/server";
+import { loadCalendarProjection } from "@/features/calendar/calendar-projection";
+import { openAiGate } from "@/lib/byok/gate";
+import { recordAIUsage } from "@/lib/ai/usage";
 import { sendChatMessage } from "./actions";
 
 // The chat slice had no tests at all before the pre-2E hardening pass — not for
@@ -36,10 +39,21 @@ vi.mock("next/navigation", () => ({
   redirect: vi.fn(() => {
     throw new Error("NEXT_REDIRECT");
   }),
+  // Reached only by a failing turn; the real one rethrows framework signals,
+  // and none of these failures is one.
+  unstable_rethrow: vi.fn(),
 }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn() }));
 vi.mock("@/lib/ai", () => ({ getAIProvider: vi.fn() }));
 vi.mock("@/lib/ai/usage", () => ({ recordAIUsage: vi.fn(async () => undefined) }));
+// Life Brain B.1. The agenda answer reads the calendar projection; its own
+// suite (`agenda-answer.test.ts`) covers the composition, so here it is a
+// fixture and the property under test is what the action does around it.
+vi.mock("server-only", () => ({}));
+vi.mock("@/features/calendar/calendar-projection", () => ({
+  requireProfileTimeZone: vi.fn(async () => "America/Sao_Paulo"),
+  loadCalendarProjection: vi.fn(),
+}));
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const conversationId = "22222222-2222-4222-8222-222222222222";
@@ -60,12 +74,16 @@ type ChatStub = {
   /** The validity windows `memoriesInForce` will read back for the matched ids. */
   memoryRows?: { id: string; valid_from: string | null; valid_until: string | null }[];
   memoryLookupFails?: boolean;
+  /** Earlier turns of an existing conversation (B.0), newest first as the query returns them. */
+  history?: { role: string; content: string }[];
 };
 
 let insertedAssistantMessage: Record<string, unknown> | null = null;
+let insertedAudit: Record<string, unknown> | null = null;
 
 function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
   insertedAssistantMessage = null;
+  insertedAudit = null;
 
   const from = vi.fn((table: string) => {
     if (table === "account_lifecycle") {
@@ -75,6 +93,7 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
     }
     if (table === "conversations") {
       return {
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { id: conversationId }, error: null }) }) }),
         insert: () => ({
           select: () => ({ single: async () => ({ data: { id: conversationId }, error: null }) }),
         }),
@@ -83,6 +102,9 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
     }
     if (table === "conversation_messages") {
       return {
+        select: () => ({
+          eq: () => ({ order: () => ({ limit: async () => ({ data: options.history ?? [], error: null }) }) }),
+        }),
         insert: async (payload: Record<string, unknown>) => {
           if (payload.role === "assistant") insertedAssistantMessage = payload;
           return { data: null, error: null };
@@ -95,7 +117,12 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
       };
     }
     if (table === "audit_logs") {
-      return { insert: async () => ({ data: null, error: null }) };
+      return {
+        insert: async (payload: Record<string, unknown>) => {
+          insertedAudit = payload;
+          return { data: null, error: null };
+        },
+      };
     }
     if (table === "memories") {
       return {
@@ -395,5 +422,169 @@ describe("sendChatMessage citation hydration", () => {
      */
     expect(envelope.evidence).toBe("evidenced");
     expect(message?.content).toBe("Resposta fundamentada.");
+  });
+});
+
+describe("Life Brain B.1: an agenda question is answered without a model (LB-B-005)", () => {
+  const TASK = "55555555-5555-4555-8555-555555555555";
+
+  function agendaProjection(items: Record<string, unknown>[]) {
+    return {
+      days: [{ date: "2026-11-01", isToday: false, inPeriod: true, items }],
+      timezone: "America/Sao_Paulo",
+      rangeStart: { year: 2026, month: 11, day: 1 },
+      rangeEnd: { year: 2026, month: 11, day: 1 },
+      failedLanes: [],
+      itemCount: items.length,
+    };
+  }
+
+  async function ask(question: string, items: Record<string, unknown>[]) {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds: [] }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    vi.mocked(loadCalendarProjection).mockResolvedValue(
+      agendaProjection(items) as unknown as Awaited<ReturnType<typeof loadCalendarProjection>>,
+    );
+    await expect(sendChatMessage(idleState, form({ question }))).rejects.toThrow("NEXT_REDIRECT");
+    return insertedAssistantMessage;
+  }
+
+  it("persists the answer from the projection and spends nothing", async () => {
+    const message = await ask("O que tenho amanhã?", [{
+      id: `deadline:${TASK}`,
+      lane: "deadline",
+      commitment: "committed",
+      at: "2026-11-01T13:00:00.000Z",
+      date: "2026-11-01",
+      title: "Enviar o relatório",
+      sensitivity: { kind: "undetermined" },
+      href: null,
+      elapsed: false,
+      reschedule: null,
+      repeats: null,
+    }]);
+
+    expect(message?.content).toContain("Enviar o relatório");
+    expect(message?.model).toBeNull();
+    expect(message).not.toHaveProperty("input_tokens");
+    expect((message?.citations as { reach: string[]; sources: { id: string }[] }).reach).toEqual(["task"]);
+    expect((message?.citations as { sources: { id: string }[] }).sources.map((s) => s.id)).toEqual([`task:${TASK}`]);
+
+    // Nothing to charge: no gate, no slot, no provider, no ledger row.
+    expect(openAiGate).not.toHaveBeenCalled();
+    expect(admitRateLimitedOperation).not.toHaveBeenCalled();
+    expect(getAIProvider).not.toHaveBeenCalled();
+    expect(recordAIUsage).not.toHaveBeenCalled();
+
+    // Still an audited automatic answer, naming the route it took.
+    expect(insertedAudit).toMatchObject({
+      action_type: "chat_answered",
+      entity_id: conversationId,
+      actor: "agent",
+      after_state: { cited_source_ids: [`task:${TASK}`], model: null, route: "agenda" },
+    });
+  });
+
+  it("answers an empty window with the fixed sentence, still without a model", async () => {
+    const message = await ask("O que tenho amanhã?", []);
+
+    expect(message?.content).toBe("Não encontrei nada na sua agenda amanhã.");
+    expect((message?.citations as { evidence: string }).evidence).toBe("no_qualifying_evidence");
+    expect(getAIProvider).not.toHaveBeenCalled();
+    expect(recordAIUsage).not.toHaveBeenCalled();
+  });
+
+  it("reports a projection fault as a recorded chat failure, never as an empty day", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds: [] }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    vi.mocked(loadCalendarProjection).mockRejectedValue(new Error("the calendar could not read the profile time zone"));
+
+    const result = await sendChatMessage(idleState, form({ question: "O que tenho amanhã?" }));
+
+    expect(result.status).toBe("error");
+    expect(insertedAssistantMessage).toBeNull();
+    expect(getAIProvider).not.toHaveBeenCalled();
+  });
+
+  it("leaves a question that is not about the agenda to the knowledge path", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({
+        user: { id: userId },
+        citedSourceIds: [],
+        matches: [{ source_type: "entry", source_id: TASK, content: "x", similarity: 0.9, occurred_at: "2026-07-20T10:00:00Z" }],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    vi.mocked(getAIProvider).mockReturnValue(stubProvider([]) as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(sendChatMessage(idleState, form())).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(loadCalendarProjection).not.toHaveBeenCalled();
+    expect(getAIProvider).toHaveBeenCalled();
+  });
+});
+
+describe("Life Brain B.1: zero sources answers 'não encontrei' without the answer call (LB-B-008)", () => {
+  function provider() {
+    const answerFromKnowledge = vi.fn(async () => ({
+      answer: "Resposta do modelo.",
+      citedSourceIds: [],
+      model: "gpt-5.6-terra",
+      inputTokens: 10,
+      outputTokens: 5,
+    }));
+    return {
+      answerFromKnowledge,
+      value: {
+        id: "openai",
+        embedText: async () => ({ embedding: [0.1], model: "text-embedding-3-small", inputTokens: 1, outputTokens: 0 }),
+        answerFromKnowledge,
+      },
+    };
+  }
+
+  it("persists the fixed sentence with no qualifying evidence and charges only the embedding", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds: [], matches: [] }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const stub = provider();
+    vi.mocked(getAIProvider).mockReturnValue(stub.value as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(sendChatMessage(idleState, form({ locale: "en" }))).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(stub.answerFromKnowledge).not.toHaveBeenCalled();
+    // The embedding is how "nothing" was learned, so its row stays; the answer
+    // row is the one that disappears.
+    expect(vi.mocked(recordAIUsage).mock.calls.map(([, usage]) => usage.operation)).toEqual(["semantic_search"]);
+    expect(insertedAssistantMessage?.content).toBe(
+      "I found nothing of yours about this in your records or your memories. If you have not recorded it yet, write \"note that…\" and I will keep it.",
+    );
+    expect(insertedAssistantMessage?.model).toBeNull();
+    expect((insertedAssistantMessage?.citations as { evidence: string }).evidence).toBe("no_qualifying_evidence");
+    expect(insertedAudit).toMatchObject({ after_state: { cited_source_ids: [], model: null, route: "no_evidence" } });
+  });
+
+  it("still asks the model when the conversation has history (B.0 follow-ups)", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({
+        user: { id: userId },
+        citedSourceIds: [],
+        matches: [],
+        history: [
+          { role: "assistant", content: "Você tem dois exames: sangue e raio-x." },
+          { role: "user", content: "Quais exames estão pendentes?" },
+        ],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const stub = provider();
+    vi.mocked(getAIProvider).mockReturnValue(stub.value as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(
+      sendChatMessage(idleState, form({ question: "E o segundo?", conversationId })),
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(stub.answerFromKnowledge).toHaveBeenCalledTimes(1);
+    expect(insertedAssistantMessage?.content).toBe("Resposta do modelo.");
   });
 });

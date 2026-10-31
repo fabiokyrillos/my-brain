@@ -76,6 +76,12 @@ function memoryHref(locale: Locale, id: string) {
   return `/${locale}/app/memories/${id}`;
 }
 
+function taskHref(locale: Locale, id: string) {
+  return `/${locale}/app/work/${id}`;
+}
+
+type TaskRow = { id: string; created_at: string | null };
+
 /**
  * Resolves every reference on one message.
  *
@@ -94,8 +100,9 @@ export async function resolveSources(
 
   const entryIds = references.filter((r) => r.type === "entry").map((r) => r.sourceId);
   const memoryIds = references.filter((r) => r.type === "memory").map((r) => r.sourceId);
+  const taskIds = references.filter((r) => r.type === "task").map((r) => r.sourceId);
 
-  const [entries, memories] = await Promise.all([
+  const [entries, memories, tasks] = await Promise.all([
     entryIds.length === 0
       ? Promise.resolve({ data: [], error: null })
       : supabase
@@ -110,6 +117,14 @@ export async function resolveSources(
         .select("id,content,sensitivity,valid_from,valid_until,created_at")
         .eq("user_id", userId)
         .in("id", memoryIds),
+    // Existence and a date, nothing else — see the task branch in `resolveOne`.
+    taskIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+        .from("tasks")
+        .select("id,created_at")
+        .eq("user_id", userId)
+        .in("id", taskIds),
   ]);
 
   type EntryRow = { id: string; original_content: string; sensitivity: string | null; occurred_at: string | null };
@@ -132,7 +147,11 @@ export async function resolveSources(
     memories.error ? [] : ((memories.data ?? []) as MemoryRow[]).map((row) => [row.id, row]),
   );
 
-  return references.map((reference) => resolveOne(reference, locale, now, entryById, memoryById));
+  const taskById = new Map<string, TaskRow>(
+    tasks.error ? [] : ((tasks.data ?? []) as TaskRow[]).map((row) => [row.id, row]),
+  );
+
+  return references.map((reference) => resolveOne(reference, locale, now, entryById, memoryById, taskById));
 }
 
 function resolveOne(
@@ -148,6 +167,7 @@ function resolveOne(
     valid_until: string | null;
     created_at: string | null;
   }>,
+  taskById: Map<string, TaskRow>,
 ): ResolvedSource {
   const base = { key: reference.id, support: reference.support };
 
@@ -169,31 +189,33 @@ function resolveOne(
 
   /*
    * `OD-2Q-1` widened the vocabulary to `entry | memory | task`, and this branch
-   * is what stops that widening from breaking this resolver **silently**.
+   * is what stops that widening from breaking this resolver **silently**: a
+   * `task` reference is answered from `tasks`, never looked up in `memories`
+   * (the `2Q-FOUNDATION-003` defect).
    *
-   * Before Phase 2Q the code below was reached by anything that was not an
-   * entry, so a `task` reference would have been looked up in `memories`,
-   * missed, and returned as `unavailable` — the exact defect
-   * `2Q-FOUNDATION-003` records, moved one level up rather than fixed.
+   * **Until Life Brain B.1 this branch refused every task**, because chat did
+   * not retrieve tasks (`OD-2Q-2`) and so no chat envelope could hold one. The
+   * deterministic agenda answer (`LB-B-005`, ADR-145) now cites tasks, and
+   * ADR-146 records the change: a cited task resolves **content-free**, in the
+   * shape `OD-2Q-5` option C gave the review page. The read is `id,created_at`
+   * — existence and a date. No title is read, so there is nothing to mask; no
+   * `source_entry_id` is read, so there is no second sensitivity derivation
+   * (`2Q-TRUST-007`); and the card's `snippet` is `null`, which the card
+   * renders as a kind and a link. ADR-127 Decision 5.1's rule — a source list
+   * carrying no governed content never resolves a classification — holds here
+   * exactly as it does on a review.
    *
-   * **A task is refused here rather than resolved, and that is the correct
-   * outcome, not a gap.** This module is chat's, and chat does not retrieve
-   * tasks (`OD-2Q-2`, signed option A), so no chat envelope can contain one.
-   * A review's envelope can — and a review must **not** be resolved through
-   * this path: `readOnlyPreviewCard` requires a `snippet` and a `sensitivity`,
-   * which for a task would mean putting its title on the surface and deriving
-   * its classification from `source_entry_id`. `OD-2Q-5` is signed as **option
-   * C**: the sources area shows no content at all, and ADR-127 Decision 5.1
-   * records that a source list carrying no governed content never resolves a
-   * classification in the first place. The review page therefore has its own
-   * content-free resolver.
-   *
-   * So this returns the same `unavailable` shape a deleted or foreign record
-   * gets — refusing, never inventing — and the type system makes the branch
-   * unmissable rather than implicit.
+   * A task that is gone, foreign or unreadable gets the same `unavailable`
+   * shape a deleted entry gets, with no branch telling the three apart.
    */
   if (reference.type === "task") {
-    return { ...base, card: unavailableCard("task"), occurredAt: null };
+    const row = taskById.get(reference.sourceId);
+    if (!row) return { ...base, card: unavailableCard("task"), occurredAt: null };
+    return {
+      ...base,
+      card: readOnlyPreviewCard({ cardType: "task", objectId: row.id, href: taskHref(locale, row.id) }),
+      occurredAt: row.created_at,
+    };
   }
 
   const row = memoryById.get(reference.sourceId);

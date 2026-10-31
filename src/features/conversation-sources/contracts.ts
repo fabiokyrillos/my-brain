@@ -133,6 +133,30 @@ export const CHAT_REACH: readonly AnswerReach[] = ["entry", "memory"];
 /** What `generateReview` retrieves — `OD-2Q-2`, signed as option A. */
 export const REVIEW_REACH: readonly AnswerReach[] = ["entry", "task"];
 
+/**
+ * Life Brain B.1 (`LB-B-005`) — what the deterministic agenda answer read.
+ *
+ * `task` only, and that understates by one table on purpose: the answer also
+ * lists **reminders**, but `reminder` is not a member of `CITED_SOURCE_TYPES`
+ * and B.1 does not add one — `LB-B-006` (slice B.2) is the requirement that
+ * widens the vocabulary. Until then a reminder is said in the answer and never
+ * cited, and the owner-facing sentence (`agendaReach` in `copy.ts`) names both,
+ * because it describes where the answer looked rather than what it could cite.
+ */
+export const AGENDA_REACH: readonly AnswerReach[] = ["task"];
+
+/**
+ * Which sentence describes a reach. Decided from the envelope's **own** reach,
+ * so a chat thread can hold a grounded answer and an agenda answer side by side
+ * and each says where it looked. Anything that is not exactly the agenda's
+ * reach keeps the knowledge sentence, which is what every row before B.1 had.
+ */
+export function reachScope(reach: readonly AnswerReach[]): "knowledge" | "agenda" {
+  return reach.length === AGENDA_REACH.length && reach.every((type, index) => type === AGENDA_REACH[index])
+    ? "agenda"
+    : "knowledge";
+}
+
 /** The version stamped on every envelope this module writes. */
 export const CITATIONS_ENVELOPE_VERSION = "2026-08-09.1";
 

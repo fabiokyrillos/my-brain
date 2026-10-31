@@ -172,3 +172,56 @@ describe("the read is bounded and owner-scoped", () => {
     expect(resolved.map((s) => s.card.cardType)).toEqual(["memory", "entry"]);
   });
 });
+
+describe("Life Brain B.1: a cited task resolves content-free (ADR-146)", () => {
+  const TASK = "55555555-5555-4555-8555-555555555555";
+  const taskRef = { id: `task:${TASK}`, type: "task" as const, sourceId: TASK, support: "product_state" as const };
+
+  function recordingClient(rows: Record<string, unknown[]>) {
+    const columns: Record<string, string> = {};
+    const supabase = {
+      from: vi.fn((table: string) => {
+        const stub: Record<string, unknown> = {};
+        stub.select = vi.fn((selected: string) => {
+          columns[table] = selected;
+          return stub;
+        });
+        stub.eq = vi.fn(() => stub);
+        stub.in = vi.fn(() => Promise.resolve({ data: rows[table] ?? [], error: null }));
+        return stub;
+      }),
+    };
+    return { supabase, columns };
+  }
+
+  it("names a task that still exists and links to it, carrying no title", async () => {
+    const { supabase, columns } = recordingClient({ tasks: [{ id: TASK, created_at: "2026-10-28T12:00:00Z" }] });
+    const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
+
+    expect(source?.card).toMatchObject({ cardType: "task", state: "previewed", snippet: null, href: `/pt-BR/app/work/${TASK}` });
+    expect(source?.occurredAt).toBe("2026-10-28T12:00:00Z");
+    // Existence and a date only — the title and the source entry are never read,
+    // so there is no content to mask and no second sensitivity derivation.
+    expect(columns.tasks).toBe("id,created_at");
+  });
+
+  it("renders a task that is gone exactly like any other unreadable source", async () => {
+    const { supabase } = recordingClient({ tasks: [] });
+    const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
+
+    expect(source?.card).toEqual(unavailableCardShape("task"));
+  });
+});
+
+function unavailableCardShape(cardType: string) {
+  return {
+    cardType,
+    state: "unavailable",
+    mutability: "mutable",
+    reversal: { kind: "none" },
+    objectId: null,
+    snippet: null,
+    sensitivity: "highly_sensitive",
+    href: null,
+  };
+}
