@@ -94,7 +94,7 @@ test.describe("editing a project and a person", () => {
     await page.reload();
     await expect(page.getByText("Migração do faturamento")).toBeVisible();
     await expect(page.locator(".entity-hero .eyebrow")).toHaveText("PAUSADO");
-    await expect(page.locator(".entity-relation-line strong")).toHaveText("Sem empresa");
+    await expect(page.locator(".entity-relation-line strong")).toHaveText("Sem organização");
 
     // The status is localized on the way out, not shown as its raw enum.
     await page.goto("/en/app/projects");

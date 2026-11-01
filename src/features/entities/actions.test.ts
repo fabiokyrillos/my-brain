@@ -480,7 +480,7 @@ describe("createOrganizationForSubject", () => {
     );
 
     expect(result.status).toBe("success");
-    expect(result.message).toBe("Empresa criada e vinculada.");
+    expect(result.message).toBe("Organização criada e vinculada.");
     expect(people.updated).toMatchObject({ organization_id: ORGANIZATION_ID });
     expect(people.eqCalls).toContainEqual(["user_id", USER_ID]);
     expect(people.eqCalls).toContainEqual(["id", PERSON_ID]);
@@ -504,7 +504,7 @@ describe("createOrganizationForSubject", () => {
     );
 
     expect(result.status).toBe("error");
-    expect(result.message).toBe("The company was created but not linked. Select it from the list.");
+    expect(result.message).toBe("The organization was created but not linked. Select it from the list.");
   });
 
   it("records the company it replaced, not only the one it set", async () => {

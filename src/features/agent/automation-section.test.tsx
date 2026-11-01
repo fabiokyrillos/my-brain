@@ -74,7 +74,7 @@ describe("the automation surface says what is actually happening", () => {
     renderSection(allSix);
     const list = screen.getByRole("list", { name: "Categorias e suas políticas" });
     expect(within(list).getAllByRole("listitem")).toHaveLength(6);
-    for (const name of ["Tarefas", "Pessoas", "Projetos", "Empresas", "Memórias", "Relações"]) {
+    for (const name of ["Tarefas", "Pessoas", "Projetos", "Organizações", "Memórias", "Relações"]) {
       expect(within(list).getByRole("heading", { name })).toBeInTheDocument();
     }
   });
@@ -176,7 +176,7 @@ describe("the control and its reversal", () => {
     // identical accessible names in a row. The form carries the category name;
     // the button keeps its visible label, so voice control still matches it.
     renderSection(allSix);
-    for (const name of ["Tarefas", "Pessoas", "Projetos", "Empresas", "Memórias", "Relações"]) {
+    for (const name of ["Tarefas", "Pessoas", "Projetos", "Organizações", "Memórias", "Relações"]) {
       expect(screen.getByRole("form", { name })).toBeInTheDocument();
     }
     expect(screen.getAllByRole("button", { name: "Salvar política" })).toHaveLength(6);

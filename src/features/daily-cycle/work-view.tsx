@@ -25,26 +25,26 @@ import { withAgentName } from "@/lib/agent-name";
 
 const copy = {
   "pt-BR": {
-    eyebrow: "EXECUÇÃO",
-    title: "Trabalho",
-    navigation: "Visões de Trabalho",
+    eyebrow: "PENDÊNCIAS",
+    title: "Tarefas",
+    navigation: "Visões de Tarefas",
     views: {
       today: { label: "Hoje", description: "Prazos de hoje e atrasos que ainda estão abertos.", empty: "Nenhum prazo exige sua atenção hoje." },
       all: { label: "Todas", description: "Tarefas confirmadas pelo {agent} e criadas manualmente.", empty: "Adicione uma tarefa acima ou capture uma intenção." },
-      waiting: { label: "Aguardando", description: "Tarefas que dependem de outra pessoa.", empty: "Use Aguardar quando uma tarefa depender de retorno." },
+      waiting: { label: "Aguardando", description: "O que depende da resposta de alguém.", empty: "Use Aguardar quando uma tarefa depender de retorno." },
     },
-    waitingNote: "Contexto de pessoas e follow-up completo chegarão em uma fase posterior.",
+    waitingNote: "Quando a resposta chegar, conclua ou retome a tarefa por aqui.",
   },
   en: {
-    eyebrow: "EXECUTION",
-    title: "Work",
-    navigation: "Work views",
+    eyebrow: "TO DO",
+    title: "Tasks",
+    navigation: "Task views",
     views: {
-      today: { label: "Today", description: "Today's deadlines and overdue work that is still open.", empty: "No deadline needs your attention today." },
+      today: { label: "Today", description: "Today's deadlines and overdue tasks that are still open.", empty: "No deadline needs your attention today." },
       all: { label: "All", description: "Tasks confirmed from {agent} and tasks you created manually.", empty: "Add a task above or capture an intention." },
-      waiting: { label: "Waiting", description: "Tasks that depend on someone else.", empty: "Use Wait when a task depends on a response." },
+      waiting: { label: "Waiting", description: "What depends on someone's reply.", empty: "Use Wait when a task depends on a response." },
     },
-    waitingNote: "Person context and complete follow-up will arrive in a later phase.",
+    waitingNote: "When the reply arrives, complete or resume the task from here.",
   },
 } as const;
 

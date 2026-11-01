@@ -65,7 +65,7 @@ export type TaskDetailCopy = {
 };
 
 const ptBR: TaskDetailCopy = {
-  back: "Trabalho",
+  back: "Tarefas",
   backToCalendar: "Calendário",
   eyebrow: "TAREFA",
   sections: {
@@ -121,7 +121,7 @@ const ptBR: TaskDetailCopy = {
 };
 
 const en: TaskDetailCopy = {
-  back: "Work",
+  back: "Tasks",
   backToCalendar: "Calendar",
   eyebrow: "TASK",
   sections: {

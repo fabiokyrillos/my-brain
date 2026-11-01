@@ -69,7 +69,7 @@ test.describe("authenticated converged navigation", () => {
             */
             primary: ["Hoje", "Conversar", "Agenda", "Memória"],
             secondaryGroup: "Secundário",
-            secondaryPair: ["Registros", "Trabalho"],
+            secondaryPair: ["Registros", "Tarefas"],
             // The four destinations the five-slot mobile bar carries beside
             // capture (UX-14, DEC-1). `Mais` retired in slice 2P.5, so the bar
             // and the primary list are the same four.
@@ -104,7 +104,7 @@ test.describe("authenticated converged navigation", () => {
             primaryGroup: "Primary",
             primary: ["Today", "Talk", "Agenda", "Memory"],
             secondaryGroup: "Secondary",
-            secondaryPair: ["Records", "Work"],
+            secondaryPair: ["Records", "Tasks"],
             mobileBar: ["Today", "Talk", "Agenda", "Memory"],
             capture: "Quick capture",
             more: "More",

@@ -73,7 +73,7 @@ const PRIMARY = ["Hoje", "Conversar", "Agenda", "Memória"] as const;
  * The rail's secondary pair (Life Brain A.2), mirroring `secondaryNavigationKeys`:
  * rendered under a rule below capture, and never a bar slot.
  */
-const SECONDARY = ["Registros", "Trabalho"] as const;
+const SECONDARY = ["Registros", "Tarefas"] as const;
 /**
  * The mobile bar, mirroring `mobileBarSlots` (UX-14, DEC-1).
  *
@@ -99,7 +99,7 @@ const MOBILE_BAR = ["Hoje", "Conversar", "Captura rápida", "Agenda", "Memória"
 const GROUPS = [
   // Conversar and Calendário (Agenda) left these two groups' copies in Life
   // Brain A.2: both are primary now, while keeping their registry groups.
-  ["Contexto", ["Projetos", "Pessoas", "Empresas", "Contextos", "Memórias", "Arquivos", "Relações"]],
+  ["Contexto", ["Projetos", "Pessoas", "Organizações", "Contextos", "Memórias", "Arquivos", "Relações"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
   ["Organização", ["Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],

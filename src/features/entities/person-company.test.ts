@@ -101,7 +101,7 @@ describe("linkPersonOrganization", () => {
     const result = await linkPersonOrganization(idleEntityEditState, companyForm(ORGANIZATION_ID));
 
     expect(result.status).toBe("success");
-    expect(result.message).toBe("Empresa atualizada.");
+    expect(result.message).toBe("Organização atualizada.");
     // The payload is the company and the timestamp — never a name or a note,
     // which this control never showed and therefore must not be able to erase.
     expect(Object.keys(people.updated as Record<string, unknown>).sort()).toEqual([
@@ -195,8 +195,8 @@ describe("linkPersonOrganization", () => {
 describe("the failure vocabulary carries a code for the outcomes a surface reshapes", () => {
   it("codes the created-but-not-linked refusal, in both locales", async () => {
     for (const [locale, message] of [
-      ["pt-BR", "A empresa foi criada, mas não foi vinculada. Selecione-a na lista."],
-      ["en", "The company was created but not linked. Select it from the list."],
+      ["pt-BR", "A organização foi criada, mas não foi vinculada. Selecione-a na lista."],
+      ["en", "The organization was created but not linked. Select it from the list."],
     ] as const) {
       const organizations = insertStub({ data: { id: ORGANIZATION_ID, name: "Acme" }, error: null });
       const people = tableStub({ data: null, error: null }, { data: null, error: { message: "conflict" } });

@@ -79,9 +79,9 @@ describe("TaskDetailView", () => {
   describe("the back affordance names where it goes", () => {
     it.each([
       ["pt-BR", "calendar", "Calendário"],
-      ["pt-BR", "work", "Trabalho"],
+      ["pt-BR", "work", "Tarefas"],
       ["en", "calendar", "Calendar"],
-      ["en", "work", "Work"],
+      ["en", "work", "Tasks"],
     ] as const)("%s / %s reads %s", (locale, destination, label) => {
       render(
         <TaskDetailView
@@ -96,9 +96,9 @@ describe("TaskDetailView", () => {
       expect(screen.getByRole("link", { name: label })).toHaveAttribute("href", "/x");
     });
 
-    it("names Work when the route says nothing, matching the href default", () => {
+    it("names Tarefas when the route says nothing, matching the href default", () => {
       renderDetail(detail());
-      expect(screen.getByRole("link", { name: "Trabalho" })).toHaveAttribute(
+      expect(screen.getByRole("link", { name: "Tarefas" })).toHaveAttribute(
         "href",
         "/pt-BR/app/work",
       );

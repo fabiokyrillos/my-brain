@@ -437,7 +437,8 @@ export const navigationCapabilities = [
    * The secondary pair — Life Brain A.2. Registros and Trabalho left the bar
    * and stayed on the rail, under a rule: still one click on desktop, and one
    * tap from Hoje's destination strip on a phone (`mobile-reachability-guard`).
-   * Slice A.3 reshapes Trabalho as Tarefas; nothing here presumes it.
+   * C.0 renamed Trabalho to Tarefas (label only; the key stays `work`), and
+   * slice A.3 reshapes the page; nothing here presumes it.
    */
   { key: "inbox", route: "inbox", group: "primary", visibility: "secondary", nested: true, aliases: [] },
   // `2J-HOJE-001`. `today` left this alias list when `/app/today` stopped

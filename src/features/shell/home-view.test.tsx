@@ -115,7 +115,7 @@ describe("HomeView", () => {
    * to them on this page is gated on a count. The calendar left the strip for
    * the opposite reason: it is a bar slot now.
    */
-  it("reaches Registros and Trabalho from the destination strip on an empty day", () => {
+  it("reaches Registros and Tarefas from the destination strip on an empty day", () => {
     renderHome(viewModel({
       status: { kind: "saved" },
       attention: [], notices: [], today: [], priorities: [], organizing: [], agenda: [],
@@ -125,7 +125,7 @@ describe("HomeView", () => {
     const strip = screen.getByRole("navigation", { name: "Ir para" });
     expect(within(strip).getAllByRole("link").map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
       ["Registros", "/pt-BR/app/inbox"],
-      ["Trabalho", "/pt-BR/app/work"],
+      ["Tarefas", "/pt-BR/app/work"],
       ["Lembretes", "/pt-BR/app/reminders"],
       ["Revisões", "/pt-BR/app/reviews"],
     ]);
@@ -154,7 +154,7 @@ describe("HomeView", () => {
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Precisa de você",
       "Hoje e atrasado",
-      "Aguardando outras pessoas",
+      "Aguardando resposta",
       "Pergunta em aberto",
       "Adiante",
       "Sendo organizado",
@@ -314,7 +314,7 @@ describe("HomeView", () => {
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Needs you",
       "Today and overdue",
-      "Waiting on other people",
+      "Waiting on a reply",
       "Open question",
       "Ahead",
       "Being organized",
@@ -333,7 +333,7 @@ describe("HomeView", () => {
       "href",
       "/pt-BR/app/inbox?view=needs-you",
     );
-    expect(screen.getByRole("link", { name: "Ver todo o trabalho" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Ver todas as tarefas" })).toHaveAttribute(
       "href",
       "/pt-BR/app/work?view=today",
     );

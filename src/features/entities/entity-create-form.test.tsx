@@ -30,7 +30,7 @@ describe("EntityCreateForm", () => {
   it("stays collapsed until asked, so the list keeps showing what exists", () => {
     render(<EntityCreateForm action={resolvesTo(idle)} kind="organization" locale="pt-BR" />);
 
-    expect(screen.getByRole("button", { name: "Nova empresa" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Nova organização" })).toBeVisible();
     expect(screen.queryByLabelText("Nome")).toBeNull();
   });
 
@@ -43,8 +43,8 @@ describe("EntityCreateForm", () => {
     unmount();
 
     render(<EntityCreateForm action={resolvesTo(idle)} kind="organization" locale="en" />);
-    await userEvent.click(screen.getByRole("button", { name: "New company" }));
-    expect(screen.getByRole("button", { name: "Create company" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "New organization" }));
+    expect(screen.getByRole("button", { name: "Create organization" })).toBeVisible();
   });
 
   it("bounds each name at its own column's limit, not at a shared one", async () => {
@@ -54,7 +54,7 @@ describe("EntityCreateForm", () => {
     const { unmount } = render(
       <EntityCreateForm action={resolvesTo(idle)} kind="organization" locale="pt-BR" />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     expect(screen.getByLabelText("Nome")).toHaveAttribute("maxlength", "160");
     unmount();
 
@@ -67,7 +67,7 @@ describe("EntityCreateForm", () => {
     const { unmount } = render(
       <EntityCreateForm action={resolvesTo(idle)} kind="organization" locale="pt-BR" />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     expect(screen.queryByLabelText("Tipo")).toBeNull();
     unmount();
 
@@ -101,13 +101,13 @@ describe("EntityCreateForm", () => {
   it("closes on a success and leaves the outcome where it can still be read", async () => {
     render(<EntityCreateForm action={resolvesTo(created)} kind="organization" locale="pt-BR" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     await userEvent.type(screen.getByLabelText("Nome"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     // Announcing a creation and then hiding the only evidence of it would leave
     // a screen-reader user with nothing to return to.
-    await waitFor(() => expect(screen.getByRole("button", { name: "Nova empresa" })).toBeVisible());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Nova organização" })).toBeVisible());
     // Two nodes carry the sentence on purpose: the polite live region announces
     // it once, and the visible paragraph is what a sighted reader returns to.
     expect(screen.getByRole("status")).toHaveTextContent("Criado.");
@@ -124,9 +124,9 @@ describe("EntityCreateForm", () => {
     };
     render(<EntityCreateForm action={resolvesTo(refused)} kind="organization" locale="pt-BR" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     await userEvent.type(screen.getByLabelText("Nome"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Esse nome já existe."));
     expect(screen.getByLabelText("Nome")).toHaveValue("Acme");
@@ -137,14 +137,14 @@ describe("EntityCreateForm", () => {
     const refused: EntityEditState = { status: "error", message: "Revise os campos.", submitted: { name: "" } };
     render(<EntityCreateForm action={resolvesTo(refused)} kind="organization" locale="pt-BR" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     await userEvent.type(screen.getByLabelText("Nome"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
 
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
 
-    expect(screen.getByRole("button", { name: "Nova empresa" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Nova organização" })).toBeVisible();
     expect(screen.queryByLabelText("Nome")).toBeNull();
   });
 
@@ -160,14 +160,14 @@ describe("EntityCreateForm", () => {
     const refused: EntityEditState = { status: "error", message: "Revise os campos.", submitted: { name: "" } };
     render(<EntityCreateForm action={resolvesTo(refused)} kind="organization" locale="pt-BR" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
     await userEvent.type(screen.getByLabelText("Nome"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
     await waitFor(() => expect(screen.getByRole("alert")).toBeVisible());
     await userEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     await waitFor(() => expect(screen.queryByLabelText("Nome")).toBeNull());
 
-    await userEvent.click(screen.getByRole("button", { name: "Nova empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova organização" }));
 
     expect(screen.getByLabelText("Nome")).toBeVisible();
   });

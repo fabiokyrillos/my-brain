@@ -47,7 +47,7 @@ const localized = {
     undone: "Alteração desfeita.",
     needsYou: "Precisa de você",
     nothingNeedsYou: "Nada precisa de você agora",
-    work: "Trabalho",
+    work: "Tarefas",
     allWork: "Todas",
   },
   en: {
@@ -73,7 +73,7 @@ const localized = {
     undone: "Change undone.",
     needsYou: "Needs you",
     nothingNeedsYou: "Nothing needs you right now",
-    work: "Work",
+    work: "Tasks",
     allWork: "All",
   },
 } as const;

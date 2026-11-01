@@ -169,7 +169,7 @@ const ptBR: VocabularyCopy = {
   },
   entityTypes: {
     context: "Contexto",
-    organization: "Empresa",
+    organization: "Organização",
     project: "Projeto",
     person: "Pessoa",
   },
@@ -232,7 +232,7 @@ const en: VocabularyCopy = {
   },
   entityTypes: {
     context: "Context",
-    organization: "Company",
+    organization: "Organization",
     project: "Project",
     person: "Person",
   },

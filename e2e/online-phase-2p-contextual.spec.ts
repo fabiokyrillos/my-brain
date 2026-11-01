@@ -215,13 +215,13 @@ test.describe("Slice 2P.6 — contextual creation and relations", () => {
 
     // The value is on the page before anything opens, and the control is beside
     // it — not behind an edit disclosure holding a nine-field form.
-    await expect(page.getByText("Sem empresa")).toBeVisible();
-    await page.getByRole("button", { name: "Editar empresa" }).click();
+    await expect(page.getByText("Sem organização")).toBeVisible();
+    await page.getByRole("button", { name: "Editar organização" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.getByLabel("Empresa").selectOption(acmeId);
-    await dialog.getByRole("button", { name: "Salvar empresa" }).click();
+    await dialog.getByRole("button", { name: "Salvar organização" }).click();
 
     // The surface says so — which is the half a unit test cannot see, because
     // the row commits whether or not the page is invalidated.
@@ -253,17 +253,17 @@ test.describe("Slice 2P.6 — contextual creation and relations", () => {
 
   test("`2P-PERSON-002`: creating a company happens in the same dialog, never a nested one", async ({ page }) => {
     await openPerson(page);
-    await page.getByRole("button", { name: "Editar empresa" }).click();
+    await page.getByRole("button", { name: "Editar organização" }).click();
 
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Criar nova empresa" }).click();
+    await dialog.getByRole("button", { name: "Criar nova organização" }).click();
 
     // `2P-PERSON-004`: still exactly one modal. A second would be the nested
     // dialog the requirement forbids, and jsdom cannot tell the difference
     // between one dialog swapping panes and two stacked.
     await expect(page.getByRole("dialog")).toHaveCount(1);
-    await dialog.getByLabel("Nome da nova empresa").fill("Gama 2P6");
-    await dialog.getByRole("button", { name: "Criar empresa" }).click();
+    await dialog.getByLabel("Nome da nova organização").fill("Gama 2P6");
+    await dialog.getByRole("button", { name: "Criar organização" }).click();
 
     await expect(page.getByRole("dialog")).toBeHidden(AFTER_A_HOSTED_WRITE);
     await expect(page.locator(".entity-relation-line strong")).toHaveText("Gama 2P6");
@@ -278,7 +278,7 @@ test.describe("Slice 2P.6 — contextual creation and relations", () => {
     await openPerson(page);
     const before = await readRow("people", `id=eq.${personId}&select=organization_id`);
 
-    const opener = page.getByRole("button", { name: "Editar empresa" });
+    const opener = page.getByRole("button", { name: "Editar organização" });
     await opener.focus();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog")).toBeVisible();

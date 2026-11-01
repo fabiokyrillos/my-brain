@@ -352,7 +352,7 @@ function brainSurface() {
     "Conversar",
     "Pessoas",
     "Projetos",
-    "Empresas",
+    "Organizações",
     "Contextos",
     "Memórias",
     "Arquivos",

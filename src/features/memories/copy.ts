@@ -208,7 +208,7 @@ const copy = {
     composeDescription:
       "Uma memória é um fato ou preferência sua que continua valendo com o tempo — por isso ela é consultada em toda conversa. Se for algo que aconteceu num momento só, registre como um registro, não como memória.",
     composeFieldLabel: "O que deve continuar valendo",
-    composePlaceholder: "Ex.: prefiro reuniões pela manhã e no máximo de 30 minutos.",
+    composePlaceholder: "Ex.: tenho alergia a dipirona e prefiro consultas pela manhã.",
     composeReviewStep: "Revisar",
     composeReviewHeading: "É isto que vou guardar:",
     composeBack: "Voltar e editar",
@@ -320,7 +320,7 @@ const copy = {
     composeDescription:
       "A memory is a fact or preference of yours that stays true over time — which is why it is consulted in every conversation. If it happened once and is over, record it as a record, not as a memory.",
     composeFieldLabel: "What should stay true",
-    composePlaceholder: "e.g. I prefer meetings in the morning and no longer than 30 minutes.",
+    composePlaceholder: "e.g. I am allergic to dipyrone and prefer morning appointments.",
     composeReviewStep: "Review",
     composeReviewHeading: "This is what I will keep:",
     composeBack: "Back and edit",

@@ -28,7 +28,16 @@ const messages = {
        * `?view=needs-you` tab inside it, which Slice C promoted onto Home.
        */
       inbox: "Registros",
-      work: "Trabalho",
+      /*
+       * `Tarefas`, not `Trabalho` (Life Brain C.0, `LB-C-008`).
+       *
+       * The list holds a blood test, a bill and a passport renewal as often as
+       * a report: naming it after work told the owner the rest of their life
+       * did not belong there. The route key stays `work`, so no URL changes;
+       * the destination is named after what it holds, the same move `home`,
+       * `inbox` and `library` made.
+       */
+      work: "Tarefas",
       /*
        * `Memória`, not `Brain` (Life Brain A.2, `INFORMATION_ARCHITECTURE.md`).
        *
@@ -50,15 +59,16 @@ const messages = {
       projects: "Projetos",
       people: "Pessoas",
       /*
-       * `Empresas`, not `Organizações` (EGC.1).
+       * `Organizações`, not `Empresas` (Life Brain C.0, `LB-C-008`).
        *
-       * The table is `organizations` and the route key follows it, but the
-       * product has called the relation "Empresa" everywhere it was already
-       * visible — the Company selector on Person and Project, and both detail
-       * heroes. A destination named after the column while every control
-       * naming the same thing says `Empresa` would be two words for one idea.
+       * EGC.1 chose `Empresas` so the destination and every control naming the
+       * same relation said one word. That rule still holds — C.0 changes the
+       * word everywhere at once (the selector on Person and Project, both
+       * detail heroes, search, history, the palette). The word changes because
+       * a clinic, a school, a gym, a bank or an airline is not a company the
+       * owner works for, and the life the product now covers is full of them.
        */
-      organizations: "Empresas",
+      organizations: "Organizações",
       contexts: "Contextos",
       reminders: "Lembretes",
       questions: "Perguntas pendentes",
@@ -117,13 +127,13 @@ const messages = {
       today: "Today",
       inbox: "Records",
       library: "Memory",
-      work: "Work",
+      work: "Tasks",
       calendar: "Agenda",
       tasks: "Tasks",
       waiting: "Waiting",
       projects: "Projects",
       people: "People",
-      organizations: "Companies",
+      organizations: "Organizations",
       contexts: "Contexts",
       reminders: "Reminders",
       questions: "Pending questions",
