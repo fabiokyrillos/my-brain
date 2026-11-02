@@ -54,7 +54,7 @@ describe("EntityEditForm", () => {
     expect(screen.getByLabelText("Nome")).toHaveValue("Atlas");
     expect(screen.getByLabelText("Descrição")).toHaveValue("Migração do faturamento");
     expect(screen.getByLabelText("Situação")).toHaveValue("paused");
-    expect(screen.getByLabelText("Empresa")).toHaveValue(ACME.id);
+    expect(screen.getByLabelText("Organização")).toHaveValue(ACME.id);
   });
 
   it("offers a project's status and a person's notes, and never the other way round", async () => {
@@ -178,10 +178,10 @@ describe("EntityEditForm", () => {
     render(<EntityEditForm action={resolvesTo(idle)} fields={personFields} locale="pt-BR" organizations={[]} />);
     await open();
 
-    const select = screen.getByLabelText("Empresa");
+    const select = screen.getByLabelText("Organização");
     expect(select).toBeEnabled();
     expect(select.querySelectorAll("option")).toHaveLength(1);
-    expect(screen.getByText("Nenhuma empresa registrada ainda.")).toBeVisible();
+    expect(screen.getByText("Nenhuma organização registrada ainda.")).toBeVisible();
   });
 
   it("submits every field the schema requires, even with no company to choose", async () => {
@@ -216,7 +216,7 @@ describe("EntityEditForm", () => {
     expect(screen.getByLabelText("Name")).toBeVisible();
     expect(screen.getByLabelText("Description")).toBeVisible();
     expect(screen.getByLabelText("Status")).toBeVisible();
-    expect(screen.getByLabelText("Company")).toBeVisible();
+    expect(screen.getByLabelText("Organization")).toBeVisible();
     expect(screen.getByRole("button", { name: "Save" })).toBeVisible();
     expect(screen.getByRole("button", { name: "Cancel" })).toBeVisible();
   });
@@ -326,13 +326,13 @@ describe("EntityEditForm — organizations and contexts", () => {
       <EntityEditForm action={resolvesTo(idle)} fields={organizationFields} locale="pt-BR" organizations={[ACME]} />,
     );
     await open();
-    expect(screen.queryByLabelText("Empresa")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Criar nova empresa" })).toBeNull();
+    expect(screen.queryByLabelText("Organização")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Criar nova organização" })).toBeNull();
     unmount();
 
     render(<EntityEditForm action={resolvesTo(idle)} fields={contextFields} locale="pt-BR" organizations={[ACME]} />);
     await open();
-    expect(screen.queryByLabelText("Empresa")).toBeNull();
+    expect(screen.queryByLabelText("Organização")).toBeNull();
   });
 
   it("offers a context's kind and never a status, and bounds its name at 120", async () => {
@@ -366,7 +366,7 @@ describe("EntityEditForm — organizations and contexts", () => {
 describe("create-and-select on the company selector", () => {
   const created: EntityEditState = {
     status: "success",
-    message: "Empresa criada e vinculada.",
+    message: "Organização criada e vinculada.",
   };
 
   it("appears for a person and a project, as a sibling form rather than a nested one", async () => {
@@ -384,14 +384,14 @@ describe("create-and-select on the company selector", () => {
     );
     await open();
 
-    expect(screen.getByRole("button", { name: "Criar nova empresa" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Criar nova organização" })).toBeVisible();
     expect(container.querySelectorAll("form form")).toHaveLength(0);
   });
 
   it("does not appear at all when the page passes no creating action", async () => {
     render(<EntityEditForm action={resolvesTo(idle)} fields={personFields} locale="pt-BR" organizations={[]} />);
     await open();
-    expect(screen.queryByRole("button", { name: "Criar nova empresa" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Criar nova organização" })).toBeNull();
   });
 
   it("submits the subject, its id and an empty description the strict schema requires", async () => {
@@ -409,9 +409,9 @@ describe("create-and-select on the company selector", () => {
       />,
     );
     await open();
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() => expect(createAction).toHaveBeenCalled());
     const submitted = createAction.mock.calls[0]![1] as FormData;
@@ -434,9 +434,9 @@ describe("create-and-select on the company selector", () => {
       />,
     );
     await open();
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Beta");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Beta");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() => expect(createAction).toHaveBeenCalled());
     const submitted = createAction.mock.calls[0]![1] as FormData;
@@ -460,12 +460,12 @@ describe("create-and-select on the company selector", () => {
       />,
     );
     await open();
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Esse nome já existe."));
-    expect(screen.getByLabelText("Nome da nova empresa")).toHaveValue("Acme");
+    expect(screen.getByLabelText("Nome da nova organização")).toHaveValue("Acme");
   });
 
   it("reports a company created but not linked as its own outcome, not as a flat failure", async () => {
@@ -473,7 +473,7 @@ describe("create-and-select on the company selector", () => {
     // the owner to create a duplicate of a row they already own.
     const partial: EntityEditState = {
       status: "error",
-      message: "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+      message: "A organização foi criada, mas não foi vinculada. Selecione-a na lista.",
       submitted: { name: "Acme" },
     };
     render(
@@ -486,13 +486,13 @@ describe("create-and-select on the company selector", () => {
       />,
     );
     await open();
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() =>
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+        "A organização foi criada, mas não foi vinculada. Selecione-a na lista.",
       ),
     );
   });

@@ -54,7 +54,7 @@ describe("AppShell", () => {
     const secondary = within(desktopNavigation).getByRole("group", { name: "Secundário" });
     expect(within(secondary).getAllByRole("link").map((link) => link.textContent)).toEqual([
       "Registros",
-      "Trabalho",
+      "Tarefas",
     ]);
     expect(screen.getAllByRole("link", { name: "Captura rápida" })).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Notificações" })).toHaveAttribute(
@@ -83,7 +83,7 @@ describe("AppShell", () => {
     // Primary, then capture, then the secondary pair — the rail's reading
     // order since Life Brain A.2 (`INFORMATION_ARCHITECTURE.md`).
     expect(alwaysVisible).toEqual([
-      "Hoje", "Conversar", "Agenda", "Memória", "Captura rápida", "Registros", "Trabalho",
+      "Hoje", "Conversar", "Agenda", "Memória", "Captura rápida", "Registros", "Tarefas",
     ]);
     expect(
       Array.from(desktopNavigation.querySelectorAll(":scope > details > summary")).map(
@@ -573,8 +573,8 @@ describe("AppShell", () => {
       within(within(desktopNavigation).getByRole("group", { name: "Secondary" }))
         .getAllByRole("link")
         .map((link) => link.textContent),
-    ).toEqual(["Records", "Work"]);
-    expect(within(desktopNavigation).getByRole("link", { name: "Work" })).toHaveAttribute(
+    ).toEqual(["Records", "Tasks"]);
+    expect(within(desktopNavigation).getByRole("link", { name: "Tasks" })).toHaveAttribute(
       "href",
       "/en/app/work",
     );

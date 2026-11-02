@@ -48,7 +48,7 @@ const copy: Record<Locale, EntryCopy> = {
     claimsLabel: "O que este produto faz",
     claims: {
       capture:
-        "Você escreve em texto livre. O produto lê, separa tarefas, pessoas, projetos e datas, e pergunta quando não tem certeza.",
+        "Você escreve em texto livre. O produto lê, separa tarefas, pessoas, datas e o que é só para lembrar, e pergunta quando não tem certeza.",
       stored_first:
         "Suas palavras são gravadas antes de qualquer modelo rodar. Se a interpretação falhar, o que você escreveu continua lá, inteiro.",
       own_credential:
@@ -67,7 +67,7 @@ const copy: Record<Locale, EntryCopy> = {
     claimsLabel: "What this product does",
     claims: {
       capture:
-        "You write in free text. The product reads it, separates tasks, people, projects and dates, and asks when it is unsure.",
+        "You write in free text. The product reads it, separates tasks, people, dates and what is only worth remembering, and asks when it is unsure.",
       stored_first:
         "Your words are stored before any model runs. If the interpretation fails, what you wrote is still there, whole.",
       own_credential:

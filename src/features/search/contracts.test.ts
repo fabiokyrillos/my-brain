@@ -122,8 +122,8 @@ describe("2I-SEARCH-001: the domain map matches the product vocabulary", () => {
   });
 
   it("labels them in product words, in both locales", () => {
-    expect(getSearchCopy("pt-BR").domains.organizations).toBe("Empresa");
-    expect(getSearchCopy("en").domains.organizations).toBe("Company");
+    expect(getSearchCopy("pt-BR").domains.organizations).toBe("Organização");
+    expect(getSearchCopy("en").domains.organizations).toBe("Organization");
     expect(getSearchCopy("pt-BR").domains.files).toBe("Arquivo");
   });
 

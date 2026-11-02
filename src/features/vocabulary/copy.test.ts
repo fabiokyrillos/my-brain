@@ -102,7 +102,7 @@ describe("the shared object-state vocabulary", () => {
       expect(memoryKindLabel("en", "recurring_info")).toBe("Recurring information");
       expect(attachmentStatusLabel("pt-BR", "ready")).toBe("Pronto");
       expect(jobStatusLabel("pt-BR", "pending")).toBe("Na fila");
-      expect(entityTypeLabel("en", "organization")).toBe("Company");
+      expect(entityTypeLabel("en", "organization")).toBe("Organization");
     });
 
     /**

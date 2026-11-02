@@ -2,8 +2,9 @@
  * `2I-SEARCH` copy — typed, both locales, no inline ternary.
  *
  * The domain labels are **product vocabulary**, not schema names:
- * `organizations` displays as *Empresas / Companies* (EGC.1 — the product said
- * "Empresa" everywhere before the destination existed) and `attachments`
+ * `organizations` displays as *Organizações / Organizations* (Life Brain C.0 —
+ * EGC.1 had said *Empresas / Companies*, the word the product already used, and
+ * C.0 renamed every control together so the two still agree) and `attachments`
  * displays as *Arquivos / Files*. The mapping lives in `contracts.ts`; this
  * file only ever holds what a person reads.
  */
@@ -52,7 +53,7 @@ const copy: Record<Locale, SearchCopy> = {
       memories: "Memória",
       people: "Pessoa",
       projects: "Projeto",
-      organizations: "Empresa",
+      organizations: "Organização",
       files: "Arquivo",
     },
     filterType: "Tipo",
@@ -65,7 +66,7 @@ const copy: Record<Locale, SearchCopy> = {
     sensitiveHint:
       "Itens marcados como muito sensíveis ficam fora da busca até você pedir. Isso vale só para esta busca.",
     idle: "Busque em tudo que é seu",
-    idleHint: "Tarefas, registros, memórias, pessoas, projetos, empresas e arquivos.",
+    idleHint: "Tarefas, registros, memórias, pessoas, projetos, organizações e arquivos.",
     tooShort: "Digite pelo menos duas letras.",
     noResults: "Nada encontrado",
     // Deliberately does NOT say "try enabling sensitive search" -- that would
@@ -89,7 +90,7 @@ const copy: Record<Locale, SearchCopy> = {
       memories: "Memory",
       people: "Person",
       projects: "Project",
-      organizations: "Company",
+      organizations: "Organization",
       files: "File",
     },
     filterType: "Type",
@@ -102,7 +103,7 @@ const copy: Record<Locale, SearchCopy> = {
     sensitiveHint:
       "Items marked highly sensitive stay out of search until you ask. This applies to this search only.",
     idle: "Search everything of yours",
-    idleHint: "Tasks, records, memories, people, projects, companies and files.",
+    idleHint: "Tasks, records, memories, people, projects, organizations and files.",
     tooShort: "Type at least two letters.",
     noResults: "Nothing found",
     noResultsHint: "Try another word, or clear the filters.",

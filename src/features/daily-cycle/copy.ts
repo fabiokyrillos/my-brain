@@ -129,12 +129,12 @@ const missingTaskCopy: Record<DailyCycleLocale, MissingTaskCopy> = {
   "pt-BR": {
     title: "Esta tarefa não está mais aqui",
     description: "O aviso que trouxe você até aqui continua válido, mas o assunto dele saiu da sua lista. Nada seu foi perdido.",
-    action: "Ver seu trabalho",
+    action: "Ver suas tarefas",
   },
   en: {
     title: "This task is no longer here",
     description: "The notice that brought you here is still valid, but its subject has left your list. Nothing of yours was lost.",
-    action: "See your work",
+    action: "See your tasks",
   },
 };
 

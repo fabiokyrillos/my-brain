@@ -28,7 +28,18 @@ const messages = {
        * `?view=needs-you` tab inside it, which Slice C promoted onto Home.
        */
       inbox: "Registros",
-      work: "Trabalho",
+      /*
+       * `Tarefas`, not `Trabalho` (Life Brain C.0, `LB-C-008`).
+       *
+       * The list holds a blood test and a light bill as readily as a report;
+       * calling it "Trabalho" filed a whole life under one of its areas — and
+       * "Trabalho" is still the name of that area (`contextKinds.work`), which
+       * made the destination and the area two meanings of one word. The route
+       * key stays `work`, so no URL changes; the palette still finds the old
+       * word as a keyword. `tasks` below is an alias's label, not a second
+       * destination.
+       */
+      work: "Tarefas",
       /*
        * `Memória`, not `Brain` (Life Brain A.2, `INFORMATION_ARCHITECTURE.md`).
        *
@@ -50,15 +61,17 @@ const messages = {
       projects: "Projetos",
       people: "Pessoas",
       /*
-       * `Empresas`, not `Organizações` (EGC.1).
+       * `Organizações`, not `Empresas` (Life Brain C.0, `LB-C-008`).
        *
-       * The table is `organizations` and the route key follows it, but the
-       * product has called the relation "Empresa" everywhere it was already
-       * visible — the Company selector on Person and Project, and both detail
-       * heroes. A destination named after the column while every control
-       * naming the same thing says `Empresa` would be two words for one idea.
+       * EGC.1 chose "Empresas" because every control naming the relation
+       * already said "Empresa", and a destination named otherwise would be two
+       * words for one idea. That rule still holds — so C.0 renamed every
+       * control with the destination, in both locales, and they agree again.
+       * What changed is the reader: to someone recording a whole life, a
+       * clinic, a school, a bank or an airline is not an "Empresa". The route
+       * key and the table stay `organizations`.
        */
-      organizations: "Empresas",
+      organizations: "Organizações",
       contexts: "Contextos",
       reminders: "Lembretes",
       questions: "Perguntas pendentes",
@@ -117,13 +130,13 @@ const messages = {
       today: "Today",
       inbox: "Records",
       library: "Memory",
-      work: "Work",
+      work: "Tasks",
       calendar: "Agenda",
       tasks: "Tasks",
       waiting: "Waiting",
       projects: "Projects",
       people: "People",
-      organizations: "Companies",
+      organizations: "Organizations",
       contexts: "Contexts",
       reminders: "Reminders",
       questions: "Pending questions",

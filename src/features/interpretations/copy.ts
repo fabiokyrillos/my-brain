@@ -93,7 +93,7 @@ export const conceptLabels: Record<(typeof conceptOptions)[number], { "pt-BR": s
   lasting_preference: { "pt-BR": "Preferência", en: "Preference" },
   personal_memory: { "pt-BR": "Memória", en: "Memory" },
   request_received: { "pt-BR": "Pedido recebido", en: "Request received" },
-  waiting_for_third_party: { "pt-BR": "Aguardando terceiro", en: "Waiting on someone" },
+  waiting_for_third_party: { "pt-BR": "Aguardando alguém", en: "Waiting on someone" },
 };
 
 /**
