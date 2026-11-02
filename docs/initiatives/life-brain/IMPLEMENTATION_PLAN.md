@@ -101,6 +101,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### C.0 — Copy e exemplos de vida (0,5 d)
 
 - "Trabalho" → "Tarefas", "Empresas" → "Organizações", "Brain" → "Memória", placeholders e estados vazios; prompt **inalterado** (paridade intocada). `messages.ts`, `*copy.ts`, testes de copy.
+- **Implementado 2026-11-02.** "Brain" → "Memória" já tinha saído em A.2 (o lugar); "Brain" como ator (o nome do assistente) fica. "Tarefas" chega antes de A.3, que muda só o layout. Guard: `src/lib/closeout/life-brain-c0-copy-guard.test.ts`. "Contextos" → "Áreas da vida" fica para C.1.
 
 ### C.1 — Área da vida (2 d, **LB-M1**)
 
