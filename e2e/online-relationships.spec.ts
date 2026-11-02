@@ -194,10 +194,10 @@ test.describe("relationships and associations", () => {
     await expect(page.getByText("Quem essa pessoa é para você.")).toBeVisible();
 
     await page.getByRole("button", { name: "Editar" }).first().click();
-    await page.getByRole("button", { name: "Criar nova empresa" }).click();
-    await page.getByLabel("Nome da nova empresa").fill(company);
-    await page.getByRole("button", { name: "Criar empresa" }).click();
-    await expect(outcome(page, "Empresa criada e vinculada.")).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Criar nova organização" }).click();
+    await page.getByLabel("Nome da nova organização").fill(company);
+    await page.getByRole("button", { name: "Criar organização" }).click();
+    await expect(outcome(page, "Organização criada e vinculada.")).toBeVisible({ timeout: 30_000 });
 
     await page.reload();
     await expect(page.getByText(company)).toBeVisible();

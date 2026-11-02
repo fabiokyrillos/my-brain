@@ -48,7 +48,7 @@ const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey);
 
 /** The six the owner signed, in the order the projection returns them. */
-const CATEGORIES_PT = ["Tarefas", "Pessoas", "Projetos", "Empresas", "Memórias", "Relações"];
+const CATEGORIES_PT = ["Tarefas", "Pessoas", "Projetos", "Organizações", "Memórias", "Relações"];
 
 test.describe("automation by category is visible, refused, and reversible", () => {
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");

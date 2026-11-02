@@ -38,7 +38,7 @@ const LENSES = [
   { route: "chat", label: "Conversar" },
   { route: "people", label: "Pessoas" },
   { route: "projects", label: "Projetos" },
-  { route: "organizations", label: "Empresas" },
+  { route: "organizations", label: "Organizações" },
   { route: "contexts", label: "Contextos" },
   { route: "memories", label: "Memórias" },
   { route: "files", label: "Arquivos" },

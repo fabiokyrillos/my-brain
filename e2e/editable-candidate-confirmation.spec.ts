@@ -47,7 +47,7 @@ const localized = {
     undone: "Alteração desfeita.",
     needsYou: "Precisa de você",
     nothingNeedsYou: "Nada precisa de você agora",
-    work: "Trabalho",
+    work: "Tarefas",
     allWork: "Todas",
   },
   en: {
@@ -73,7 +73,7 @@ const localized = {
     undone: "Change undone.",
     needsYou: "Needs you",
     nothingNeedsYou: "Nothing needs you right now",
-    work: "Work",
+    work: "Tasks",
     allWork: "All",
   },
 } as const;
@@ -426,7 +426,7 @@ async function runDispositionJourney(
   for (const outcome of text.outcomes) await expect(page.getByText(outcome, { exact: true })).toBeVisible();
 
   await page.goto(`/${locale}/app/work?view=all`);
-  await expect(page.getByRole("heading", { name: text.work })).toBeVisible();
+  await expect(page.getByRole("heading", { name: text.work, exact: true, level: 1 })).toBeVisible();
   await expect(page.getByRole("link", { name: text.allWork, exact: true })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText(editedTitle, { exact: true })).toBeVisible();
   for (const title of candidateTitles.slice(1)) await expect(page.getByText(title, { exact: true })).toHaveCount(0);
