@@ -1,5 +1,16 @@
 # Technical Changelog
 
+## 2026-11-03 — Life Brain A.3, part 1: the Tarefas header, views and toolbar on the primitives
+
+- **One compact header.** `WorkView` opens with `PageHeader compact` ("Tarefas", the active view's one line hidden on a phone) and the quick add as its action; the "EXECUÇÃO" eyebrow and the display title are gone. On a phone the quick add takes the row under the title and the field absorbs the width.
+- **An add control that cannot wrap.** `InlineCreateForm` submits through an `IconButton` ("+", named "Adicionar nova tarefa" / "Add new task"); the two-line "Adicionar" the baseline recorded is gone, and its three locale ternaries moved into a typed record. Projects and People use the same form and get the same control.
+- **The views are a `SegmentedControl`** (Hoje · Todas · Aguardando), still `aria-current="page"` links that keep the narrowing and reset the page.
+- **Filters behind one ghost button with a count.** The summary reads "Filtros" with a `Badge` counting the active filters (`activeFilterCount`, the same seven `isNarrowed` reads; ordering and grouping are not filters) and an accessible name that says it in words ("Filtros, 3 ativos"). The command console's summary is the same ghost button; a box appears only around an open panel.
+- **Row badges are the `Badge` primitive**, the state toned by meaning (waiting, blocked, in progress, completed) with the word always present.
+- **`SegmentedControl` fix:** its options measured 38px; on a coarse pointer or below 900px they now take the full 44px touch target. Tarefas is its first consumer.
+- **Not in this part** (A.3 continues): rows as `ListItem` with actions in a sheet, the `Sheet` primitive, `candidate-editor` copy, retiring `button-primary/secondary`, and the ≤ 180px first-task target — in the synthetic fixture the first task starts at about 380px on a 390px phone, because the header, the quick add, the Lista · Calendário · Planejar modes, the views and the toolbar are still five rows.
+- **Gates:** typecheck 0 errors; lint 0 errors (3 pre-existing warnings); Vitest 540 files, 10,060 passed; `npm run build` green; Playwright `layout-contracts` + `accessibility` + `daily-surfaces`, desktop and mobile, production build, all passed (5 skipped), including three new A.3 contracts (square add control, 44px targets, no sideways scroll at 320px).
+
 ## 2026-11-02 — Life Brain C.0: the product's words stop assuming work
 
 - **Tarefas, not Trabalho** (`LB-C-008`). The task list's nav label, page title, view and mode navigation names, the task page's back link, the missing-task action, Hoje's "Ver todas as tarefas" and the person page's "Tarefas em aberto" column; en "Tasks" throughout. "Trabalho" stays the name of the *work* life area (`contextKinds.work`), which is what made the destination and the area two meanings of one word. Route key `work` and every URL unchanged; the palette still finds "trabalho".

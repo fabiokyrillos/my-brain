@@ -45,6 +45,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 - `work-view.tsx`, `tasks/*` lista, `task-commands` botões → `Button`; `SegmentedControl` Hoje/Todas/Aguardando; filtros em sheet; linhas `ListItem`; quick-add em `IconButton` + campo. Retira `button-primary/secondary` de `operations.css` quando o último consumidor sair.
 - Testes: `work-view.test.tsx`, `candidate-editor` ternários migrados para `copy.ts` (−12 ternários), Playwright `daily-surfaces` + `online-conversational-creation`.
 - Aceite: primeira tarefa ≤ 180px no iPhone; "Adicionar" não quebra; ≤ 2 tipos de controle de seleção.
+- **Parte 1 implementada 2026-11-03:** `PageHeader compact`, quick-add com `IconButton` (não quebra), `SegmentedControl` das visões, filtros atrás de um botão `ghost` com contagem, `Badge` nos chips. Falta: linhas `ListItem`, `Sheet`, `candidate-editor`, retirar `button-primary/secondary`, e a meta de 180px (hoje ~380px no fixture; depende de tirar os modos Lista · Calendário · Planejar desta página, decisão de A.4).
 
 ### A.4 — Agenda (2 d)
 
