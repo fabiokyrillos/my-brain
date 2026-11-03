@@ -1248,3 +1248,67 @@ test.describe("the person-candidate card stays usable at every width", () => {
     }
   });
 });
+
+/*
+ * Life Brain A.3 (`LB-A-006`) — the compact Tarefas page, mirroring what
+ * `WorkView` renders: `PageHeader compact` with the quick add as its action,
+ * the Lista · Calendário · Planejar modes, the `SegmentedControl` for the
+ * views, and the toolbar of ghost buttons. The baseline recorded a two-line
+ * "Adicionar" and segmented options under the touch minimum on a phone.
+ */
+function tarefasBody() {
+  const ghost = "ui-button ui-button--ghost ui-button--sm";
+  return `<div class="content-page work-page">
+    <header class="ui-page-header ui-page-header--compact work-page-header">
+      <div class="ui-page-header__text"><h1 class="ui-page-header__title">Tarefas</h1>
+        <p class="ui-page-header__description">Prazos de hoje e atrasos que ainda estão abertos.</p></div>
+      <div class="ui-page-header__actions"><div><form class="inline-create">
+        <label for="new-task" class="sr-only">Nova tarefa</label>
+        <input id="new-task" name="name" placeholder="Nova tarefa">
+        <button type="submit" aria-label="Adicionar nova tarefa" class="ui-button ui-button--primary ui-button--md ui-icon-button"><span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span></button>
+      </form></div></div>
+    </header>
+    <nav aria-label="Modos das tarefas" class="work-modes"><a aria-current="page" class="work-mode" href="#">Lista</a><a class="work-mode" href="#">Calendário</a><a class="work-mode" href="#">Planejar</a></nav>
+    <nav aria-label="Visões das tarefas" class="ui-segmented work-view-tabs">
+      <a aria-current="page" class="ui-segmented__option" href="#">Hoje</a><a class="ui-segmented__option" href="#">Todas</a><a class="ui-segmented__option" href="#">Aguardando</a>
+    </nav>
+    <div class="work-toolbar">
+      <details class="work-disclosure"><summary class="${ghost}"><span class="ui-button__label">Filtros</span></summary></details>
+      <details class="work-disclosure"><summary class="${ghost}"><span class="ui-button__label">Mude uma tarefa com suas palavras</span></summary></details>
+    </div>
+    <div class="list-stack"><article class="list-row" id="first-task"><div class="list-row-main"><strong>Exame de sangue</strong></div></article></div>
+  </div>`;
+}
+
+test.describe("Life Brain A.3: the compact Tarefas page on a phone", () => {
+  test("the add control is one square that never wraps, and the field takes the width", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const add = page.getByRole("button", { name: "Adicionar nova tarefa" });
+    const box = (await add.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+    const field = (await page.getByLabel("Nova tarefa", { exact: true }).boundingBox())!;
+    expect(Math.abs((field.y + field.height / 2) - (box.y + box.height / 2))).toBeLessThanOrEqual(2);
+    expect(field.width).toBeGreaterThan(box.width * 3);
+  });
+
+  test("every view option and toolbar button meets the touch minimum", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const coarse = await page.evaluate(() => matchMedia("(pointer: coarse)").matches);
+    for (const name of ["Hoje", "Todas", "Aguardando"]) {
+      const box = (await page.getByRole("navigation", { name: "Visões das tarefas" }).getByRole("link", { name }).boundingBox())!;
+      expect(box.height, name).toBeGreaterThanOrEqual(44);
+    }
+    if (coarse) {
+      for (const summary of await page.locator(".work-toolbar summary").all()) {
+        expect((await summary.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
+  test("the page never scrolls sideways at 320 CSS px", async ({ page }) => {
+    await render(page, tarefasBody(), 320, 700);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+});

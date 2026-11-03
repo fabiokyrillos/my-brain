@@ -64,7 +64,12 @@ export type WorkFiltersCopy = {
    * the disclosure opens itself whenever something is active.
    */
   readonly filterSummary: string;
-  readonly filtersActive: string;
+  /**
+   * Life Brain A.3. The summary is one ghost button ("Filtros") with the count
+   * of active filters in a badge; the badge is a digit, so the button's
+   * accessible name carries the sentence a screen reader needs.
+   */
+  readonly filtersActiveLabel: (count: number) => string;
 };
 
 const ptBR: WorkFiltersCopy = {
@@ -104,8 +109,8 @@ const ptBR: WorkFiltersCopy = {
   positionAdjusted: "A página que você tinha aberto não existe mais aqui. Esta é a mais próxima.",
   groupCount: (count) => `${count} tarefa${count === 1 ? "" : "s"}`,
   ungrouped: "Sem essa relação",
-  filterSummary: "Filtrar, ordenar e agrupar",
-  filtersActive: "filtros ativos",
+  filterSummary: "Filtros",
+  filtersActiveLabel: (count) => (count === 1 ? "Filtros, 1 ativo" : `Filtros, ${count} ativos`),
 };
 
 const en: WorkFiltersCopy = {
@@ -145,8 +150,8 @@ const en: WorkFiltersCopy = {
   positionAdjusted: "The page you had open is no longer here. This is the nearest one.",
   groupCount: (count) => `${count} task${count === 1 ? "" : "s"}`,
   ungrouped: "Without that relationship",
-  filterSummary: "Filter, sort and group",
-  filtersActive: "filters active",
+  filterSummary: "Filters",
+  filtersActiveLabel: (count) => `Filters, ${count} active`,
 };
 
 const BY_LOCALE: Record<Locale, WorkFiltersCopy> = { "pt-BR": ptBR, en };

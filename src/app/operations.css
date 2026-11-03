@@ -24,7 +24,7 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 .empty-list{display:grid;justify-items:start;gap:var(--space-2);padding:var(--space-6) 0;color:var(--text-secondary)}
 .empty-list svg{color:var(--mark-decorative)}
 .empty-list strong{color:var(--text-primary);font:var(--type-reading-lg);letter-spacing:-.01em}
-.empty-list p{margin:0;font:var(--type-body);max-width:var(--width-reading);line-height:1.6}.row-actions{display:flex;gap:7px}.row-action{border:1px solid var(--border-strong);background:var(--background-surface);border-radius: var(--radius-md);padding:7px 9px;color:var(--text-primary);font: var(--type-caption);font-weight:700}.row-action:hover{background:var(--background-subtle)}.inline-create{display:flex;gap:8px}.inline-create input{min-width:240px;border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:10px 12px}.inline-create button{border:0;border-radius: var(--radius-md);background:var(--text-primary);color:var(--action-primary-text);padding:10px 13px;font-weight:750}.inline-create-feedback{font: var(--type-caption)}.dashboard-task-list{display:grid;gap:0;margin-top:24px}.dashboard-task{display:flex;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--border-default)}.dashboard-task strong{min-width:0;font: var(--type-body)}.dashboard-task span{white-space:nowrap;font:var(--type-eyebrow);color:var(--text-secondary)}
+.empty-list p{margin:0;font:var(--type-body);max-width:var(--width-reading);line-height:1.6}.row-actions{display:flex;gap:7px}.row-action{border:1px solid var(--border-strong);background:var(--background-surface);border-radius: var(--radius-md);padding:7px 9px;color:var(--text-primary);font: var(--type-caption);font-weight:700}.row-action:hover{background:var(--background-subtle)}.inline-create{display:flex;align-items:center;gap:var(--space-2)}.inline-create input{min-width:240px;border:1px solid var(--border-strong);border-radius: var(--radius-md);padding:10px 12px}.inline-create-feedback{font: var(--type-caption)}.dashboard-task-list{display:grid;gap:0;margin-top:24px}.dashboard-task{display:flex;justify-content:space-between;gap:15px;padding:15px 0;border-bottom:1px solid var(--border-default)}.dashboard-task strong{min-width:0;font: var(--type-body)}.dashboard-task span{white-space:nowrap;font:var(--type-eyebrow);color:var(--text-secondary)}
 
 /*
  * Task detail — the object, recomposed (`03-componentes.md`).
@@ -325,7 +325,7 @@ a.home-agenda-link:hover{background:var(--background-subtle)}
   .list-row-main p{white-space:normal}
 }
 @media(max-width:900px){.interpretation-grid{grid-template-columns:1fr}.entry-heading{display:block}.entry-confidence{display:inline-flex;margin-top:8px}.list-header{align-items:flex-start;flex-direction:column}.inline-create{width:100%}.inline-create input{min-width:0;flex:1}}
-@media(max-width:600px){.content-page{padding:38px 18px 110px}.entry-heading h1{font-size:39px}.interpretation-main,.interpretation-actions{padding:20px 16px}.entity-list article{grid-template-columns:1fr auto}.entity-list article>span{grid-column:1/-1;grid-row:2}.list-row{grid-template-columns:1fr}.list-meta{justify-content:space-between}.row-actions{flex-wrap:wrap}.inline-create{display:grid}.list-header .inline-create input{width:100%}}
+@media(max-width:600px){.content-page{padding:38px 18px 110px}.entry-heading h1{font-size:39px}.interpretation-main,.interpretation-actions{padding:20px 16px}.entity-list article{grid-template-columns:1fr auto}.entity-list article>span{grid-column:1/-1;grid-row:2}.list-row{grid-template-columns:1fr}.list-meta{justify-content:space-between}.row-actions{flex-wrap:wrap}.list-header .inline-create input{width:100%}}
 
 /* Phase 2B: immutable interpretation review */
 .entry-status{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;border:1px solid var(--border-strong);border-radius: var(--radius-full);padding:9px 12px;background:var(--background-subtle);color:var(--text-secondary);font:var(--type-eyebrow)}
@@ -699,32 +699,29 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  * default marker is removed because the caret is drawn by `::after` where the
  * layout can place it.
  */
-.work-toolbar{display:grid;gap:var(--space-2);margin-bottom:var(--space-5)}
-.work-disclosure{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface)}
-.work-disclosure>summary{
-  display:flex;align-items:center;gap:var(--space-2);
-  min-height:var(--touch-target);padding:var(--space-2) var(--space-4);
-  font:var(--type-label);color:var(--text-primary);
-  cursor:pointer;list-style:none;
-}
+.work-toolbar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--space-2);margin-bottom:var(--space-4)}
+.work-toolbar>.work-disclosure[open]{flex-basis:100%}
+/* Life Brain A.3: each disclosure's summary is a ghost `Button` (ui.css), so
+   the box appears only around an open panel. */
+.work-disclosure[open]{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface)}
+.work-disclosure>summary{list-style:none;cursor:pointer}
 .work-disclosure>summary::-webkit-details-marker{display:none}
-.work-disclosure>summary::after{content:"+";margin-left:auto;color:var(--text-muted);font:var(--type-mono)}
-.work-disclosure[open]>summary::after{content:"−"}
-.work-disclosure[open]>summary{border-bottom:1px solid var(--border-divider)}
-.work-disclosure>summary:focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
-.work-disclosure-badge{
-  display:inline-flex;align-items:center;min-height:20px;padding:0 var(--space-2);
-  border-radius:var(--radius-full);
-  background:var(--tone-attention-bg);color:var(--tone-attention-fg);
-  font:var(--type-eyebrow);
-}
+.work-disclosure[open]>summary{width:100%;justify-content:flex-start;border-bottom:1px solid var(--border-divider);border-radius:var(--radius-lg) var(--radius-lg) 0 0}
 .work-disclosure .work-filters,.work-disclosure .command-console{margin:0;padding:var(--space-4);border:0;background:transparent}
 
 /* Phase 2X.12: canonical Work surface */
-.work-view-tabs{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
-.work-view-tabs a{border:1px solid var(--border-default);border-radius: var(--radius-full);padding:9px 15px;min-height:44px;display:inline-flex;align-items:center;color:var(--text-secondary);font:600 12px var(--font-sans);background:var(--background-surface)}
-.work-view-tabs a[aria-current="page"]{background:var(--text-primary);color:var(--action-primary-text);border-color:var(--text-primary)}
-.work-view-tabs a:focus-visible,.row-action:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+/* Life Brain A.3: the views are a `SegmentedControl` (ui.css); only its
+   place on this page is set here. */
+.work-view-tabs{margin-bottom:var(--space-3)}
+/* The quick add is the header's action. On a phone it takes the row under the
+   title, and the field — not the "+" — absorbs the width, so the add control
+   keeps its square and never wraps. */
+@media(max-width:600px){
+  .work-page-header{flex-wrap:wrap;gap:var(--space-3)}
+  .work-page-header .ui-page-header__actions,.work-page-header .ui-page-header__actions>div{flex:1 1 100%;min-width:0}
+  .work-page-header .inline-create input{flex:1;min-width:0}
+}
+.row-action:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
 .work-view-note{margin-top:7px!important;font: var(--type-caption)!important}
 .work-origin{display:block;color:var(--text-secondary);font: var(--type-caption);margin-top:5px}
 .work-page .row-action{min-height:44px;display:inline-flex;align-items:center;gap:5px}

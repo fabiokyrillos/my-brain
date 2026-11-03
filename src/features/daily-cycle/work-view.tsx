@@ -1,4 +1,6 @@
+import { SlidersHorizontal, SquareTerminal } from "lucide-react";
 import Link from "next/link";
+import { Badge, PageHeader, SegmentedControl, buttonVariants } from "@/components/ui";
 import { applyBulkWorkCommand, applyWorkItemAction, createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
@@ -19,13 +21,12 @@ import { WorkFilters } from "./work-filters";
 import { getWorkFiltersCopy } from "./work-filters-copy";
 import { groupWorkItems } from "./work-grouping";
 import { WorkModeTabs } from "./work-modes";
-import { isNarrowed, toWorkQueryParams, workHref, type WorkQuery } from "./work-query";
+import { activeFilterCount, isNarrowed, toWorkQueryParams, workHref, type WorkQuery } from "./work-query";
 import { workViews, type WorkViewId } from "./work-projection";
 import { withAgentName } from "@/lib/agent-name";
 
 const copy = {
   "pt-BR": {
-    eyebrow: "EXECUÇÃO",
     title: "Tarefas",
     navigation: "Visões das tarefas",
     views: {
@@ -36,7 +37,6 @@ const copy = {
     waitingNote: "Contexto de pessoas e follow-up completo chegarão em uma fase posterior.",
   },
   en: {
-    eyebrow: "EXECUTION",
     title: "Tasks",
     navigation: "Task views",
     views: {
@@ -107,27 +107,33 @@ export function WorkView({
     is keyboard-operable with no code, and this stays a server component.
   */
   const narrowed = query ? isNarrowed(query) : false;
+  const filterCount = query ? activeFilterCount(query) : 0;
 
   return <div className="content-page work-page">
     <WorkViewViewed locale={locale} view={view} />
-    <header className="list-header">
-      <div>
-        <p className="eyebrow">{text.eyebrow}</p>
-        <h1>{text.title}</h1>
-        <p>{active.description}</p>
-        {view === "waiting" && <p className="work-view-note">{text.waitingNote}</p>}
-        {positionAdjusted ? (
-          <p className="work-position-adjusted" role="status">{filtersCopy.positionAdjusted}</p>
-        ) : null}
-      </div>
-      {/*
-        Creating a task is a primary action of this space on every view, not only
-        on "Todas" (`02-arquitetura-e-rotas.md` lists *criar* among Trabalho's
-        main actions). It was hidden on Hoje and Aguardando, which is where a
-        user most often wants it.
-      */}
-      <InlineCreateForm action={createRecord} kind="task" locale={locale} />
-    </header>
+    {/*
+      Life Brain A.3 (`LB-A-006`). One compact header: the title, the active
+      view's one-line description (hidden on a phone by `compact`), and the
+      quick add as its action. The eyebrow went with the baseline's
+      eyebrow + display + lead stack, which spent a third of an iPhone screen
+      before the first task.
+
+      Creating a task stays a primary action on every view, not only on
+      "Todas" (`02-arquitetura-e-rotas.md` lists *criar* among the space's
+      main actions) — it was once hidden on Hoje and Aguardando, which is where
+      a user most often wants it.
+    */}
+    <PageHeader
+      actions={<InlineCreateForm action={createRecord} kind="task" locale={locale} />}
+      className="work-page-header"
+      description={active.description}
+      size="compact"
+      title={text.title}
+    />
+    {view === "waiting" && <p className="work-view-note">{text.waitingNote}</p>}
+    {positionAdjusted ? (
+      <p className="work-position-adjusted" role="status">{filtersCopy.positionAdjusted}</p>
+    ) : null}
 
     {/* Lista · Calendário · Planejar — the same work, three ways of looking at
         it. The Lista tab carries the current narrowing so a trip through the
@@ -138,27 +144,35 @@ export function WorkView({
       locale={locale}
     />
 
-    <nav className="work-view-tabs" aria-label={text.navigation}>
-      {workViews.map((candidate) => <Link
-        aria-current={candidate === view ? "page" : undefined}
-        // Switching view keeps the narrowing but returns to page 1: page 7 of
-        // Hoje is very rarely page 7 of Todas.
-        href={query ? workHref(locale, { ...query, view: candidate, page: 1 }) : `/${locale}/app/work?view=${candidate}`}
-        key={candidate}
-      >
-        {text.views[candidate].label}
-      </Link>)}
-    </nav>
+    {/* Hoje · Todas · Aguardando — the one selection control for the views
+        (Life Brain A.3). Switching view keeps the narrowing but returns to
+        page 1: page 7 of Hoje is very rarely page 7 of Todas. */}
+    <SegmentedControl
+      className="work-view-tabs"
+      label={text.navigation}
+      options={workViews.map((candidate) => ({
+        value: candidate,
+        label: text.views[candidate].label,
+        href: query ? workHref(locale, { ...query, view: candidate, page: 1 }) : `/${locale}/app/work?view=${candidate}`,
+      }))}
+      value={view}
+    />
 
     <div className="work-toolbar">
       {query ? (
         <details className="work-disclosure" open={narrowed}>
-          <summary>
-            {filtersCopy.filterSummary}
-            {/* Open by default when something is active, and said in words as
-                well: a narrowing you cannot see is a list that lies about what
-                it contains. */}
-            {narrowed ? <span className="work-disclosure-badge">{filtersCopy.filtersActive}</span> : null}
+          {/* One ghost button (Life Brain A.3) with the count of active
+              filters. Open by default when something is active, and said in
+              words as well — in the accessible name, since the badge is a
+              digit: a narrowing you cannot see is a list that lies about what
+              it contains. */}
+          <summary
+            aria-label={filterCount > 0 ? filtersCopy.filtersActiveLabel(filterCount) : undefined}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            <SlidersHorizontal aria-hidden="true" className="ui-button__icon" />
+            <span className="ui-button__label">{filtersCopy.filterSummary}</span>
+            {filterCount > 0 ? <Badge aria-hidden="true" size="sm" tone="accent">{filterCount}</Badge> : null}
           </summary>
           <WorkFilters locale={locale} query={query} />
         </details>
@@ -169,7 +183,10 @@ export function WorkView({
         preview and undo — so it is collapsed, never removed.
       */}
       <details className="work-disclosure">
-        <summary>{getTaskCommandCopy(locale).console.title}</summary>
+        <summary className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <SquareTerminal aria-hidden="true" className="ui-button__icon" />
+          <span className="ui-button__label">{getTaskCommandCopy(locale).console.title}</span>
+        </summary>
         <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
       </details>
     </div>

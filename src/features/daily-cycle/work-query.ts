@@ -206,6 +206,24 @@ export function workHref(locale: string, query: WorkQuery): string {
 }
 
 /** Whether the query narrows the view at all — what "filtered empty" means. */
+/**
+ * How many of the narrowing filters are away from their default — the count
+ * on the Tarefas filter button (Life Brain A.3). Ordering and grouping are not
+ * filters: they change how the set is shown, never which tasks are in it, so
+ * they are not counted, exactly as `isNarrowed` ignores them.
+ */
+export function activeFilterCount(query: WorkQuery): number {
+  return [
+    query.state !== DEFAULT_WORK_QUERY.state,
+    query.due !== DEFAULT_WORK_QUERY.due,
+    query.planned !== DEFAULT_WORK_QUERY.planned,
+    query.priority !== DEFAULT_WORK_QUERY.priority,
+    query.origin !== DEFAULT_WORK_QUERY.origin,
+    query.projectId !== null,
+    query.contextId !== null,
+  ].filter(Boolean).length;
+}
+
 export function isNarrowed(query: WorkQuery): boolean {
   return query.state !== DEFAULT_WORK_QUERY.state
     || query.due !== DEFAULT_WORK_QUERY.due

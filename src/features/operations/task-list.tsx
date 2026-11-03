@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Badge, type BadgeProps } from "@/components/ui";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
@@ -59,6 +60,20 @@ const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
   medium: { pt: "Média", en: "Medium" },
   high: { pt: "Alta", en: "High" },
   urgent: { pt: "Urgente", en: "Urgent" },
+};
+
+/*
+ * Life Brain A.3. The state is a `Badge`; its tone repeats what the word
+ * already says, so colour is never the only signal (`2L-ACCESS`).
+ */
+const stateTone: Record<WorkItemHumanState, BadgeProps["tone"]> = {
+  not_started: "neutral",
+  in_progress: "info",
+  waiting_on_someone: "warning",
+  blocked: "risk",
+  deferred: "neutral",
+  completed: "success",
+  cancelled: "neutral",
 };
 
 export type { WorkItemActionHandler };
@@ -311,28 +326,28 @@ function TaskRow({
           || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (
           <div className="work-relations">
             {task.projects.map((project) => (
-              <span className="status-badge" key={`project-${project.id}`}>{project.label}</span>
+              <Badge size="sm" key={`project-${project.id}`}>{project.label}</Badge>
             ))}
             {task.contexts.map((context) => (
-              <span className="status-badge" key={`context-${context.id}`}>{context.label}</span>
+              <Badge size="sm" key={`context-${context.id}`}>{context.label}</Badge>
             ))}
             {task.people.map((person) => (
-              <span className="status-badge" key={`person-${person.id}`}>{person.label}</span>
+              <Badge size="sm" key={`person-${person.id}`}>{person.label}</Badge>
             ))}
             {task.waitingOnPeople.map((person) => (
-              <span className="status-badge" key={`waiting-on-${person.id}`}>
+              <Badge size="sm" key={`waiting-on-${person.id}`}>
                 {(pt ? "Aguardando: " : "Waiting on: ") + person.label}
-              </span>
+              </Badge>
             ))}
             {task.parent && (
-              <span className="status-badge" key={`parent-${task.parent.id}`}>
+              <Badge size="sm" key={`parent-${task.parent.id}`}>
                 {(pt ? "Tarefa-mãe: " : "Parent: ") + task.parent.label}
-              </span>
+              </Badge>
             )}
             {task.dependsOn?.map((dependency) => (
-              <span className="status-badge" key={`depends-on-${dependency.id}`}>
+              <Badge size="sm" key={`depends-on-${dependency.id}`}>
                 {(pt ? "Depende de: " : "Depends on: ") + dependency.label}
-              </span>
+              </Badge>
             ))}
           </div>
         )}
@@ -340,7 +355,7 @@ function TaskRow({
       <div className="list-meta">
         {task.dueAt && <span>{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.dueAt))}</span>}
         {!task.dueAt && task.intentionalNoDue && (
-          <span className="status-badge">{pt ? "Sem prazo" : "No due date"}</span>
+          <Badge size="sm">{pt ? "Sem prazo" : "No due date"}</Badge>
         )}
         {/*
           `2M-PLAN-001`. This line used to be `pt ? "Planejado: " : "Planned: "`
@@ -357,10 +372,10 @@ function TaskRow({
           </span>
         )}
         {task.priority && (
-          <span className="status-badge">{priorityCopy[task.priority][pt ? "pt" : "en"]}</span>
+          <Badge size="sm">{priorityCopy[task.priority][pt ? "pt" : "en"]}</Badge>
         )}
         {task.noDueReason && <small>{task.noDueReason}</small>}
-        <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
+        <Badge size="sm" tone={stateTone[task.humanState]}>{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</Badge>
         <WorkItemActions action={action} locale={locale} task={task} undoAction={undoAction} />
         {/*
           `2L-EDIT-001`. The controls arrive already derived from the taxonomy
