@@ -1,5 +1,14 @@
 # Technical Changelog
 
+## 2026-11-03 — Life Brain A.3, part 2: the quick add behind "+", and one row of controls
+
+- **The quick add waits behind the header's "+"** (`DESIGN_DIRECTION.md` §6.1). A `<details class="work-quick-add">` whose summary is a square primary `IconButton` named "Adicionar uma tarefa" / "Add a task"; open, the header wraps, the field takes the row under the title and the "+" turns into its close. It opens before hydration, like the filters. The submit keeps its name ("Adicionar nova tarefa"), so the two online journeys only gained the click that opens it.
+- **The views and the toolbar are one row.** `.work-controls` holds the `SegmentedControl` and both ghost buttons; an open panel moves under them at full width. On a phone the filter and command buttons are icon-only squares (the label stays in the accessibility tree; the active-filter count stays visible) and the view options use `--space-3` padding, so the row fits a 390px phone (230 + 46 + 46 px in 354).
+- **Measured in the synthetic fixture (390px):** the first task starts at **286px**, down from ~380px after part 1. Of what remains above it, ~90px is the top bar and page padding and ~66px is the Lista · Calendário · Planejar modes row.
+- **Decision — the modes stay until A.4.** Removing them only from Tarefas would leave Calendário and Planejar with a "Lista" tab pointing here and no way back; A.4 turns both into lenses of Agenda and removes the modes component everywhere at once. Without the modes the fixture would put the first task at ~220px; the ≤ 180px target also needs the top padding, which is a shell change for A.4/A.6 to weigh.
+- **Fixed from part 1:** `ui.css`'s segmented touch-target rule used a comma media query (`(pointer: coarse), (max-width: 899px)`), which `ui-css-scope` reads as a selector list; it is two blocks now. Part 1 had been pushed with that guard red.
+- **Gates:** typecheck 0 errors; lint 0 errors (3 pre-existing warnings); Vitest 540 files, 10,063 passed; `npm run build` green; Playwright `layout-contracts` + `accessibility` + `daily-surfaces`, desktop and mobile, production build — 317 passed, 5 skipped, five A.3 contracts among them.
+
 ## 2026-11-03 — Life Brain A.3, part 1: the Tarefas header, views and toolbar on the primitives
 
 - **One compact header.** `WorkView` opens with `PageHeader compact` ("Tarefas", the active view's one line hidden on a phone) and the quick add as its action; the "EXECUÇÃO" eyebrow and the display title are gone. On a phone the quick add takes the row under the title and the field absorbs the width.
