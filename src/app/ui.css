@@ -269,6 +269,12 @@ select.ui-input { cursor: pointer; }
   text-decoration: none;
   white-space: nowrap;
 }
+/* A finger needs the full touch target, not the 38px a mouse is fine with:
+   Tarefas (Life Brain A.3) was the first page to put this control on a phone,
+   and its options measured under 44px. The track grows instead of the label. */
+@media (pointer: coarse), (max-width: 899px) {
+  .ui-segmented__option { min-height: var(--touch-target); }
+}
 .ui-segmented__option:hover { color: var(--text-primary); }
 .ui-segmented__option:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .ui-segmented__option[aria-current="page"] { background: var(--background-surface); color: var(--text-primary); box-shadow: var(--elevation-1); }
