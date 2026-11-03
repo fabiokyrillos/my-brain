@@ -72,6 +72,8 @@ describe("WorkView", () => {
   it("preserves manual task creation on the canonical surface", () => {
     renderWork({ locale: "en", view: "all" });
 
+    // Life Brain A.3 part 2: the field lives behind the header's "+".
+    screen.getByText("Add a task", { selector: "summary *" }).closest("details")!.setAttribute("open", "");
     expect(screen.getByLabelText("New task")).toBeVisible();
     expect(screen.getByRole("button", { name: "Add new task" })).toBeVisible();
   });
@@ -445,5 +447,33 @@ describe("WorkView: Life Brain A.3 — the compact Tarefas page", () => {
     });
 
     expect(screen.getByText("Not started")).toHaveClass("ui-badge");
+  });
+
+  it("puts the quick add behind one “+” in the header, closed until asked", () => {
+    renderWork({ locale: "pt-BR", view: "today" });
+
+    const header = screen.getByRole("heading", { level: 1, name: "Tarefas" }).closest("header")!;
+    const disclosure = header.querySelector("details.work-quick-add")!;
+    expect(disclosure).not.toHaveAttribute("open");
+    const summary = disclosure.querySelector("summary")!;
+    expect(summary).toHaveClass("ui-button", "ui-icon-button");
+    expect(summary).toHaveTextContent("Adicionar uma tarefa");
+    expect(within(disclosure as HTMLElement).getByLabelText("Nova tarefa")).not.toBeVisible();
+  });
+
+  it("puts the views and the toolbar on one row of controls", () => {
+    renderWork({ locale: "en", view: "all", query });
+
+    const row = document.querySelector(".work-controls")!;
+    expect(row.querySelector("nav.ui-segmented")).not.toBeNull();
+    expect(row.querySelectorAll("details.work-disclosure > summary.ui-button")).toHaveLength(2);
+  });
+
+  it("names the command console's button in full even where it shows only its icon", () => {
+    renderWork({ locale: "pt-BR", view: "all", query });
+
+    const summaries = Array.from(document.querySelectorAll(".work-controls details.work-disclosure > summary"));
+    const consoleSummary = summaries.find((summary) => summary.textContent?.includes("Mude uma tarefa"))!;
+    expect(consoleSummary.querySelector(".ui-button__label")).toHaveClass("work-control-label");
   });
 });

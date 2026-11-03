@@ -699,8 +699,14 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  * default marker is removed because the caret is drawn by `::after` where the
  * layout can place it.
  */
+/* Life Brain A.3 part 2: the views and the toolbar are one row of controls.
+   The toolbar's own box dissolves into that row, and an open panel moves to
+   the end and takes the full width under the buttons. */
+.work-controls{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-bottom:var(--space-4)}
+.work-controls>.work-view-tabs{margin:0}
+.work-controls>.work-toolbar{display:contents}
+.work-controls .work-disclosure[open]{flex-basis:100%;order:1}
 .work-toolbar{display:flex;flex-wrap:wrap;align-items:flex-start;gap:var(--space-2);margin-bottom:var(--space-4)}
-.work-toolbar>.work-disclosure[open]{flex-basis:100%}
 /* Life Brain A.3: each disclosure's summary is a ghost `Button` (ui.css), so
    the box appears only around an open panel. */
 .work-disclosure[open]{border:1px solid var(--border-default);border-radius:var(--radius-lg);background:var(--background-surface)}
@@ -716,10 +722,23 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 /* The quick add is the header's action. On a phone it takes the row under the
    title, and the field — not the "+" — absorbs the width, so the add control
    keeps its square and never wraps. */
+/* Part 2: the quick add waits behind the header's "+". Open, the header wraps,
+   the field takes the row under the title and the "+" turns into its close. */
+.work-quick-add>summary{list-style:none;cursor:pointer}
+.work-quick-add>summary::-webkit-details-marker{display:none}
+.work-quick-add>summary svg{transition:transform var(--motion-fast) ease-out}
+.work-quick-add[open]>summary svg{transform:rotate(45deg)}
+.work-page-header:has(.work-quick-add[open]){flex-wrap:wrap}
+.work-page-header:has(.work-quick-add[open]) .ui-page-header__actions{flex:1 1 100%;min-width:0}
+.work-quick-add[open]{display:flex;align-items:flex-start;gap:var(--space-2);width:100%}
+.work-quick-add[open]>summary{order:1}
+.work-quick-add[open]>div{flex:1;min-width:0}
+.work-quick-add .inline-create input{flex:1;min-width:0}
+@media (prefers-reduced-motion: reduce){.work-quick-add>summary svg{transition:none}}
 @media(max-width:600px){
-  .work-page-header{flex-wrap:wrap;gap:var(--space-3)}
-  .work-page-header .ui-page-header__actions,.work-page-header .ui-page-header__actions>div{flex:1 1 100%;min-width:0}
-  .work-page-header .inline-create input{flex:1;min-width:0}
+  .work-controls .work-control-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .work-controls summary:has(.work-control-label){min-width:var(--touch-target);justify-content:center}
+  .work-controls .ui-segmented__option{padding-inline:var(--space-3)}
 }
 .row-action:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
 .work-view-note{margin-top:7px!important;font: var(--type-caption)!important}

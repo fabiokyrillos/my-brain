@@ -1,6 +1,6 @@
-import { SlidersHorizontal, SquareTerminal } from "lucide-react";
+import { Plus, SlidersHorizontal, SquareTerminal } from "lucide-react";
 import Link from "next/link";
-import { Badge, PageHeader, SegmentedControl, buttonVariants } from "@/components/ui";
+import { Badge, PageHeader, SegmentedControl, buttonVariants, cn } from "@/components/ui";
 import { applyBulkWorkCommand, applyWorkItemAction, createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { TaskList } from "@/features/operations/task-list";
@@ -29,6 +29,7 @@ const copy = {
   "pt-BR": {
     title: "Tarefas",
     navigation: "Visões das tarefas",
+    addTask: "Adicionar uma tarefa",
     views: {
       today: { label: "Hoje", description: "Prazos de hoje e atrasos que ainda estão abertos.", empty: "Nenhum prazo exige sua atenção hoje." },
       all: { label: "Todas", description: "Tarefas confirmadas pelo {agent} e criadas manualmente.", empty: "Adicione uma tarefa acima ou capture uma intenção." },
@@ -39,6 +40,7 @@ const copy = {
   en: {
     title: "Tasks",
     navigation: "Task views",
+    addTask: "Add a task",
     views: {
       today: { label: "Today", description: "Today's deadlines and overdue tasks that are still open.", empty: "No deadline needs your attention today." },
       all: { label: "All", description: "Tasks confirmed from {agent} and tasks you created manually.", empty: "Add a task above or capture an intention." },
@@ -124,7 +126,21 @@ export function WorkView({
       a user most often wants it.
     */}
     <PageHeader
-      actions={<InlineCreateForm action={createRecord} kind="task" locale={locale} />}
+      actions={(
+        /*
+          Part 2: the field waits behind one "+" (`DESIGN_DIRECTION.md` §6.1),
+          so the first task is not a full row further down. A `<details>`,
+          like the filters: it opens before hydration and needs no state.
+          Open, it takes the row under the title.
+        */
+        <details className="work-quick-add">
+          <summary className={cn(buttonVariants({ variant: "primary", size: "md" }), "ui-icon-button")}>
+            <Plus aria-hidden="true" className="ui-button__icon" />
+            <span className="sr-only">{text.addTask}</span>
+          </summary>
+          <InlineCreateForm action={createRecord} kind="task" locale={locale} />
+        </details>
+      )}
       className="work-page-header"
       description={active.description}
       size="compact"
@@ -147,48 +163,54 @@ export function WorkView({
     {/* Hoje · Todas · Aguardando — the one selection control for the views
         (Life Brain A.3). Switching view keeps the narrowing but returns to
         page 1: page 7 of Hoje is very rarely page 7 of Todas. */}
-    <SegmentedControl
-      className="work-view-tabs"
-      label={text.navigation}
-      options={workViews.map((candidate) => ({
-        value: candidate,
-        label: text.views[candidate].label,
-        href: query ? workHref(locale, { ...query, view: candidate, page: 1 }) : `/${locale}/app/work?view=${candidate}`,
-      }))}
-      value={view}
-    />
+    {/* The views and the toolbar share one row of controls (part 2); an open
+        panel takes the full width under it. */}
+    <div className="work-controls">
+      <SegmentedControl
+        className="work-view-tabs"
+        label={text.navigation}
+        options={workViews.map((candidate) => ({
+          value: candidate,
+          label: text.views[candidate].label,
+          href: query ? workHref(locale, { ...query, view: candidate, page: 1 }) : `/${locale}/app/work?view=${candidate}`,
+        }))}
+        value={view}
+      />
 
-    <div className="work-toolbar">
-      {query ? (
-        <details className="work-disclosure" open={narrowed}>
-          {/* One ghost button (Life Brain A.3) with the count of active
-              filters. Open by default when something is active, and said in
-              words as well — in the accessible name, since the badge is a
-              digit: a narrowing you cannot see is a list that lies about what
-              it contains. */}
-          <summary
-            aria-label={filterCount > 0 ? filtersCopy.filtersActiveLabel(filterCount) : undefined}
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-          >
-            <SlidersHorizontal aria-hidden="true" className="ui-button__icon" />
-            <span className="ui-button__label">{filtersCopy.filterSummary}</span>
-            {filterCount > 0 ? <Badge aria-hidden="true" size="sm" tone="accent">{filterCount}</Badge> : null}
+      <div className="work-toolbar">
+        {query ? (
+          <details className="work-disclosure" open={narrowed}>
+            {/* One ghost button (Life Brain A.3) with the count of active
+                filters. Open by default when something is active, and said in
+                words as well — in the accessible name, since the badge is a
+                digit: a narrowing you cannot see is a list that lies about what
+                it contains. */}
+            <summary
+              aria-label={filterCount > 0 ? filtersCopy.filtersActiveLabel(filterCount) : undefined}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              <SlidersHorizontal aria-hidden="true" className="ui-button__icon" />
+              <span className="ui-button__label work-control-label">{filtersCopy.filterSummary}</span>
+              {filterCount > 0 ? <Badge aria-hidden="true" size="sm" tone="accent">{filterCount}</Badge> : null}
+            </summary>
+            <WorkFilters locale={locale} query={query} />
+          </details>
+        ) : null}
+        {/*
+          The command console keeps every capability it had and stops occupying the
+          top of the page. It is a real feature — `runTaskCommand` with its own
+          preview and undo — so it is collapsed, never removed.
+        */}
+        <details className="work-disclosure">
+          <summary className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            <SquareTerminal aria-hidden="true" className="ui-button__icon" />
+            {/* Icon-only on a phone, where the sentence would take the row;
+                the label stays in the accessibility tree there. */}
+            <span className="ui-button__label work-control-label">{getTaskCommandCopy(locale).console.title}</span>
           </summary>
-          <WorkFilters locale={locale} query={query} />
+          <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
         </details>
-      ) : null}
-      {/*
-        The command console keeps every capability it had and stops occupying the
-        top of the page. It is a real feature — `runTaskCommand` with its own
-        preview and undo — so it is collapsed, never removed.
-      */}
-      <details className="work-disclosure">
-        <summary className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          <SquareTerminal aria-hidden="true" className="ui-button__icon" />
-          <span className="ui-button__label">{getTaskCommandCopy(locale).console.title}</span>
-        </summary>
-        <CommandConsole action={runTaskCommand} locale={locale} origin="work" />
-      </details>
+      </div>
     </div>
     {groups.map((group) => (
       <section

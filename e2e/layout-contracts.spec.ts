@@ -1256,33 +1256,58 @@ test.describe("the person-candidate card stays usable at every width", () => {
  * views, and the toolbar of ghost buttons. The baseline recorded a two-line
  * "Adicionar" and segmented options under the touch minimum on a phone.
  */
-function tarefasBody() {
+function tarefasBody(options: { quickAddOpen?: boolean } = {}) {
   const ghost = "ui-button ui-button--ghost ui-button--sm";
+  const icon = '<span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span>';
   return `<div class="content-page work-page">
     <header class="ui-page-header ui-page-header--compact work-page-header">
       <div class="ui-page-header__text"><h1 class="ui-page-header__title">Tarefas</h1>
         <p class="ui-page-header__description">Prazos de hoje e atrasos que ainda estão abertos.</p></div>
-      <div class="ui-page-header__actions"><div><form class="inline-create">
-        <label for="new-task" class="sr-only">Nova tarefa</label>
-        <input id="new-task" name="name" placeholder="Nova tarefa">
-        <button type="submit" aria-label="Adicionar nova tarefa" class="ui-button ui-button--primary ui-button--md ui-icon-button"><span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span></button>
-      </form></div></div>
+      <div class="ui-page-header__actions"><details class="work-quick-add"${options.quickAddOpen ? " open" : ""}>
+        <summary class="ui-button ui-button--primary ui-button--md ui-icon-button">${icon}<span class="sr-only">Adicionar uma tarefa</span></summary>
+        <div><form class="inline-create">
+          <label for="new-task" class="sr-only">Nova tarefa</label>
+          <input id="new-task" name="name" placeholder="Nova tarefa">
+          <button type="submit" aria-label="Adicionar nova tarefa" class="ui-button ui-button--primary ui-button--md ui-icon-button">${icon}</button>
+        </form></div>
+      </details></div>
     </header>
     <nav aria-label="Modos das tarefas" class="work-modes"><a aria-current="page" class="work-mode" href="#">Lista</a><a class="work-mode" href="#">Calendário</a><a class="work-mode" href="#">Planejar</a></nav>
-    <nav aria-label="Visões das tarefas" class="ui-segmented work-view-tabs">
-      <a aria-current="page" class="ui-segmented__option" href="#">Hoje</a><a class="ui-segmented__option" href="#">Todas</a><a class="ui-segmented__option" href="#">Aguardando</a>
-    </nav>
-    <div class="work-toolbar">
-      <details class="work-disclosure"><summary class="${ghost}"><span class="ui-button__label">Filtros</span></summary></details>
-      <details class="work-disclosure"><summary class="${ghost}"><span class="ui-button__label">Mude uma tarefa com suas palavras</span></summary></details>
+    <div class="work-controls">
+      <nav aria-label="Visões das tarefas" class="ui-segmented work-view-tabs">
+        <a aria-current="page" class="ui-segmented__option" href="#">Hoje</a><a class="ui-segmented__option" href="#">Todas</a><a class="ui-segmented__option" href="#">Aguardando</a>
+      </nav>
+      <div class="work-toolbar">
+        <details class="work-disclosure"><summary class="${ghost}">${icon}<span class="ui-button__label work-control-label">Filtros</span></summary></details>
+        <details class="work-disclosure"><summary class="${ghost}">${icon}<span class="ui-button__label work-control-label">Mude uma tarefa com suas palavras</span></summary></details>
+      </div>
     </div>
     <div class="list-stack"><article class="list-row" id="first-task"><div class="list-row-main"><strong>Exame de sangue</strong></div></article></div>
   </div>`;
 }
 
 test.describe("Life Brain A.3: the compact Tarefas page on a phone", () => {
-  test("the add control is one square that never wraps, and the field takes the width", async ({ page }) => {
+  test("the quick add waits behind a square "+" on the title's row", async ({ page }) => {
     await render(page, tarefasBody(), 390, 844);
+    const plus = (await page.locator(".work-quick-add > summary").boundingBox())!;
+    const title = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+    expect(plus.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(plus.width - plus.height)).toBeLessThanOrEqual(1);
+    expect(plus.y).toBeLessThan(title.y + title.height);
+    await expect(page.getByLabel("Nova tarefa", { exact: true })).toBeHidden();
+  });
+
+  test("the views and both toolbar buttons fit one row on a 390px phone", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const tops = await page.locator(".work-controls > nav, .work-controls summary").evaluateAll(
+      (nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+    );
+    expect(tops).toHaveLength(3);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(8);
+  });
+
+  test("the add control is one square that never wraps, and the field takes the width", async ({ page }) => {
+    await render(page, tarefasBody({ quickAddOpen: true }), 390, 844);
     const add = page.getByRole("button", { name: "Adicionar nova tarefa" });
     const box = (await add.boundingBox())!;
     expect(box.height).toBeGreaterThanOrEqual(44);
