@@ -99,15 +99,15 @@ test.describe("the entity graph's own surfaces", () => {
 
     // The empty state is the state this slice exists to make actionable: it now
     // says what to do next and carries the control that does it.
-    await expect(page.getByRole("heading", { name: "Empresas", level: 1 })).toBeVisible();
-    const create = page.getByRole("button", { name: "Nova empresa" });
+    await expect(page.getByRole("heading", { name: "Organizações", level: 1 })).toBeVisible();
+    const create = page.getByRole("button", { name: "Nova organização" });
     await expect(create).toBeVisible();
     if (mobile) expect((await create.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
     await create.click();
     await page.getByLabel("Nome").fill(name);
     await page.getByLabel("Descrição").fill("Cliente desde 2024");
-    await page.getByRole("button", { name: "Criar empresa" }).click();
+    await page.getByRole("button", { name: "Criar organização" }).click();
 
     const row = page.getByRole("link", { name: new RegExp(name) });
     await expect(row).toBeVisible({ timeout: 30_000 });
@@ -187,21 +187,21 @@ test.describe("the entity graph's own surfaces", () => {
     await page.getByRole("link", { name: new RegExp(personName) }).click();
 
     await page.getByRole("button", { name: "Editar" }).click();
-    await page.getByRole("button", { name: "Criar nova empresa" }).click();
-    await page.getByLabel("Nome da nova empresa").fill(companyName);
-    await page.getByRole("button", { name: "Criar empresa" }).click();
+    await page.getByRole("button", { name: "Criar nova organização" }).click();
+    await page.getByLabel("Nome da nova organização").fill(companyName);
+    await page.getByRole("button", { name: "Criar organização" }).click();
 
     // The whole point of EGC-ORG-005: one act, not "create it, reopen the form,
     // now pick it". The selector must already hold the new company.
-    await expect(outcome(page, "Empresa criada e vinculada.")).toBeVisible({ timeout: 30_000 });
+    await expect(outcome(page, "Organização criada e vinculada.")).toBeVisible({ timeout: 30_000 });
 
     // And it is stored, not merely displayed — this reload is what separates the
     // two.
     await page.reload();
     await expect(page.getByText(companyName)).toBeVisible();
     await page.getByRole("button", { name: "Editar" }).click();
-    await expect(page.getByLabel("Empresa")).toHaveValue(/.+/);
-    const selected = await page.getByLabel("Empresa").evaluate(
+    await expect(page.getByLabel("Organização")).toHaveValue(/.+/);
+    const selected = await page.getByLabel("Organização").evaluate(
       (element) => (element as HTMLSelectElement).selectedOptions[0]?.textContent ?? "",
     );
     expect(selected).toBe(companyName);
@@ -242,9 +242,9 @@ test.describe("the entity graph's own surfaces", () => {
     // that had not run gate A4 — a green test that had proven nothing.
     const company = `Nav ${crypto.randomUUID().slice(0, 8)}`;
     await page.goto("/pt-BR/app/organizations");
-    await page.getByRole("button", { name: "Nova empresa" }).click();
+    await page.getByRole("button", { name: "Nova organização" }).click();
     await page.getByLabel("Nome").fill(company);
-    await page.getByRole("button", { name: "Criar empresa" }).click();
+    await page.getByRole("button", { name: "Criar organização" }).click();
 
     const row = page.getByRole("link", { name: new RegExp(company) });
     await expect(row).toBeVisible({ timeout: 30_000 });

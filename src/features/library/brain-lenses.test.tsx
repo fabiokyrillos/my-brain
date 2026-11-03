@@ -21,7 +21,7 @@ describe("BrainLensTabs", () => {
       "Conversar",
       "Pessoas",
       "Projetos",
-      "Empresas",
+      "Organizações",
       "Contextos",
       "Memórias",
       "Arquivos",

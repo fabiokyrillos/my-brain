@@ -62,7 +62,7 @@ describe("WorkView", () => {
   it("localizes the accessible view control and marks the active view", () => {
     renderWork({ locale: "pt-BR", view: "today" });
 
-    const navigation = screen.getByRole("navigation", { name: "Visões de Trabalho" });
+    const navigation = screen.getByRole("navigation", { name: "Visões das tarefas" });
     expect(within(navigation).getByRole("link", { name: "Hoje" })).toHaveAttribute("aria-current", "page");
     expect(within(navigation).getByRole("link", { name: "Todas" })).not.toHaveAttribute("aria-current");
     expect(within(navigation).getByRole("link", { name: "Aguardando" })).not.toHaveAttribute("aria-current");
@@ -306,7 +306,7 @@ describe("WorkView: narrowing, grouping and the position", () => {
   it("keeps the narrowing when the view changes, but returns to the first page", () => {
     renderWork({ locale: "en", view: "all", page: 4, query: { ...query, priority: "high", page: 4 } });
 
-    const tab = within(screen.getByRole("navigation", { name: "Work views" }))
+    const tab = within(screen.getByRole("navigation", { name: "Task views" }))
       .getByRole("link", { name: "Waiting" });
     expect(tab.getAttribute("href")).toContain("priority=high");
     expect(tab.getAttribute("href")).not.toContain("page=");

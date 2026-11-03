@@ -82,8 +82,8 @@ test.describe("editing a project and a person", () => {
 
     // No organization exists for a fresh account, so the selector explains
     // itself instead of offering an empty control.
-    await expect(page.getByLabel("Empresa")).toBeEnabled();
-    await expect(page.getByText("Nenhuma empresa registrada ainda.")).toBeVisible();
+    await expect(page.getByLabel("Organização")).toBeEnabled();
+    await expect(page.getByText("Nenhuma organização registrada ainda.")).toBeVisible();
 
     await page.getByLabel("Descrição").fill("Migração do faturamento");
     await page.getByLabel("Situação").selectOption("paused");
@@ -94,7 +94,7 @@ test.describe("editing a project and a person", () => {
     await page.reload();
     await expect(page.getByText("Migração do faturamento")).toBeVisible();
     await expect(page.locator(".entity-hero .eyebrow")).toHaveText("PAUSADO");
-    await expect(page.locator(".entity-relation-line strong")).toHaveText("Sem empresa");
+    await expect(page.locator(".entity-relation-line strong")).toHaveText("Sem organização");
 
     // The status is localized on the way out, not shown as its raw enum.
     await page.goto("/en/app/projects");

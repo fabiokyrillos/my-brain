@@ -352,7 +352,7 @@ function brainSurface() {
     "Conversar",
     "Pessoas",
     "Projetos",
-    "Empresas",
+    "Organizações",
     "Contextos",
     "Memórias",
     "Arquivos",
@@ -370,7 +370,7 @@ function brainSurface() {
   const panels = [
     `<li><article class="brain-domain"><div class="brain-domain-head">`
       + `<h3><a href="#">Pessoas</a></h3><span class="brain-domain-count">12</span></div>`
-      + `<p class="brain-domain-note">Quem aparece no seu trabalho.</p>`
+      + `<p class="brain-domain-note">Quem faz parte da sua vida.</p>`
       + `<p class="brain-recent-label">Recentes</p>`
       + `<ul class="brain-recent"><li><span>Marina Duarte</span></li>`
       + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
@@ -672,7 +672,7 @@ function workList() {
  */
 function workTaskPanel() {
   return `<div class="content-page task-detail-page task-detail-panel">`
-    + `<button class="back-link task-panel-close" type="button">Voltar para Trabalho</button>`
+    + `<button class="back-link task-panel-close" type="button">Voltar para Tarefas</button>`
     + `<header class="task-detail-header"><div>`
     + `<p class="eyebrow">TAREFA</p>`
     + `<span class="work-protected" data-masked="true">`
@@ -797,7 +797,7 @@ function entityWorkspace() {
     + `</section>`;
 
   const openColumn = `<section class="entity-workspace-column" aria-labelledby="ws-open">`
-    + `<h2 id="ws-open">Trabalho em aberto</h2>`
+    + `<h2 id="ws-open">Tarefas em aberto</h2>`
     + `<section class="entity-tasks"><h3>Pendências e tarefas</h3>`
     + `<div class="mini-list"><article><strong>Revisar o contrato de prestação de serviços da Aurora`
     + ` antes da reunião de quinta-feira com o time jurídico</strong><span>Em aberto</span></article></div>`
@@ -820,7 +820,7 @@ function entityWorkspace() {
     + `<a class="back-link" href="#">Pessoas</a>`
     + `<header class="entity-hero"><div><p class="eyebrow">PESSOA</p>`
     + `<h1>Marina Alexandrina Bittencourt de Albuquerque Vasconcelos</h1>`
-    + `<p class="entity-relation-line"><span>Empresa</span><strong>Aurora</strong></p></div></header>`
+    + `<p class="entity-relation-line"><span>Organização</span><strong>Aurora</strong></p></div></header>`
     + editDisclosure
     + changes
     + `<div class="entity-workspace-columns">${openColumn}${knowsColumn}</div>`
@@ -1455,7 +1455,7 @@ test.describe("the entity workspace reads as one template", () => {
     expect(outline).toEqual([
       "H1:Marina Alexandrina Bitte",
       "H2:O que mudou recentemente",
-      "H2:Trabalho em aberto",
+      "H2:Tarefas em aberto",
       "H3:Pendências e tarefas",
       "H3:Projetos",
       "H2:O que o Brain sabe",
@@ -1474,7 +1474,7 @@ test.describe("the entity workspace reads as one template", () => {
     // screen reader announces cannot drift from the one on the screen.
     const columns = page.locator(".entity-workspace-column");
     await expect(columns).toHaveCount(2);
-    await expect(columns.nth(0)).toHaveAccessibleName("Trabalho em aberto");
+    await expect(columns.nth(0)).toHaveAccessibleName("Tarefas em aberto");
     await expect(columns.nth(1)).toHaveAccessibleName("O que o Brain sabe");
   });
 

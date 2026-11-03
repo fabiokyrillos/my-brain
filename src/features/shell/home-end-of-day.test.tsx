@@ -97,7 +97,7 @@ describe("2J-DAY-003: what is still open is summarized from what is already load
     const section = endOfDaySection();
     expect(within(section).getByText(/Prioridades de hoje: 1/)).toBeInTheDocument();
     expect(within(section).getByText(/Precisa de você: 1/)).toBeInTheDocument();
-    expect(within(section).getByText(/Aguardando outras pessoas: 2/)).toBeInTheDocument();
+    expect(within(section).getByText(/Aguardando retorno: 2/)).toBeInTheDocument();
   });
 
   it("says the day is clear when nothing is open", () => {
@@ -108,7 +108,7 @@ describe("2J-DAY-003: what is still open is summarized from what is already load
   it("omits a line for a category with nothing in it, rather than showing a zero", () => {
     renderHome({ waitingCount: 3 });
     const section = endOfDaySection();
-    expect(within(section).getByText(/Aguardando outras pessoas: 3/)).toBeInTheDocument();
+    expect(within(section).getByText(/Aguardando retorno: 3/)).toBeInTheDocument();
     expect(within(section).queryByText(/Precisa de você: 0/)).toBeNull();
     expect(within(section).queryByText(/Prioridades de hoje: 0/)).toBeNull();
   });

@@ -301,7 +301,7 @@ test.describe("converged daily journey — capture, review, and confirmation", (
     confirmedTaskTitle = confirmedTask!.title;
 
     await page.goto("/pt-BR/app/work?view=all");
-    await expect(page.getByRole("heading", { name: "Trabalho" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tarefas", exact: true, level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: "Todas" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByText(confirmedTaskTitle, { exact: true })).toBeVisible();
   });

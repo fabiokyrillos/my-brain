@@ -26,23 +26,23 @@ import { withAgentName } from "@/lib/agent-name";
 const copy = {
   "pt-BR": {
     eyebrow: "EXECUÇÃO",
-    title: "Trabalho",
-    navigation: "Visões de Trabalho",
+    title: "Tarefas",
+    navigation: "Visões das tarefas",
     views: {
       today: { label: "Hoje", description: "Prazos de hoje e atrasos que ainda estão abertos.", empty: "Nenhum prazo exige sua atenção hoje." },
       all: { label: "Todas", description: "Tarefas confirmadas pelo {agent} e criadas manualmente.", empty: "Adicione uma tarefa acima ou capture uma intenção." },
-      waiting: { label: "Aguardando", description: "Tarefas que dependem de outra pessoa.", empty: "Use Aguardar quando uma tarefa depender de retorno." },
+      waiting: { label: "Aguardando", description: "Tarefas que dependem do retorno de alguém.", empty: "Use Aguardar quando uma tarefa depender de retorno." },
     },
     waitingNote: "Contexto de pessoas e follow-up completo chegarão em uma fase posterior.",
   },
   en: {
     eyebrow: "EXECUTION",
-    title: "Work",
-    navigation: "Work views",
+    title: "Tasks",
+    navigation: "Task views",
     views: {
-      today: { label: "Today", description: "Today's deadlines and overdue work that is still open.", empty: "No deadline needs your attention today." },
+      today: { label: "Today", description: "Today's deadlines and overdue tasks that are still open.", empty: "No deadline needs your attention today." },
       all: { label: "All", description: "Tasks confirmed from {agent} and tasks you created manually.", empty: "Add a task above or capture an intention." },
-      waiting: { label: "Waiting", description: "Tasks that depend on someone else.", empty: "Use Wait when a task depends on a response." },
+      waiting: { label: "Waiting", description: "Tasks that depend on someone getting back to you.", empty: "Use Wait when a task depends on a response." },
     },
     waitingNote: "Person context and complete follow-up will arrive in a later phase.",
   },

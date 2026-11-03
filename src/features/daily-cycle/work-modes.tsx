@@ -27,8 +27,8 @@ import type { Locale } from "@/lib/preferences";
 export type WorkMode = "list" | "calendar" | "plan";
 
 const COPY = {
-  "pt-BR": { label: "Modos de Trabalho", list: "Lista", calendar: "Calendário", plan: "Planejar" },
-  en: { label: "Work modes", list: "List", calendar: "Calendar", plan: "Plan" },
+  "pt-BR": { label: "Modos das tarefas", list: "Lista", calendar: "Calendário", plan: "Planejar" },
+  en: { label: "Task modes", list: "List", calendar: "Calendar", plan: "Plan" },
 } as const satisfies Record<Locale, { label: string; list: string; calendar: string; plan: string }>;
 
 export function WorkModeTabs({

@@ -75,7 +75,7 @@ describe("CompanyPanel", () => {
     expect(screen.getByText("Acme")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("aria-modal", "true");
@@ -83,7 +83,7 @@ describe("CompanyPanel", () => {
     // produce duplicate ids and silently point `aria-labelledby` at the wrong
     // heading.
     expect(dialog).toHaveAttribute("aria-labelledby", "entity-company-dialog-title");
-    expect(screen.getByRole("heading", { name: "Empresa" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "Organização" })).toHaveAttribute(
       "id",
       "entity-company-dialog-title",
     );
@@ -91,27 +91,27 @@ describe("CompanyPanel", () => {
 
   it("offers picking an existing company and creating one in the same dialog", async () => {
     mount();
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
 
     // Both halves are reachable from here, and neither opens a second dialog —
     // `2P-PERSON-002` and `2P-PERSON-004` in one assertion.
-    expect(screen.getByRole("combobox", { name: "Empresa" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
+    expect(screen.getByRole("combobox", { name: "Organização" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
 
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
-    expect(screen.getByLabelText("Nome da nova empresa")).toBeInTheDocument();
+    expect(screen.getByLabelText("Nome da nova organização")).toBeInTheDocument();
     // And back, without leaving the dialog.
-    await userEvent.click(screen.getByRole("button", { name: "Escolher uma empresa existente" }));
-    expect(screen.getByRole("combobox", { name: "Empresa" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Escolher uma organização existente" }));
+    expect(screen.getByRole("combobox", { name: "Organização" })).toBeInTheDocument();
   });
 
   it("submits the person and the chosen company, and nothing else", async () => {
-    const linkAction = resolvesTo({ status: "success", message: "Empresa atualizada." });
+    const linkAction = resolvesTo({ status: "success", message: "Organização atualizada." });
     mount({ linkAction });
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Empresa" }), ORGANIZATION_ID);
-    await userEvent.click(screen.getByRole("button", { name: "Salvar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Organização" }), ORGANIZATION_ID);
+    await userEvent.click(screen.getByRole("button", { name: "Salvar organização" }));
 
     await waitFor(() => expect(linkAction).toHaveBeenCalled());
     const submitted = linkAction.mock.calls[0]![1];
@@ -125,18 +125,18 @@ describe("CompanyPanel", () => {
   });
 
   it("closes on success and keeps the outcome on the page", async () => {
-    const linkAction = resolvesTo({ status: "success", message: "Empresa atualizada." });
+    const linkAction = resolvesTo({ status: "success", message: "Organização atualizada." });
     mount({ linkAction });
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Salvar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Salvar organização" }));
 
     // Announcing a save and then destroying the only evidence of it would leave
     // a screen-reader user with nothing to return to.
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     // Twice on purpose: once in the polite live region for a screen reader, once
     // visibly. `entity-edit-form.tsx` records the same pairing.
-    expect(screen.getAllByText("Empresa atualizada.")).toHaveLength(2);
+    expect(screen.getAllByText("Organização atualizada.")).toHaveLength(2);
   });
 
   it("writes nothing when the dialog is cancelled", async () => {
@@ -150,8 +150,8 @@ describe("CompanyPanel", () => {
     */
     const { createAction, linkAction } = mount();
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Empresa" }), ORGANIZATION_ID);
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Organização" }), ORGANIZATION_ID);
     await userEvent.click(screen.getByRole("button", { name: "Fechar" }));
 
     expect(screen.getByText("Descartar o que você preencheu?")).toBeTruthy();
@@ -165,7 +165,7 @@ describe("CompanyPanel", () => {
   it("writes nothing when Escape closes the dialog", async () => {
     const { createAction, linkAction } = mount();
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
     await userEvent.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -184,23 +184,23 @@ describe("CompanyPanel", () => {
      */
     const createAction = resolvesTo({
       status: "error",
-      message: "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+      message: "A organização foi criada, mas não foi vinculada. Selecione-a na lista.",
       code: "createdButNotLinked",
     });
     mount({ createAction });
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
 
     await waitFor(() => expect(createAction).toHaveBeenCalled());
     // Back on the selector, still inside the one dialog, with the true state
     // said and the next act named.
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Empresa" })).toBeInTheDocument());
-    expect(screen.queryByLabelText("Nome da nova empresa")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Organização" })).toBeInTheDocument());
+    expect(screen.queryByLabelText("Nome da nova organização")).toBeNull();
     expect(screen.getByRole("alert")).toHaveTextContent(
-      "A empresa foi criada, mas não foi vinculada.",
+      "A organização foi criada, mas não foi vinculada.",
     );
     expect(screen.getByText(/já existe e está na lista/)).toBeInTheDocument();
   });
@@ -214,23 +214,23 @@ describe("CompanyPanel", () => {
      */
     const createAction = resolvesTo({
       status: "error",
-      message: "A empresa foi criada, mas não foi vinculada. Selecione-a na lista.",
+      message: "A organização foi criada, mas não foi vinculada. Selecione-a na lista.",
       code: "createdButNotLinked",
     });
-    const linkAction = resolvesTo({ status: "success", message: "Empresa atualizada." });
+    const linkAction = resolvesTo({ status: "success", message: "Organização atualizada." });
     mount({ createAction, linkAction });
 
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
-    await userEvent.click(screen.getByRole("button", { name: "Criar nova empresa" }));
-    await userEvent.type(screen.getByLabelText("Nome da nova empresa"), "Acme");
-    await userEvent.click(screen.getByRole("button", { name: "Criar empresa" }));
-    await waitFor(() => expect(screen.getByRole("combobox", { name: "Empresa" })).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar nova organização" }));
+    await userEvent.type(screen.getByLabelText("Nome da nova organização"), "Acme");
+    await userEvent.click(screen.getByRole("button", { name: "Criar organização" }));
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Organização" })).toBeInTheDocument());
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Empresa" }), ORGANIZATION_ID);
-    await userEvent.click(screen.getByRole("button", { name: "Salvar empresa" }));
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Organização" }), ORGANIZATION_ID);
+    await userEvent.click(screen.getByRole("button", { name: "Salvar organização" }));
 
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getAllByText("Empresa atualizada.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Organização atualizada.").length).toBeGreaterThan(0);
     expect(screen.queryByText(/não foi vinculada/)).toBeNull();
   });
 
@@ -240,7 +240,7 @@ describe("CompanyPanel", () => {
     // relation's context. A field here would be the synthesized global title the
     // decision forbids.
     mount({ organizationId: ORGANIZATION_ID, organizationName: "Acme" });
-    await userEvent.click(screen.getByRole("button", { name: /Editar empresa/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Editar organização/ }));
 
     expect(screen.queryByLabelText("Papel")).toBeNull();
     expect(screen.queryByRole("textbox", { name: /Papel|Cargo|Role/ })).toBeNull();

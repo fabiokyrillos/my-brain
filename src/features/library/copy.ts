@@ -60,9 +60,9 @@ const copy: Record<Locale, LibraryCopy> = {
     recentLabel: "Recentes",
     descriptions: {
       memories: "O que o Brain lembra sobre você.",
-      people: "Quem aparece no seu trabalho.",
-      projects: "No que você está trabalhando.",
-      organizations: "Empresas e clientes.",
+      people: "Quem faz parte da sua vida.",
+      projects: "O que você está levando adiante.",
+      organizations: "Onde você trabalha, estuda, se cuida ou é cliente.",
       contexts: "Áreas da sua vida.",
       files: "Documentos e anexos.",
       // 2N.6. Named for what it holds rather than for the drawing on it: the
@@ -88,9 +88,9 @@ const copy: Record<Locale, LibraryCopy> = {
     recentLabel: "Recent",
     descriptions: {
       memories: "What the Brain remembers about you.",
-      people: "Who shows up in your work.",
-      projects: "What you are working on.",
-      organizations: "Companies and clients.",
+      people: "The people in your life.",
+      projects: "What you are moving forward.",
+      organizations: "Where you work, study, get care or are a customer.",
       contexts: "Areas of your life.",
       files: "Documents and attachments.",
       relations: "How these things connect.",
