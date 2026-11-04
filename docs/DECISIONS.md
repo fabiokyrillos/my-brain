@@ -2314,3 +2314,22 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** Asking the model to filter by date from eight unwindowed rows (rejected: the right rows are often not among the eight). A date filter in the application after retrieval (rejected: same displacement `202608130093` removed for archived memories). Defaults on the new parameters (rejected: ambiguous overload). Treating "quando" alone as recency (rejected: "quando é a consulta?" is an agenda question, routed earlier by B.1; the flag needs a past-tense verb or "foi").
 
 - **Consequences.** Migrations: **105** local; hosted stays at 104 until the owner's go. The 14 chain guards move to 105 with their reasons. Tasks and reminders (B.2's title match) are not windowed yet. Questions with two periods, or a period the parser does not know ("no Natal", "quando eu morava em Recife"), keep retrieving by meaning alone.
+
+## ADR-151 — A person's role becomes their note, and a lasting record is offered as a memory
+
+- **Date:** 2026-11-04
+- **Status:** Accepted — Life Brain slice C.2 (ADR-145, `LB-C-005`; `LIFE_DATA_MODEL.md` §1). **No migration.**
+
+- **Context.** "Fui no cardiologista, Dr. Silva" produced a person named Dr. Silva and nothing about who he is; the owner had to open the person and type it. "Prefiro consultas de manhã" and "Ana faz aniversário em 5 de maio" were tagged `lasting_preference` and `personal_memory` and shown as chips, while the only path to a memory was the assistant's composer.
+
+- **Decision 1 — `people[].role` in the extraction, both runtimes.** Required and nullable, 1–80 characters, what the person is (occupation or what they are to the owner) **only when the entry says it**. Zod `personCandidateSchema`, the worker's validator and its strict JSON Schema; `storedEntryExtractionSchema` reads older people as `role: null`; 8 parity cases; strategy `entry-extraction-v3` and prompt `2026-11-04.2` moved together. `extraction.people` is persisted verbatim into `extracted_people`, so no RPC changes.
+- **Decision 2 — The role is written as the person's note, never as a column.** After a confirmed resolution, a person the RPC **created** gets the reading's role as `people.notes`, only while the note is empty (`.is("notes", null)`), never for a person linked to an existing one. Best effort: the resolution stands if the note fails. This is the shape the 2P-PERSON-001 amendment signs — there is no global role field on `people`, `phase-2p-person-role-guard` still holds it — and the note is free text the owner edits like any other. The suggestion shows the role beside the name before confirmation.
+- **Decision 3 — A lasting record is offered as a memory, never stored without the owner.** On a record whose reading carries `lasting_preference` or `personal_memory`, the page shows the assistant's existing `MemoryProposalCard`, prefilled by `buildMemoryProposal` with the owner's words (no model call), unless a memory already names the record. `createProposedMemory` gains `sourceEntryId` (origin `record`): the entry is read under the owner's session, the memory names it and **inherits its sensitivity**, and the audit sentence says it came from a record; `memories_source_entry_owner_fk` still refuses another owner's entry.
+
+- **Alternatives considered.** A `people.role` column (refused by the 2P-PERSON-001 amendment and by `LIFE_DATA_MODEL.md`). Writing the memory automatically from the concept (rejected: an AI→domain write the owner did not confirm). Asking the model to rewrite the record into a memory sentence (rejected: a second model call and a paraphrase of the owner's words).
+
+- **Consequences.** New people from confirmed suggestions arrive with a note when the entry named their role. Records about preferences and personal facts carry a "Guardar como memória?" card until the owner keeps or dismisses it.
+
+### Amendment (2026-11-04) — the owner's standing authorization for Life Brain
+
+- The owner, 2026-11-04: *"Pq vc ta me pedindo permissão? Tá no automático, autorizo tudo."* Recorded as a **standing** go for the rest of Life Brain: merging a slice's PR when its CI is green, applying an **allocated** migration (LB-M2 is the one left) to the hosted project, and deploying the worker, without a per-PR question. It replaces LB-X-002's per-PR go for these three acts and nothing else: a fourth migration is still a stop condition (ADR-145 Decision 7), every hosted apply is still verified byte for byte and read back, and a session's own tool permissions still apply.

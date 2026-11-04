@@ -170,6 +170,9 @@ type MemoryCopy = {
   readonly proposalDuplicate: string;
   readonly proposalEmpty: string;
   readonly proposalView: string;
+  /** Life Brain C.2 (ADR-151): the proposal on a record's page. */
+  readonly recordProposalHeading: string;
+  readonly recordProposalLead: string;
   /**
    * `2K-ACT-009` — the conversational undo, which archives (OD-2K-3).
    *
@@ -292,6 +295,8 @@ const copy = {
     proposalCreated: "Memória guardada.",
     proposalDuplicate: "Você já tem essa memória.",
     proposalEmpty: "Diga o que eu devo lembrar.",
+    recordProposalHeading: "Guardar como memória?",
+    recordProposalLead: "Este registro parece algo duradouro sobre você. Revise antes de guardar; nada é salvo sem a sua confirmação.",
     proposalView: "Ver memória",
     conversationalUndo: "Arquivar essa memória",
     conversationalUndoing: "Arquivando…",
@@ -403,6 +408,8 @@ const copy = {
     proposalCreated: "Memory kept.",
     proposalDuplicate: "You already have that memory.",
     proposalEmpty: "Tell me what to remember.",
+    recordProposalHeading: "Keep this as a memory?",
+    recordProposalLead: "This record looks like something lasting about you. Review it before keeping it; nothing is saved until you confirm.",
     proposalView: "View memory",
     conversationalUndo: "Archive that memory",
     conversationalUndoing: "Archiving…",

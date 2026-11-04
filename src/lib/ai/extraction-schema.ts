@@ -62,6 +62,16 @@ export const entityCandidateSchema = z.object({
   inferred: z.boolean(),
 });
 
+/**
+ * Life Brain C.2 (`LB-C-005`, ADR-151) — a person, with what they are to the
+ * owner when the entry says it ("cardiologista", "irmã", "chefe"). Required and
+ * nullable, like every optional fact in a strict schema. Only people carry a
+ * role; contexts, organizations and projects keep the plain candidate shape.
+ */
+export const personCandidateSchema = entityCandidateSchema.extend({
+  role: z.string().trim().min(1).max(80).nullable(),
+});
+
 export const taskCandidateSchema = z.object({
   title: z.string().trim().min(1).max(240),
   description: z.string().trim().max(2000).nullable(),
@@ -104,7 +114,7 @@ export const entryExtractionSchema = z.object({
   contexts: z.array(entityCandidateSchema),
   organizations: z.array(entityCandidateSchema),
   projects: z.array(entityCandidateSchema),
-  people: z.array(entityCandidateSchema),
+  people: z.array(personCandidateSchema),
   taskCandidates: z.array(taskCandidateSchema),
   pendingQuestions: z.array(pendingQuestionSchema),
   // Required and nullable: the provider's strict schema requires every key.
@@ -120,8 +130,11 @@ export const entryExtractionSchema = z.object({
  */
 export const storedEntryExtractionSchema = entryExtractionSchema.extend({
   lifeArea: lifeAreaSchema.nullable().default(null),
+  // C.2: every reading stored before it has people without `role`.
+  people: z.array(personCandidateSchema.extend({ role: personCandidateSchema.shape.role.default(null) })),
 });
 
 export type EntryExtraction = z.infer<typeof entryExtractionSchema>;
 export type EntityCandidate = z.infer<typeof entityCandidateSchema>;
+export type PersonCandidate = z.infer<typeof personCandidateSchema>;
 export type TaskCandidate = z.infer<typeof taskCandidateSchema>;

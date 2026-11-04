@@ -118,6 +118,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### C.2 — Pessoas com papel e memórias propostas (1 d)
 
 - `people[].role` na extração; gravação em `notes` na confirmação; `lasting_preference`/`personal_memory` → proposta de memória.
+- **Implementado 2026-11-04 (ADR-151):** `role` nos dois runtimes (versões `entry-extraction-v3` / `2026-11-04.2`), gravado como nota da pessoa criada por sugestão confirmada (só com nota vazia), mostrado ao lado do nome; o cartão de proposta do assistente na página do registro, com a origem e a sensibilidade do registro. Zero migrations.
 
 ### C.3 — Eventos com período (2,5 d, **LB-M2**)
 

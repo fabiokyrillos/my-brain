@@ -51,8 +51,8 @@ async function fetchProvider(url: string, init: RequestInit): Promise<Response> 
 // (verified in node_modules/server-only/index.js), so it is not portable to
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
-const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v2";
-const EXTRACTION_PROMPT_VERSION = "2026-11-04.1";
+const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v3";
+const EXTRACTION_PROMPT_VERSION = "2026-11-04.2";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -71,6 +71,7 @@ Security and truth rules:
 
 Entity fields, and the line between them:
 - people: individual human beings named or unambiguously identified in the entry. A first name on its own is enough, and a person named for the first time belongs here just as much as a familiar one — "Known user context" lists who is already registered, it is not the set of people you are allowed to return. A role, a pronoun or a group is not a name.
+- people[].role: what that person is — their occupation or what they are to the owner — when the entry says it, in a few words of the entry's own language (cardiologista, dentista, advogada, irmã, chefe, professor da Ana). null when the entry does not say; never guess one from the name.
 - organizations: companies, clients, institutions, schools, public bodies — something a person can belong to or work for.
 - projects: a named, continuing body of work the entry treats as a thing in its own right. A deliverable somebody is asking for is not a project, and a task title is never a project.
 - contexts: the area of life or work the entry belongs to, such as Trabalho, Casa, Saúde or Estudos.
@@ -87,7 +88,7 @@ Life area:
 - lifeArea: the one area of life the entry is mostly about, from a fixed list: health (consultations, exams, medication, symptoms, therapy), family (relatives, partner, children, birthdays, family events), home (the house, repairs, cleaning, groceries, things for the home), finance (bills, payments, salary, taxes, banking, purchases as spending), travel (trips, flights, hotels, the documents and bookings of a trip), work (the job, clients, colleagues, deliverables), study (courses, classes, exams for a course, reading to learn), leisure (hobbies, sport, friends, entertainment), ideas (an idea worth keeping, not yet a plan), other (none of these). Pick the area the entry is about, not a word it mentions. confidence says how clearly the entry belongs there. Use null only when the entry is too short or empty to tell.
 
 Examples of the area:
-- "Fui no cardiologista hoje, Dr. Silva" -> lifeArea: health. people: Dr. Silva.
+- "Fui no cardiologista hoje, Dr. Silva" -> lifeArea: health. people: Dr. Silva (role: cardiologista).
 - "Paguei R$ 350 de conta de luz" -> lifeArea: finance.
 - "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> lifeArea: travel.
 - "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
@@ -142,7 +143,15 @@ const entryExtractionSchema = {
     contexts: { type: "array", items: entityCandidateSchema },
     organizations: { type: "array", items: entityCandidateSchema },
     projects: { type: "array", items: entityCandidateSchema },
-    people: { type: "array", items: entityCandidateSchema },
+    // Life Brain C.2 (ADR-151): a person carries a required, nullable role.
+    people: {
+      type: "array",
+      items: {
+        ...entityCandidateSchema,
+        required: [...entityCandidateSchema.required, "role"],
+        properties: { ...entityCandidateSchema.properties, role: { type: ["string", "null"] } },
+      },
+    },
     taskCandidates: {
       type: "array",
       items: {

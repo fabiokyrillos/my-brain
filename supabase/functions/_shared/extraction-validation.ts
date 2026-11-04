@@ -85,6 +85,11 @@ export type TaskCandidateValue = {
   explicit: boolean;
 };
 
+/** Life Brain C.2 (ADR-151): a person carries what they are to the owner, or null. */
+export type PersonCandidateValue = EntityCandidateValue & {
+  role: string | null;
+};
+
 export type PendingQuestionValue = {
   question: string;
   reason: string;
@@ -100,7 +105,7 @@ export type ExtractionValue = {
   contexts: EntityCandidateValue[];
   organizations: EntityCandidateValue[];
   projects: EntityCandidateValue[];
-  people: EntityCandidateValue[];
+  people: PersonCandidateValue[];
   taskCandidates: TaskCandidateValue[];
   pendingQuestions: PendingQuestionValue[];
   lifeArea: LifeAreaValue | null;
@@ -305,6 +310,45 @@ function readEntityCandidates(
   return values;
 }
 
+/**
+ * People are entity candidates plus a required, nullable `role` (1–80
+ * characters, trimmed like every other string here).
+ */
+function readPersonCandidates(
+  collector: Collector,
+  raw: unknown,
+  path: string,
+): PersonCandidateValue[] {
+  const items = readArray(collector, raw, path, 0);
+  if (items === null) return [];
+
+  const values: PersonCandidateValue[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const itemPath = `${path}.${index}`;
+    if (!isPlainObject(item)) {
+      fail(collector, itemPath, "expected_object");
+      continue;
+    }
+    const name = readString(collector, item.name, `${itemPath}.name`, 1, 160);
+    const confidence = readNumber(collector, item.confidence, `${itemPath}.confidence`, 0, 1);
+    const evidence = readString(collector, item.evidence, `${itemPath}.evidence`, 1, 500);
+    const inferred = readBoolean(collector, item.inferred, `${itemPath}.inferred`);
+    let role: string | null = null;
+    let roleValid = true;
+    if (!("role" in item)) {
+      fail(collector, `${itemPath}.role`, "required");
+      roleValid = false;
+    } else if (item.role !== null) {
+      role = readString(collector, item.role, `${itemPath}.role`, 1, 80);
+      roleValid = role !== null;
+    }
+    if (name === null || confidence === null || evidence === null || inferred === null || !roleValid) continue;
+    values.push({ name, confidence, evidence, inferred, role });
+  }
+  return values;
+}
+
 function readTaskCandidates(
   collector: Collector,
   raw: unknown,
@@ -462,7 +506,7 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
   const contexts = readEntityCandidates(collector, input.contexts, "contexts");
   const organizations = readEntityCandidates(collector, input.organizations, "organizations");
   const projects = readEntityCandidates(collector, input.projects, "projects");
-  const people = readEntityCandidates(collector, input.people, "people");
+  const people = readPersonCandidates(collector, input.people, "people");
   const taskCandidates = readTaskCandidates(collector, input.taskCandidates, "taskCandidates");
   const pendingQuestions = readPendingQuestions(collector, input.pendingQuestions, "pendingQuestions");
   const lifeArea = readLifeArea(collector, input.lifeArea);

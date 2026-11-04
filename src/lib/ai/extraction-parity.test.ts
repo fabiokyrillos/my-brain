@@ -28,7 +28,7 @@ function baseExtraction() {
     contexts: [{ name: "Trabalho", confidence: 0.9, evidence: "reunião", inferred: false }],
     organizations: [],
     projects: [{ name: "Relatório", confidence: 0.6, evidence: "relatório trimestral", inferred: true }],
-    people: [{ name: "Ana", confidence: 0.95, evidence: "com Ana", inferred: false }],
+    people: [{ name: "Ana", confidence: 0.95, evidence: "com Ana", inferred: false, role: null }],
     taskCandidates: [
       {
         title: "Enviar o relatório",
@@ -184,6 +184,21 @@ const corpus: { name: string; input: unknown }[] = [
     delete person.inferred;
     return { ...base, people: [person] };
   })() },
+  // Life Brain C.2 (ADR-151): a person's role, required and nullable.
+  { name: "person role: a word", input: withEntityCandidate({ role: "cardiologista" }) },
+  { name: "person role: null", input: withEntityCandidate({ role: null }) },
+  { name: "person role: blank", input: withEntityCandidate({ role: "  " }) },
+  { name: "person role: at the limit", input: withEntityCandidate({ role: "a".repeat(80) }) },
+  { name: "person role: over the limit", input: withEntityCandidate({ role: "a".repeat(81) }) },
+  { name: "person role: a number", input: withEntityCandidate({ role: 3 }) },
+  { name: "person role: padded", input: withEntityCandidate({ role: "  irmã  " }) },
+  { name: "person role: missing", input: (() => {
+    const base = baseExtraction();
+    const people = base.people as Record<string, unknown>[];
+    const person = { ...people[0] };
+    delete person.role;
+    return { ...base, people: [person] };
+  })() },
   { name: "entity not an object", input: withRoot({ people: ["Ana"] }) },
   { name: "entity list not an array", input: withRoot({ organizations: {} }) },
 
@@ -284,7 +299,7 @@ const corpus: { name: string; input: unknown }[] = [
   // 4. Array holes. `Array.prototype.forEach` skips them entirely; the schema
   // sees `undefined` and rejects.
   { name: "sparse concepts array", input: withRoot({ concepts: sparse(["task", undefined, "reminder"]) }) },
-  { name: "sparse people array", input: withRoot({ people: sparse([{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false }, undefined]) }) },
+  { name: "sparse people array", input: withRoot({ people: sparse([{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }, undefined]) }) },
   { name: "sparse taskCandidates array", input: withRoot({ taskCandidates: sparse([undefined]) }) },
   { name: "sparse pendingQuestions array", input: withRoot({ pendingQuestions: sparse([undefined]) }) },
   { name: "explicit undefined concept", input: withRoot({ concepts: ["task", undefined] }) },

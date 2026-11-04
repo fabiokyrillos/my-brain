@@ -26,6 +26,10 @@ import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { setEntrySensitivity } from "@/features/sensitivity/entry-sensitivity-actions";
 import { EntrySensitivityForm } from "@/features/sensitivity/entry-sensitivity-form";
+import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
+import { getMemoryCopy } from "@/features/memories/copy";
+import { MemoryProposalCard } from "@/features/memories/memory-proposal-card";
+import { recordMemoryProposal } from "@/features/memories/record-memory-proposal";
 
 export default async function EntryDetailPage({
   params,
@@ -148,6 +152,24 @@ export default async function EntryDetailPage({
   const missingInterpretationState = universalStateForProductState(view.productState) ?? "interpretation_failed";
   const stillInterpreting = missingInterpretationState === "interpreting";
 
+  /*
+   * Life Brain C.2 (ADR-151). A reading tagged `lasting_preference` or
+   * `personal_memory` offers to keep the record as a memory — unless a memory
+   * already names this record (kept, or kept and archived: either way the
+   * owner has decided). RLS scopes the count to the owner.
+   */
+  const { count: keptMemoryCount } = editableCurrent && !editableCurrent.isRecordOnly
+    ? await supabase.from("memories").select("id", { count: "exact", head: true }).eq("source_entry_id", entryId)
+    : { count: 0 };
+  const memoryProposal = editableCurrent && !editableCurrent.isRecordOnly
+    ? recordMemoryProposal({
+      concepts: editableCurrent.concepts,
+      content: view.original.content,
+      alreadyKept: (keptMemoryCount ?? 0) > 0,
+    })
+    : null;
+  const memoryCopy = getMemoryCopy(locale);
+
   const nextActions = editableCurrent ? (
     <>
       {editableCurrent.isRecordOnly ? (
@@ -180,6 +202,20 @@ export default async function EntryDetailPage({
           undoAction={undoAgentAction}
         />
       )}
+      {memoryProposal ? (
+        <section aria-label={memoryCopy.recordProposalHeading} className="record-memory-proposal">
+          <h3>{memoryCopy.recordProposalHeading}</h3>
+          <p>{memoryCopy.recordProposalLead}</p>
+          <MemoryProposalCard
+            action={createProposedMemory}
+            content={memoryProposal.content}
+            kind={memoryProposal.kind}
+            locale={locale}
+            sourceEntryId={entryId}
+            undoAction={undoProposedMemory}
+          />
+        </section>
+      ) : null}
       {!editableCurrent.isRecordOnly
         && attentionReason === "review_interpretation"
         && !canConfirmCandidates
