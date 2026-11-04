@@ -181,9 +181,10 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     // Chain head moved to 101 by Phase 2R slice 2R.1's ONE authorized migration (ADR-132 Decision 8 / ADR-133 Decision 3: the reminder recurrence model). Same reasoning: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2R migration is a stop condition and fails here.
         // Chain head moved to 102 by Phase 2S slice 2S.1's ONE authorized migration (ADR-137 OD-2S-7 A / ADR-138 Decision 3: the suppression model, the cadence rule and the notice destination). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2S migration is a stop condition and fails here.
     // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this slice still ships none.
-    expect(migrations.length).toBe(103);
+    // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations.length).toBe(104);
     expect(migrations.sort().at(-1)).toBe(
-      "202610280103_notify_heartbeat_destination.sql",
+      "202611040104_life_brain_m1_life_areas.sql",
     );
   });
 

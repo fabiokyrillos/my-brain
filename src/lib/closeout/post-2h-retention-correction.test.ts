@@ -220,6 +220,14 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // rather than tolerated, because the property this assertion protects is
       // "nothing follows that somebody did not deliberately account for".
       "202610280103_notify_heartbeat_destination.sql",
+      // Life Brain LB-M1 (slice C.1, ADR-148): life areas as contexts — the
+      // `contexts.kind` CHECK widened, one area context per owner, the worker's
+      // `link_entry_life_area` and the owner's `set_entry_sensitivity`. It
+      // touches no schedule, no retention job and no cron; its two functions
+      // grant execute to exactly one role each. Named here rather than
+      // tolerated, because the property this assertion protects is "nothing
+      // follows that somebody did not deliberately account for".
+      "202611040104_life_brain_m1_life_areas.sql",
     ]);
   });
 });

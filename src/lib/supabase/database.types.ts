@@ -3545,6 +3545,16 @@ export type Database = {
         }
         Returns: Json
       }
+      link_entry_life_area: {
+        Args: {
+          p_confidence: number
+          p_entry_id: string
+          p_kind: string
+          p_locale: string
+          p_service_user_id: string
+        }
+        Returns: Json
+      }
       list_needs_attention: {
         Args: {
           p_cursor_entry_id?: string
@@ -4011,6 +4021,10 @@ export type Database = {
       }
       set_automation_category_policy: {
         Args: { p_category: string; p_operation_key: string; p_state: string }
+        Returns: Json
+      }
+      set_entry_sensitivity: {
+        Args: { p_entry_id: string; p_sensitivity: string }
         Returns: Json
       }
       suppress_notification_subject: {

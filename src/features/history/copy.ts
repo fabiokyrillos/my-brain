@@ -242,6 +242,9 @@ const ptBR: HistoryCopy = {
     // before/after states already carry the category and both policy values.
     automation_policy_changed: "mudou a política de automação de uma categoria",
     entry_person_candidates_resolved: "confirmou pessoas mencionadas em um registro",
+    // Life Brain C.1 (ADR-148).
+    entry_life_area_linked: "arquivou um registro numa área da vida",
+    entry_sensitivity_set: "definiu a sensibilidade de um registro",
     entry_person_candidates_undone: "desfez decisões sobre pessoas mencionadas",
     entry_interpretation_failed: "não conseguiu interpretar o registro[ “{subject}”]",
     entry_interpreted: "interpretou o registro[ “{subject}”]",
@@ -422,6 +425,9 @@ const en: HistoryCopy = {
     entry_interpretation_correction_undone: "undid an interpretation correction",
     automation_policy_changed: "changed the automation policy for one category",
     entry_person_candidates_resolved: "confirmed people mentioned in a record",
+    // Life Brain C.1 (ADR-148).
+    entry_life_area_linked: "filed a record under an area of life",
+    entry_sensitivity_set: "set a record's sensitivity",
     entry_person_candidates_undone: "undid decisions about mentioned people",
     entry_interpretation_failed: "could not interpret the record[ “{subject}”]",
     entry_interpreted: "interpreted the record[ “{subject}”]",

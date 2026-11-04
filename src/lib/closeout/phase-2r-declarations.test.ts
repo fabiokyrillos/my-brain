@@ -404,7 +404,8 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
     ).toEqual(["202608230101_phase_2r_slice_1_reminder_recurrence.sql"]);
         // Chain head moved to 102 by Phase 2S slice 2S.1's ONE authorized migration (ADR-137 OD-2S-7 A / ADR-138 Decision 3: the suppression model, the cadence rule and the notice destination). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim about THIS initiative is untouched. A SECOND 2S migration is a stop condition and fails here.
     // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and Phase 2R's allocation is untouched.
-    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(103);
+    // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(104);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {
