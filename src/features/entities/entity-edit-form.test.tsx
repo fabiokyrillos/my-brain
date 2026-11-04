@@ -359,6 +359,15 @@ describe("EntityEditForm — organizations and contexts", () => {
       "Work",
       "Personal",
       "Custom",
+      // Life Brain C.1: an area's own page must be able to keep its kind.
+      "Health",
+      "Family",
+      "Home",
+      "Finance",
+      "Travel",
+      "Study",
+      "Leisure",
+      "Ideas",
     ]);
   });
 });

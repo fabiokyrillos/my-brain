@@ -1,3 +1,4 @@
+import { LIFE_AREA_KINDS } from "@/features/vocabulary/copy";
 import "server-only";
 import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
 import { computeUnavailableCandidateIndexes, hasUnconfirmedTaskCandidates } from "@/features/interpretations/data";
@@ -128,6 +129,38 @@ const STATE_BY_VIEW: Record<Exclude<InboxView, "all">, (item: InboxItemView) => 
   "awaiting-ai": (item) => item.attentionReason === "configure_ai_credential",
 };
 
+/**
+ * Life Brain C.1 (ADR-148) — the life area each current reading was linked to.
+ *
+ * Two reads, because `entry_entities` is polymorphic and has no foreign key to
+ * `contexts` to embed through: the context links of these interpretations,
+ * then which of those contexts are areas. **Best effort**: a failed read is no
+ * area on any row, never a failed page — the chip is a reading aid, and the
+ * queue is how the owner decides on records.
+ */
+async function loadLifeAreas(
+  supabase: SupabaseClient,
+  interpretationIds: readonly string[],
+): Promise<ReadonlyMap<string, string>> {
+  const areas = new Map<string, string>();
+  if (interpretationIds.length === 0) return areas;
+  const links = await supabase
+    .from("entry_entities")
+    .select("interpretation_id,entity_id")
+    .eq("entity_type", "context")
+    .in("interpretation_id", [...interpretationIds]);
+  if (links.error || !links.data?.length) return areas;
+  const contextIds = [...new Set(links.data.map((row) => row.entity_id as string))];
+  const contexts = await supabase.from("contexts").select("id,kind").in("id", contextIds).in("kind", [...LIFE_AREA_KINDS]);
+  if (contexts.error) return areas;
+  const kindById = new Map((contexts.data ?? []).map((row) => [row.id as string, row.kind as string]));
+  for (const link of links.data) {
+    const kind = kindById.get(link.entity_id as string);
+    if (kind && !areas.has(link.interpretation_id as string)) areas.set(link.interpretation_id as string, kind);
+  }
+  return areas;
+}
+
 export async function loadInboxProjection(
   supabase: SupabaseClient,
   { locale, page, view = "all" }: { locale: "pt-BR" | "en"; page: number; view?: InboxView },
@@ -170,6 +203,8 @@ export async function loadInboxProjection(
     candidate_index: number;
     disposition: string;
   }>;
+
+  const areaByInterpretationId = await loadLifeAreas(supabase, interpretationIds);
 
   const latestJobByEntryId = new Map<string, { status: string; next_attempt_at: string | null }>();
   for (const job of jobs) {
@@ -221,6 +256,7 @@ export async function loadInboxProjection(
     );
 
     const source: InboxItemSource = {
+      lifeArea: entry.current_interpretation_id ? areaByInterpretationId.get(entry.current_interpretation_id) ?? null : null,
       entryId: entry.id,
       title,
       originalPreview,

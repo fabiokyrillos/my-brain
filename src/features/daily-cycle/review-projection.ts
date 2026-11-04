@@ -1,3 +1,4 @@
+import { toSensitivityLevel, type SensitivityLevel } from "@/features/sensitivity/contracts";
 import "server-only";
 import { resolveOwnerTimeZone } from "@/lib/time/owner-timezone";
 import { actionablePendingQuestionFilter } from "@/features/agent/question-visibility";
@@ -67,6 +68,12 @@ export type EntryReviewProjection = {
   pendingPersonCandidates: readonly PendingPersonCandidate[];
   personCandidateUndoId: string | null;
   relationOptions: CandidateRelationOptions;
+  /**
+   * Life Brain C.1 (`LB-C-006`) — the record's own classification, for the
+   * owner's override control. Set by the loader from the row it already reads;
+   * absent from the pure builder, which never sees `entries.sensitivity`.
+   */
+  sensitivity?: SensitivityLevel;
 };
 
 export type EntryReviewProjectionInput = {
@@ -383,7 +390,7 @@ export async function loadEntryReviewProjection(
   ) as { timezone?: unknown } | null;
   const taskCandidateCount = data.extraction?.taskCandidates.length ?? 0;
 
-  return toEntryReviewProjection({
+  const projection = toEntryReviewProjection({
     entryId,
     agentName: await getAgentName(),
     originalContent: data.entry.original_content,
@@ -415,4 +422,7 @@ export async function loadEntryReviewProjection(
       now: new Date().toISOString(),
     },
   });
+  // Life Brain C.1: the row `loadInterpretationReview` read with `select("*")`,
+  // narrowed fail-closed by the contract.
+  return { ...projection, sensitivity: toSensitivityLevel(data.entry.sensitivity) };
 }

@@ -1,3 +1,4 @@
+import { isLifeAreaKind } from "@/features/vocabulary/copy";
 import { toSensitivityLevel } from "@/features/sensitivity/contracts";
 import { toTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import {
@@ -43,6 +44,8 @@ export type InboxItemSource = {
   readonly originalPreserved: boolean;
   readonly availableActions: readonly ProjectionActionSource[];
   readonly lifecycle: DailyCycleLifecycleInput;
+  /** Life Brain C.1: the raw `contexts.kind` of the reading's area link. Narrowed below. */
+  readonly lifeArea?: string | null;
 };
 
 export type NeedsAttentionItemSource = {
@@ -324,6 +327,8 @@ export function toInboxItemView(source: InboxItemSource): InboxItemView | null {
     significantAt: source.significantAt,
     availableActions,
     originalPreserved: source.originalPreserved,
+    // Life Brain C.1: only one of the eight areas becomes a chip.
+    ...(isLifeAreaKind(source.lifeArea) ? { lifeArea: source.lifeArea } : {}),
     /*
       "Só registro" (`04-estados.md`) — the entry was read and proposed nothing.
 

@@ -1,6 +1,6 @@
 import type { Locale } from "@/lib/preferences";
 
-import type { TaskPersonRole } from "./schema";
+import type { ContextKind, TaskPersonRole } from "./schema";
 
 /**
  * The entity-editing copy, as one typed record per locale (ADR-036).
@@ -62,7 +62,7 @@ type EntityCopy = {
   readonly createContext: string;
   readonly contextNotFound: string;
   readonly kindLabel: string;
-  readonly kinds: Readonly<Record<"work" | "personal" | "custom", string>>;
+  readonly kinds: Readonly<Record<ContextKind, string>>;
   readonly linkedPeople: string;
   readonly linkedPeopleEmpty: string;
   readonly linkedProjects: string;
@@ -297,7 +297,11 @@ const copy = {
     createContext: "Criar contexto",
     contextNotFound: "Este contexto não existe.",
     kindLabel: "Tipo",
-    kinds: { work: "Trabalho", personal: "Pessoal", custom: "Personalizado" },
+    kinds: {
+      work: "Trabalho", personal: "Pessoal", custom: "Personalizado",
+      health: "Saúde", family: "Família", home: "Casa", finance: "Finanças",
+      travel: "Viagens", study: "Estudos", leisure: "Lazer", ideas: "Ideias",
+    },
     linkedPeople: "Pessoas",
     linkedPeopleEmpty: "Nenhuma pessoa vinculada.",
     linkedProjects: "Projetos",
@@ -466,7 +470,11 @@ const copy = {
     createContext: "Create context",
     contextNotFound: "This context does not exist.",
     kindLabel: "Kind",
-    kinds: { work: "Work", personal: "Personal", custom: "Custom" },
+    kinds: {
+      work: "Work", personal: "Personal", custom: "Custom",
+      health: "Health", family: "Family", home: "Home", finance: "Finance",
+      travel: "Travel", study: "Study", leisure: "Leisure", ideas: "Ideas",
+    },
     linkedPeople: "People",
     linkedPeopleEmpty: "No linked people.",
     linkedProjects: "Projects",

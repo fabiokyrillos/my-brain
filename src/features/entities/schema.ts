@@ -65,15 +65,29 @@ export const PROJECT_STATUSES = ["active", "paused", "completed", "archived"] as
 
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
-/** The three literals `contexts_kind_check` allows (`202607160003:6`). */
-export const CONTEXT_KINDS = ["work", "personal", "custom"] as const;
+/**
+ * The kinds the owner creates by hand — the original three
+ * (`202607160003:6`). Life areas are not among them: the product creates an
+ * area's context on demand, one per owner (LB-M1, ADR-148).
+ */
+export const CREATABLE_CONTEXT_KINDS = ["work", "personal", "custom"] as const;
+
+/**
+ * Every literal `contexts_kind_check` admits since LB-M1: the three hand-made
+ * kinds and the eight life areas. Reading and editing use this list, so an
+ * area's context keeps its kind through its own page.
+ */
+export const CONTEXT_KINDS = [
+  ...CREATABLE_CONTEXT_KINDS,
+  "health", "family", "home", "finance", "travel", "study", "leisure", "ideas",
+] as const;
 
 export type ContextKind = (typeof CONTEXT_KINDS)[number];
 
 /**
  * `contexts.kind` narrowed for rendering, defaulting to `custom`.
  *
- * The column is `text` with a CHECK, so a value outside the three is a data
+ * The column is `text` with a CHECK, so a value outside the eleven is a data
  * fault rather than a crash — the same posture `projects/[projectId]/page.tsx`
  * already takes for `projects.status`. `custom` is the safe default because it
  * is the kind that promises the reader least about the row.
@@ -114,7 +128,7 @@ export const contextCreateSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),
   name: contextName,
   description: optionalText,
-  kind: z.enum(CONTEXT_KINDS),
+  kind: z.enum(CREATABLE_CONTEXT_KINDS),
 }).strict();
 
 export const contextUpdateSchema = z.object({

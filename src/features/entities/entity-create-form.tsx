@@ -27,7 +27,7 @@ import type { Locale } from "@/lib/preferences";
 import { getEntityCopy } from "./copy";
 import { idleEntityEditState, type EntityEditState } from "./edit-state";
 import type { EntityEditAction } from "./entity-edit-form";
-import { CONTEXT_KINDS } from "./schema";
+import { CREATABLE_CONTEXT_KINDS } from "./schema";
 
 export type EntityCreateKind = "organization" | "context";
 
@@ -130,7 +130,7 @@ export function EntityCreateForm({
             key={`kind-${restored("kind") ?? "work"}`}
             name="kind"
           >
-            {CONTEXT_KINDS.map((contextKind) => (
+            {CREATABLE_CONTEXT_KINDS.map((contextKind) => (
               <option key={contextKind} value={contextKind}>{copy.kinds[contextKind]}</option>
             ))}
           </select>
