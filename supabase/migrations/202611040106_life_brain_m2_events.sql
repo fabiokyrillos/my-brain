@@ -144,7 +144,15 @@ begin
     raise exception 'A record-only reading proposes nothing' using errcode = '55000', detail = 'RECORD_ONLY';
   end if;
 
-  request_fingerprint := md5(p_entry_id::text || ':' || p_expected_interpretation_id::text || ':' || canonical_indexes::text);
+  -- sha256 hex, the shape `undo_operations_request_fingerprint_check` admits
+  -- (`202607190032`), computed as the task confirmation computes it.
+  request_fingerprint := pg_catalog.encode(
+    extensions.digest(
+      pg_catalog.convert_to(p_entry_id::text || ':' || p_expected_interpretation_id::text || ':' || canonical_indexes::text, 'UTF8'),
+      'sha256'
+    ),
+    'hex'
+  );
 
   select * into existing_operation
   from public.undo_operations

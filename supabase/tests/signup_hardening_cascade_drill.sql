@@ -316,6 +316,14 @@ begin
     );
   exception when others then failures := failures || ('reminder_series: ' || sqlerrm); end;
 
+  -- Life Brain C.3 (`202611040106`). Inserted directly for the populator's
+  -- reason (no session for `confirm_entry_event_candidates`), linked to the
+  -- drill's own context and entry so the owned composite keys are exercised.
+  begin
+    insert into public.events (user_id, title, starts_at, context_id, source_entry_id)
+    values (p_user, 'Drill event ' || p_tag, now() + interval '1 day', v_ctx, v_entry);
+  exception when others then failures := failures || ('events: ' || sqlerrm); end;
+
   begin
     insert into public.notifications (user_id, type, title, body)
     values (p_user, 'heartbeat', 'Drill notification ' || p_tag, 'Drill body');

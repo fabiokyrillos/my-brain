@@ -292,6 +292,11 @@ with rpc_closed (table_name) as (
   ('entity_deletion_confirmations'),
   ('entry_person_candidate_resolutions'),
   ('error_events'),
+  -- Life Brain C.3 (`202611040106`). Every write is
+  -- `confirm_entry_event_candidates` or `cancel_event`, both definers, and the
+  -- undo handler runs under the router; no service_role path reads or writes
+  -- events, so the migration revokes it explicitly.
+  ('events'),
   ('notification_suppressions'),
   ('product_events'),
   ('rate_limit_events'),
@@ -532,6 +537,9 @@ select is(
   || E'entry_person_candidate_resolutions -> SELECT\n'
   || E'entry_task_candidate_resolutions -> SELECT\n'
   || E'error_events -> (none)\n'
+  -- Life Brain C.3 (`202611040106`). SELECT-only: the owner reads their agenda,
+  -- and the two definer RPCs are the only doors in.
+  || E'events -> SELECT\n'
   || E'heartbeat_runs -> SELECT\n'
   || E'jobs -> INSERT,SELECT\n'
   -- Phase 2M slice 2M.4b's three. All `SELECT`-only, and deliberately: every
