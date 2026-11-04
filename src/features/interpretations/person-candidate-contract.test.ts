@@ -11,8 +11,8 @@ describe("parseExtractedPeople", () => {
       { name: "  Giovanna   (Gigi) ", evidence: " pra Giovanna(gigi) ", confidence: 1 },
       { name: "Jaime", confidence: 0.8 },
     ])).toEqual([
-      { candidateIndex: 0, name: "Giovanna (Gigi)", evidence: "pra Giovanna(gigi)", confidence: 1 },
-      { candidateIndex: 1, name: "Jaime", evidence: "", confidence: 0.8 },
+      { candidateIndex: 0, name: "Giovanna (Gigi)", evidence: "pra Giovanna(gigi)", confidence: 1, role: null },
+      { candidateIndex: 1, name: "Jaime", evidence: "", confidence: 0.8, role: null },
     ]);
   });
 
@@ -23,8 +23,8 @@ describe("parseExtractedPeople", () => {
       { name: "Marina", confidence: 2 },
       { name: "João", evidence: 7, confidence: 0.9 },
     ])).toEqual([
-      { candidateIndex: 2, name: "Marina", evidence: "", confidence: 1 },
-      { candidateIndex: 3, name: "João", evidence: "", confidence: 0.9 },
+      { candidateIndex: 2, name: "Marina", evidence: "", confidence: 1, role: null },
+      { candidateIndex: 3, name: "João", evidence: "", confidence: 0.9, role: null },
     ]);
   });
 
@@ -48,6 +48,7 @@ describe("derivePendingPersonCandidates", () => {
       proposedName: "Giovanna (Gigi)",
       evidence: "pra Giovanna(gigi)",
       confidence: 1,
+      role: null,
     }]);
   });
 
@@ -69,5 +70,16 @@ describe("derivePendingPersonCandidates", () => {
       resolvedCandidateIndexes: new Set(),
       linkedNormalizedNames: new Set([normalizePersonCandidateName("JOÃO")]),
     })).toEqual([]);
+  });
+});
+
+describe("Life Brain C.2: a person's role", () => {
+  it("is read, trimmed and bounded, and is null when absent or blank", () => {
+    expect(parseExtractedPeople([
+      { name: "Dr. Silva", evidence: "Dr. Silva", confidence: 0.9, role: "  cardiologista " },
+      { name: "Ana", evidence: "Ana", confidence: 0.9, role: "   " },
+      { name: "Jaime", evidence: "Jaime", confidence: 0.9 },
+      { name: "Bia", evidence: "Bia", confidence: 0.9, role: "a".repeat(120) },
+    ]).map((candidate) => candidate.role)).toEqual(["cardiologista", null, null, "a".repeat(80)]);
   });
 });

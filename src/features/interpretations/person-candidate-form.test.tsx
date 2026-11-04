@@ -7,8 +7,8 @@ import { PersonCandidateForm } from "./person-candidate-form";
 import type { PersonCandidateActionState } from "./person-candidate-actions";
 
 const candidates = [
-  { candidateIndex: 0, originalName: "Giovanna (Gigi)", proposedName: "Giovanna (Gigi)", evidence: "pra Giovanna", confidence: 1 },
-  { candidateIndex: 1, originalName: "Jaime", proposedName: "Jaime", evidence: "para Jaime", confidence: 0.9 },
+  { candidateIndex: 0, originalName: "Giovanna (Gigi)", proposedName: "Giovanna (Gigi)", evidence: "pra Giovanna", confidence: 1, role: null },
+  { candidateIndex: 1, originalName: "Jaime", proposedName: "Jaime", evidence: "para Jaime", confidence: 0.9, role: null },
 ];
 const idle: PersonCandidateActionState = { status: "idle", message: "", undoId: null };
 
@@ -181,5 +181,13 @@ describe("the person-candidate card's layout contract", () => {
     expect(ruleFor(css, ".candidate-item")).toContain("grid-template-columns:24px 1fr auto");
     expect(ruleFor(css, ".candidate-item>input")).toContain("position:absolute");
     expect(ruleFor(css, ".candidate-check")).toContain("width:21px");
+  });
+});
+
+describe("Life Brain C.2: the role the reading gave a person", () => {
+  it("is shown beside the name, and nothing is shown when there is none", () => {
+    renderForm({ candidates: [{ ...candidates[0]!, originalName: "Dr. Silva", proposedName: "Dr. Silva", role: "cardiologista" }, candidates[1]!] });
+    expect(screen.getByText("· cardiologista")).toBeInTheDocument();
+    expect(document.querySelectorAll(".person-candidate-role")).toHaveLength(1);
   });
 });

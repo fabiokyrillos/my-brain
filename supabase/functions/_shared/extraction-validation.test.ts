@@ -28,7 +28,7 @@ function validExtraction(): Record<string, unknown> {
     contexts: [],
     organizations: [],
     projects: [],
-    people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false }],
+    people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }],
     // Life Brain C.1: a required, nullable key.
     lifeArea: { kind: "work", confidence: 0.9 },
     taskCandidates: [{
@@ -145,11 +145,11 @@ Deno.test("an over-length candidate title is refused before it can break tasks.t
 Deno.test("entity candidate evidence and confidence are bounded", () => {
   const base = validExtraction();
   assertEquals(
-    issuesOf({ ...base, people: [{ name: "Ana", confidence: 0.9, evidence: "a".repeat(501), inferred: false }] }),
+    issuesOf({ ...base, people: [{ name: "Ana", confidence: 0.9, evidence: "a".repeat(501), inferred: false, role: null }] }),
     [{ path: "people.0.evidence", code: "too_long" }],
   );
   assertEquals(
-    issuesOf({ ...base, people: [{ name: "", confidence: 0.9, evidence: "com Ana", inferred: false }] }),
+    issuesOf({ ...base, people: [{ name: "", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }] }),
     [{ path: "people.0.name", code: "too_short" }],
   );
 });
@@ -177,8 +177,8 @@ Deno.test("a bad element never stops the loop: entity candidates", () => {
   const issues = issuesOf({
     ...base,
     people: [
-      { name: "", confidence: 0.9, evidence: "trecho", inferred: false },
-      { name: "Ana", confidence: 5, evidence: "trecho", inferred: false },
+      { name: "", confidence: 0.9, evidence: "trecho", inferred: false, role: null },
+      { name: "Ana", confidence: 5, evidence: "trecho", inferred: false, role: null },
     ],
   });
   assertEquals(issues, [

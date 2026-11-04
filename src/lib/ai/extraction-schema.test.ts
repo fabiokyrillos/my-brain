@@ -11,8 +11,8 @@ const validExtraction = {
   organizations: [{ name: "Royal Caribbean", confidence: 0.78, evidence: "Next Cruise", inferred: true }],
   projects: [{ name: "Next Cruise", confidence: 0.99, evidence: "relatório de Next Cruise", inferred: false }],
   people: [
-    { name: "Jaime", confidence: 0.99, evidence: "Jaime pediu", inferred: false },
-    { name: "Maria", confidence: 0.99, evidence: "conversar com Maria", inferred: false },
+    { name: "Jaime", confidence: 0.99, evidence: "Jaime pediu", inferred: false, role: null },
+    { name: "Maria", confidence: 0.99, evidence: "conversar com Maria", inferred: false, role: "gerente" },
   ],
   lifeArea: { kind: "work", confidence: 0.95 },
   taskCandidates: [
@@ -50,6 +50,31 @@ describe("entryExtractionSchema", () => {
  * A row stored before C.1 has no key at all, and reading it must not fail —
  * that is what `storedEntryExtractionSchema` is for.
  */
+describe("people[].role (Life Brain C.2, ADR-151)", () => {
+  const withRole = (role: unknown) => ({
+    ...validExtraction,
+    people: [{ name: "Dr. Silva", confidence: 0.9, evidence: "Dr. Silva", inferred: false, role }],
+  });
+
+  it("accepts a role and null", () => {
+    expect(entryExtractionSchema.safeParse(withRole("cardiologista")).success).toBe(true);
+    expect(entryExtractionSchema.safeParse(withRole(null)).success).toBe(true);
+  });
+
+  it("refuses a blank or overlong role, and a person without the key from the model", () => {
+    expect(entryExtractionSchema.safeParse(withRole(" ")).success).toBe(false);
+    expect(entryExtractionSchema.safeParse(withRole("a".repeat(81))).success).toBe(false);
+    const missing = { ...validExtraction, people: [{ name: "Ana", confidence: 0.9, evidence: "Ana", inferred: false }] };
+    expect(entryExtractionSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it("reads a reading stored before C.2 as a person with no role", () => {
+    const stored = { ...validExtraction, people: [{ name: "Ana", confidence: 0.9, evidence: "Ana", inferred: false }] };
+    const parsed = storedEntryExtractionSchema.parse(stored);
+    expect(parsed.people[0]?.role).toBeNull();
+  });
+});
+
 describe("lifeArea", () => {
   const withoutLifeArea: Record<string, unknown> = { ...validExtraction };
   delete withoutLifeArea.lifeArea;

@@ -134,7 +134,12 @@ export function PersonCandidateForm({
               */
               return (
                 <fieldset key={candidate.candidateIndex} className="person-candidate-item" aria-label={groupLabel}>
-                  <legend>{candidate.originalName}</legend>
+                  {/* Life Brain C.2: the role, when the reading names one, is part
+                      of who this is — and what the note will say if confirmed. */}
+                  <legend>
+                    {candidate.originalName}
+                    {candidate.role ? <span className="person-candidate-role"> · {candidate.role}</span> : null}
+                  </legend>
                   {candidate.evidence && <p className="person-candidate-evidence">{candidate.evidence}</p>}
                   {/*
                     The two options are grouped so the layout can place them as

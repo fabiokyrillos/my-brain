@@ -85,8 +85,8 @@ describe("toEntryReviewProjection", () => {
         concepts: ["task"],
         contexts: [], organizations: [], projects: [],
         people: [
-          { name: "Jaime", evidence: "para Jaime", confidence: 1, inferred: false },
-          { name: "Giovanna (Gigi)", evidence: "pra Giovanna(gigi)", confidence: 1, inferred: false },
+          { name: "Jaime", evidence: "para Jaime", confidence: 1, inferred: false, role: null },
+          { name: "Giovanna (Gigi)", evidence: "pra Giovanna(gigi)", confidence: 1, inferred: false, role: null },
         ],
         taskCandidates: [], pendingQuestions: [], confidence: 1,
       },
@@ -98,6 +98,7 @@ describe("toEntryReviewProjection", () => {
       proposedName: "Giovanna (Gigi)",
       evidence: "pra Giovanna(gigi)",
       confidence: 1,
+      role: null,
     }]);
   });
 
@@ -110,7 +111,7 @@ describe("toEntryReviewProjection", () => {
         language: "pt-BR", occurredAt: "2026-08-16T12:28:00.000Z", isRetroactive: false,
         lifeArea: null,
         summary: "Falar com Giovanna", concepts: [], contexts: [], organizations: [], projects: [],
-        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false }],
+        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false, role: null }],
         taskCandidates: [], pendingQuestions: [], confidence: 1,
       },
       personCandidateResolutions: [{ interpretation_id: "interp-1", candidate_index: 0, disposition: "rejected" }],
@@ -127,7 +128,7 @@ describe("toEntryReviewProjection", () => {
         language: "pt-BR", occurredAt: "2026-08-16T12:28:00.000Z", isRetroactive: false,
         lifeArea: null,
         summary: "Falar com Giovanna", concepts: [], contexts: [], organizations: [], projects: [],
-        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false }],
+        people: [{ name: "Giovanna", evidence: "com Giovanna", confidence: 1, inferred: false, role: null }],
         taskCandidates: [], pendingQuestions: [], confidence: 1,
       },
       personCandidateResolutions: [{ interpretation_id: "interp-1", candidate_index: 0, disposition: "rejected" }],
@@ -612,7 +613,7 @@ describe("person candidates from an entry that names a person and their organiza
       contexts: [],
       organizations: [{ name: "Royal Caribbean", evidence: "faz parte da Royal Caribbean", confidence: 0.99, inferred: false }],
       projects: [],
-      people: [{ name: "Garo", evidence: "relatório de Sweepstakes pra Garo", confidence: 0.9, inferred: false }],
+      people: [{ name: "Garo", evidence: "relatório de Sweepstakes pra Garo", confidence: 0.9, inferred: false, role: null }],
       taskCandidates: [],
       pendingQuestions: [],
       confidence: 0.9,
@@ -634,6 +635,7 @@ describe("person candidates from an entry that names a person and their organiza
       proposedName: "Garo",
       evidence: "relatório de Sweepstakes pra Garo",
       confidence: 0.9,
+      role: null,
     }]);
     // The organization is surfaced as a mention, never as somebody to create.
     expect(projection.extractedMentions.map((mention) => mention.name))

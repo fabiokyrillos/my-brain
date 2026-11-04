@@ -22,6 +22,8 @@ export type ExtractedPersonCandidate = {
   name: string;
   evidence: string;
   confidence: number;
+  /** Life Brain C.2: what the reading says they are, or null (readings before C.2). */
+  role: string | null;
 };
 
 export type PendingPersonCandidate = {
@@ -30,6 +32,8 @@ export type PendingPersonCandidate = {
   proposedName: string;
   evidence: string;
   confidence: number;
+  /** Life Brain C.2: shown beside the name, and written as the note on creation. */
+  role: string | null;
 };
 
 function collapseWhitespace(value: string): string {
@@ -63,6 +67,7 @@ export function parseExtractedPeople(value: unknown): ExtractedPersonCandidate[]
       name,
       evidence: boundedText(record.evidence, PERSON_CANDIDATE_EVIDENCE_MAX_LENGTH),
       confidence,
+      role: boundedText(record.role, 80) || null,
     }];
   });
 }
@@ -94,6 +99,7 @@ export function derivePendingPersonCandidates(input: {
       proposedName: candidate.name,
       evidence: candidate.evidence,
       confidence: candidate.confidence,
+      role: candidate.role,
     }];
   });
 }

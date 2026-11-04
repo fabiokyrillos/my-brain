@@ -120,3 +120,95 @@ describe("resolvePersonCandidates", () => {
     });
   });
 });
+
+describe("Life Brain C.2: a created person keeps the role the reading gave them (LB-C-005)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function clientWithRoles(people: unknown[], results: Record<string, unknown>[]) {
+    const updates: { patch: Record<string, unknown>; filters: [string, unknown][] }[] = [];
+    const rpc = vi.fn(async () => ({
+      data: { operationKey, undoId, idempotent: false, results },
+      error: null,
+    }));
+    const from = vi.fn((table: string) => {
+      if (table === "entry_interpretations") {
+        const builder = {
+          select: () => builder,
+          eq: () => builder,
+          maybeSingle: async () => ({ data: { extracted_people: people }, error: null }),
+        };
+        return builder;
+      }
+      if (table === "people") {
+        return {
+          update: (patch: Record<string, unknown>) => {
+            const entry = { patch, filters: [] as [string, unknown][] };
+            updates.push(entry);
+            const chain = {
+              eq: (column: string, value: unknown) => { entry.filters.push([column, value]); return chain; },
+              is: async (column: string, value: unknown) => { entry.filters.push([`is:${column}`, value]); return { error: null }; },
+            };
+            return chain;
+          },
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    });
+    return {
+      value: { auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) }, rpc, from },
+      updates,
+    };
+  }
+
+  it("writes the role as the note of a person this resolution created, only while it is empty", async () => {
+    const { value, updates } = clientWithRoles(
+      [{ name: "Dr. Silva", role: "  cardiologista " }, { name: "Ana", role: null }],
+      [
+        { candidateIndex: 0, disposition: "confirmed", personId: "person-1", outcome: "created" },
+        { candidateIndex: 1, disposition: "rejected", personId: null, outcome: "ignored" },
+      ],
+    );
+    vi.mocked(createClient).mockResolvedValue(value as never);
+
+    const result = await resolvePersonCandidates(idle, form());
+    expect(result).toMatchObject({ status: "success" });
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.patch.notes).toBe("cardiologista");
+    expect(updates[0]!.filters).toEqual([["id", "person-1"], ["user_id", "user-1"], ["is:notes", null]]);
+  });
+
+  it("never touches a person it linked rather than created, or a candidate with no role", async () => {
+    const { value, updates } = clientWithRoles(
+      [{ name: "Dr. Silva", role: "cardiologista" }, { name: "Ana", role: null }],
+      [
+        { candidateIndex: 0, disposition: "confirmed", personId: "person-existing", outcome: "linked_existing" },
+        { candidateIndex: 1, disposition: "confirmed", personId: "person-2", outcome: "created" },
+      ],
+    );
+    vi.mocked(createClient).mockResolvedValue(value as never);
+
+    await resolvePersonCandidates(idle, form({
+      resolutions: JSON.stringify([
+        { candidateIndex: 0, disposition: "confirmed" },
+        { candidateIndex: 1, disposition: "confirmed" },
+      ]),
+    }));
+    expect(updates).toEqual([]);
+  });
+
+  it("keeps the confirmed resolution when the role cannot be read", async () => {
+    const rpc = vi.fn(async () => ({
+      data: { operationKey, undoId, idempotent: false, results: [{ candidateIndex: 0, disposition: "confirmed", personId: "person-1", outcome: "created" }] },
+      error: null,
+    }));
+    const from = vi.fn(() => { throw new Error("read failed"); });
+    vi.mocked(createClient).mockResolvedValue({
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: "user-1" } } })) }, rpc, from,
+    } as never);
+
+    const result = await resolvePersonCandidates(idle, form({
+      resolutions: JSON.stringify([{ candidateIndex: 0, disposition: "confirmed" }]),
+    }));
+    expect(result).toMatchObject({ status: "success", undoId });
+  });
+});

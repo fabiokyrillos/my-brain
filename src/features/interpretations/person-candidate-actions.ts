@@ -128,7 +128,60 @@ function readResult(value: unknown) {
     return outcome === "created" || outcome === "linked_existing" || outcome === "ignored" ? [outcome] : [];
   });
   if (outcomes.length !== result.results.length) return null;
-  return { undoId: result.undoId, idempotent: result.idempotent === true, outcomes };
+  // Life Brain C.2: which candidate became which new person, for its role.
+  const created = result.results.flatMap((item) => {
+    const row = item as Record<string, unknown>;
+    return row.outcome === "created" && typeof row.personId === "string" && Number.isInteger(row.candidateIndex)
+      ? [{ candidateIndex: row.candidateIndex as number, personId: row.personId }]
+      : [];
+  });
+  return { undoId: result.undoId, idempotent: result.idempotent === true, outcomes, created };
+}
+
+/**
+ * Life Brain C.2 (`LB-C-005`, ADR-151) — a person created from a confirmed
+ * suggestion keeps what the reading said they are ("cardiologista") as their
+ * note.
+ *
+ * Read from the interpretation the owner confirmed against (owner-scoped by
+ * RLS), written only to a person this resolution **created** and only while
+ * their note is still empty — so it can never overwrite what the owner wrote,
+ * and linking an existing person never touches them. Best effort: a failure
+ * here leaves the person without a note and the resolution exactly as
+ * confirmed; it is reported by code, never by content.
+ */
+async function writeCreatedRoles(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  input: { userId: string; interpretationId: string; created: readonly { candidateIndex: number; personId: string }[] },
+): Promise<void> {
+  if (input.created.length === 0) return;
+  const { data, error } = await supabase
+    .from("entry_interpretations")
+    .select("extracted_people")
+    .eq("id", input.interpretationId)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+  if (error || !data) return;
+  const people = Array.isArray(data.extracted_people) ? data.extracted_people : [];
+  for (const { candidateIndex, personId } of input.created) {
+    const role = readRole(people[candidateIndex]);
+    if (role === null) continue;
+    const { error: writeError } = await supabase
+      .from("people")
+      .update({ notes: role, updated_at: new Date().toISOString() })
+      .eq("id", personId)
+      .eq("user_id", input.userId)
+      .is("notes", null);
+    if (writeError) console.warn("[person-candidates] role note not written", { code: writeError.code ?? "unknown" });
+  }
+}
+
+function readRole(candidate: unknown): string | null {
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return null;
+  const role = (candidate as Record<string, unknown>).role;
+  if (typeof role !== "string") return null;
+  const trimmed = role.trim();
+  return trimmed.length > 0 && trimmed.length <= 80 ? trimmed : null;
 }
 
 function refreshPersonSurfaces(entryId: string) {
@@ -168,6 +221,16 @@ export async function resolvePersonCandidates(
   const created = result.outcomes.filter((outcome) => outcome === "created").length;
   const linked = result.outcomes.filter((outcome) => outcome === "linked_existing").length;
   const ignored = result.outcomes.filter((outcome) => outcome === "ignored").length;
+  try {
+    await writeCreatedRoles(supabase, {
+      userId: user.id,
+      interpretationId: parsed.data.expectedInterpretationId,
+      created: result.created,
+    });
+  } catch {
+    // Best effort by contract: the resolution is already committed.
+    console.warn("[person-candidates] role note not written", { code: "unexpected" });
+  }
   refreshPersonSurfaces(parsed.data.entryId);
 
   return {
