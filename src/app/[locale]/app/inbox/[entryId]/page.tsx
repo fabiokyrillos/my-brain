@@ -30,6 +30,9 @@ import { createProposedMemory, undoProposedMemory } from "@/features/memories/ac
 import { getMemoryCopy } from "@/features/memories/copy";
 import { MemoryProposalCard } from "@/features/memories/memory-proposal-card";
 import { recordMemoryProposal } from "@/features/memories/record-memory-proposal";
+import { cancelEvent, confirmEventCandidates, undoEventCandidates } from "@/features/events/actions";
+import { loadEntryEvents } from "@/features/events/entry-events";
+import { EventCandidateForm } from "@/features/events/event-candidate-form";
 
 export default async function EntryDetailPage({
   params,
@@ -169,6 +172,11 @@ export default async function EntryDetailPage({
     })
     : null;
   const memoryCopy = getMemoryCopy(locale);
+  // Life Brain C.3 (ADR-152): what the reading proposes for the agenda, and
+  // what of this record is already on it.
+  const entryEvents = editableCurrent && !editableCurrent.isRecordOnly
+    ? await loadEntryEvents(supabase, { entryId, interpretationId: editableCurrent.interpretationId })
+    : null;
 
   const nextActions = editableCurrent ? (
     <>
@@ -202,6 +210,20 @@ export default async function EntryDetailPage({
           undoAction={undoAgentAction}
         />
       )}
+      {entryEvents ? (
+        <EventCandidateForm
+          action={confirmEventCandidates}
+          cancelAction={cancelEvent}
+          entryId={entryId}
+          interpretationId={editableCurrent.interpretationId}
+          locale={locale}
+          onAgenda={entryEvents.onAgenda}
+          operationKey={randomUUID()}
+          pending={entryEvents.pending}
+          timezone={timezone}
+          undoAction={undoEventCandidates}
+        />
+      ) : null}
       {memoryProposal ? (
         <section aria-label={memoryCopy.recordProposalHeading} className="record-memory-proposal">
           <h3>{memoryCopy.recordProposalHeading}</h3>

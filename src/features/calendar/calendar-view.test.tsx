@@ -48,6 +48,7 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     // be looking at. Rescheduling has its own fixture and its own file.
     reschedule: null,
     joinedReminders: [],
+    span: null,
     ...overrides,
   };
 }
@@ -332,7 +333,8 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
     view({ query: query({ lanes: ["deadline", "reminder", "review"] }) });
     const narrowed = document.querySelector("details.calendar-filters");
     expect(narrowed?.hasAttribute("open")).toBe(true);
-    expect(narrowed?.querySelector("summary")?.getAttribute("aria-label")).toBe("O que mostrar, 2 ocultos");
+    // Six lanes since Life Brain C.3 (the event lane), three of them shown.
+    expect(narrowed?.querySelector("summary")?.getAttribute("aria-label")).toBe("O que mostrar, 3 ocultos");
   });
 
   it("announces the range and the count", () => {

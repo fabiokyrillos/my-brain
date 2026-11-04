@@ -448,7 +448,7 @@ describe("Life Brain B.1: an agenda question is answered without a model (LB-B-0
   function agendaProjection(items: Record<string, unknown>[]) {
     return {
       // `joinedReminders` is required on the view since Life Brain A.4.
-      days: [{ date: "2026-11-01", isToday: false, inPeriod: true, items: items.map((item) => ({ joinedReminders: [], ...item })) }],
+      days: [{ date: "2026-11-01", isToday: false, inPeriod: true, items: items.map((item) => ({ joinedReminders: [], span: null, ...item })) }],
       timezone: "America/Sao_Paulo",
       rangeStart: { year: 2026, month: 11, day: 1 },
       rangeEnd: { year: 2026, month: 11, day: 1 },

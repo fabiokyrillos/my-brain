@@ -99,6 +99,15 @@ type ReminderRow = {
   task_id: string | null;
 };
 
+type EventRow = {
+  id: string;
+  title: string;
+  starts_at: string;
+  ends_at: string | null;
+  all_day: boolean;
+  source_entry_id: string | null;
+};
+
 type SummaryRow = {
   id: string;
   period_start: string;
@@ -233,7 +242,7 @@ export async function loadCalendarProjection(
   const wanted = new Set<CalendarLane>(query.lanes);
   const failedLanes: CalendarLaneFailure[] = [];
 
-  const [deadlines, intentions, reminders, reviews, suggestions] = await Promise.all([
+  const [deadlines, intentions, reminders, reviews, suggestions, events] = await Promise.all([
     wanted.has("deadline")
       ? readLane<TaskRow>(() => supabase
         .from("tasks")
@@ -278,20 +287,36 @@ export async function loadCalendarProjection(
         .gte("occurred_at", startIso)
         .lt("occurred_at", endIso))
       : Promise.resolve([] as readonly SuggestionRow[]),
+    /*
+      Life Brain C.3 (ADR-152). Confirmed events that overlap the window: they
+      start before it ends, and end (or, with no end, start) at or after it
+      begins. A cancelled event is the owner's "not happening" and is not drawn.
+    */
+    wanted.has("event")
+      ? readLane<EventRow>(() => supabase
+        .from("events")
+        .select("id,title,starts_at,ends_at,all_day,source_entry_id")
+        .eq("user_id", userId)
+        .eq("status", "confirmed")
+        .lt("starts_at", endIso)
+        .or(`ends_at.gte.${startIso},and(ends_at.is.null,starts_at.gte.${startIso})`))
+      : Promise.resolve([] as readonly EventRow[]),
   ]);
 
   for (const [lane, rows] of [
     ["deadline", deadlines], ["intention", intentions], ["reminder", reminders],
-    ["review", reviews], ["suggestion", suggestions],
+    ["review", reviews], ["suggestion", suggestions], ["event", events],
   ] as const) {
     if (rows === null && wanted.has(lane)) failedLanes.push({ lane });
   }
 
   const taskRows = [...(deadlines ?? []), ...(intentions ?? [])];
   const reminderRows = reminders ?? [];
+  const eventRows = events ?? [];
   const sourceLevels = await loadSourceLevels(supabase, userId, [
     ...taskRows.map((row) => row.source_entry_id),
     ...reminderRows.map((row) => row.entry_id),
+    ...eventRows.map((row) => row.source_entry_id),
   ]);
   /*
     `2R-SURFACE-003`. Asked in the calendar's own terms -- these reminder ids,
@@ -358,8 +383,8 @@ export async function loadCalendarProjection(
     reminders projection already fell into once.
   */
   const push = (
-    item: Omit<CalendarItemView, "date" | "elapsed" | "commitment" | "repeats" | "joinedReminders">
-      & { readonly repeats?: string | null },
+    item: Omit<CalendarItemView, "date" | "elapsed" | "commitment" | "repeats" | "joinedReminders" | "span">
+      & { readonly repeats?: string | null; readonly span?: CalendarItemView["span"] },
   ) => {
     const at = new Date(item.at);
     if (!Number.isFinite(at.getTime())) {
@@ -375,6 +400,7 @@ export async function loadCalendarProjection(
       elapsed: at.getTime() < nowMs,
       repeats: item.repeats ?? null,
       joinedReminders: [],
+      span: item.span ?? null,
     });
   };
 
@@ -457,6 +483,37 @@ export async function loadCalendarProjection(
       // than none, and the occurrence still appears either way.
       repeats: repeatLabels.get(row.id) ?? null,
     });
+  }
+
+  /*
+    Life Brain C.3 (ADR-152). An event sits on every local day of the window it
+    covers: its first day at its own instant, each later day at that day's
+    start, so a trip from the 3rd to the 10th is on all eight squares. The
+    sensitivity is its source record's, derived exactly as a task's is.
+  */
+  for (const row of eventRows) {
+    const startMs = new Date(row.starts_at).getTime();
+    const endMs = row.ends_at === null ? startMs : new Date(row.ends_at).getTime();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) {
+      if (!failedLanes.some((failure) => failure.lane === "event")) failedLanes.push({ lane: "event" });
+      continue;
+    }
+    const firstDay = localDateOf(new Date(Math.max(startMs, bounds.start)), timezone);
+    const lastDay = localDateOf(new Date(Math.min(endMs, bounds.end - 1)), timezone);
+    for (let day = firstDay; compareLocalDates(day, lastDay) <= 0; day = addLocalDays(day, 1)) {
+      const dayStart = localDayBoundsForDate(day, timezone).start;
+      const at = dayStart <= startMs ? row.starts_at : new Date(dayStart).toISOString();
+      push({
+        id: `event:${row.id}:${formatLocalDate(day)}`,
+        lane: "event",
+        at,
+        title: row.title,
+        sensitivity: deriveTaskSensitivity(row.source_entry_id, sourceLevels),
+        href: row.source_entry_id ? `/${locale}/app/inbox/${row.source_entry_id}` : null,
+        reschedule: null,
+        span: { allDay: row.all_day, startsAt: row.starts_at, endsAt: row.ends_at },
+      });
+    }
   }
 
   for (const row of reviews ?? []) {

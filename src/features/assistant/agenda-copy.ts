@@ -18,7 +18,7 @@ import type { Locale } from "@/lib/preferences";
 export type AgendaPeriodPhrase = { readonly lead: string; readonly after: string };
 
 /** The lanes an agenda answer reads (`agendaQueryFor`). */
-export type AgendaLane = Extract<CalendarLane, "deadline" | "intention" | "reminder">;
+export type AgendaLane = Extract<CalendarLane, "deadline" | "intention" | "reminder" | "event">;
 
 export type AgendaCopy = {
   readonly periods: {
@@ -71,9 +71,9 @@ const AGENDA_COPY = {
     },
     found: (lead, count) => `${lead}, você tem ${count} ${count === 1 ? "item" : "itens"} na agenda:`,
     empty: (after) => `Não encontrei nada na sua agenda ${after}.`,
-    lanes: { deadline: "prazo", intention: "planejado", reminder: "lembrete" },
+    lanes: { deadline: "prazo", intention: "planejado", reminder: "lembrete", event: "evento" },
     joinedReminder: (times) => `lembrete às ${times}`,
-    laneNames: { deadline: "os prazos", intention: "as tarefas planejadas", reminder: "os lembretes" },
+    laneNames: { deadline: "os prazos", intention: "as tarefas planejadas", reminder: "os lembretes", event: "os eventos" },
     joinLanes: joinWith("e"),
     partial: (lanes) => `Não consegui ler ${lanes} agora, então pode haver mais.`,
     maskedItem: "item protegido",
@@ -99,9 +99,9 @@ const AGENDA_COPY = {
     },
     found: (lead, count) => `${lead}, you have ${count} ${count === 1 ? "item" : "items"} on your agenda:`,
     empty: (after) => `I found nothing on your agenda ${after}.`,
-    lanes: { deadline: "deadline", intention: "planned", reminder: "reminder" },
+    lanes: { deadline: "deadline", intention: "planned", reminder: "reminder", event: "event" },
     joinedReminder: (times) => `reminder at ${times}`,
-    laneNames: { deadline: "the deadlines", intention: "the planned tasks", reminder: "the reminders" },
+    laneNames: { deadline: "the deadlines", intention: "the planned tasks", reminder: "the reminders", event: "the events" },
     joinLanes: joinWith("and"),
     partial: (lanes) => `I could not read ${lanes} right now, so there may be more.`,
     maskedItem: "protected item",

@@ -77,6 +77,7 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     elapsed: false,
     reschedule: { taskId: TASK_ID, controls: schedulingControlsFor("todo") },
     joinedReminders: [],
+    span: null,
     ...overrides,
   };
 }
