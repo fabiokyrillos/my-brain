@@ -1,6 +1,6 @@
 import "server-only";
 import { z } from "zod";
-import { conceptSchema, entryExtractionSchema, pendingQuestionSchema, taskCandidateSchema } from "@/lib/ai/extraction-schema";
+import { conceptSchema, pendingQuestionSchema, storedEntryExtractionSchema, taskCandidateSchema } from "@/lib/ai/extraction-schema";
 import type { Database } from "@/lib/supabase/database.types";
 import type { createClient } from "@/lib/supabase/server";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -294,7 +294,7 @@ export async function loadInterpretationReview(supabase: SupabaseClient, entryId
   const currentRow = selectCurrentInterpretation(entry, interpretationRows);
   const revisions = interpretationRows.map((row) => parseInterpretationRevision(row, links, names, entry.occurred_at));
   const current = currentRow ? revisions.find((revision) => revision.id === currentRow.id) ?? null : null;
-  const extraction = currentRow ? entryExtractionSchema.safeParse(currentRow.raw_output) : null;
+  const extraction = currentRow ? storedEntryExtractionSchema.safeParse(currentRow.raw_output) : null;
   const candidateResolutionHistory = projectCandidateResolutionHistory(interpretationRows, candidateResolutions);
   return {
     entry,

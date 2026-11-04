@@ -2,6 +2,7 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { requireServiceData, requireServiceSuccess } from "../_shared/result.ts";
 import { rankEntityCandidates, type EntityCandidate, type EntityType } from "../_shared/entity-resolution.ts";
 import { buildExtractionElementTrust } from "../_shared/trust-builders.ts";
+import { lifeAreaToLink } from "../_shared/life-area.ts";
 import {
   describeExtractionIssues,
   validateExtraction,
@@ -50,8 +51,8 @@ async function fetchProvider(url: string, init: RequestInit): Promise<Response> 
 // (verified in node_modules/server-only/index.js), so it is not portable to
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
-const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-const EXTRACTION_PROMPT_VERSION = "2026-08-22.1";
+const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v2";
+const EXTRACTION_PROMPT_VERSION = "2026-11-04.1";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -82,6 +83,16 @@ Examples of that line:
 - "Assinei o contrato com a Ambev" -> organizations: Ambev. people: none, because naming a company names no person.
 - "Falar com o pessoal do jurídico" -> people: none, because no individual is named. If who is meant changes the action, add a pending question rather than choosing a name.
 
+Life area:
+- lifeArea: the one area of life the entry is mostly about, from a fixed list: health (consultations, exams, medication, symptoms, therapy), family (relatives, partner, children, birthdays, family events), home (the house, repairs, cleaning, groceries, things for the home), finance (bills, payments, salary, taxes, banking, purchases as spending), travel (trips, flights, hotels, the documents and bookings of a trip), work (the job, clients, colleagues, deliverables), study (courses, classes, exams for a course, reading to learn), leisure (hobbies, sport, friends, entertainment), ideas (an idea worth keeping, not yet a plan), other (none of these). Pick the area the entry is about, not a word it mentions. confidence says how clearly the entry belongs there. Use null only when the entry is too short or empty to tell.
+
+Examples of the area:
+- "Fui no cardiologista hoje, Dr. Silva" -> lifeArea: health. people: Dr. Silva.
+- "Paguei R$ 350 de conta de luz" -> lifeArea: finance.
+- "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> lifeArea: travel.
+- "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
+- "Reunião do Projeto Aurora com a Marina" -> lifeArea: work.
+
 Known concept identifiers are fixed by the response schema.`;
 
 const CONCEPTS = [
@@ -109,7 +120,7 @@ const entryExtractionSchema = {
   required: [
     "language", "occurredAt", "isRetroactive", "summary", "concepts",
     "contexts", "organizations", "projects", "people",
-    "taskCandidates", "pendingQuestions", "confidence",
+    "taskCandidates", "pendingQuestions", "lifeArea", "confidence",
   ],
   properties: {
     language: { type: "string", enum: ["pt-BR", "en"] },
@@ -117,6 +128,17 @@ const entryExtractionSchema = {
     isRetroactive: { type: "boolean" },
     summary: { type: "string" },
     concepts: { type: "array", items: { type: "string", enum: CONCEPTS }, minItems: 1 },
+    // Life Brain C.1 (ADR-148). Required and nullable, like every optional
+    // fact in a strict schema; the enum mirrors `LIFE_AREAS`.
+    lifeArea: {
+      type: ["object", "null"],
+      additionalProperties: false,
+      required: ["kind", "confidence"],
+      properties: {
+        kind: { type: "string", enum: ["health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other"] },
+        confidence: { type: "number" },
+      },
+    },
     contexts: { type: "array", items: entityCandidateSchema },
     organizations: { type: "array", items: entityCandidateSchema },
     projects: { type: "array", items: entityCandidateSchema },
@@ -585,6 +607,30 @@ export async function processEntryJob(
         p_service_user_id: job.user_id,
       });
       if (persist.error) throw new JobFailure("persistence_failed");
+    }
+
+    /*
+     * Life Brain C.1 (ADR-148). The entry's life area, after the reading it
+     * belongs to is persisted. Non-blocking for the same reason the embedding
+     * is: an area that cannot be linked never destroys an interpretation. The
+     * RPC links the CURRENT interpretation, so a reprocessed entry is linked
+     * on its new reading, and it gives health and finance their default
+     * sensitivity unless the owner already chose one.
+     */
+    const area = lifeAreaToLink(extracted.extraction.lifeArea);
+    if (area !== null) {
+      try {
+        const linked = await service.rpc("link_entry_life_area", {
+          p_entry_id: entryId,
+          p_kind: area.kind,
+          p_confidence: area.confidence,
+          p_locale: extracted.extraction.language,
+          p_service_user_id: job.user_id,
+        });
+        if (linked.error) throw new JobFailure("persistence_failed");
+      } catch (areaError) {
+        console.error("Entry life area link failed", { code: classifyJobFailure(areaError) });
+      }
     }
 
     try {

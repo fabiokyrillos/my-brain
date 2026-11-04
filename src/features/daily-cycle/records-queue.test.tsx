@@ -124,3 +124,20 @@ describe("Registros as a decision queue", () => {
     expect(within(screen.getByRole("listitem")).getByText(/quando/i)).toBeInTheDocument();
   });
 });
+
+describe("Life Brain C.1: the record's life area", () => {
+  it("names the area beside the owner's words", () => {
+    renderQueue([item({ lifeArea: "health" })]);
+    expect(screen.getByText("Saúde")).toHaveClass("ui-badge", "records-area");
+  });
+
+  it("says nothing when the record has no area", () => {
+    const { container } = renderQueue([item()]);
+    expect(container.querySelector(".records-area")).toBeNull();
+  });
+
+  it("names it in English too", () => {
+    renderQueue([item({ lifeArea: "finance" })], "en");
+    expect(screen.getByText("Finance")).toBeInTheDocument();
+  });
+});

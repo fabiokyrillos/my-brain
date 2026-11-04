@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Badge } from "@/components/ui";
+import { contextKindLabel } from "@/features/vocabulary/copy";
 import { formatInstant } from "@/lib/time/instant-format";
 import { getDailyCycleCopy, type DailyCycleLocale } from "./copy";
 import { getRecordsCopy } from "./records-copy";
@@ -116,6 +118,10 @@ function RecordRow({
           {/* The owner's own words, quoted. The interpretation summary is not
               what identifies a record in a queue about deciding on it. */}
           <span className="records-original">{item.originalPreview}</span>
+          {/* Life Brain C.1: the area of life this record was filed under. */}
+          {item.lifeArea ? (
+            <Badge className="records-area" size="sm">{contextKindLabel(locale, item.lifeArea)}</Badge>
+          ) : null}
         </span>
 
         <span className="records-proposal">{proposalFor(item, locale)}</span>

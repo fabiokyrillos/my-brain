@@ -15,6 +15,7 @@ import {
   relationshipEndSchema,
   projectUpdateSchema,
   PROJECT_STATUSES,
+  CREATABLE_CONTEXT_KINDS,
 } from "./schema";
 import { RELATIONSHIP_TYPES } from "./relationship-vocabulary";
 
@@ -181,8 +182,10 @@ describe("the context schemas", () => {
     expect(contextCreateSchema.safeParse(create({ name: "x".repeat(121) })).success).toBe(false);
   });
 
-  it("accepts exactly the three kinds the CHECK allows", () => {
-    for (const kind of CONTEXT_KINDS) {
+  it("lets the owner create exactly the three hand-made kinds", () => {
+    // Life Brain C.1 (LB-M1): the CHECK admits eight life areas too, but the
+    // product creates those, one per owner; the form never offers them.
+    for (const kind of CREATABLE_CONTEXT_KINDS) {
       expect(contextCreateSchema.safeParse(create({ kind })).success, kind).toBe(true);
     }
     expect(contextCreateSchema.safeParse(create({ kind: "family" })).success).toBe(false);
@@ -296,10 +299,11 @@ describe("asContextKind", () => {
   });
 
   it("folds an unrecognised stored value to custom rather than throwing", () => {
-    // `contexts.kind` is `text` with a CHECK, so a value outside the three is a
-    // data fault. A detail page must render it, not crash on it — and `custom`
-    // is the kind that promises the reader least about the row.
-    expect(asContextKind("family")).toBe("custom");
+    // `contexts.kind` is `text` with a CHECK, so a value outside the eleven is
+    // a data fault. A detail page must render it, not crash on it — and
+    // `custom` is the kind that promises the reader least about the row.
+    // ("family" was the example here until LB-M1 made it a life area.)
+    expect(asContextKind("pets")).toBe("custom");
     expect(asContextKind("")).toBe("custom");
   });
 });

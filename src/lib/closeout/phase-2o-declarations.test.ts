@@ -592,9 +592,17 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
       laterNotifyHeartbeat,
       `ADR-144 is allocated exactly one migration: ${laterNotifyHeartbeat.join(", ")}`,
     ).toHaveLength(1);
+    // Life Brain (ADR-145 Decision 7): three migrations allocated, LB-M1/M2/M3,
+    // each one only with the owner's authorization for its PR. A fourth is a
+    // stop condition, so the ceiling is asserted here as well.
+    const laterLifeBrain = migrations.filter((name) => /life_brain_m[123]_/i.test(name));
+    expect(
+      laterLifeBrain.length,
+      `Life Brain is allocated at most three migrations: ${laterLifeBrain.join(", ")}`,
+    ).toBeLessThanOrEqual(3);
     expect(migrations).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
-      + laterPhase2s.length + laterNotifyHeartbeat.length,
+      + laterPhase2s.length + laterNotifyHeartbeat.length + laterLifeBrain.length,
     );
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);

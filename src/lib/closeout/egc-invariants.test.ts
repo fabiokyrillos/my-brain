@@ -156,7 +156,11 @@ const REPO = resolve(__dirname, "../../..");
 // reasoning as every move before it — moved in the commit that adds the
 // migration, visibly, and Entity Graph Completion still spends nothing, which
 // is the only claim this constant makes.
-const AUTHORIZED_MIGRATION_HEAD = "202610280103";
+// Chain head moved to 202611040104 by Life Brain LB-M1 (slice C.1, ADR-148):
+// life areas as contexts, the migration ADR-145 allocated and the owner
+// authorized for its PR (LB-OD-9). Moved in the commit that adds it; Entity
+// Graph Completion still spends nothing.
+const AUTHORIZED_MIGRATION_HEAD = "202611040104";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

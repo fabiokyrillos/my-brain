@@ -393,3 +393,33 @@ describe("toWorkItemView task graph (Slice 2C.5)", () => {
     expect(work).toBeNull();
   });
 });
+
+/*
+ * Life Brain C.1 (`LB-C-001`, ADR-148). A record carries the life area its
+ * current reading was linked to, and the mapper admits only the eight areas:
+ * a context that is not an area (work, personal, custom) or a value it does not
+ * know is no area at all, never a chip with a raw token in it.
+ */
+describe("the record's life area", () => {
+  const source = {
+    entryId: "entry-1",
+    title: "Consulta no cardiologista",
+    originalPreview: "Fui no cardiologista hoje, Dr. Silva.",
+    significantAt: occurredAt,
+    originalPreserved: true,
+    availableActions: entryActions,
+    lifecycle: { entryLifecycle: "completed", hasValidTaskCandidates: false },
+  };
+
+  it("carries a known area", () => {
+    const item = map(mappers.toInboxItemView, { ...source, lifeArea: "health" } as InboxItemSource) as Record<string, unknown>;
+    expect(item.lifeArea).toBe("health");
+  });
+
+  it("carries no area for a non-area kind, an unknown token, or none", () => {
+    for (const lifeArea of ["custom", "work", "personal", "pets", "", null, undefined]) {
+      const item = map(mappers.toInboxItemView, { ...source, lifeArea } as InboxItemSource) as Record<string, unknown>;
+      expect(item, String(lifeArea)).not.toHaveProperty("lifeArea");
+    }
+  });
+});

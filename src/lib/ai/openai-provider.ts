@@ -73,8 +73,8 @@ function normalizeTranscriptionUsage(response: unknown): AIUsageDetails {
   };
 }
 
-export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v1";
-export const EXTRACTION_PROMPT_VERSION = "2026-08-22.1";
+export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v2";
+export const EXTRACTION_PROMPT_VERSION = "2026-11-04.1";
 
 /** Explicit ceiling per provider call. See the constructor for why. */
 export const NODE_OPENAI_TIMEOUT_MS = 120_000;
@@ -126,6 +126,16 @@ Examples of that line:
 - "Reunião do Projeto Aurora com a Marina" -> people: Marina. projects: Aurora. organizations: none.
 - "Assinei o contrato com a Ambev" -> organizations: Ambev. people: none, because naming a company names no person.
 - "Falar com o pessoal do jurídico" -> people: none, because no individual is named. If who is meant changes the action, add a pending question rather than choosing a name.
+
+Life area:
+- lifeArea: the one area of life the entry is mostly about, from a fixed list: health (consultations, exams, medication, symptoms, therapy), family (relatives, partner, children, birthdays, family events), home (the house, repairs, cleaning, groceries, things for the home), finance (bills, payments, salary, taxes, banking, purchases as spending), travel (trips, flights, hotels, the documents and bookings of a trip), work (the job, clients, colleagues, deliverables), study (courses, classes, exams for a course, reading to learn), leisure (hobbies, sport, friends, entertainment), ideas (an idea worth keeping, not yet a plan), other (none of these). Pick the area the entry is about, not a word it mentions. confidence says how clearly the entry belongs there. Use null only when the entry is too short or empty to tell.
+
+Examples of the area:
+- "Fui no cardiologista hoje, Dr. Silva" -> lifeArea: health. people: Dr. Silva.
+- "Paguei R$ 350 de conta de luz" -> lifeArea: finance.
+- "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> lifeArea: travel.
+- "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
+- "Reunião do Projeto Aurora com a Marina" -> lifeArea: work.
 
 Known concept identifiers are fixed by the response schema.`;
 

@@ -2,7 +2,9 @@
 
 ## Extração
 
-O original é salvo antes de qualquer chamada. A OpenAI recebe o texto como dado não confiável e retorna um schema validado com idioma, data, retroatividade, resumo, 19 conceitos, contextos, organizações, projetos, pessoas, tarefas candidatas, perguntas e confiança.
+O original é salvo antes de qualquer chamada. A OpenAI recebe o texto como dado não confiável e retorna um schema validado com idioma, data, retroatividade, resumo, 19 conceitos, contextos, organizações, projetos, pessoas, tarefas candidatas, perguntas, **área da vida** e confiança.
+
+Desde o Life Brain C.1 (ADR-148, prompt `2026-11-04.1`, estratégia `entry-extraction-v2`), a extração devolve `lifeArea: { kind, confidence } | null`, com `kind` num vocabulário fechado: `health`, `family`, `home`, `finance`, `travel`, `work`, `study`, `leisure`, `ideas`, `other`. O prompt define cada área e traz exemplos de vida ao lado dos corporativos. Depois de persistir a interpretação, o worker chama `link_entry_life_area` quando `confidence ≥ 0,6` e a área não é `other`: o registro é ligado ao contexto da área (criado sob demanda, um por dono), e saúde e finanças ficam `private` se ainda eram `normal` e o dono nunca escolheu um nível. Uma falha nesse passo não derruba a interpretação.
 
 O perfil padrão prioriza qualidade: chat e revisões usam `gpt-5.6-terra`, extração e arquivos usam `gpt-5.6-luna`, rotinas previsíveis usam `gpt-5-mini` e embeddings usam `text-embedding-3-small`. Perfis e overrides por operação são validados nas Configurações; variáveis server-only continuam como fallback operacional.
 

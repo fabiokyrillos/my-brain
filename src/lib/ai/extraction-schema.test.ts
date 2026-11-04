@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { entryExtractionSchema } from "./extraction-schema";
+import { LIFE_AREAS, entryExtractionSchema, storedEntryExtractionSchema } from "./extraction-schema";
 
 const validExtraction = {
   language: "pt-BR",
@@ -14,6 +14,7 @@ const validExtraction = {
     { name: "Jaime", confidence: 0.99, evidence: "Jaime pediu", inferred: false },
     { name: "Maria", confidence: 0.99, evidence: "conversar com Maria", inferred: false },
   ],
+  lifeArea: { kind: "work", confidence: 0.95 },
   taskCandidates: [
     {
       title: "Atualizar o relatório de Next Cruise",
@@ -40,5 +41,40 @@ describe("entryExtractionSchema", () => {
 
   it("rejects malformed occurred dates", () => {
     expect(entryExtractionSchema.safeParse({ ...validExtraction, occurredAt: "next friday" }).success).toBe(false);
+  });
+});
+
+/*
+ * Life Brain C.1 (`LB-C-002`, ADR-148). The model returns one life area per
+ * entry, or null, from a closed vocabulary; the strict schema requires the key.
+ * A row stored before C.1 has no key at all, and reading it must not fail —
+ * that is what `storedEntryExtractionSchema` is for.
+ */
+describe("lifeArea", () => {
+  const withoutLifeArea: Record<string, unknown> = { ...validExtraction };
+  delete withoutLifeArea.lifeArea;
+
+  it("is a closed vocabulary of ten, with other as the escape and no legacy kinds", () => {
+    expect([...LIFE_AREAS]).toEqual(["health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other"]);
+  });
+
+  it("accepts every area and null", () => {
+    for (const kind of LIFE_AREAS) {
+      expect(entryExtractionSchema.safeParse({ ...validExtraction, lifeArea: { kind, confidence: 0.7 } }).success, kind).toBe(true);
+    }
+    expect(entryExtractionSchema.safeParse({ ...validExtraction, lifeArea: null }).success).toBe(true);
+  });
+
+  it("refuses an unknown area, a confidence outside 0–1 and a missing key from the model", () => {
+    expect(entryExtractionSchema.safeParse({ ...validExtraction, lifeArea: { kind: "pets", confidence: 0.7 } }).success).toBe(false);
+    expect(entryExtractionSchema.safeParse({ ...validExtraction, lifeArea: { kind: "personal", confidence: 0.7 } }).success).toBe(false);
+    expect(entryExtractionSchema.safeParse({ ...validExtraction, lifeArea: { kind: "home", confidence: 1.2 } }).success).toBe(false);
+    expect(entryExtractionSchema.safeParse(withoutLifeArea).success).toBe(false);
+  });
+
+  it("reads a row stored before C.1 as having no area, rather than refusing it", () => {
+    const parsed = storedEntryExtractionSchema.safeParse(withoutLifeArea);
+    expect(parsed.success).toBe(true);
+    expect(parsed.success && parsed.data.lifeArea).toBeNull();
   });
 });

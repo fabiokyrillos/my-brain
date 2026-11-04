@@ -1,3 +1,4 @@
+import type { LifeAreaKind } from "@/features/vocabulary/copy";
 import type { SensitivityLevel } from "@/features/sensitivity/contracts";
 import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
 
@@ -188,6 +189,12 @@ export type InboxItemView = {
    * would deny them.
    */
   readonly isRecordOnly: boolean;
+  /**
+   * Life Brain C.1 (`LB-C-001`, ADR-148) — the life area the current reading
+   * was linked to. Absent when there is none: an entry with no area is the
+   * common case, and a row must not carry a chip it cannot name.
+   */
+  readonly lifeArea?: LifeAreaKind;
 };
 
 export type NeedsAttentionItemView = {

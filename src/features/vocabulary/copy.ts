@@ -46,8 +46,20 @@ export const PROJECT_STATUSES = ["active", "paused", "completed", "archived"] as
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
 /** `public.contexts.kind` — `202607160003:6`. */
-export const CONTEXT_KINDS = ["work", "personal", "custom"] as const;
+export const CONTEXT_KINDS = [
+  "work", "personal", "custom",
+  // Life Brain C.1 (LB-M1, ADR-148): the eight life areas.
+  "health", "family", "home", "finance", "travel", "study", "leisure", "ideas",
+] as const;
 export type ContextKind = (typeof CONTEXT_KINDS)[number];
+
+/** The eight kinds that are life areas (LB-M1) — a subset of `CONTEXT_KINDS`. */
+export const LIFE_AREA_KINDS = ["health", "family", "home", "finance", "travel", "study", "leisure", "ideas"] as const;
+export type LifeAreaKind = (typeof LIFE_AREA_KINDS)[number];
+
+export function isLifeAreaKind(value: unknown): value is LifeAreaKind {
+  return typeof value === "string" && (LIFE_AREA_KINDS as readonly string[]).includes(value);
+}
 
 /** `public.memories.kind` — mirrors `memories/schema.ts`, asserted by the drift test. */
 export const MEMORY_KINDS = [
@@ -137,6 +149,14 @@ const ptBR: VocabularyCopy = {
     work: "Trabalho",
     personal: "Pessoal",
     custom: "Personalizado",
+    health: "Saúde",
+    family: "Família",
+    home: "Casa",
+    finance: "Finanças",
+    travel: "Viagens",
+    study: "Estudos",
+    leisure: "Lazer",
+    ideas: "Ideias",
   },
   memoryKinds: {
     preference: "Preferência",
@@ -200,6 +220,14 @@ const en: VocabularyCopy = {
     work: "Work",
     personal: "Personal",
     custom: "Custom",
+    health: "Health",
+    family: "Family",
+    home: "Home",
+    finance: "Finance",
+    travel: "Travel",
+    study: "Study",
+    leisure: "Leisure",
+    ideas: "Ideas",
   },
   memoryKinds: {
     preference: "Preference",

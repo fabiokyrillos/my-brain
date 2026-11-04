@@ -151,11 +151,15 @@ describe("Life Brain C.0 — destinations named for a whole life", () => {
     expect(offending).toEqual([]);
   });
 
-  it("leaves the extraction prompt alone (C.0 is copy only; C.1 owns the prompt)", () => {
+  it("left the extraction prompt to C.1, which extended it rather than replacing it", () => {
+    // C.0 pinned the version at "2026-08-22.1" and said C.1 would move it on
+    // purpose. C.1 did (ADR-148): the life-area section was added and the
+    // corporate examples stay beside it (`LB-C-007` extends, never replaces).
     for (const file of ["src/lib/ai/openai-provider.ts", "supabase/functions/process-jobs/entry.ts"]) {
       const source = readFileSync(join(REPO, file), "utf8");
-      expect(source, file).toContain('EXTRACTION_PROMPT_VERSION = "2026-08-22.1"');
+      expect(source, file).toContain('EXTRACTION_PROMPT_VERSION = "2026-11-04.1"');
       expect(source, file).toContain("such as Trabalho, Casa, Saúde or Estudos.");
+      expect(source, file).toContain("Assinei o contrato com a Ambev");
     }
   });
 });

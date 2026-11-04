@@ -134,6 +134,9 @@ export const HISTORY_ACTION_TYPES = [
   // stays, and what moved is an attribute of it.
   "automation_policy_changed",
   "entry_person_candidates_resolved",
+  // Life Brain C.1 (ADR-148): written by `link_entry_life_area` and `set_entry_sensitivity`.
+  "entry_life_area_linked",
+  "entry_sensitivity_set",
   "entry_person_candidates_undone",
   "entry_interpretation_failed",
   "entry_interpreted",
@@ -254,6 +257,10 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   entry_interpretation_correction_undone: "undone",
   automation_policy_changed: "changed",
   entry_person_candidates_resolved: "created",
+  // Life Brain C.1 (ADR-148). Filing a record under an area and setting its
+  // sensitivity both change an attribute of a record that stays.
+  entry_life_area_linked: "changed",
+  entry_sensitivity_set: "changed",
   entry_person_candidates_undone: "undone",
   entry_interpretation_failed: "failed",
   entry_interpreted: "interpreted",

@@ -78,6 +78,23 @@ export const pendingQuestionSchema = z.object({
   confidence: z.number().min(0).max(1),
 });
 
+/**
+ * Life Brain C.1 (`LB-C-001`/`-002`, ADR-148) — the area of life an entry is
+ * mostly about. A closed vocabulary: the first nine are areas a context can
+ * have (`contexts.kind`, migration LB-M1); `other` is the honest answer when
+ * none fits, and links nothing. The legacy kinds `personal` and `custom` are
+ * not areas and the model may not return them.
+ */
+export const LIFE_AREAS = [
+  "health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other",
+] as const;
+export type LifeArea = (typeof LIFE_AREAS)[number];
+
+export const lifeAreaSchema = z.object({
+  kind: z.enum(LIFE_AREAS),
+  confidence: z.number().min(0).max(1),
+});
+
 export const entryExtractionSchema = z.object({
   language: z.enum(["pt-BR", "en"]),
   occurredAt: storableInstant,
@@ -90,7 +107,19 @@ export const entryExtractionSchema = z.object({
   people: z.array(entityCandidateSchema),
   taskCandidates: z.array(taskCandidateSchema),
   pendingQuestions: z.array(pendingQuestionSchema),
+  // Required and nullable: the provider's strict schema requires every key.
+  lifeArea: lifeAreaSchema.nullable(),
   confidence: z.number().min(0).max(1),
+});
+
+/**
+ * The same contract for reading what is **already stored**. Every
+ * `raw_output` written before C.1 lacks `lifeArea`; reading one must yield
+ * "no area", not a failed parse that would hide the rest of the reading.
+ * Never used for provider output, which must carry the key.
+ */
+export const storedEntryExtractionSchema = entryExtractionSchema.extend({
+  lifeArea: lifeAreaSchema.nullable().default(null),
 });
 
 export type EntryExtraction = z.infer<typeof entryExtractionSchema>;

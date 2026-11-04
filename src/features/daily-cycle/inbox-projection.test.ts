@@ -46,6 +46,10 @@ function clientMock(options: {
   openQuestions?: Array<{ entry_id: string }>;
   tasks?: InboxTaskRow[];
   resolutions?: InboxResolutionRow[];
+  /** Life Brain C.1: context links on the current readings, and those contexts. */
+  areaLinks?: Array<{ interpretation_id: string; entity_id: string }>;
+  areaContexts?: Array<{ id: string; kind: string }>;
+  areaReadFails?: boolean;
 } = {}) {
   const {
     entries = [entry()],
@@ -54,6 +58,9 @@ function clientMock(options: {
     openQuestions = [],
     tasks = [],
     resolutions = [],
+    areaLinks = [],
+    areaContexts = [],
+    areaReadFails = false,
   } = options;
 
   const stubs: Record<string, ReturnType<typeof queryStub>> = {
@@ -63,6 +70,8 @@ function clientMock(options: {
     pending_questions: queryStub({ data: openQuestions, error: null }),
     tasks: queryStub({ data: tasks, error: null }),
     entry_task_candidate_resolutions: queryStub({ data: resolutions, error: null }),
+    entry_entities: queryStub(areaReadFails ? { data: null, error: { message: "boom" } } : { data: areaLinks, error: null }),
+    contexts: queryStub({ data: areaContexts, error: null }),
   };
   const from = vi.fn((table: string) => stubs[table]);
   return { client: { from }, stubs, from };
@@ -428,3 +437,39 @@ describe("loadInboxProjection: views", () => {
     expect(stubs.entries.in).toHaveBeenCalledWith("status", ["awaiting_ai_configuration"]);
   });
 });
+
+describe("Life Brain C.1: the record's life area", () => {
+  const linked = {
+    entries: [entry({ id: "entry-1", current_interpretation_id: "int-1" }), entry({ id: "entry-2", current_interpretation_id: "int-2" })],
+    interpretations: [
+      { id: "int-1", summary: "Consulta", task_candidates: [] },
+      { id: "int-2", summary: "Reunião", task_candidates: [] },
+    ],
+    areaLinks: [
+      { interpretation_id: "int-1", entity_id: "ctx-health" },
+      { interpretation_id: "int-2", entity_id: "ctx-custom" },
+    ],
+    areaContexts: [{ id: "ctx-health", kind: "health" }, { id: "ctx-custom", kind: "custom" }],
+  };
+
+  it("reads the area of each record's current reading", async () => {
+    const { client, stubs } = clientMock(linked);
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items.find((item) => item.entryId === "entry-1")?.lifeArea).toBe("health");
+    // A context that is not an area is no area.
+    expect(page.items.find((item) => item.entryId === "entry-2")).not.toHaveProperty("lifeArea");
+    expect(stubs.entry_entities.eq).toHaveBeenCalledWith("entity_type", "context");
+    expect(stubs.entry_entities.in).toHaveBeenCalledWith("interpretation_id", ["int-1", "int-2"]);
+    expect(stubs.contexts.in).toHaveBeenCalledWith("kind", ["health", "family", "home", "finance", "travel", "study", "leisure", "ideas"]);
+  });
+
+  it("still renders every record when the area cannot be read", async () => {
+    const { client } = clientMock({ ...linked, areaReadFails: true });
+    const page = await loadInboxProjection(client as never, { locale: "pt-BR", page: 1 });
+
+    expect(page.items).toHaveLength(2);
+    expect(page.items.every((item) => item.lifeArea === undefined)).toBe(true);
+  });
+});
+

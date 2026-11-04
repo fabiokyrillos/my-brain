@@ -146,6 +146,12 @@ describe("Deno worker copies stay identical to their Node source", () => {
       // comparing two things that are not copies of each other.
       "lifecycle-gate.ts",
       "lifecycle-gate.test.ts",
+      // Life Brain C.1 (ADR-148): when the worker links an entry to its life
+      // area. Deno-owned: nothing in Node links an interpretation, because the
+      // worker is the only writer of readings. The threshold it applies is
+      // asserted a second time by `link_entry_life_area` in SQL.
+      "life-area.ts",
+      "life-area.test.ts",
       // Phase 2M slice 2M.4b's two, and they are opposite kinds of "not a copy".
       //
       //   * `notification-payload.ts` IS a second implementation of a Node

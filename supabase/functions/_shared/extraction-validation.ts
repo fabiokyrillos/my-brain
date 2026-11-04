@@ -50,8 +50,23 @@ export const EXTRACTION_CONCEPTS = [
 
 export const EXTRACTION_LANGUAGES = ["pt-BR", "en"] as const;
 
+/**
+ * Life Brain C.1 (ADR-148) — mirrors `LIFE_AREAS` in
+ * `src/lib/ai/extraction-schema.ts`; `extraction-parity.test.ts` fails the
+ * build if the two ever accept or normalize a value differently.
+ */
+export const EXTRACTION_LIFE_AREAS = [
+  "health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other",
+] as const;
+
 export type ExtractionConcept = (typeof EXTRACTION_CONCEPTS)[number];
 export type ExtractionLanguage = (typeof EXTRACTION_LANGUAGES)[number];
+export type ExtractionLifeArea = (typeof EXTRACTION_LIFE_AREAS)[number];
+
+export type LifeAreaValue = {
+  kind: ExtractionLifeArea;
+  confidence: number;
+};
 
 export type EntityCandidateValue = {
   name: string;
@@ -88,6 +103,7 @@ export type ExtractionValue = {
   people: EntityCandidateValue[];
   taskCandidates: TaskCandidateValue[];
   pendingQuestions: PendingQuestionValue[];
+  lifeArea: LifeAreaValue | null;
   confidence: number;
 };
 
@@ -387,6 +403,30 @@ function readPendingQuestions(
  * source-of-truth Zod schema (the provider's own JSON Schema already sets
  * `additionalProperties: false`, so extra keys cannot arrive from OpenAI).
  */
+const LIFE_AREA_SET: ReadonlySet<string> = new Set(EXTRACTION_LIFE_AREAS);
+
+/**
+ * Required key, nullable value — the Zod schema's `lifeAreaSchema.nullable()`.
+ * A missing key is an issue (the provider's strict schema always sends it);
+ * `null` is a valid "the entry does not say".
+ */
+function readLifeArea(collector: Collector, raw: unknown): LifeAreaValue | null {
+  if (raw === null) return null;
+  if (raw === undefined) {
+    fail(collector, "lifeArea", "required");
+    return null;
+  }
+  if (!isPlainObject(raw)) {
+    fail(collector, "lifeArea", "expected_object");
+    return null;
+  }
+  const kind = typeof raw.kind === "string" && LIFE_AREA_SET.has(raw.kind) ? (raw.kind as ExtractionLifeArea) : null;
+  if (kind === null) fail(collector, "lifeArea.kind", "expected_enum");
+  const confidence = readNumber(collector, raw.confidence, "lifeArea.confidence", 0, 1);
+  if (kind === null || confidence === null) return null;
+  return { kind, confidence };
+}
+
 export function validateExtraction(input: unknown): ExtractionValidationResult {
   const collector: Collector = { issues: [] };
 
@@ -425,6 +465,7 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
   const people = readEntityCandidates(collector, input.people, "people");
   const taskCandidates = readTaskCandidates(collector, input.taskCandidates, "taskCandidates");
   const pendingQuestions = readPendingQuestions(collector, input.pendingQuestions, "pendingQuestions");
+  const lifeArea = readLifeArea(collector, input.lifeArea);
   const confidence = readNumber(collector, input.confidence, "confidence", 0, 1);
 
   if (collector.issues.length > 0) {
@@ -445,6 +486,7 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
       people,
       taskCandidates,
       pendingQuestions,
+      lifeArea,
       confidence: confidence as number,
     },
   };
