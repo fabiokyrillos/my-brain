@@ -186,12 +186,15 @@ select lives_ok(
   'a 160-character organization name is accepted, which is a different bound from the context one'
 );
 
+-- `family` was the example here until Life Brain LB-M1 (`202611040104`,
+-- ADR-148) made it one of the eight life areas the CHECK now admits; the
+-- property is unchanged — a kind outside the vocabulary is refused.
 select throws_ok(
   $$ insert into public.contexts (user_id, name, kind)
-     values ('e6c00001-0000-4000-8000-000000000001', 'Bad kind', 'family') $$,
+     values ('e6c00001-0000-4000-8000-000000000001', 'Bad kind', 'pets') $$,
   '23514',
   null::text,
-  'a kind outside the three the CHECK allows is refused, which is what contextCreateSchema turns into a sentence'
+  'a kind outside the vocabulary the CHECK allows is refused, which is what contextCreateSchema turns into a sentence'
 );
 
 -- ---------------------------------------------------------------------------
