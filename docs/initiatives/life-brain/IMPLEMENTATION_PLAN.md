@@ -47,6 +47,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 - Aceite: primeira tarefa ≤ 180px no iPhone; "Adicionar" não quebra; ≤ 2 tipos de controle de seleção.
 - **Parte 1 implementada 2026-11-03:** `PageHeader compact`, quick-add com `IconButton` (não quebra), `SegmentedControl` das visões, filtros atrás de um botão `ghost` com contagem, `Badge` nos chips. Falta: linhas `ListItem`, `Sheet`, `candidate-editor`, retirar `button-primary/secondary`, e a meta de 180px.
 - **Parte 2 implementada 2026-11-03:** quick-add atrás do "+" do cabeçalho; visões e barra de ferramentas numa linha só. Primeira tarefa no fixture: 286px (era ~380). Os modos Lista · Calendário · Planejar **ficam até A.4** (sair só daqui deixaria uma aba "Lista" de mão única em Calendário e Planejar); A.4 os remove de todas as páginas de uma vez.
+- **Parte 3 implementada 2026-11-04:** linhas em três posições (seleção · título + uma linha de meta · estado + ações); no celular, as ações num painel de baixo atrás de um "⋯" — o `ConfirmDialog` existente apresentado de baixo, via portal (o `Sheet` é a apresentação, não um segundo modal); sem gestos. `candidate-editor`: 11 ternários para o registro tipado. Ficam: `button-primary/secondary` (9 consumidores fora de Tarefas) e a meta de 180px (A.4).
 
 ### A.4 — Agenda (2 d)
 
