@@ -27,6 +27,9 @@ import { detectAgendaQuestion, type AgendaSpan } from "@/features/assistant/agen
 import { loadAgendaAnswer } from "@/features/assistant/agenda-answer";
 import type { ChatState } from "./chat-state";
 import { loadStructuredSources, type StructuredSourceClient } from "./structured-sources";
+import { retrieveKnowledge, type KnowledgeRpcClient } from "./knowledge-retrieval";
+import { byRecency, readTemporalQuestion, temporalWindowFor } from "./temporal-window";
+import { isSupportedTimeZone, localDateOf } from "@/lib/time/local-day";
 import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const chatInputSchema = z.object({
@@ -353,11 +356,28 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       sourceType: "conversation",
       sourceId: conversationId,
     });
-    const { data: matches, error: matchError } = await supabase.rpc("match_internal_knowledge", {
-      p_query_embedding: embedded.embedding,
-      p_match_count: 8,
+    /*
+     * Life Brain B.3 (`LB-B-007`, ADR-150). The zone is read before retrieval
+     * now, because a question about "semana passada" or "março" is retrieved
+     * inside that period of the OWNER's days. Tasks and reminders below use the
+     * same zone for their sentences.
+     */
+    const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+    const profile = requireSupabaseData(profileResult, "load chat profile");
+    const timezone = profile?.timezone ?? defaultAgentPreferences.timezone;
+    const temporal = readTemporalQuestion(parsed.data.question);
+    const window = temporal.span === null || !isSupportedTimeZone(timezone)
+      ? null
+      : temporalWindowFor(temporal.span, localDateOf(new Date(), timezone), timezone);
+    const { matches: retrieved, matchError } = await retrieveKnowledge(supabase as unknown as KnowledgeRpcClient, {
+      embedding: embedded.embedding,
+      window,
+      // Recency re-orders what came back, so it asks for the RPC's whole bound
+      // and keeps the newest eight that clear the floor (below).
+      count: temporal.recency ? 20 : 8,
     });
     if (matchError) throw matchError;
+    const matches = (retrieved ?? []) as KnowledgeRow[];
 
     // A memory the owner archived must stop being used, or "Archive" on the
     // Memories page is a label with nothing behind it (UX-10).
@@ -379,9 +399,9 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     // It costs one indexed lookup over at most 20 ids, and it shares
     // `isMemoryInForce` with both the badge the owner reads and the SQL
     // predicate, which `phase-2n-knowledge-guard.test.ts` holds together.
-    const relevant = ((matches ?? []) as KnowledgeRow[]).filter((match) => match.similarity >= 0.2);
+    const relevant = matches.filter((match) => match.similarity >= 0.2);
     const inForce = await memoriesInForce(supabase, relevant);
-    const vectorSources: ChatSource[] = relevant
+    const ranked: ChatSource[] = relevant
       .filter((match) => match.source_type !== "memory" || inForce.has(match.source_id))
       .map((match) => ({
         id: `${match.source_type}:${match.source_id}`,
@@ -390,17 +410,16 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         occurredAt: match.occurred_at,
         similarity: match.similarity,
       }));
+    // "Última vez", "recentemente", "quando foi": newest first, never fewer rows.
+    const vectorSources = temporal.recency ? byRecency(ranked).slice(0, 8) : ranked;
 
     /*
      * Life Brain B.2 (`LB-B-006`, ADR-147). Tasks and reminders have no vector,
      * so they are matched by their titles and appended after the ranked
-     * sources. The zone is read here rather than only before the model call,
-     * because their sentences carry local dates. A highly sensitive or
+     * sources. Their sentences carry local dates, in the zone read above
+     * (since B.3, before retrieval). A highly sensitive or
      * unreadable source never reaches this list (`structured-sources.ts`).
      */
-    const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-    const profile = requireSupabaseData(profileResult, "load chat profile");
-    const timezone = profile?.timezone ?? defaultAgentPreferences.timezone;
     const structured = await loadStructuredSources(supabase as unknown as StructuredSourceClient, {
       userId: user.id,
       question: parsed.data.question,
@@ -501,7 +520,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
      */
     const aboveFloorMemories = relevant.filter((match) => match.source_type === "memory");
     const explanation = buildAnswerExplanation({
-      retrieved: (matches ?? []).length,
+      retrieved: matches.length,
       aboveFloor: relevant.length,
       aboveFloorMemories: aboveFloorMemories.length,
       inForceMemories: aboveFloorMemories.filter((match) => inForce.has(match.source_id)).length,
