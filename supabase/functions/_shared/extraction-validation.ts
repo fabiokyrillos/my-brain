@@ -90,6 +90,20 @@ export type PersonCandidateValue = EntityCandidateValue & {
   role: string | null;
 };
 
+/** Life Brain C.3 (ADR-152): something that happens from X to Y, for the agenda. */
+export type EventCandidateValue = {
+  title: string;
+  startsAt: string;
+  endsAt: string | null;
+  allDay: boolean;
+  location: string | null;
+  confidence: number;
+  explicit: boolean;
+};
+
+/** Mirrors `MAX_EVENT_CANDIDATES` in `src/lib/ai/extraction-schema.ts`. */
+const MAX_EVENT_CANDIDATES = 20;
+
 export type PendingQuestionValue = {
   question: string;
   reason: string;
@@ -107,6 +121,7 @@ export type ExtractionValue = {
   projects: EntityCandidateValue[];
   people: PersonCandidateValue[];
   taskCandidates: TaskCandidateValue[];
+  eventCandidates: EventCandidateValue[];
   pendingQuestions: PendingQuestionValue[];
   lifeArea: LifeAreaValue | null;
   confidence: number;
@@ -349,6 +364,57 @@ function readPersonCandidates(
   return values;
 }
 
+function readEventCandidates(
+  collector: Collector,
+  raw: unknown,
+  path: string,
+): EventCandidateValue[] {
+  const items = readArray(collector, raw, path, 0);
+  if (items === null) return [];
+  if (items.length > MAX_EVENT_CANDIDATES) {
+    fail(collector, path, "too_long");
+    return [];
+  }
+
+  const values: EventCandidateValue[] = [];
+  for (let index = 0; index < items.length; index += 1) {
+    const item = items[index];
+    const itemPath = `${path}.${index}`;
+    if (!isPlainObject(item)) {
+      fail(collector, itemPath, "expected_object");
+      continue;
+    }
+    const title = readString(collector, item.title, `${itemPath}.title`, 1, 240);
+    const location = readNullableString(collector, item.location, `${itemPath}.location`, 1, 240);
+    const allDay = readBoolean(collector, item.allDay, `${itemPath}.allDay`);
+    const confidence = readNumber(collector, item.confidence, `${itemPath}.confidence`, 0, 1);
+    const explicit = readBoolean(collector, item.explicit, `${itemPath}.explicit`);
+
+    const startsAt = isIsoInstant(item.startsAt) ? item.startsAt : null;
+    if (startsAt === null) fail(collector, `${itemPath}.startsAt`, "expected_iso_instant");
+    let endsAt: string | null | undefined;
+    if (item.endsAt === null) {
+      endsAt = null;
+    } else if (isIsoInstant(item.endsAt)) {
+      endsAt = item.endsAt;
+    } else {
+      fail(collector, `${itemPath}.endsAt`, "expected_iso_instant");
+      endsAt = undefined;
+    }
+    if (startsAt !== null && typeof endsAt === "string" && Date.parse(endsAt) < Date.parse(startsAt)) {
+      fail(collector, `${itemPath}.endsAt`, "out_of_range");
+      continue;
+    }
+
+    if (
+      title === null || location === undefined || allDay === null || confidence === null
+      || explicit === null || startsAt === null || endsAt === undefined
+    ) continue;
+    values.push({ title, startsAt, endsAt, allDay, location, confidence, explicit });
+  }
+  return values;
+}
+
 function readTaskCandidates(
   collector: Collector,
   raw: unknown,
@@ -508,6 +574,7 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
   const projects = readEntityCandidates(collector, input.projects, "projects");
   const people = readPersonCandidates(collector, input.people, "people");
   const taskCandidates = readTaskCandidates(collector, input.taskCandidates, "taskCandidates");
+  const eventCandidates = readEventCandidates(collector, input.eventCandidates, "eventCandidates");
   const pendingQuestions = readPendingQuestions(collector, input.pendingQuestions, "pendingQuestions");
   const lifeArea = readLifeArea(collector, input.lifeArea);
   const confidence = readNumber(collector, input.confidence, "confidence", 0, 1);
@@ -529,6 +596,7 @@ export function validateExtraction(input: unknown): ExtractionValidationResult {
       projects,
       people,
       taskCandidates,
+      eventCandidates,
       pendingQuestions,
       lifeArea,
       confidence: confidence as number,

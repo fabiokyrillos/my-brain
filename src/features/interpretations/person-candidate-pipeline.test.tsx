@@ -66,6 +66,7 @@ function extraction(overrides: Partial<Extraction> = {}): Extraction {
     occurredAt: "2026-08-22T12:00:00.000Z",
     isRetroactive: false,
     lifeArea: null,
+    eventCandidates: [],
     summary: "Desenvolver o relatório de Sweepstakes para Garo, da Royal Caribbean.",
     concepts: ["task"],
     contexts: [],

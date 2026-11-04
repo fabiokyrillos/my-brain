@@ -29,6 +29,8 @@ function validExtraction(): Record<string, unknown> {
     organizations: [],
     projects: [],
     people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }],
+    // Life Brain C.3: a required, possibly empty list.
+    eventCandidates: [],
     // Life Brain C.1: a required, nullable key.
     lifeArea: { kind: "work", confidence: 0.9 },
     taskCandidates: [{

@@ -27,6 +27,7 @@ const validExtraction = {
     },
   ],
   pendingQuestions: [],
+  eventCandidates: [],
   confidence: 0.91,
 };
 

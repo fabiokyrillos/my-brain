@@ -34,6 +34,8 @@ function extractionWith(fields: {
     organizations: [],
     projects: [],
     people: [],
+    // Life Brain C.3: a required, possibly empty list.
+    eventCandidates: [],
     // Life Brain C.1: a required, nullable key.
     lifeArea: null,
     taskCandidates: [

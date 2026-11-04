@@ -54,6 +54,16 @@ function baseExtraction() {
     ],
     // Life Brain C.1 (`LB-C-002`): one area per entry, or null.
     lifeArea: { kind: "work", confidence: 0.9 },
+    // Life Brain C.3 (ADR-152): proposed for the agenda.
+    eventCandidates: [{
+      title: "Consulta com o cardiologista",
+      startsAt: "2026-11-12T15:00:00-03:00",
+      endsAt: null,
+      allDay: false,
+      location: null,
+      confidence: 0.9,
+      explicit: true,
+    }],
     confidence: 0.77,
   } as Record<string, unknown>;
 }
@@ -100,6 +110,12 @@ function withEntityCandidate(patch: Record<string, unknown>) {
   const base = baseExtraction();
   const people = base.people as Record<string, unknown>[];
   return { ...base, people: [{ ...people[0], ...patch }] };
+}
+
+function withEventCandidate(patch: Record<string, unknown>) {
+  const base = baseExtraction();
+  const events = base.eventCandidates as Record<string, unknown>[];
+  return { ...base, eventCandidates: [{ ...events[0], ...patch }] };
 }
 
 function withPendingQuestion(patch: Record<string, unknown>) {
@@ -241,6 +257,33 @@ const corpus: { name: string; input: unknown }[] = [
   { name: "reason blank", input: withPendingQuestion({ reason: "" }) },
   { name: "question confidence out of range", input: withPendingQuestion({ confidence: -1 }) },
   { name: "questions list empty", input: withRoot({ pendingQuestions: [] }) },
+
+  // Life Brain C.3 (ADR-152): event candidates.
+  { name: "events: empty", input: withRoot({ eventCandidates: [] }) },
+  { name: "events: missing entirely", input: (() => { const v = baseExtraction(); delete v.eventCandidates; return v; })() },
+  { name: "events: not an array", input: withRoot({ eventCandidates: {} }) },
+  { name: "events: twenty", input: withRoot({ eventCandidates: Array.from({ length: 20 }, () => (baseExtraction().eventCandidates as unknown[])[0]) }) },
+  { name: "events: twenty-one", input: withRoot({ eventCandidates: Array.from({ length: 21 }, () => (baseExtraction().eventCandidates as unknown[])[0]) }) },
+  { name: "event: a trip with a period", input: withEventCandidate({ title: "Viagem a Lisboa", startsAt: "2026-12-03T00:00:00-03:00", endsAt: "2026-12-10T23:59:59-03:00", allDay: true, location: "Lisboa" }) },
+  { name: "event: ends before it starts", input: withEventCandidate({ endsAt: "2026-11-12T14:00:00-03:00" }) },
+  { name: "event: ends when it starts", input: withEventCandidate({ endsAt: "2026-11-12T15:00:00-03:00" }) },
+  { name: "event: malformed start", input: withEventCandidate({ startsAt: "dia 12" }) },
+  { name: "event: start out of offset range", input: withEventCandidate({ startsAt: "2026-11-12T15:00:00+16:00" }) },
+  { name: "event: malformed end", input: withEventCandidate({ endsAt: "amanhã" }) },
+  { name: "event: blank title", input: withEventCandidate({ title: "  " }) },
+  { name: "event: padded title", input: withEventCandidate({ title: "  Jantar  " }) },
+  { name: "event: title over the limit", input: withEventCandidate({ title: "a".repeat(241) }) },
+  { name: "event: blank location", input: withEventCandidate({ location: " " }) },
+  { name: "event: location over the limit", input: withEventCandidate({ location: "a".repeat(241) }) },
+  { name: "event: allDay as a string", input: withEventCandidate({ allDay: "true" }) },
+  { name: "event: confidence out of range", input: withEventCandidate({ confidence: 2 }) },
+  { name: "event: explicit missing", input: (() => {
+    const base = baseExtraction();
+    const event = { ...(base.eventCandidates as Record<string, unknown>[])[0] };
+    delete event.explicit;
+    return { ...base, eventCandidates: [event] };
+  })() },
+  { name: "event: not an object", input: withRoot({ eventCandidates: ["Consulta"] }) },
   { name: "questions list not an array", input: withRoot({ pendingQuestions: null }) },
 
   // Unknown keys are stripped, not rejected, by the source of truth.
