@@ -921,3 +921,52 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
   color: var(--link);
   font: var(--type-label);
 }
+
+/* Life Brain A.3 part 3: the task row on the list's own shape.
+
+   Three slots, never a fourth row: the selection (when the list offers bulk),
+   the title with one meta line under it, and the state with the actions.
+   Before this, the selection label, the body and the trailing column were
+   three children of a two-column grid — the "lone checkbox centred in an empty
+   cell" the baseline recorded — and every date and chip lived in the trailing
+   column, which on a phone stacked under the title as four more lines. */
+.work-row{grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3);align-items:start;padding:var(--space-3) var(--space-4)}
+.work-row:not(:has(> .work-row-select)){grid-template-columns:minmax(0,1fr) auto}
+.work-row .list-row-main strong{margin-bottom:0}
+.work-row-meta{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);margin-top:var(--space-1);color:var(--text-secondary);font:var(--type-caption)}
+.work-row-meta .work-origin{display:inline;margin:0}
+.work-relations{display:contents}
+.work-row>.list-meta{justify-content:flex-end;align-items:center;gap:var(--space-2)}
+.work-row-inline{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:var(--space-2)}
+.work-row-more{display:none}
+
+/* On a phone the inline verbs leave the row and one "⋯" opens them in a sheet
+   (`row-actions-sheet.tsx`). The trailing slot becomes a narrow column — the
+   state over the "⋯" — so the title keeps the width. These rules come after
+   the generic `.list-row` phone rules on purpose: the row keeps its slots. */
+@media(max-width:600px){
+  .work-row,.work-row:not(:has(> .work-row-select)){padding:var(--space-3)}
+  .work-row{grid-template-columns:auto minmax(0,1fr) auto}
+  .work-row:not(:has(> .work-row-select)){grid-template-columns:minmax(0,1fr) auto}
+  .work-row>.list-meta{flex-direction:column;align-items:flex-end;justify-content:flex-start;width:auto}
+  .work-row-inline{display:none}
+  .work-row-more{display:inline-flex}
+}
+
+/* The sheet is the shared dialog presented from the bottom. It is portalled to
+   `body`, so nothing here may depend on `.work-page`. */
+.work-row-sheet .row-actions{display:grid;gap:var(--space-2);margin-bottom:var(--space-3)}
+.work-row-sheet .row-actions form{display:block}
+.work-row-sheet .row-action{width:100%;min-height:var(--touch-target);justify-content:center}
+.work-row-sheet .task-command-dialog-body:not([hidden]){display:grid;gap:var(--space-2)}
+.work-row-sheet .task-command-dialog-cancel{margin-left:0}
+@media(max-width:600px){
+  .task-command-dialog-backdrop:has(> .work-row-sheet){place-items:end stretch;padding:0}
+  .task-command-dialog.work-row-sheet{
+    width:100%;
+    max-height:calc(100vh - var(--space-8));
+    max-height:calc(100dvh - var(--space-8));
+    border-radius:var(--radius-sheet) var(--radius-sheet) 0 0;
+    padding-bottom:calc(var(--space-5) + env(safe-area-inset-bottom));
+  }
+}

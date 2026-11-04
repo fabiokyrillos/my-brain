@@ -298,9 +298,11 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
     const protectedContent = read("src/features/operations/protected-content.tsx");
     const quickEdit = read("src/features/operations/quick-edit.tsx");
     const undo = read("src/features/operations/undo-affordance.tsx");
+    const sheet = read("src/features/operations/row-actions-sheet.tsx");
 
     for (const [source, name, tokens] of [
-      [list, "task-list.tsx", ["list-row", "list-row-main", "list-meta", "work-origin"]],
+      [list, "task-list.tsx", ["list-row", "list-row-main", "list-meta", "work-origin", "work-row", "work-row-meta", "work-row-inline"]],
+      [sheet, "row-actions-sheet.tsx", ["work-row-more"]],
       [protectedContent, "protected-content.tsx", ["work-protected", "work-protected-label", "work-protected-toggle", 'data-masked="true"']],
       [quickEdit, "quick-edit.tsx", ["work-quick-edit", "work-quick-edit-summary"]],
       [undo, "undo-affordance.tsx", ["work-undo", "work-undo-button", "work-undo-window"]],
