@@ -164,15 +164,18 @@ async function writeCreatedRoles(
   if (error || !data) return;
   const people = Array.isArray(data.extracted_people) ? data.extracted_people : [];
   for (const { candidateIndex, personId } of input.created) {
-    const role = readRole(people[candidateIndex]);
-    if (role === null) continue;
+    // Written as the person's free-text note, never a column of its own:
+    // the 2P-PERSON-001 amendment refuses a global field for what a person is, and
+    // `phase-2p-person-role-guard` holds that.
+    const note = readRole(people[candidateIndex]);
+    if (note === null) continue;
     const { error: writeError } = await supabase
       .from("people")
-      .update({ notes: role, updated_at: new Date().toISOString() })
+      .update({ notes: note, updated_at: new Date().toISOString() })
       .eq("id", personId)
       .eq("user_id", input.userId)
       .is("notes", null);
-    if (writeError) console.warn("[person-candidates] role note not written", { code: writeError.code ?? "unknown" });
+    if (writeError) console.warn("[person-candidates] note not written", { code: writeError.code ?? "unknown" });
   }
 }
 
@@ -229,7 +232,7 @@ export async function resolvePersonCandidates(
     });
   } catch {
     // Best effort by contract: the resolution is already committed.
-    console.warn("[person-candidates] role note not written", { code: "unexpected" });
+    console.warn("[person-candidates] note not written", { code: "unexpected" });
   }
   refreshPersonSurfaces(parsed.data.entryId);
 

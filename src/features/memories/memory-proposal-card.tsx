@@ -89,6 +89,7 @@ export function MemoryProposalCard({
   content,
   kind,
   locale,
+  sourceEntryId,
 }: {
   action: MemoryProposalAction;
   /**
@@ -100,6 +101,8 @@ export function MemoryProposalCard({
   content: string;
   kind: MemoryKind;
   locale: Locale;
+  /** Life Brain C.2 (ADR-151): set when the proposal sits on a record's page. */
+  sourceEntryId?: string;
 }) {
   const [state, formAction, pending] = useActionState(action, idleMemoryProposalState);
   const [undone, undoFormAction, undoPending] = useActionState(undoAction, idleMemoryProposalState);
@@ -195,6 +198,12 @@ export function MemoryProposalCard({
   return (
     <form action={formAction} className="memory-proposal">
       <input name="locale" type="hidden" value={locale} />
+      {sourceEntryId ? (
+        <>
+          <input name="origin" type="hidden" value="record" />
+          <input name="sourceEntryId" type="hidden" value={sourceEntryId} />
+        </>
+      ) : null}
 
       <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
         {pending ? copy.proposalConfirming : state.status === "error" ? state.message : ""}

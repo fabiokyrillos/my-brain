@@ -112,7 +112,10 @@ export const memoryLifecycleSchema = z.object({
  * revalidation.** Optional because the composer that predates it sends no such
  * field and must keep working unchanged.
  */
-export const MEMORY_ORIGINS = ["composer", "memories"] as const;
+// Life Brain C.2 (ADR-151): `record` — a memory the owner confirmed from the
+// proposal on a record's page. The audit sentence is the only thing it selects;
+// the provenance travels separately, in `sourceEntryId`.
+export const MEMORY_ORIGINS = ["composer", "memories", "record"] as const;
 export type MemoryOrigin = (typeof MEMORY_ORIGINS)[number];
 
 export const memoryProposalSchema = z.object({
@@ -120,6 +123,14 @@ export const memoryProposalSchema = z.object({
   content: memoryContent,
   kind: z.enum(MEMORY_KINDS),
   origin: z.enum(MEMORY_ORIGINS).optional(),
+  /**
+   * Life Brain C.2 (ADR-151): the record the proposal came from. Present only
+   * for a memory proposed on a record's page; the composer and the memories
+   * page still send none, for the reason above. Ownership is proved twice:
+   * the action reads the entry under the owner's session, and
+   * `memories_source_entry_owner_fk` refuses another owner's entry.
+   */
+  sourceEntryId: z.string().uuid().optional(),
 }).strict();
 
 export type MemoryUpdateInput = z.infer<typeof memoryUpdateSchema>;

@@ -954,3 +954,9 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .entry-sensitivity-row{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
 .entry-sensitivity-row select{min-height:var(--touch-target);padding:0 var(--space-3);border:1px solid var(--control-border);border-radius:var(--radius-md);background:var(--background-surface);color:var(--text-primary);font:var(--type-body)}
 .entry-sensitivity-outcome{margin:0;font:var(--type-caption);color:var(--text-secondary)}
+
+/* Life Brain C.2 (ADR-151): what the reading says the person is, beside the name. */
+.person-candidate-role {
+  font-weight: 400;
+  color: var(--text-secondary);
+}

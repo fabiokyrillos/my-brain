@@ -380,3 +380,68 @@ describe("createProposedMemory (DEC-5)", () => {
     expect(memories.inserted).toBeUndefined();
   });
 });
+
+describe("Life Brain C.2: a memory confirmed from a record names it and inherits its protection", () => {
+  const ENTRY_ID = "8a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d";
+
+  function recordClient(entry: Result) {
+    let inserted: Record<string, unknown> | undefined;
+    const entryEq: Array<[string, unknown]> = [];
+    const audit = vi.fn<AuditInsert>(async () => ({ error: null }));
+    const memories: Record<string, unknown> = {};
+    let isInsert = false;
+    memories.select = vi.fn(() => memories);
+    memories.eq = vi.fn(() => memories);
+    memories.limit = vi.fn(() => memories);
+    memories.insert = vi.fn((row: Record<string, unknown>) => { isInsert = true; inserted = row; return memories; });
+    memories.maybeSingle = vi.fn(async () => (isInsert ? { data: { id: MEMORY_ID }, error: null } : { data: null, error: null }));
+    const entries: Record<string, unknown> = {};
+    entries.select = vi.fn(() => entries);
+    entries.eq = vi.fn((column: string, value: unknown) => { entryEq.push([column, value]); return entries; });
+    entries.maybeSingle = vi.fn(async () => entry);
+    return {
+      value: {
+        from: vi.fn((table: string) => {
+          if (table === "audit_logs") return { insert: audit };
+          if (table === "agent_preferences") return { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: null }) }) }) };
+          if (table === "entries") return entries;
+          return memories;
+        }),
+      },
+      get inserted() { return inserted; },
+      entryEq,
+      audit,
+    };
+  }
+
+  const recordForm = () => form({
+    locale: "pt-BR",
+    content: "Prefiro consultas de manhã cedo",
+    kind: "preference",
+    origin: "record",
+    sourceEntryId: ENTRY_ID,
+  });
+
+  it("stores the record as the source and keeps the record's sensitivity", async () => {
+    const stub = recordClient({ data: { id: ENTRY_ID, sensitivity: "private" }, error: null });
+    vi.mocked(requireUser).mockResolvedValue({ supabase: stub.value, user: { id: USER_ID } } as never);
+
+    const result = await createProposedMemory(idleMemoryProposalState, recordForm());
+
+    expect(result.status).toBe("success");
+    expect(stub.inserted!.source_entry_id).toBe(ENTRY_ID);
+    expect(stub.inserted!.sensitivity).toBe("private");
+    expect(stub.entryEq).toEqual([["id", ENTRY_ID], ["user_id", USER_ID]]);
+    expect(stub.audit.mock.calls[0]![0].reason).toBe("Owner confirmed a memory proposed from a record");
+  });
+
+  it("refuses a record the caller cannot read, and writes nothing", async () => {
+    const stub = recordClient({ data: null, error: null });
+    vi.mocked(requireUser).mockResolvedValue({ supabase: stub.value, user: { id: USER_ID } } as never);
+
+    const result = await createProposedMemory(idleMemoryProposalState, recordForm());
+
+    expect(result.status).toBe("error");
+    expect(stub.inserted).toBeUndefined();
+  });
+});

@@ -374,6 +374,23 @@ export async function createProposedMemory(
     return { status: "duplicate", message: copy.proposalDuplicate, memoryId: existing.data.id };
   }
 
+  /*
+   * Life Brain C.2 (ADR-151). A memory proposed from a record names that
+   * record and inherits its sensitivity, so a health record's memory is as
+   * private as the record — never less protected than its source.
+   */
+  let source: { id: string; sensitivity: string } | null = null;
+  if (parsed.data.sourceEntryId) {
+    const entry = await supabase
+      .from("entries")
+      .select("id,sensitivity")
+      .eq("id", parsed.data.sourceEntryId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (entry.error || !entry.data) return { status: "error", message: copy.saveFailed, memoryId: null };
+    source = entry.data;
+  }
+
   const embedded = await embedMemory(supabase, user.id, content, parsed.data.locale);
 
   const { data: created, error } = await supabase
@@ -382,6 +399,7 @@ export async function createProposedMemory(
       user_id: user.id,
       content,
       kind,
+      ...(source ? { source_entry_id: source.id, sensitivity: source.sensitivity } : {}),
       // `confidence` is not offered to the owner and is not rendered anywhere
       // this slice touches (UX-10): a hand-written memory is not a probabilistic
       // claim, and showing "100%" beside it invited a reading the number could
@@ -406,7 +424,9 @@ export async function createProposedMemory(
     // typed on the memories page.
     parsed.data.origin === "memories"
       ? "Owner wrote a memory from the memories page"
-      : "Owner confirmed a memory proposed by the assistant composer",
+      : parsed.data.origin === "record"
+        ? "Owner confirmed a memory proposed from a record"
+        : "Owner confirmed a memory proposed by the assistant composer",
   );
 
   revalidateMemory(parsed.data.locale, created.id);
