@@ -90,7 +90,7 @@ describe("agendaQueryFor — the window each question names", () => {
 });
 
 describe("composeAgendaAnswer — the projection, said as an answer", () => {
-  it("lists each item with its time and kind, and cites only the tasks", () => {
+  it("lists each item with its time and kind, and cites its tasks and reminders", () => {
     const answer = composeAgendaAnswer({
       span: TOMORROW,
       locale: "pt-BR",
@@ -110,12 +110,13 @@ describe("composeAgendaAnswer — the projection, said as an answer", () => {
     const citations = parseCitations(answer.citations);
     expect(citations.evidence).toBe("evidenced");
     expect(citations.reach).toEqual(AGENDA_REACH);
-    // A reminder has no citable type yet (B.2 decides it), so it is listed and
-    // not cited; the task is cited by the id the projection read.
+    // Life Brain B.2 (ADR-147): a reminder is citable now, so both items are
+    // cited by the ids the projection read, in the order the answer lists them.
     expect(citations.sources).toEqual([
+      { id: `reminder:${REMINDER}`, type: "reminder", sourceId: REMINDER, support: "product_state" },
       { id: `task:${TASK_A}`, type: "task", sourceId: TASK_A, support: "product_state" },
     ]);
-    expect(answer.citedSourceIds).toEqual([`task:${TASK_A}`]);
+    expect(answer.citedSourceIds).toEqual([`reminder:${REMINDER}`, `task:${TASK_A}`]);
   });
 
   it("cites only ids the projection returned, once each", () => {

@@ -16,10 +16,9 @@ import "server-only";
  *
  * Deadlines, intentions and reminders. Reviews are not things to do, and an
  * unconfirmed suggestion is the Brain's guess, so neither belongs in "o que
- * tenho amanhã". Every **task** is cited by the id the projection read under
- * the owner's session, so the answer can only cite rows that exist. A
- * **reminder** is said and not cited: `reminder` is not in the citation
- * vocabulary until B.2 (`LB-B-006`) decides it — see `AGENDA_REACH`.
+ * tenho amanhã". Every **task** and, since B.2 (ADR-147), every **reminder** is
+ * cited by the id the projection read under the owner's session, so the answer
+ * can only cite rows that exist — see `AGENDA_REACH`.
  *
  * ## Sensitivity
  *
@@ -65,7 +64,7 @@ const AGENDA_LANES: readonly AgendaLane[] = ["deadline", "intention", "reminder"
 const MAX_LISTED_ITEMS = 15;
 
 /** The envelope's own bound (`referenceSchema` … `.max(20)`). */
-const MAX_CITED_TASKS = 20;
+const MAX_CITED_ITEMS = 20;
 
 export type AgendaAnswer = {
   readonly content: string;
@@ -135,10 +134,12 @@ function isAgendaLane(lane: string): lane is AgendaLane {
 }
 
 /** `deadline:<uuid>` / `intention:<uuid>` → the task's id; anything else → `null`. */
-function taskIdOf(item: CalendarItemView): string | null {
-  if (item.lane !== "deadline" && item.lane !== "intention") return null;
+/** What an agenda line cites: its task (deadline or intention) or its reminder. */
+function citableOf(item: CalendarItemView): { readonly type: "task" | "reminder"; readonly id: string } | null {
+  const type = item.lane === "deadline" || item.lane === "intention" ? "task" : item.lane === "reminder" ? "reminder" : null;
+  if (type === null) return null;
   const [, id] = item.id.split(":");
-  return id ?? null;
+  return id ? { type, id } : null;
 }
 
 export function composeAgendaAnswer(input: {
@@ -194,11 +195,13 @@ export function composeAgendaAnswer(input: {
   const seen = new Set<string>();
   const sources: PersistedSourceReference[] = [];
   for (const item of items) {
-    const taskId = taskIdOf(item);
-    if (taskId === null || seen.has(taskId)) continue;
-    seen.add(taskId);
-    if (sources.length >= MAX_CITED_TASKS) break;
-    sources.push({ id: `task:${taskId}`, type: "task", sourceId: taskId, support: supportKindForSource("task") });
+    const citable = citableOf(item);
+    if (citable === null) continue;
+    const key = `${citable.type}:${citable.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (sources.length >= MAX_CITED_ITEMS) break;
+    sources.push({ id: key, type: citable.type, sourceId: citable.id, support: supportKindForSource(citable.type) });
   }
 
   return {

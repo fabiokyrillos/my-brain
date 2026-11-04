@@ -14,10 +14,13 @@ Classificação e associações reversíveis de alta confiança podem ser persis
 
 1. A pergunta vira embedding.
 2. A RPC pgvector recupera registros e memórias do próprio usuário.
-3. As fontes entram como dados não confiáveis, nunca como instruções.
-4. A resposta estruturada pode citar somente IDs fornecidos.
-5. IDs inexistentes são removidos deterministicamente.
-6. Mensagem, modelo, tokens e fontes ficam persistidos.
+3. Desde o Life Brain B.2 (ADR-147), tarefas e lembretes entram por título: as palavras de conteúdo da pergunta casam com `tasks.title` e `reminders.title` (`ilike`, do próprio usuário, sem cancelados, no máximo seis de cada). O que Tarefas esconderia — fonte muito sensível ou ilegível — nunca chega ao prompt.
+4. As fontes entram como dados não confiáveis, nunca como instruções.
+5. A resposta estruturada pode citar somente IDs fornecidos.
+6. IDs inexistentes são removidos deterministicamente.
+7. Mensagem, modelo, tokens e fontes ficam persistidos; a citação de uma tarefa ou lembrete não carrega texto.
+
+Uma pergunta sem verbo de mudança vai direto a esse caminho, sem a pré-chamada de comandos (`LB-B-009`).
 
 Se as fontes forem insuficientes, o agente deve dizer isso em vez de completar lacunas.
 

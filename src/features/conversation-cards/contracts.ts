@@ -86,6 +86,9 @@ export const CONVERSATION_CARD_TYPES = [
   "task",
   "memory",
   "entry",
+  // Life Brain B.2 (ADR-147): a cited reminder. Read-only — the card links to
+  // the reminder's page; nothing about it is changed from a conversation.
+  "reminder",
   "person",
   "project",
   "organization",
@@ -100,6 +103,7 @@ export type MutableConversationCardType = (typeof MUTABLE_CONVERSATION_CARD_TYPE
 
 export const READ_ONLY_CONVERSATION_CARD_TYPES = [
   "entry",
+  "reminder",
   "person",
   "project",
   "organization",

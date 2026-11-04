@@ -213,6 +213,51 @@ describe("Life Brain B.1: a cited task resolves content-free (ADR-146)", () => {
   });
 });
 
+describe("Life Brain B.2: a cited reminder resolves content-free (ADR-147)", () => {
+  const REMINDER = "77777777-7777-4777-8777-777777777777";
+  const reminderRef = { id: `reminder:${REMINDER}`, type: "reminder" as const, sourceId: REMINDER, support: "product_state" as const };
+
+  function recordingClient(rows: Record<string, unknown[]>) {
+    const columns: Record<string, string> = {};
+    const supabase = {
+      from: vi.fn((table: string) => {
+        const stub: Record<string, unknown> = {};
+        stub.select = vi.fn((selected: string) => {
+          columns[table] = selected;
+          return stub;
+        });
+        stub.eq = vi.fn(() => stub);
+        stub.in = vi.fn(() => Promise.resolve({ data: rows[table] ?? [], error: null }));
+        return stub;
+      }),
+    };
+    return { supabase, columns };
+  }
+
+  it("names a reminder that still exists and links to its page, carrying no title", async () => {
+    const { supabase, columns } = recordingClient({ reminders: [{ id: REMINDER, created_at: "2026-11-02T12:00:00Z" }] });
+    const [source] = await resolveSources(supabase as never, USER, citations(reminderRef), "en", NOW);
+
+    expect(source?.card).toMatchObject({
+      cardType: "reminder",
+      state: "previewed",
+      mutability: "read_only",
+      snippet: null,
+      href: `/en/app/reminders/${REMINDER}`,
+    });
+    expect(source?.occurredAt).toBe("2026-11-02T12:00:00Z");
+    // The task's terms: existence and a date, never the title or the entry.
+    expect(columns.reminders).toBe("id,created_at");
+  });
+
+  it("renders a reminder that is gone like any other unreadable source", async () => {
+    const { supabase } = recordingClient({ reminders: [] });
+    const [source] = await resolveSources(supabase as never, USER, citations(reminderRef), "pt-BR", NOW);
+
+    expect(source?.card).toEqual({ ...unavailableCardShape("reminder"), mutability: "read_only" });
+  });
+});
+
 function unavailableCardShape(cardType: string) {
   return {
     cardType,

@@ -80,7 +80,13 @@ function taskHref(locale: Locale, id: string) {
   return `/${locale}/app/work/${id}`;
 }
 
+function reminderHref(locale: Locale, id: string) {
+  return `/${locale}/app/reminders/${id}`;
+}
+
 type TaskRow = { id: string; created_at: string | null };
+/** Life Brain B.2 (ADR-147): a reminder resolves exactly as a task does. */
+type ReminderRow = TaskRow;
 
 /**
  * Resolves every reference on one message.
@@ -101,8 +107,9 @@ export async function resolveSources(
   const entryIds = references.filter((r) => r.type === "entry").map((r) => r.sourceId);
   const memoryIds = references.filter((r) => r.type === "memory").map((r) => r.sourceId);
   const taskIds = references.filter((r) => r.type === "task").map((r) => r.sourceId);
+  const reminderIds = references.filter((r) => r.type === "reminder").map((r) => r.sourceId);
 
-  const [entries, memories, tasks] = await Promise.all([
+  const [entries, memories, tasks, reminders] = await Promise.all([
     entryIds.length === 0
       ? Promise.resolve({ data: [], error: null })
       : supabase
@@ -125,6 +132,15 @@ export async function resolveSources(
         .select("id,created_at")
         .eq("user_id", userId)
         .in("id", taskIds),
+    // The same two columns for a reminder, for the same reason: no title is
+    // read, so there is nothing to mask and no classification to derive.
+    reminderIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase
+        .from("reminders")
+        .select("id,created_at")
+        .eq("user_id", userId)
+        .in("id", reminderIds),
   ]);
 
   type EntryRow = { id: string; original_content: string; sensitivity: string | null; occurred_at: string | null };
@@ -151,7 +167,11 @@ export async function resolveSources(
     tasks.error ? [] : ((tasks.data ?? []) as TaskRow[]).map((row) => [row.id, row]),
   );
 
-  return references.map((reference) => resolveOne(reference, locale, now, entryById, memoryById, taskById));
+  const reminderById = new Map<string, ReminderRow>(
+    reminders.error ? [] : ((reminders.data ?? []) as ReminderRow[]).map((row) => [row.id, row]),
+  );
+
+  return references.map((reference) => resolveOne(reference, locale, now, entryById, memoryById, taskById, reminderById));
 }
 
 function resolveOne(
@@ -168,6 +188,7 @@ function resolveOne(
     created_at: string | null;
   }>,
   taskById: Map<string, TaskRow>,
+  reminderById: Map<string, ReminderRow>,
 ): ResolvedSource {
   const base = { key: reference.id, support: reference.support };
 
@@ -214,6 +235,21 @@ function resolveOne(
     return {
       ...base,
       card: readOnlyPreviewCard({ cardType: "task", objectId: row.id, href: taskHref(locale, row.id) }),
+      occurredAt: row.created_at,
+    };
+  }
+
+  /*
+   * Life Brain B.2 (`LB-B-006`, ADR-147). A cited reminder, content-free on the
+   * task's terms: existence and a date, a link to the reminder's page, and the
+   * same `unavailable` shape for gone, foreign or unreadable.
+   */
+  if (reference.type === "reminder") {
+    const row = reminderById.get(reference.sourceId);
+    if (!row) return { ...base, card: unavailableCard("reminder"), occurredAt: null };
+    return {
+      ...base,
+      card: readOnlyPreviewCard({ cardType: "reminder", objectId: row.id, href: reminderHref(locale, row.id) }),
       occurredAt: row.created_at,
     };
   }

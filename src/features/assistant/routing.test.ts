@@ -32,7 +32,38 @@ describe("decideAssistantRoute", () => {
 
   it("tries the command path for everything else", () => {
     expect(decideAssistantRoute("Mude a prioridade da tarefa do relatório")).toEqual({ kind: "command_first" });
-    expect(decideAssistantRoute("O que combinei com Jaime?")).toEqual({ kind: "command_first" });
+    // A statement with no change verb still goes through the parse: it may be
+    // an implicit task the command model knows how to read.
+    expect(decideAssistantRoute("Preciso comprar leite amanhã")).toEqual({ kind: "command_first" });
+  });
+
+  /*
+   * Life Brain B.2, `LB-B-009`. A question with no change verb used to pay for a
+   * task-command parse that could only answer `not_a_task_command` before the
+   * knowledge answer ran — two text-model calls for one question
+   * (`AUDIT_CHAT_RETRIEVAL.md` §1). It now goes straight to knowledge.
+   */
+  it.each([
+    "O que combinei com Jaime?",
+    "Quais exames estão pendentes?",
+    "quando fui ao médico pela última vez",
+    "Como está a viagem para Lisboa?",
+    "What did I say about the trip?",
+    "When did I last see the doctor",
+    "Is the passport renewal still open?",
+  ])("sends the question %j straight to knowledge (LB-B-009)", (question) => {
+    expect(decideAssistantRoute(question)).toEqual({ kind: "knowledge", reason: "question_form" });
+  });
+
+  it.each([
+    "Pode concluir a tarefa do exame?",
+    "Você marca o relatório como feito?",
+    "Dá para adiar a consulta para sexta?",
+    "Can you mark the blood test as done?",
+    "Could you move the dentist task to Friday?",
+    "Crie uma tarefa: renovar passaporte?",
+  ])("keeps the polite command %j on the command path", (command) => {
+    expect(decideAssistantRoute(command)).toEqual({ kind: "command_first" });
   });
 
   it("answers an agenda question from the calendar, before any command parse (LB-B-005)", () => {

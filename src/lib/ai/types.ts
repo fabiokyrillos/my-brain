@@ -37,10 +37,16 @@ export type ChatSource = {
    * envelope and filters returned ids against the set it was given. Widening it
    * therefore costs no prompt change and no migration.
    */
-  type: "entry" | "memory" | "task";
+  type: "entry" | "memory" | "task" | "reminder";
   content: string;
   occurredAt: string;
-  similarity: number;
+  /**
+   * The vector similarity, for a source the RPC ranked. `null` for a source
+   * matched by text (Life Brain B.2: tasks and reminders have no vector), so no
+   * caller can mistake a title match for a ranked one. Nothing downstream reads
+   * it; the prompt carries id, type, date and content only.
+   */
+  similarity: number | null;
 };
 
 /**

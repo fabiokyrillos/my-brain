@@ -79,7 +79,7 @@ export const ANSWER_SUPPORT_KIND: SupportKind = "inference";
  * check constraint, no trigger and no deployed validator. The pinning is here,
  * in TypeScript, and this constant is the single place it lives.
  */
-export const CITED_SOURCE_TYPES = ["entry", "memory", "task"] as const;
+export const CITED_SOURCE_TYPES = ["entry", "memory", "task", "reminder"] as const;
 export type CitedSourceType = (typeof CITED_SOURCE_TYPES)[number];
 
 /**
@@ -100,6 +100,9 @@ const SUPPORT_BY_TYPE: Readonly<Record<CitedSourceType, SupportKind>> = {
   entry: "direct_record",
   memory: "product_state",
   task: "product_state",
+  // Life Brain B.2 (ADR-147): a reminder is something the product holds as
+  // scheduled, exactly as a task is something it holds as open.
+  reminder: "product_state",
 };
 
 export function supportKindForSource(type: CitedSourceType): SupportKind {
@@ -127,8 +130,15 @@ export function supportKindForSource(type: CitedSourceType): SupportKind {
 export const ANSWER_REACH = CITED_SOURCE_TYPES;
 export type AnswerReach = (typeof ANSWER_REACH)[number];
 
-/** What `sendChatMessage` retrieves. Unchanged, and its copy still says so. */
-export const CHAT_REACH: readonly AnswerReach[] = ["entry", "memory"];
+/**
+ * What `sendChatMessage` retrieves.
+ *
+ * Life Brain B.2 (`LB-B-006`, ADR-147) widened it: entries and memories by
+ * vector as before, and tasks and reminders by their titles. An envelope
+ * written before B.2 keeps the reach it recorded, `["entry", "memory"]`, and
+ * `reachScope` still gives it the sentence that was true when it was answered.
+ */
+export const CHAT_REACH: readonly AnswerReach[] = ["entry", "memory", "task", "reminder"];
 
 /** What `generateReview` retrieves — `OD-2Q-2`, signed as option A. */
 export const REVIEW_REACH: readonly AnswerReach[] = ["entry", "task"];
@@ -136,25 +146,29 @@ export const REVIEW_REACH: readonly AnswerReach[] = ["entry", "task"];
 /**
  * Life Brain B.1 (`LB-B-005`) — what the deterministic agenda answer read.
  *
- * `task` only, and that understates by one table on purpose: the answer also
- * lists **reminders**, but `reminder` is not a member of `CITED_SOURCE_TYPES`
- * and B.1 does not add one — `LB-B-006` (slice B.2) is the requirement that
- * widens the vocabulary. Until then a reminder is said in the answer and never
- * cited, and the owner-facing sentence (`agendaReach` in `copy.ts`) names both,
- * because it describes where the answer looked rather than what it could cite.
+ * B.1 wrote `["task"]`: the answer listed reminders but could not cite them.
+ * B.2 (ADR-147) admitted `reminder` to the vocabulary, so the agenda answer now
+ * cites both, and an agenda envelope from B.1 keeps `["task"]`.
  */
-export const AGENDA_REACH: readonly AnswerReach[] = ["task"];
+export const AGENDA_REACH: readonly AnswerReach[] = ["task", "reminder"];
 
 /**
  * Which sentence describes a reach. Decided from the envelope's **own** reach,
- * so a chat thread can hold a grounded answer and an agenda answer side by side
- * and each says where it looked. Anything that is not exactly the agenda's
- * reach keeps the knowledge sentence, which is what every row before B.1 had.
+ * so a thread can hold answers from three eras side by side and each says where
+ * it looked:
+ *
+ *  - `agenda` — read only the agenda: no entry and no memory in the reach
+ *    (B.1's `["task"]` and B.2's `["task", "reminder"]`);
+ *  - `knowledge_wide` — entries or memories **and** reminders: the knowledge
+ *    answer since B.2, which also matched task and reminder titles;
+ *  - `knowledge` — everything else, which is every row before B.2 (and a
+ *    review's `["entry", "task"]`, whose sentence this slice does not touch).
  */
-export function reachScope(reach: readonly AnswerReach[]): "knowledge" | "agenda" {
-  return reach.length === AGENDA_REACH.length && reach.every((type, index) => type === AGENDA_REACH[index])
-    ? "agenda"
-    : "knowledge";
+export function reachScope(reach: readonly AnswerReach[]): "knowledge" | "knowledge_wide" | "agenda" {
+  const readsKnowledge = reach.includes("entry") || reach.includes("memory");
+  if (reach.length > 0 && !readsKnowledge) return "agenda";
+  if (readsKnowledge && reach.includes("reminder")) return "knowledge_wide";
+  return "knowledge";
 }
 
 /** The version stamped on every envelope this module writes. */

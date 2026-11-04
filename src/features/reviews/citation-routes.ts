@@ -30,6 +30,10 @@ export const CITED_ROUTE_SEGMENT: Readonly<Record<CitedSourceType, string>> = {
   entry: "inbox",
   memory: "memories",
   task: "work",
+  // Life Brain B.2 (ADR-147). A review never retrieves reminders, so no review
+  // envelope vouches for one; the entry exists because the map is total over
+  // the vocabulary, and it admits only a reminder an envelope actually cites.
+  reminder: "reminders",
 };
 
 /** The reverse map, built from the forward one so the two cannot disagree. */

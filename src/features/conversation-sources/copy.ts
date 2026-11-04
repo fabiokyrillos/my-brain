@@ -38,6 +38,13 @@ export type ConversationSourcesCopy = {
    */
   readonly agendaReach: string;
   readonly agendaInsufficient: string;
+  /**
+   * Life Brain B.2 — the knowledge answer that also matched task and reminder
+   * titles (`reachScope` → `knowledge_wide`). The two older sentences stay for
+   * the rows they describe.
+   */
+  readonly wideReach: string;
+  readonly wideInsufficient: string;
   /** An old row, which recorded neither reach nor evidence state. */
   readonly legacyUnknown: string;
   readonly freshnessLabel: string;
@@ -79,6 +86,9 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
       "Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros nem das suas memórias.",
     agendaReach: "Olhei só a sua agenda: tarefas com prazo ou planejadas e lembretes nesse período.",
     agendaInsufficient: "Nada na sua agenda nesse período.",
+    wideReach: "Procurei nos seus registros e memórias, e nos títulos das suas tarefas e lembretes.",
+    wideInsufficient:
+      "Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros, memórias, tarefas nem lembretes.",
     legacyUnknown: "Esta resposta é de antes de eu passar a anotar onde procurei.",
     freshnessLabel: "De",
     freshnessUnknown: "Sem data",
@@ -103,6 +113,9 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
       "I found nothing of yours about this. What I answered above does not come from your records or your memories.",
     agendaReach: "I looked only at your agenda: tasks due or planned and reminders in that period.",
     agendaInsufficient: "Nothing on your agenda in that period.",
+    wideReach: "I looked in your records and memories, and in the titles of your tasks and reminders.",
+    wideInsufficient:
+      "I found nothing of yours about this. What I answered above does not come from your records, memories, tasks or reminders.",
     legacyUnknown: "This answer predates my keeping track of where I looked.",
     freshnessLabel: "From",
     freshnessUnknown: "No date",

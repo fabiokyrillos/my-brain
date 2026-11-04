@@ -82,6 +82,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - `chat/actions.ts` anexa acertos `ilike` de `tasks`/`reminders` (reaproveita `search/actions.ts`) como fontes `task`/`reminder`; `CHAT_REACH` ampliado; render já existe (revisões). Pré-chamada de comandos só para forma de comando (LB-B-009).
 - Testes: fontes mistas citadas e validadas; comando vs pergunta.
+- **Implementado 2026-11-04 (ADR-147):** casamento por título em `tasks`/`reminders` (não reaproveita `searchEverything`, que casa a pergunta inteira como uma string); o que Tarefas esconderia nunca vai ao prompt; `reminder` citável sem conteúdo, e a agenda cita os lembretes; três frases de alcance por era; pergunta sem verbo de mudança pula o parse de comandos.
 
 ### B.3 — Recência e janela de datas (1 d, **LB-M3**)
 

@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  AGENDA_REACH,
   ANSWER_REACH,
   ANSWER_SUPPORT_KIND,
   CHAT_REACH,
@@ -18,6 +19,7 @@ import {
   SUPPORT_KINDS,
   buildCitationsEnvelope,
   parseCitations,
+  reachScope,
   supportKindForSource,
 } from "./contracts";
 import { getConversationSourcesCopy } from "./copy";
@@ -170,26 +172,43 @@ describe("2K-SRC-006: the answer discloses its actual reach", () => {
    * The property this file protects is unchanged and now stated precisely, with
    * the admissible set asserted alongside it so neither can drift unnoticed.
    */
-  it("names exactly the two source types chat's retrieval covers", () => {
-    expect([...CHAT_REACH].sort()).toEqual(["entry", "memory"]);
-    // And the copy the owner actually reads still says two places, so the
-    // sentence and the stamped fact cannot disagree.
+  it("names the four source types chat reads since Life Brain B.2, and the sentence says all four", () => {
+    // Was `["entry", "memory"]` until B.2 (`LB-B-006`, ADR-147) added task and
+    // reminder titles. The sentence and the stamped fact still cannot disagree:
+    // the wide reach has its own sentence, and the old one stays for old rows.
+    expect([...CHAT_REACH].sort()).toEqual(["entry", "memory", "reminder", "task"]);
+    expect(reachScope(CHAT_REACH)).toBe("knowledge_wide");
     for (const locale of ["pt-BR", "en"] as const) {
-      expect(getConversationSourcesCopy(locale).reach.toLowerCase())
+      const copy = getConversationSourcesCopy(locale);
+      expect(copy.wideReach.toLowerCase()).toMatch(locale === "pt-BR" ? /tarefas e lembretes/ : /tasks and reminders/);
+      expect(copy.reach.toLowerCase())
         .toMatch(locale === "pt-BR" ? /só nesses dois lugares/ : /those two places only/);
     }
   });
 
-  it("keeps the admissible vocabulary separate from what chat declares", () => {
-    expect([...ANSWER_REACH]).toEqual(["entry", "memory", "task"]);
-    expect([...ANSWER_REACH]).not.toEqual([...CHAT_REACH]);
-    // The control that the separation is real: a review declares the other pair.
+  it("gives each era of reach the sentence that was true when it was answered", () => {
+    expect(reachScope(["entry", "memory"])).toBe("knowledge");
+    expect(reachScope(CHAT_REACH)).toBe("knowledge_wide");
+    expect(reachScope(["task"])).toBe("agenda");
+    expect(reachScope(AGENDA_REACH)).toBe("agenda");
+    expect(reachScope(REVIEW_REACH)).toBe("knowledge");
+    expect(reachScope([])).toBe("knowledge");
+  });
+
+  it("keeps the admissible vocabulary separate from what each caller declares", () => {
+    expect([...ANSWER_REACH]).toEqual(["entry", "memory", "task", "reminder"]);
+    // Since B.2 chat declares the whole vocabulary; the separation is still
+    // real, because a review and the agenda each declare their own subset.
     expect([...REVIEW_REACH]).toEqual(["entry", "task"]);
+    expect([...AGENDA_REACH]).toEqual(["task", "reminder"]);
+    for (const reach of [CHAT_REACH, REVIEW_REACH, AGENDA_REACH]) {
+      for (const type of reach) expect(ANSWER_REACH).toContain(type);
+    }
   });
 
   it("stamps the reach on every new envelope", () => {
     expect(buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: CHAT_REACH }).reach)
-      .toEqual(["entry", "memory"]);
+      .toEqual(["entry", "memory", "task", "reminder"]);
   });
 
   it("claims no reach for a legacy row, which never recorded one", () => {

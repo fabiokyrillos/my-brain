@@ -28,6 +28,7 @@ import {
   REVIEW_REACH,
   buildCitationsEnvelope,
   parseCitations,
+  reachScope,
   supportKindForSource,
   type PersistedSourceReference,
 } from "@/features/conversation-sources/contracts";
@@ -198,12 +199,13 @@ describe("2Q-CITE-008: a review written before the producer keeps working", () =
 });
 
 describe("OD-2Q-1: one vocabulary, and each caller declares its own reach", () => {
-  it("admits three types and no more", () => {
-    expect([...CITED_SOURCE_TYPES]).toEqual(["entry", "memory", "task"]);
+  it("admits four types and no more", () => {
+    // Three until Life Brain B.2 admitted `reminder` (ADR-147).
+    expect([...CITED_SOURCE_TYPES]).toEqual(["entry", "memory", "task", "reminder"]);
     expect([...ANSWER_REACH]).toEqual([...CITED_SOURCE_TYPES]);
   });
 
-  it("leaves chat's declared reach byte-identical to what it was", () => {
+  it("keeps chat's declared reach and the sentence the owner reads in step", () => {
     /*
      * **This is the control that chat did not move**, and it is the assertion
      * that used to read `expect([...ANSWER_REACH]).toEqual(["entry","memory"])`.
@@ -215,7 +217,17 @@ describe("OD-2Q-1: one vocabulary, and each caller declares its own reach", () =
      * If this ever grows a third member without that sentence changing, the
      * product is lying to them.
      */
-    expect([...CHAT_REACH]).toEqual(["entry", "memory"]);
+    /*
+     * Life Brain B.2 (ADR-147) grew it to four, **and changed the sentence with
+     * it**: an envelope stamped with this reach reads `wideReach` ("…e nos
+     * títulos das suas tarefas e lembretes"), and an envelope stamped with the
+     * old pair keeps "só nesses dois lugares". The property is the same one —
+     * what chat declares and what it tells the owner cannot drift — asserted
+     * here and in `conversation-sources/contracts.test.ts`.
+     */
+    expect([...CHAT_REACH]).toEqual(["entry", "memory", "task", "reminder"]);
+    expect(reachScope(CHAT_REACH)).toBe("knowledge_wide");
+    expect(reachScope(["entry", "memory"])).toBe("knowledge");
   });
 
   it("gives a review the reach it actually has", () => {
@@ -225,7 +237,7 @@ describe("OD-2Q-1: one vocabulary, and each caller declares its own reach", () =
 
   it("stamps the caller's reach on the envelope, not a shared default", () => {
     expect(buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: CHAT_REACH }).reach)
-      .toEqual(["entry", "memory"]);
+      .toEqual(["entry", "memory", "task", "reminder"]);
     expect(reviewEnvelope().reach).toEqual(["entry", "task"]);
   });
 

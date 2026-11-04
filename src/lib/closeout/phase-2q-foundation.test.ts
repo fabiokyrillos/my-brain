@@ -470,9 +470,10 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
 
   it("and the widened vocabulary is still pinned in TypeScript, not in SQL", () => {
     const contracts = read(CONTRACTS);
-    // Inverted with the rest: the vocabulary is now three, and it lives in one
-    // constant so a fourth cannot be added in one place and missed in another.
-    expect(contracts).toContain('export const CITED_SOURCE_TYPES = ["entry", "memory", "task"] as const;');
+    // Inverted with the rest: the vocabulary lives in one constant so a new
+    // member cannot be added in one place and missed in another. Life Brain B.2
+    // added the fourth, `reminder` (ADR-147), in exactly that one place.
+    expect(contracts).toContain('export const CITED_SOURCE_TYPES = ["entry", "memory", "task", "reminder"] as const;');
     expect(contracts).toContain("export type CitedSourceType = (typeof CITED_SOURCE_TYPES)[number];");
     expect(contracts, "the schema must read the constant, not a second literal")
       .toContain("type: z.enum(CITED_SOURCE_TYPES)");

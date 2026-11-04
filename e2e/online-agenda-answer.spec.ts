@@ -133,9 +133,10 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE} · ${text.deadlineLane}`);
       // Where it looked, said for the agenda — not "records and memories only".
       await expect(answer.getByText(text.reach)).toBeVisible();
-      // The task is a navigable source, carrying no title in the card; the
-      // reminder is listed and not cited (ADR-146 Decision 2).
+      // The task is a navigable source, carrying no title in the card, and
+      // since Life Brain B.2 (ADR-147) so is its reminder, on the reminder page.
       await expect(answer.locator(`a[href^="/${locale}/app/work/"]`)).toHaveCount(1);
+      await expect(answer.locator(`a[href^="/${locale}/app/reminders/"]`)).toHaveCount(1);
       // No model answered, so no model id is printed under the message.
       await expect(answer.locator("xpath=./small")).toHaveCount(0);
 
