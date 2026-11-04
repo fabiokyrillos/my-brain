@@ -51,6 +51,19 @@ export type WorkCopy = {
      */
     readonly partialCoverage: string;
   };
+  /**
+   * Life Brain A.3 part 3 — the row's actions in a sheet on a phone.
+   *
+   * `moreFor` takes the row's own label for the same reason `revealFor` does
+   * (`2L-ACCESS-003`): fifty buttons named "More actions" name nothing. For a
+   * masked row that label is the protected stub, never the title.
+   */
+  readonly rowActions: {
+    readonly moreFor: (item: string) => string;
+    readonly description: string;
+    readonly open: string;
+    readonly close: string;
+  };
   /** `2L-EDIT-001` — the quick-edit frame on a list row. */
   readonly quickEdit: {
     readonly summary: string;
@@ -122,6 +135,12 @@ const ptBR: WorkCopy = {
     partialCoverage:
       "A proteção acompanha a anotação de origem da tarefa. Tarefas que você criou direto aqui não têm origem para acompanhar.",
   },
+  rowActions: {
+    moreFor: (item) => `Mais ações para ${item}`,
+    description: "O que fazer com esta tarefa. Para editar prazo, prioridade ou relações, abra a tarefa.",
+    open: "Abrir tarefa",
+    close: "Fechar",
+  },
   quickEdit: {
     summary: "Editar aqui",
     summaryFor: (item) => `Editar ${item} aqui`,
@@ -181,6 +200,12 @@ const en: WorkCopy = {
     hideFor: (item) => `Hide protected content for ${item}`,
     partialCoverage:
       "Protection follows the note a task came from. Tasks you typed straight in here have no note to follow.",
+  },
+  rowActions: {
+    moreFor: (item) => `More actions for ${item}`,
+    description: "What to do with this task. To change its dates, priority or links, open the task.",
+    open: "Open task",
+    close: "Close",
   },
   quickEdit: {
     summary: "Edit here",

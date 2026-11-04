@@ -52,6 +52,9 @@ const WORK_SURFACES = [
   "src/features/operations/protected-content.tsx",
   "src/features/operations/undo-affordance.tsx",
   "src/features/operations/inline-create-form.tsx",
+  // Life Brain A.3 part 3: the row's actions in a sheet. A "⋯" button and the
+  // shared dialog — the place a swipe-to-reveal would otherwise be proposed.
+  "src/features/operations/row-actions-sheet.tsx",
   "src/features/daily-cycle/work-view.tsx",
   "src/features/daily-cycle/work-filters.tsx",
   /*

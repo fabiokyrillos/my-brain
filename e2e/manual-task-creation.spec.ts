@@ -99,7 +99,10 @@ test.describe("manual task creation through the validated contract", () => {
       await signIn(page, copy);
       await page.goto(`/${copy.locale}/app/work?view=all`);
 
-      // The same entry point and the same accessible names as before the slice.
+      // Life Brain A.3: the field waits behind the header's "+".
+      await page.locator(".work-quick-add > summary").click();
+
+      // The same accessible names as before the slice.
       // `exact` matters: the field's label is "New task" and the submit button's
       // accessible name is "Add new task", and `getByLabel` substring-matches by
       // default — so the loose form resolves to both and fails strict mode.

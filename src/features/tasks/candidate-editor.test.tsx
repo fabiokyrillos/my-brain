@@ -1110,3 +1110,16 @@ describe("CandidateEditor", () => {
     });
   });
 });
+
+/*
+ * Life Brain A.3 (`IMPLEMENTATION_PLAN.md` §A.3, "`candidate-editor` ternários
+ * migrados para `copy.ts`"). Every visible string of the editor comes from its
+ * typed `copy` record; an inline `locale === "pt-BR" ? … : …` is a second place
+ * a translation can drift, and `LB-X-003` says no new one is written.
+ */
+describe("candidate editor copy lives in its typed record", () => {
+  it("has no inline locale ternary left", () => {
+    const source = readFileSync(path.join(process.cwd(), "src/features/tasks/candidate-editor.tsx"), "utf8");
+    expect(source.match(/locale === "pt-BR" \?/g) ?? []).toEqual([]);
+  });
+});

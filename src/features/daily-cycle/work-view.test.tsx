@@ -72,6 +72,8 @@ describe("WorkView", () => {
   it("preserves manual task creation on the canonical surface", () => {
     renderWork({ locale: "en", view: "all" });
 
+    // Life Brain A.3 part 2: the field lives behind the header's "+".
+    screen.getByText("Add a task", { selector: "summary *" }).closest("details")!.setAttribute("open", "");
     expect(screen.getByLabelText("New task")).toBeVisible();
     expect(screen.getByRole("button", { name: "Add new task" })).toBeVisible();
   });
@@ -353,5 +355,125 @@ describe("WorkView: narrowing, grouping and the position", () => {
     expect(next.getAttribute("href")).toContain("priority=high");
     expect(next.getAttribute("href")).toContain("group=project");
     expect(next.getAttribute("href")).toContain("page=2");
+  });
+});
+
+/*
+ * Life Brain A.3 (`LB-A-006`, `DESIGN_DIRECTION.md` §6.1). The page opened with
+ * an eyebrow, a display title, a lead, a two-line "Adicionar" and three rows of
+ * controls before the first task. These pin the compact shape: one header, one
+ * selection control for the views, an icon-only add that cannot wrap, and the
+ * filters behind one button that says how many are on.
+ */
+describe("WorkView: Life Brain A.3 — the compact Tarefas page", () => {
+  const query = {
+    view: "all" as const,
+    state: "open" as const,
+    due: "any" as const,
+    planned: "any" as const,
+    priority: "any" as const,
+    origin: "any" as const,
+    projectId: null,
+    contextId: null,
+    order: "default" as const,
+    group: "none" as const,
+    page: 1,
+  };
+
+  it("opens with a compact page header and no eyebrow", () => {
+    renderWork({ locale: "pt-BR", view: "all" });
+
+    const heading = screen.getByRole("heading", { level: 1, name: "Tarefas" });
+    expect(heading.closest("header")).toHaveClass("ui-page-header", "ui-page-header--compact");
+    expect(screen.queryByText("EXECUÇÃO")).not.toBeInTheDocument();
+    // The command console keeps its own eyebrow inside its collapsed
+    // disclosure; nothing above the list carries one any more.
+    const visibleEyebrows = Array.from(document.querySelectorAll(".eyebrow")).filter((node) => !node.closest("details"));
+    expect(visibleEyebrows).toEqual([]);
+  });
+
+  it("chooses the view with the one segmented control", () => {
+    renderWork({ locale: "en", view: "waiting" });
+
+    const navigation = screen.getByRole("navigation", { name: "Task views" });
+    expect(navigation).toHaveClass("ui-segmented");
+    expect(within(navigation).getAllByRole("link").map((link) => link.textContent)).toEqual(["Today", "All", "Waiting"]);
+    expect(within(navigation).getByRole("link", { name: "Waiting" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("adds a task with an icon-only button, so the label can never wrap", () => {
+    renderWork({ locale: "pt-BR", view: "today" });
+
+    const add = screen.getByRole("button", { name: "Adicionar nova tarefa" });
+    expect(add).toHaveClass("ui-icon-button");
+    expect(add).toHaveAttribute("type", "submit");
+    expect(add.textContent).toBe("");
+    expect(screen.getByLabelText("Nova tarefa")).toHaveAttribute("placeholder", "Nova tarefa");
+  });
+
+  it("keeps the filters behind one ghost button with no count while nothing is narrowed", () => {
+    renderWork({ locale: "pt-BR", view: "all", query });
+
+    const summary = screen.getByText("Filtros", { selector: "summary *, summary" }).closest("summary")!;
+    expect(summary).toHaveClass("ui-button", "ui-button--ghost");
+    expect(summary.querySelector(".ui-badge")).toBeNull();
+  });
+
+  it("counts the active filters on that button, in words for a screen reader", () => {
+    renderWork({ locale: "en", view: "all", query: { ...query, priority: "high", due: "overdue", origin: "brain" } });
+
+    const summary = document.querySelector("details.work-disclosure > summary")!;
+    const badge = summary.querySelector(".ui-badge")!;
+    expect(badge).toHaveTextContent("3");
+    expect(summary).toHaveAccessibleName("Filters, 3 active");
+  });
+
+  it("shows each task's state as a badge primitive", () => {
+    renderWork({
+      locale: "en",
+      items: [{
+        taskId: "task-1",
+        title: "Blood test",
+        intentionalNoDue: false,
+        humanState: "not_started",
+        origin: "you",
+        availableActions: [],
+        projects: [],
+        contexts: [],
+        people: [],
+        waitingOnPeople: [],
+        sensitivity: { kind: "undetermined" } as const,
+      } as unknown as WorkItemView],
+    });
+
+    expect(screen.getByText("Not started")).toHaveClass("ui-badge");
+  });
+
+  it("puts the quick add behind one “+” in the header, closed until asked", () => {
+    renderWork({ locale: "pt-BR", view: "today" });
+
+    const header = screen.getByRole("heading", { level: 1, name: "Tarefas" }).closest("header")!;
+    const disclosure = header.querySelector("details.work-quick-add")!;
+    expect(disclosure).not.toHaveAttribute("open");
+    const summary = disclosure.querySelector("summary")!;
+    expect(summary).toHaveClass("ui-button", "ui-icon-button");
+    expect(summary).toHaveTextContent("Adicionar uma tarefa");
+    expect(within(disclosure as HTMLElement).getByLabelText("Nova tarefa")).not.toBeVisible();
+  });
+
+  it("puts the views and the toolbar on one row of controls", () => {
+    renderWork({ locale: "en", view: "all", query });
+
+    const row = document.querySelector(".work-controls")!;
+    expect(row.querySelector("nav.ui-segmented")).not.toBeNull();
+    expect(row.querySelectorAll("details.work-disclosure > summary.ui-button")).toHaveLength(2);
+  });
+
+  it("names the command console's button in full even where it shows only its icon", () => {
+    renderWork({ locale: "pt-BR", view: "all", query });
+
+    const summaries = Array.from(document.querySelectorAll(".work-controls details.work-disclosure > summary"));
+    const consoleSummary = summaries.find((summary) => summary.textContent?.includes("Mude uma tarefa"))!;
+    expect(consoleSummary.querySelector(".ui-button__label")).toHaveClass("work-control-label");
   });
 });

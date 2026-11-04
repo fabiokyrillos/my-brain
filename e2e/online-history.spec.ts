@@ -93,6 +93,7 @@ test.describe("history reads as sentences, filters in the database, and links to
     const projectName = `Atlas ${crypto.randomUUID().slice(0, 8)}`;
 
     await page.goto("/pt-BR/app/work?view=all");
+    await page.locator(".work-quick-add > summary").click();
     const field = page.getByLabel("Nova tarefa", { exact: true });
     await field.fill(taskTitle);
     await page.getByRole("button", { name: "Adicionar nova tarefa" }).click();

@@ -602,13 +602,15 @@ function conversationSuggestions() {
  */
 function workList() {
   const row = (id: string, main: string) =>
-    `<article class="list-row">`
+    `<article class="list-row work-row">`
     + `<label class="work-row-select"><input type="checkbox">`
     + `<span class="sr-only">Select task ${id}</span></label>`
     + `<div class="list-row-main">${main}`
-    + `<small class="work-origin">Criada por você</small></div>`
+    + `<div class="work-row-meta"><small class="work-origin">Criada por você</small>`
+    + `<span>06/11/2026, 12:00</span><span class="ui-badge ui-badge--sm">Alta</span></div></div>`
     + `<div class="list-meta">`
-    + `<span class="status-badge">Não iniciada</span>`
+    + `<span class="ui-badge ui-badge--sm">Não iniciada</span>`
+    + `<div class="work-row-inline">`
     + `<div class="row-actions">`
     + `<form><button class="row-action" type="submit">Concluir</button></form>`
     + `<form><button class="row-action" type="submit">Aguardar</button></form>`
@@ -630,6 +632,10 @@ function workList() {
     + `<span class="task-control-name">Reagendar</span>`
     + `</form></li>`
     + `</ul></div></details>`
+    + `</div>`
+    // Life Brain A.3 part 3: the phone's way to the same verbs.
+    + `<button aria-haspopup="dialog" aria-label="Mais ações para Tarefa ${id}" class="ui-button ui-button--ghost ui-button--md ui-icon-button work-row-more" type="button">`
+    + `<span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span></button>`
     + `</div></article>`;
 
   const ordinary = row(
@@ -1195,7 +1201,9 @@ test("2L-MOBILE-007: every row's primary action is reachable without scrolling s
   await render(page, WORK_MOBILE());
 
   const width = await page.evaluate(() => document.documentElement.clientWidth);
-  const actions = page.locator(".list-row .row-action");
+  // Life Brain A.3 part 3: on a phone the inline verbs leave the row and the
+  // "⋯" that opens them in a sheet is what has to be in reach.
+  const actions = page.locator(".list-row .row-action:visible, .list-row .work-row-more:visible");
   const total = await actions.count();
   expect(total).toBeGreaterThan(0);
   for (let index = 0; index < total; index += 1) {
@@ -1235,7 +1243,17 @@ test("2L-MOBILE-003: no Work action is reachable only on hover", async ({ page }
 
   // Every control is measured **without** hovering. A control that only paints
   // on `:hover` computes to zero size or `visibility: hidden` here.
-  const controls = page.locator(".work-page button, .work-page a[href], .work-filters a[href]");
+  // Life Brain A.3 part 3: the inline verbs are not hidden until hover on a
+  // phone — they are replaced, by a visible "⋯" per row that opens them in a
+  // sheet. So what a phone shows is measured, and every row must carry the "⋯".
+  const rows = page.locator(".work-page .list-row");
+  for (let index = 0; index < await rows.count(); index += 1) {
+    await expect(rows.nth(index).locator(".work-row-more"), `row ${index} has no visible way to its actions`).toBeVisible();
+  }
+  await expect(page.locator(".work-row-inline").first()).toBeHidden();
+  const controls = page.locator(
+    ".work-page button:not(.work-row-inline *), .work-page a[href]:not(.work-row-inline *), .work-filters a[href]",
+  );
   const total = await controls.count();
   expect(total).toBeGreaterThan(4);
   for (let index = 0; index < total; index += 1) {
@@ -1266,8 +1284,14 @@ test("2L-MOBILE-009: the Work surfaces reflow at 320 CSS pixels", async ({ page 
   expect(overflow.scrollWidth, "content is clipped or scrolls sideways at 320px")
     .toBeLessThanOrEqual(overflow.clientWidth + 1);
 
-  // And nothing became unreachable in the process.
-  const controls = page.locator(".work-page button, .work-filters a[href]");
+  // And nothing became unreachable in the process. Life Brain A.3 part 3: at
+  // this width the inline verbs are replaced by each row's "⋯", which opens the
+  // same verbs in a sheet — so the "⋯" is what must still be there.
+  const rows = page.locator(".work-page .list-row");
+  for (let index = 0; index < await rows.count(); index += 1) {
+    expect(await rows.nth(index).locator(".work-row-more").boundingBox(), `row ${index} lost its way to its actions at 320px`).not.toBeNull();
+  }
+  const controls = page.locator(".work-page button:not(.work-row-inline *), .work-filters a[href]");
   const total = await controls.count();
   expect(total).toBeGreaterThan(4);
   for (let index = 0; index < total; index += 1) {

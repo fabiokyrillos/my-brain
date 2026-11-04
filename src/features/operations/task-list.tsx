@@ -14,6 +14,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Badge, type BadgeProps } from "@/components/ui";
 import type { WorkItemHumanState, WorkItemPriority, WorkItemView } from "@/features/daily-cycle/contracts";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
@@ -39,7 +40,9 @@ import {
   type Selection,
 } from "./selection";
 import type { TaskUndoHandler } from "./undo-affordance";
+import { RowActionsSheet } from "./row-actions-sheet";
 import { WorkItemActions, type WorkItemActionHandler } from "./work-item-actions";
+import { isWorkSurfaceAction } from "@/features/task-commands/taxonomy";
 
 const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   not_started: { pt: "Não iniciada", en: "Not started" },
@@ -59,6 +62,20 @@ const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
   medium: { pt: "Média", en: "Medium" },
   high: { pt: "Alta", en: "High" },
   urgent: { pt: "Urgente", en: "Urgent" },
+};
+
+/*
+ * Life Brain A.3. The state is a `Badge`; its tone repeats what the word
+ * already says, so colour is never the only signal (`2L-ACCESS`).
+ */
+const stateTone: Record<WorkItemHumanState, BadgeProps["tone"]> = {
+  not_started: "neutral",
+  in_progress: "info",
+  waiting_on_someone: "warning",
+  blocked: "risk",
+  deferred: "neutral",
+  completed: "success",
+  cancelled: "neutral",
 };
 
 export type { WorkItemActionHandler };
@@ -259,9 +276,13 @@ function TaskRow({
   // the link rather than the row, because the row contains the action forms and
   // a <form> inside an <a> is not valid markup.
   const openHref = task.availableActions.find((available) => available.id === "open_task")?.href;
+  // What this row may be called outside its own protected slot — the sheet's
+  // button and title (`2L-PRIVACY-001`): the protected stub when masked.
+  const label = resolveTaskContent(task.sensitivity, task.taskId).masked ? getWorkCopy(locale).protected.label : task.title;
+  const hasVerbs = task.availableActions.some((available) => isWorkSurfaceAction(available.id));
 
   return (
-    <article className="list-row">
+    <article className="list-row work-row">
       {selectable ? (
         <label className="work-row-select">
           {/*
@@ -306,77 +327,102 @@ function TaskRow({
           {openHref ? <Link className="work-title-link" href={openHref}><strong>{task.title}</strong></Link> : <strong>{task.title}</strong>}
           {task.description && <p>{task.description}</p>}
         </ProtectedContent>
-        <small className="work-origin">{task.origin === "brain" ? (pt ? `Sugerida pelo ${agentName}` : `Suggested by ${agentName}`) : (pt ? "Criada por você" : "Created by you")}</small>
-        {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
-          || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (
-          <div className="work-relations">
-            {task.projects.map((project) => (
-              <span className="status-badge" key={`project-${project.id}`}>{project.label}</span>
-            ))}
-            {task.contexts.map((context) => (
-              <span className="status-badge" key={`context-${context.id}`}>{context.label}</span>
-            ))}
-            {task.people.map((person) => (
-              <span className="status-badge" key={`person-${person.id}`}>{person.label}</span>
-            ))}
-            {task.waitingOnPeople.map((person) => (
-              <span className="status-badge" key={`waiting-on-${person.id}`}>
-                {(pt ? "Aguardando: " : "Waiting on: ") + person.label}
-              </span>
-            ))}
-            {task.parent && (
-              <span className="status-badge" key={`parent-${task.parent.id}`}>
-                {(pt ? "Tarefa-mãe: " : "Parent: ") + task.parent.label}
-              </span>
-            )}
-            {task.dependsOn?.map((dependency) => (
-              <span className="status-badge" key={`depends-on-${dependency.id}`}>
-                {(pt ? "Depende de: " : "Depends on: ") + dependency.label}
-              </span>
-            ))}
-          </div>
-        )}
+        {/*
+          Life Brain A.3 part 3: one meta line under the title — who made it,
+          when it is due or meant, how urgent, and what it belongs to. These
+          used to sit in the trailing column beside the actions, which is
+          what pushed every row on a phone to four or five lines.
+        */}
+        <div className="work-row-meta">
+          <small className="work-origin">{task.origin === "brain" ? (pt ? `Sugerida pelo ${agentName}` : `Suggested by ${agentName}`) : (pt ? "Criada por você" : "Created by you")}</small>
+          {task.dueAt && <span>{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.dueAt))}</span>}
+          {!task.dueAt && task.intentionalNoDue && (
+            <Badge size="sm">{pt ? "Sem prazo" : "No due date"}</Badge>
+          )}
+          {/*
+            `2M-PLAN-001`. This line used to be `pt ? "Planejado: " : "Planned: "`
+            with a `timeStyle: "short"` beside it — a second declaration of what
+            the column means, three files from a calendar that had independently
+            decided the same column was an *intention*. Both halves were wrong in
+            the same direction: the ternary said it here, and the clock component
+            presented a day the user chose as a time they reserved.
+          */}
+          {task.plannedAt && (
+            <span>
+              {`${getPlannedAtCopy(locale).prefix} `}
+              {formatPlannedDay(task.plannedAt, locale, timezone)}
+            </span>
+          )}
+          {task.priority && (
+            <Badge size="sm">{priorityCopy[task.priority][pt ? "pt" : "en"]}</Badge>
+          )}
+          {task.noDueReason && <small>{task.noDueReason}</small>}
+          {(task.projects.length > 0 || task.contexts.length > 0 || task.people.length > 0
+            || task.waitingOnPeople.length > 0 || task.parent || (task.dependsOn?.length ?? 0) > 0) && (
+            <span className="work-relations">
+              {task.projects.map((project) => (
+                <Badge size="sm" key={`project-${project.id}`}>{project.label}</Badge>
+              ))}
+              {task.contexts.map((context) => (
+                <Badge size="sm" key={`context-${context.id}`}>{context.label}</Badge>
+              ))}
+              {task.people.map((person) => (
+                <Badge size="sm" key={`person-${person.id}`}>{person.label}</Badge>
+              ))}
+              {task.waitingOnPeople.map((person) => (
+                <Badge size="sm" key={`waiting-on-${person.id}`}>
+                  {(pt ? "Aguardando: " : "Waiting on: ") + person.label}
+                </Badge>
+              ))}
+              {task.parent && (
+                <Badge size="sm" key={`parent-${task.parent.id}`}>
+                  {(pt ? "Tarefa-mãe: " : "Parent: ") + task.parent.label}
+                </Badge>
+              )}
+              {task.dependsOn?.map((dependency) => (
+                <Badge size="sm" key={`depends-on-${dependency.id}`}>
+                  {(pt ? "Depende de: " : "Depends on: ") + dependency.label}
+                </Badge>
+              ))}
+            </span>
+          )}
+        </div>
       </div>
       <div className="list-meta">
-        {task.dueAt && <span>{new Intl.DateTimeFormat(locale, { dateStyle: "short", timeStyle: "short", timeZone: timezone }).format(new Date(task.dueAt))}</span>}
-        {!task.dueAt && task.intentionalNoDue && (
-          <span className="status-badge">{pt ? "Sem prazo" : "No due date"}</span>
-        )}
+        <Badge size="sm" tone={stateTone[task.humanState]}>{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</Badge>
         {/*
-          `2M-PLAN-001`. This line used to be `pt ? "Planejado: " : "Planned: "`
-          with a `timeStyle: "short"` beside it — a second declaration of what
-          the column means, three files from a calendar that had independently
-          decided the same column was an *intention*. Both halves were wrong in
-          the same direction: the ternary said it here, and the clock component
-          presented a day the user chose as a time they reserved.
+          Inline from a tablet up; hidden on a phone, where the "⋯" below opens
+          the same verbs in a sheet. CSS decides which one a viewport shows, so
+          neither depends on JavaScript having measured anything.
         */}
-        {task.plannedAt && (
-          <span>
-            {`${getPlannedAtCopy(locale).prefix} `}
-            {formatPlannedDay(task.plannedAt, locale, timezone)}
-          </span>
-        )}
-        {task.priority && (
-          <span className="status-badge">{priorityCopy[task.priority][pt ? "pt" : "en"]}</span>
-        )}
-        {task.noDueReason && <small>{task.noDueReason}</small>}
-        <span className="status-badge">{humanStateCopy[task.humanState][pt ? "pt" : "en"]}</span>
-        <WorkItemActions action={action} locale={locale} task={task} undoAction={undoAction} />
-        {/*
-          `2L-EDIT-001`. The controls arrive already derived from the taxonomy
-          against this row's real status — this row does not compute them, and
-          could not: `humanState` is lossy on purpose.
-        */}
-        {quickEdit ? (
-          <QuickEdit
-            action={quickEdit.action}
-            controls={quickEdit.controlsByTaskId[task.taskId] ?? []}
-            dateBounds={quickEdit.dateBounds}
+        <div className="work-row-inline">
+          <WorkItemActions action={action} locale={locale} task={task} undoAction={undoAction} />
+          {/*
+            `2L-EDIT-001`. The controls arrive already derived from the taxonomy
+            against this row's real status — this row does not compute them, and
+            could not: `humanState` is lossy on purpose.
+          */}
+          {quickEdit ? (
+            <QuickEdit
+              action={quickEdit.action}
+              controls={quickEdit.controlsByTaskId[task.taskId] ?? []}
+              dateBounds={quickEdit.dateBounds}
+              locale={locale}
+              relationOptions={quickEdit.relationOptions}
+              taskId={task.taskId}
+              title={task.title}
+              undoAction={quickEdit.undoAction}
+            />
+          ) : null}
+        </div>
+        {hasVerbs ? (
+          <RowActionsSheet
+            action={action}
+            label={label}
             locale={locale}
-            relationOptions={quickEdit.relationOptions}
-            taskId={task.taskId}
-            title={task.title}
-            undoAction={quickEdit.undoAction}
+            openHref={openHref}
+            task={task}
+            undoAction={undoAction}
           />
         ) : null}
       </div>

@@ -1248,3 +1248,178 @@ test.describe("the person-candidate card stays usable at every width", () => {
     }
   });
 });
+
+/*
+ * Life Brain A.3 (`LB-A-006`) — the compact Tarefas page, mirroring what
+ * `WorkView` renders: `PageHeader compact` with the quick add as its action,
+ * the Lista · Calendário · Planejar modes, the `SegmentedControl` for the
+ * views, and the toolbar of ghost buttons. The baseline recorded a two-line
+ * "Adicionar" and segmented options under the touch minimum on a phone.
+ */
+function tarefasBody(options: { quickAddOpen?: boolean } = {}) {
+  const ghost = "ui-button ui-button--ghost ui-button--sm";
+  const icon = '<span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span>';
+  return `<div class="content-page work-page">
+    <header class="ui-page-header ui-page-header--compact work-page-header">
+      <div class="ui-page-header__text"><h1 class="ui-page-header__title">Tarefas</h1>
+        <p class="ui-page-header__description">Prazos de hoje e atrasos que ainda estão abertos.</p></div>
+      <div class="ui-page-header__actions"><details class="work-quick-add"${options.quickAddOpen ? " open" : ""}>
+        <summary class="ui-button ui-button--primary ui-button--md ui-icon-button">${icon}<span class="sr-only">Adicionar uma tarefa</span></summary>
+        <div><form class="inline-create">
+          <label for="new-task" class="sr-only">Nova tarefa</label>
+          <input id="new-task" name="name" placeholder="Nova tarefa">
+          <button type="submit" aria-label="Adicionar nova tarefa" class="ui-button ui-button--primary ui-button--md ui-icon-button">${icon}</button>
+        </form></div>
+      </details></div>
+    </header>
+    <nav aria-label="Modos das tarefas" class="work-modes"><a aria-current="page" class="work-mode" href="#">Lista</a><a class="work-mode" href="#">Calendário</a><a class="work-mode" href="#">Planejar</a></nav>
+    <div class="work-controls">
+      <nav aria-label="Visões das tarefas" class="ui-segmented work-view-tabs">
+        <a aria-current="page" class="ui-segmented__option" href="#">Hoje</a><a class="ui-segmented__option" href="#">Todas</a><a class="ui-segmented__option" href="#">Aguardando</a>
+      </nav>
+      <div class="work-toolbar">
+        <details class="work-disclosure"><summary class="${ghost}">${icon}<span class="ui-button__label work-control-label">Filtros</span></summary></details>
+        <details class="work-disclosure"><summary class="${ghost}">${icon}<span class="ui-button__label work-control-label">Mude uma tarefa com suas palavras</span></summary></details>
+      </div>
+    </div>
+    <div class="list-stack">${taskRow("first-task", "Exame de sangue")}${taskRow("second-task", LONG_TITLE)}</div>
+  </div>`;
+}
+
+/** Mirrors `TaskRow` (part 3): selection, title + meta line, state + actions. */
+function taskRow(id: string, title: string) {
+  const icon = '<span aria-hidden="true" class="ui-button__icon"><svg width="16" height="16"></svg></span>';
+  return `<article class="list-row work-row" id="${id}">`
+    + `<label class="work-row-select"><input type="checkbox"><span class="sr-only">Selecionar ${title}</span></label>`
+    + `<div class="list-row-main"><a class="work-title-link" href="#"><strong>${title}</strong></a>`
+    + `<div class="work-row-meta"><small class="work-origin">Criada por você</small><span>06/11/2026, 12:00</span>`
+    + `<span class="ui-badge ui-badge--sm">Alta</span><span class="work-relations"><span class="ui-badge ui-badge--sm">Saúde</span></span></div></div>`
+    + `<div class="list-meta"><span class="ui-badge ui-badge--sm">Não iniciada</span>`
+    + `<div class="work-row-inline"><div class="row-actions">`
+    + `<form><button class="row-action" type="submit">Concluir</button></form>`
+    + `<form><button class="row-action" type="submit">Aguardar</button></form></div>`
+    + `<details class="work-quick-edit"><summary class="work-quick-edit-summary">Editar aqui</summary></details></div>`
+    + `<button aria-haspopup="dialog" aria-label="Mais ações para ${title}" class="ui-button ui-button--ghost ui-button--md ui-icon-button work-row-more" type="button">${icon}</button>`
+    + `</div></article>`;
+}
+
+/** Mirrors the open sheet: `ConfirmDialog` with `work-row-sheet`, portalled to body. */
+function rowSheet() {
+  return `<div class="task-command-dialog-backdrop"><div role="dialog" aria-modal="true" aria-labelledby="s-title" class="task-command-dialog work-row-sheet">`
+    + `<h3 id="s-title">Exame de sangue</h3><p>O que fazer com esta tarefa.</p>`
+    + `<div class="task-command-dialog-body"><div class="row-actions">`
+    + `<form><button class="row-action" type="submit">Concluir</button></form>`
+    + `<form><button class="row-action" type="submit">Aguardar</button></form></div>`
+    + `<a class="ui-button ui-button--secondary ui-button--md" href="#">Abrir tarefa</a>`
+    + `<button class="task-command-dialog-cancel" type="button">Fechar</button></div></div></div>`;
+}
+
+test.describe("Life Brain A.3: the compact Tarefas page on a phone", () => {
+  test("the quick add waits behind a square "+" on the title's row", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const plus = (await page.locator(".work-quick-add > summary").boundingBox())!;
+    const title = (await page.getByRole("heading", { level: 1 }).boundingBox())!;
+    expect(plus.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(plus.width - plus.height)).toBeLessThanOrEqual(1);
+    expect(plus.y).toBeLessThan(title.y + title.height);
+    await expect(page.getByLabel("Nova tarefa", { exact: true })).toBeHidden();
+  });
+
+  test("the views and both toolbar buttons fit one row on a 390px phone", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const tops = await page.locator(".work-controls > nav, .work-controls summary").evaluateAll(
+      (nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+    );
+    expect(tops).toHaveLength(3);
+    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(8);
+  });
+
+  test("the add control is one square that never wraps, and the field takes the width", async ({ page }) => {
+    await render(page, tarefasBody({ quickAddOpen: true }), 390, 844);
+    const add = page.getByRole("button", { name: "Adicionar nova tarefa" });
+    const box = (await add.boundingBox())!;
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+    const field = (await page.getByLabel("Nova tarefa", { exact: true }).boundingBox())!;
+    expect(Math.abs((field.y + field.height / 2) - (box.y + box.height / 2))).toBeLessThanOrEqual(2);
+    expect(field.width).toBeGreaterThan(box.width * 3);
+  });
+
+  test("every view option and toolbar button meets the touch minimum", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const coarse = await page.evaluate(() => matchMedia("(pointer: coarse)").matches);
+    for (const name of ["Hoje", "Todas", "Aguardando"]) {
+      const box = (await page.getByRole("navigation", { name: "Visões das tarefas" }).getByRole("link", { name }).boundingBox())!;
+      expect(box.height, name).toBeGreaterThanOrEqual(44);
+    }
+    if (coarse) {
+      for (const summary of await page.locator(".work-toolbar summary").all()) {
+        expect((await summary.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+  });
+
+  test("the page never scrolls sideways at 320 CSS px", async ({ page }) => {
+    await render(page, tarefasBody(), 320, 700);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe("Life Brain A.3 part 3: the task row and its sheet", () => {
+  test("on a phone the row keeps three slots, shows the “⋯” and hides the inline verbs", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const row = page.locator("#first-task");
+    await expect(row.locator(".work-row-more")).toBeVisible();
+    await expect(row.locator(".work-row-inline")).toBeHidden();
+    const more = (await row.locator(".work-row-more").boundingBox())!;
+    expect(more.width).toBeGreaterThanOrEqual(44);
+    expect(more.height).toBeGreaterThanOrEqual(44);
+    const title = (await row.locator(".list-row-main").boundingBox())!;
+    // The title keeps the row's width: the trailing column is narrow, beside it.
+    expect(title.width).toBeGreaterThan(180);
+    // The state badge sits over the "⋯"; both stay within the title's first lines.
+    expect(more.y - title.y).toBeLessThanOrEqual(40);
+  });
+
+  test("on a phone a short task is one compact row, not a stack", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const height = (await page.locator("#first-task").boundingBox())!.height;
+    // A title, one wrapped meta line and the state-over-"⋯" column. Before
+    // part 3 the same row stacked its dates, chips, two full-width verbs and
+    // "Editar aqui" under the title.
+    expect(height).toBeLessThanOrEqual(120);
+  });
+
+  test("from a tablet up the verbs are inline and the “⋯” is gone", async ({ page }) => {
+    await render(page, tarefasBody(), 1280, 900);
+    const row = page.locator("#first-task");
+    await expect(row.locator(".work-row-inline .row-action").first()).toBeVisible();
+    await expect(row.locator(".work-row-more")).toBeHidden();
+  });
+
+  test("a long title never pushes the trailing slot off the row", async ({ page }) => {
+    await render(page, tarefasBody(), 375, 812);
+    const row = (await page.locator("#second-task").boundingBox())!;
+    const more = (await page.locator("#second-task .work-row-more").boundingBox())!;
+    expect(more.x + more.width).toBeLessThanOrEqual(row.x + row.width + 1);
+  });
+
+  test("the sheet rises from the bottom at full width on a phone", async ({ page }) => {
+    await render(page, rowSheet(), 390, 844);
+    const sheet = (await page.getByRole("dialog").boundingBox())!;
+    expect(Math.round(sheet.width)).toBe(390);
+    expect(Math.round(sheet.y + sheet.height)).toBe(844);
+    for (const name of ["Concluir", "Aguardar", "Fechar"]) {
+      const box = (await page.getByRole("dialog").getByRole("button", { name }).boundingBox())!;
+      expect(box.height, name).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test("the same dialog stays centred on a desktop", async ({ page }) => {
+    await render(page, rowSheet(), 1280, 900);
+    const sheet = (await page.getByRole("dialog").boundingBox())!;
+    expect(sheet.width).toBeLessThanOrEqual(461);
+    expect(Math.abs(sheet.x + sheet.width / 2 - 640)).toBeLessThanOrEqual(2);
+  });
+});
