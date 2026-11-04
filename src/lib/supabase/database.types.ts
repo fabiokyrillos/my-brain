@@ -3628,16 +3628,32 @@ export type Database = {
         Args: { p_entry_id: string; p_service_user_id: string }
         Returns: boolean
       }
-      match_internal_knowledge: {
-        Args: { p_match_count?: number; p_query_embedding: string }
-        Returns: {
-          content: string
-          occurred_at: string
-          similarity: number
-          source_id: string
-          source_type: string
-        }[]
-      }
+      match_internal_knowledge:
+        | {
+            Args: { p_match_count?: number; p_query_embedding: string }
+            Returns: {
+              content: string
+              occurred_at: string
+              similarity: number
+              source_id: string
+              source_type: string
+            }[]
+          }
+        | {
+            Args: {
+              p_match_count: number
+              p_query_embedding: string
+              p_since: string
+              p_until: string
+            }
+            Returns: {
+              content: string
+              occurred_at: string
+              similarity: number
+              source_id: string
+              source_type: string
+            }[]
+          }
       model_only_element_trust: {
         Args: { p_model_confidence: number }
         Returns: Json
