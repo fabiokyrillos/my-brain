@@ -26,6 +26,7 @@ function item(overrides: Partial<CalendarItemView> & Pick<CalendarItemView, "id"
     reschedule: null,
     repeats: null,
     joinedReminders: [],
+    span: null,
     ...overrides,
   };
 }
@@ -53,7 +54,8 @@ describe("agendaQueryFor — the window each question names", () => {
     expect(agendaQueryFor({ kind: "day", offset: 0 }, TODAY)).toEqual({
       orientation: "day",
       anchor: TODAY,
-      lanes: ["deadline", "intention", "reminder"],
+      // Life Brain C.3: confirmed events are on the agenda too.
+      lanes: ["deadline", "intention", "reminder", "event"],
     });
     expect(agendaQueryFor(TOMORROW, TODAY).anchor).toEqual({ year: 2026, month: 11, day: 1 });
     expect(agendaQueryFor({ kind: "day", offset: 2 }, TODAY).anchor).toEqual({ year: 2026, month: 11, day: 2 });
@@ -85,7 +87,7 @@ describe("agendaQueryFor — the window each question names", () => {
 
   it("never asks the projection for reviews or unconfirmed suggestions", () => {
     for (const span of [TOMORROW, { kind: "week", offset: 0 }, { kind: "month", offset: 1 }] as const) {
-      expect(agendaQueryFor(span, TODAY).lanes).toEqual(["deadline", "intention", "reminder"]);
+      expect(agendaQueryFor(span, TODAY).lanes).toEqual(["deadline", "intention", "reminder", "event"]);
     }
   });
 });
@@ -230,7 +232,7 @@ describe("composeAgendaAnswer — the projection, said as an answer", () => {
       span: TOMORROW,
       locale: "pt-BR",
       projection: projection([{ date: "2026-11-01", items: [] }], [
-        { lane: "deadline" }, { lane: "intention" }, { lane: "reminder" },
+        { lane: "deadline" }, { lane: "intention" }, { lane: "reminder" }, { lane: "event" },
       ]),
     })).toThrow();
   });

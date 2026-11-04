@@ -73,8 +73,8 @@ function normalizeTranscriptionUsage(response: unknown): AIUsageDetails {
   };
 }
 
-export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v3";
-export const EXTRACTION_PROMPT_VERSION = "2026-11-04.2";
+export const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v4";
+export const EXTRACTION_PROMPT_VERSION = "2026-11-04.3";
 
 /** Explicit ceiling per provider call. See the constructor for why. */
 export const NODE_OPENAI_TIMEOUT_MS = 120_000;
@@ -137,6 +137,14 @@ Examples of the area:
 - "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> lifeArea: travel.
 - "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
 - "Reunião do Projeto Aurora com a Marina" -> lifeArea: work.
+
+Events:
+- eventCandidates: things that happen at a time or over a period and belong on the owner's agenda — a consultation, an exam at the lab, a dinner, a flight, a trip. title in the entry's own language; startsAt and endsAt are ISO instants with the user's offset (endsAt null when only a start is known; for a trip, the end of its last day); allDay true for a whole day or days with no time given (a trip, a holiday), false when a time is given; location when the entry names one, else null; explicit true when the entry states the date, false when you inferred it. An event is not a task: "consulta dia 12 às 15h" is an event, "marcar a consulta" is a task. Something that already happened is a completed_activity, not an event candidate. Use [] when there is none.
+
+Examples of events:
+- "Consulta com o cardiologista dia 12 às 15h" -> eventCandidates: "Consulta com o cardiologista", the 12th at 15:00, allDay false. taskCandidates: none.
+- "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> eventCandidates: "Viagem a Lisboa", 3 to 10 December, allDay true, location Lisboa.
+- "Preciso marcar o dentista" -> eventCandidates: none. taskCandidates: one task.
 
 Known concept identifiers are fixed by the response schema.`;
 

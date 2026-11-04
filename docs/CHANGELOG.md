@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-04 — Life Brain C.3: events with a period, confirmed by the owner, on the calendar's sixth lane (LB-M2)
+
+- **Migration `202611040106_life_brain_m2_events.sql`** (LB-M2, ADR-152, supersedes OD-2M-3 A): `public.events` (RLS forced, SELECT-only for the owner, owned composite FKs, no sensitivity column), `confirm_entry_event_candidates` (definer, owner + current-interpretation checks, candidate validation, idempotent, one event per candidate, area context, undo + audit), `private.undo_confirm_entry_event_candidates` registered with the router, `cancel_event`. pgTAP `life_brain_m2_events.sql` (30).
+- **Extraction:** `eventCandidates[]` in both runtimes (≤ 20, `endsAt` never before `startsAt`), `storedEntryExtractionSchema` default `[]`, an events prompt section with three life examples, `entry-extraction-v4` / `2026-11-04.3`, 20 parity cases.
+- **Record page:** "Pôr na agenda?" lists the candidates checked, with period and place; confirming announces the result with an undo; events already on the agenda are listed with a named cancel (`src/features/events/`).
+- **Calendar:** `event` is the sixth lane (committed); a multi-day event sits on each day it covers; all-day reads "Dia todo". The chat's agenda answer and Home's agenda include events.
+- **Wiring the guards asked for:** the 14 chain guards → 106; the 2F cleanup partition and the privacy enumeration (events with reminders, "Lembretes, eventos e notificações"); the history vocabulary (three actions, the `event` subject, not linkable); `database.types.ts`; `SECURITY.md`; `DATABASE.md`.
+
 ## 2026-11-04 — Life Brain C.2: a person's role becomes their note, and a lasting record is offered as a memory
 
 - **`people[].role`** in the extraction (ADR-151): required and nullable in both runtimes (Zod `personCandidateSchema`, the worker's validator, its strict JSON Schema), only when the entry says it; `storedEntryExtractionSchema` reads older people as `role: null`; 8 parity cases; `entry-extraction-v3` / `2026-11-04.2`.

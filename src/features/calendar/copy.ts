@@ -69,6 +69,8 @@ export type CalendarCopy = {
     readonly elapsed: string;
     /** Life Brain A.4: the task's own reminder, on the task's line. */
     readonly joinedReminder: (times: string) => string;
+    /** Life Brain C.3: an event with no time of day. */
+    readonly allDay: string;
     readonly open: (label: string) => string;
     readonly at: (time: string) => string;
   };
@@ -129,6 +131,7 @@ const PT_BR: CalendarCopy = {
       reminder: "Lembretes",
       review: "Revisões",
       suggestion: "Datas sugeridas",
+      event: "Eventos",
     },
     descriptions: {
       deadline: "Tarefas com data-limite.",
@@ -136,6 +139,7 @@ const PT_BR: CalendarCopy = {
       reminder: "Lembretes marcados para um horário.",
       review: "Períodos que você já revisou.",
       suggestion: "Datas que o Brain identificou e você ainda não confirmou.",
+      event: "Consultas, viagens e outros compromissos com hora ou período.",
     },
   },
   commitment: {
@@ -162,6 +166,7 @@ const PT_BR: CalendarCopy = {
   item: {
     elapsed: "Já passou",
     joinedReminder: (times) => `Lembrete às ${times}`,
+    allDay: "Dia todo",
     open: (label) => `Abrir ${label}`,
     at: (time) => `às ${time}`,
   },
@@ -200,6 +205,7 @@ const EN: CalendarCopy = {
       reminder: "Reminders",
       review: "Reviews",
       suggestion: "Suggested dates",
+      event: "Events",
     },
     descriptions: {
       deadline: "Tasks with a due date.",
@@ -207,6 +213,7 @@ const EN: CalendarCopy = {
       reminder: "Reminders set for a time.",
       review: "Periods you have already reviewed.",
       suggestion: "Dates the Brain found and you have not confirmed.",
+      event: "Appointments, trips and other plans with a time or a period.",
     },
   },
   commitment: {
@@ -233,6 +240,7 @@ const EN: CalendarCopy = {
   item: {
     elapsed: "Already passed",
     joinedReminder: (times) => `Reminder at ${times}`,
+    allDay: "All day",
     open: (label) => `Open ${label}`,
     at: (time) => `at ${time}`,
   },

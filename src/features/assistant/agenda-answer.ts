@@ -58,7 +58,8 @@ import type { AgendaSpan } from "./agenda-intent";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
-const AGENDA_LANES: readonly AgendaLane[] = ["deadline", "intention", "reminder"];
+// Life Brain C.3: confirmed events are on the agenda too (ADR-152).
+const AGENDA_LANES: readonly AgendaLane[] = ["deadline", "intention", "reminder", "event"];
 
 /** Lines listed before the answer points at the Agenda for the rest. */
 const MAX_LISTED_ITEMS = 15;

@@ -59,7 +59,7 @@ function client(tables: Record<string, Result | ((column: string, select: string
       let column = "";
       let select = "";
       const stub: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "in", "lt", "gte", "neq", "not", "is", "order", "range"]) {
+      for (const method of ["select", "eq", "in", "lt", "gte", "neq", "not", "is", "order", "range", "or"]) {
         stub[method] = vi.fn((first: unknown) => {
           if (method === "select" && typeof first === "string") select = first;
           if ((method === "gte" || method === "lt") && typeof first === "string" && !column) {
@@ -635,5 +635,47 @@ describe("Life Brain A.4: a task's own reminder rides on the task's line", () =>
     expect(items.map((item) => item.id).sort()).toEqual(["deadline:t1", "reminder:r2", "reminder:r3"]);
     expect(items.every((item) => item.joinedReminders.length === 0)).toBe(true);
     expect(result.itemCount).toBe(3);
+  });
+});
+
+describe("Life Brain C.3: confirmed events are the sixth lane (ADR-152)", () => {
+  const trip = { id: "ev1", title: "Viagem a Lisboa", starts_at: "2026-08-14T03:00:00.000Z", ends_at: "2026-08-17T02:59:59.000Z", all_day: true, source_entry_id: "e-trip" };
+  const visit = { id: "ev2", title: "Dentista", starts_at: "2026-08-15T18:00:00.000Z", ends_at: null, all_day: false, source_entry_id: null };
+
+  it("puts an event on its day, committed, linked to the record it came from", async () => {
+    const result = await load(client({
+      events: { data: [visit], error: null },
+      entries: entriesStub({}),
+    }), { lanes: ["event"] });
+    const items = result.days.flatMap((day) => day.items) as (ItemView & { span: unknown })[];
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ lane: "event", commitment: "committed", title: "Dentista", at: "2026-08-15T18:00:00.000Z", href: null, reschedule: null });
+    expect(items[0]!.span).toEqual({ allDay: false, startsAt: "2026-08-15T18:00:00.000Z", endsAt: null });
+  });
+
+  it("draws a trip on every day of the window it covers", async () => {
+    const result = await load(client({
+      events: { data: [trip], error: null },
+      entries: entriesStub({ levels: { data: [{ id: "e-trip", sensitivity: "normal" }], error: null } }),
+    }), { lanes: ["event"], orientation: "week" });
+    const days = result.days.filter((day) => day.items.some((item) => item.lane === "event")).map((day) => day.date);
+    expect(days).toEqual(["2026-08-14", "2026-08-15", "2026-08-16"]);
+    const items = result.days.flatMap((day) => day.items);
+    expect(items[0]!.href?.split("?")[0]).toBe("/pt-BR/app/inbox/e-trip");
+    // The first day keeps the event's own instant; later days start at local midnight.
+    expect(items.map((item) => item.at)).toEqual(["2026-08-14T03:00:00.000Z", "2026-08-15T03:00:00.000Z", "2026-08-16T03:00:00.000Z"]);
+  });
+
+  it("derives an event's protection from its record, like a task's", async () => {
+    const result = await load(client({
+      events: { data: [trip], error: null },
+      entries: entriesStub({ levels: { data: [{ id: "e-trip", sensitivity: "highly_sensitive" }], error: null } }),
+    }), { lanes: ["event"] });
+    expect(result.days[0]!.items[0]!.sensitivity).toEqual({ kind: "derived", level: "highly_sensitive" });
+  });
+
+  it("names the lane when the events cannot be read", async () => {
+    const result = await load(client({ events: { data: null, error: { code: "42501" } } }), { lanes: ["event", "deadline"] });
+    expect(result.failedLanes).toEqual([{ lane: "event" }]);
   });
 });

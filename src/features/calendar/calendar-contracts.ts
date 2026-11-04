@@ -121,6 +121,20 @@ export type CalendarItemView = {
    * anything that is not a task line.
    */
   readonly joinedReminders: readonly CalendarJoinedReminder[];
+  /**
+   * Life Brain C.3 (ADR-152): the whole period of an event-lane item, so a day
+   * in the middle of a trip can say it is part of one. `null` for every other
+   * lane. The place is deliberately absent — it is the owner's text and stays on
+   * the record, under the record's own protection.
+   */
+  readonly span: CalendarEventSpan | null;
+};
+
+/** An event's period, as the owner confirmed it. */
+export type CalendarEventSpan = {
+  readonly allDay: boolean;
+  readonly startsAt: string;
+  readonly endsAt: string | null;
 };
 
 /** A reminder carried on its task's line rather than as a line of its own. */

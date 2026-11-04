@@ -203,6 +203,12 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
        * absence is the decision rather than an omission.
        */
       { table: "reminder_series" },
+      /*
+       * Life Brain C.3 (ADR-152). An event is the owner's agenda — a title, a
+       * period and a place they confirmed — so it is exported and deleted with
+       * the reminders beside it, in the same category, rather than withheld.
+       */
+      { table: "events" },
       { table: "notifications" },
       /*
        * Phase 2S slice 2S.1. A suppression is the owner telling the agent to

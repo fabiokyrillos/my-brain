@@ -89,7 +89,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
       "Memórias e resumos",
       "Conversas",
       "Arquivos e análises",
-      "Lembretes e notificações",
+      "Lembretes, eventos e notificações",
       "Perguntas pendentes",
       "Uso de IA e credencial",
       "Processamento e auditoria",

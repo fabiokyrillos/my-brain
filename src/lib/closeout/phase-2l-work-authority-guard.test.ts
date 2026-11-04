@@ -102,6 +102,13 @@ const UNDO_ROUTER_ALLOWLIST: readonly string[] = [
   "src/features/agent/actions.ts",
   "src/features/agent/automation-actions.ts",
   "src/features/deletion/actions.ts",
+  /*
+   * Life Brain C.3 (ADR-152). `202611040106` registers
+   * `confirm_entry_event_candidates` with the handler registry, and the
+   * record page's "Desfazer" after "Pôr na agenda" is the button that spends
+   * it. Its handler closes its ledger row and deletes exactly what it created.
+   */
+  "src/features/events/actions.ts",
   "src/features/interpretations/actions.ts",
   /*
    * The **seventh**, joining in Phase 2R slice 2R.2. `202608230101` registers

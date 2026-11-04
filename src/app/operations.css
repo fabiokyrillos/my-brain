@@ -960,3 +960,64 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
   font-weight: 400;
   color: var(--text-secondary);
 }
+
+/*
+ * Life Brain C.3 (ADR-152) — a record's proposed events and the ones it put on
+ * the agenda. The task candidates' rhythm: a heading, one sentence, a list of
+ * checkable rows, one primary button.
+ */
+.event-candidates {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.event-candidates-form,
+.event-agenda {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.event-candidates h3 {
+  margin: 0;
+  font: var(--type-heading);
+}
+
+.event-candidates-lead {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.event-candidates-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event-candidate,
+.event-agenda-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+}
+
+.event-candidate input {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.event-candidate-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.event-candidate-text small {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}

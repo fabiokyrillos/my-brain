@@ -88,14 +88,17 @@ export type CalendarOrientation = (typeof CALENDAR_ORIENTATIONS)[number];
 export type FixedSpanOrientation = Exclude<CalendarOrientation, "month">;
 
 /**
- * The five lanes `2M-CAL-002` names, over the five sources that already exist.
+ * The five lanes `2M-CAL-002` named, over the five sources that already
+ * existed — and, since Life Brain C.3, a sixth.
  *
- * Every one is a **read of something the product already stores**. There is no
- * sixth lane and no event entity — OD-2M-3 A refused one, and the
- * committed-versus-suggested distinction `2M-CAL-003` asks for is derivable from
- * which lane an item is in.
+ * Every one is a **read of something the product stores**. OD-2M-3 A refused an
+ * event entity when the calendar only projected tasks and reminders; ADR-145
+ * Decision 6 superseded it and ADR-152 (LB-M2) added `events`, so `event` is
+ * the sixth lane: something that happens at a time or over a period, which the
+ * owner confirmed. The committed-versus-suggested distinction `2M-CAL-003` asks
+ * for is still derivable from which lane an item is in.
  */
-export const CALENDAR_LANES = ["deadline", "intention", "reminder", "review", "suggestion"] as const;
+export const CALENDAR_LANES = ["deadline", "intention", "reminder", "event", "review", "suggestion"] as const;
 export type CalendarLane = (typeof CALENDAR_LANES)[number];
 
 /**
@@ -116,6 +119,8 @@ export const COMMITMENT_BY_LANE: Record<CalendarLane, CalendarCommitment> = {
   deadline: "committed",
   intention: "intended",
   reminder: "committed",
+  // A confirmed event is a commitment the owner made, like a deadline.
+  event: "committed",
   review: "recorded",
   suggestion: "suggested",
 };

@@ -82,6 +82,27 @@ export const taskCandidateSchema = z.object({
   explicit: z.boolean(),
 });
 
+/**
+ * Life Brain C.3 (`LB-C-003`, ADR-152) — something that happens from X to Y,
+ * proposed for the agenda: a consultation at 15:00, a trip from the 3rd to the
+ * 10th. Confirmed by the owner like a task candidate, never written by the
+ * model. `endsAt` is null for an instant; never before `startsAt`.
+ */
+export const MAX_EVENT_CANDIDATES = 20;
+
+export const eventCandidateSchema = z.object({
+  title: z.string().trim().min(1).max(240),
+  startsAt: storableInstant,
+  endsAt: storableInstant.nullable(),
+  allDay: z.boolean(),
+  location: z.string().trim().min(1).max(240).nullable(),
+  confidence: z.number().min(0).max(1),
+  explicit: z.boolean(),
+}).refine(
+  (candidate) => candidate.endsAt === null || Date.parse(candidate.endsAt) >= Date.parse(candidate.startsAt),
+  { path: ["endsAt"], message: "endsAt is before startsAt" },
+);
+
 export const pendingQuestionSchema = z.object({
   question: z.string().trim().min(1).max(500),
   reason: z.string().trim().min(1).max(500),
@@ -116,6 +137,8 @@ export const entryExtractionSchema = z.object({
   projects: z.array(entityCandidateSchema),
   people: z.array(personCandidateSchema),
   taskCandidates: z.array(taskCandidateSchema),
+  // Life Brain C.3: required, possibly empty.
+  eventCandidates: z.array(eventCandidateSchema).max(MAX_EVENT_CANDIDATES),
   pendingQuestions: z.array(pendingQuestionSchema),
   // Required and nullable: the provider's strict schema requires every key.
   lifeArea: lifeAreaSchema.nullable(),
@@ -130,6 +153,8 @@ export const entryExtractionSchema = z.object({
  */
 export const storedEntryExtractionSchema = entryExtractionSchema.extend({
   lifeArea: lifeAreaSchema.nullable().default(null),
+  // C.3: every reading stored before it has no `eventCandidates`.
+  eventCandidates: z.array(eventCandidateSchema).max(MAX_EVENT_CANDIDATES).default([]),
   // C.2: every reading stored before it has people without `role`.
   people: z.array(personCandidateSchema.extend({ role: personCandidateSchema.shape.role.default(null) })),
 });
@@ -137,4 +162,5 @@ export const storedEntryExtractionSchema = entryExtractionSchema.extend({
 export type EntryExtraction = z.infer<typeof entryExtractionSchema>;
 export type EntityCandidate = z.infer<typeof entityCandidateSchema>;
 export type PersonCandidate = z.infer<typeof personCandidateSchema>;
+export type EventCandidate = z.infer<typeof eventCandidateSchema>;
 export type TaskCandidate = z.infer<typeof taskCandidateSchema>;

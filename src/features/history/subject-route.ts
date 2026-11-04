@@ -102,6 +102,12 @@ export const HISTORY_SUBJECT_ROUTES = {
    * commit that does — the assertion above is what makes forgetting impossible.
    */
   reminder_series: null,
+  /*
+   * Life Brain C.3 (ADR-152). **Null**, for the reason `reminder_series` gives:
+   * an event has no page of its own — it is shown on the calendar and on the
+   * record it came from — so an href here would be a guess.
+   */
+  event: null,
 } satisfies Record<HistoryEntityType, SubjectRouteBuilder | null>;
 
 /** The entity types whose subject has a page — derived, never re-listed. */

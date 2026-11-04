@@ -123,6 +123,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### C.3 — Eventos com período (2,5 d, **LB-M2**)
 
 - Tabela `events`, candidatos, confirmação/undo, faixa no calendário, viagem como período. Supera OD-2M-3 A.
+- **Implementado 2026-11-04 (ADR-152):** migration `202611040106` (tabela, confirmação idempotente com undo registrado, cancelamento), `eventCandidates` nos dois runtimes (`entry-extraction-v4` / `2026-11-04.3`), "Pôr na agenda?" na página do registro, sexta faixa `event` no calendário, na agenda do chat e de Hoje. As três migrations do Life Brain estão gastas.
 
 ### C.4 — Linha do tempo por área e Ideias (1,5 d)
 

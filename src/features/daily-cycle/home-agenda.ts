@@ -116,7 +116,8 @@ export async function loadHomeAgendaProjection(
     query: {
       orientation: "agenda",
       anchor: localDateOf(now, timezone),
-      lanes: ["deadline", "intention", "reminder"],
+      // Life Brain C.3: confirmed events are on Home's agenda too.
+      lanes: ["deadline", "intention", "reminder", "event"],
     },
   });
 

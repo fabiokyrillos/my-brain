@@ -75,7 +75,8 @@ export function CalendarItem({
   const copy = getCalendarCopy(locale);
   const laneName = copy.lanes.names[item.lane];
   const commitment = copy.commitment[item.commitment];
-  const time = formatTime(item.at, locale, timezone);
+  // Life Brain C.3: an all-day event has no hour to show.
+  const time = item.span?.allDay ? copy.item.allDay : formatTime(item.at, locale, timezone);
 
   return (
     <li

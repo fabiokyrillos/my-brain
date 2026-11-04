@@ -167,6 +167,7 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   notification_suppressions: "Phase 2S owner-written silence, read by the heartbeat and never a Phase 2F fixture target; cascades at 202608240102:80",
   heartbeat_runs: "heartbeat-owned per-tick record; cascades at 202607160007:68",
   memories: "no Phase 2F proof writes it; cascades at 202607160006:5",
+  events: "Life Brain LB-M2: written only by confirm_entry_event_candidates, which no Phase 2F proof calls; cascades from auth.users at 202611040106:32",
   entry_embeddings: "no Phase 2F proof writes it; cascades at 202607160006:28",
   conversations: "no Phase 2F proof writes it; cascades at 202607160006:42",
   conversation_messages: "chat-only, no Phase 2F proof writes it; cascades at 202607160006:54",

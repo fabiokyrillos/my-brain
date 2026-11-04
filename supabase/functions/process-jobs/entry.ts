@@ -51,8 +51,8 @@ async function fetchProvider(url: string, init: RequestInit): Promise<Response> 
 // (verified in node_modules/server-only/index.js), so it is not portable to
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
-const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v3";
-const EXTRACTION_PROMPT_VERSION = "2026-11-04.2";
+const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v4";
+const EXTRACTION_PROMPT_VERSION = "2026-11-04.3";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -94,6 +94,14 @@ Examples of the area:
 - "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
 - "Reunião do Projeto Aurora com a Marina" -> lifeArea: work.
 
+Events:
+- eventCandidates: things that happen at a time or over a period and belong on the owner's agenda — a consultation, an exam at the lab, a dinner, a flight, a trip. title in the entry's own language; startsAt and endsAt are ISO instants with the user's offset (endsAt null when only a start is known; for a trip, the end of its last day); allDay true for a whole day or days with no time given (a trip, a holiday), false when a time is given; location when the entry names one, else null; explicit true when the entry states the date, false when you inferred it. An event is not a task: "consulta dia 12 às 15h" is an event, "marcar a consulta" is a task. Something that already happened is a completed_activity, not an event candidate. Use [] when there is none.
+
+Examples of events:
+- "Consulta com o cardiologista dia 12 às 15h" -> eventCandidates: "Consulta com o cardiologista", the 12th at 15:00, allDay false. taskCandidates: none.
+- "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> eventCandidates: "Viagem a Lisboa", 3 to 10 December, allDay true, location Lisboa.
+- "Preciso marcar o dentista" -> eventCandidates: none. taskCandidates: one task.
+
 Known concept identifiers are fixed by the response schema.`;
 
 const CONCEPTS = [
@@ -121,7 +129,7 @@ const entryExtractionSchema = {
   required: [
     "language", "occurredAt", "isRetroactive", "summary", "concepts",
     "contexts", "organizations", "projects", "people",
-    "taskCandidates", "pendingQuestions", "lifeArea", "confidence",
+    "taskCandidates", "eventCandidates", "pendingQuestions", "lifeArea", "confidence",
   ],
   properties: {
     language: { type: "string", enum: ["pt-BR", "en"] },
@@ -150,6 +158,24 @@ const entryExtractionSchema = {
         ...entityCandidateSchema,
         required: [...entityCandidateSchema.required, "role"],
         properties: { ...entityCandidateSchema.properties, role: { type: ["string", "null"] } },
+      },
+    },
+    // Life Brain C.3 (ADR-152): proposed for the agenda, never written by the model.
+    eventCandidates: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "startsAt", "endsAt", "allDay", "location", "confidence", "explicit"],
+        properties: {
+          title: { type: "string" },
+          startsAt: { type: "string" },
+          endsAt: { type: ["string", "null"] },
+          allDay: { type: "boolean" },
+          location: { type: ["string", "null"] },
+          confidence: { type: "number" },
+          explicit: { type: "boolean" },
+        },
       },
     },
     taskCandidates: {
