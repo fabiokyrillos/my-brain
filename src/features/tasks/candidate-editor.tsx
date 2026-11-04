@@ -81,6 +81,18 @@ type FieldError = {
 
 const copy = {
   "pt-BR": {
+    // Control labels (Life Brain A.3: moved out of inline locale ternaries).
+    editSuggestionLabel: "Editar sugestão",
+    clearDescriptionLabel: "Remover descrição",
+    clearDueDateLabel: "Remover prazo",
+    clearPlannedDateLabel: "Remover data planejada",
+    clearProjectsLabel: "Remover projetos",
+    clearContextsLabel: "Remover contextos",
+    clearPeopleLabel: "Remover pessoas",
+    clearWaitingOnLabel: "Remover pessoas aguardadas",
+    clearParentLabel: "Remover tarefa-mãe",
+    clearDependenciesLabel: "Remover dependências",
+    resetSuggestionLabel: "Restaurar sugestão",
     candidate: (title: string) => `Sugestão: ${title}`,
     edit: (title: string) => `Editar sugestão: ${title}`,
     title: "Título",
@@ -155,6 +167,18 @@ const copy = {
     plannedDateOverlap: "Esse horário é ambíguo no fuso informado.",
   },
   en: {
+    // Control labels (Life Brain A.3: moved out of inline locale ternaries).
+    editSuggestionLabel: "Edit suggestion",
+    clearDescriptionLabel: "Clear description",
+    clearDueDateLabel: "Clear due date",
+    clearPlannedDateLabel: "Clear planned date",
+    clearProjectsLabel: "Clear projects",
+    clearContextsLabel: "Clear contexts",
+    clearPeopleLabel: "Clear people",
+    clearWaitingOnLabel: "Clear waiting on",
+    clearParentLabel: "Clear parent task",
+    clearDependenciesLabel: "Clear dependencies",
+    resetSuggestionLabel: "Reset to suggestion",
     candidate: (title: string) => `Suggestion: ${title}`,
     edit: (title: string) => `Edit suggestion: ${title}`,
     title: "Title",
@@ -719,7 +743,7 @@ export function CandidateEditor({
           style={{ minHeight: 44, minWidth: 44 }}
           type="button"
         >
-          {locale === "pt-BR" ? "Editar sugestão" : "Edit suggestion"}
+          {localized.editSuggestionLabel}
         </button>
         {canonicalEdit && (
           <span
@@ -798,7 +822,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover descrição" : "Clear description"}
+            {localized.clearDescriptionLabel}
           </button>
 
           <label className="field-label" htmlFor={dueDateId}>
@@ -842,7 +866,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover prazo" : "Clear due date"}
+            {localized.clearDueDateLabel}
           </button>
 
           <label className="field-label" htmlFor={plannedDateId}>
@@ -877,7 +901,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover data planejada" : "Clear planned date"}
+            {localized.clearPlannedDateLabel}
           </button>
 
           <label className="field-label" htmlFor={priorityId}>
@@ -965,7 +989,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover projetos" : "Clear projects"}
+            {localized.clearProjectsLabel}
           </button>
 
           <label className="field-label" htmlFor={contextsId}>
@@ -994,7 +1018,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover contextos" : "Clear contexts"}
+            {localized.clearContextsLabel}
           </button>
 
           <label className="field-label" htmlFor={peopleId}>
@@ -1023,7 +1047,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover pessoas" : "Clear people"}
+            {localized.clearPeopleLabel}
           </button>
 
           <label className="field-label" htmlFor={waitingOnId}>
@@ -1052,7 +1076,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover pessoas aguardadas" : "Clear waiting on"}
+            {localized.clearWaitingOnLabel}
           </button>
 
           <label className="field-label" htmlFor={parentTaskId}>
@@ -1093,7 +1117,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover tarefa-mãe" : "Clear parent task"}
+            {localized.clearParentLabel}
           </button>
 
           <label className="field-label" htmlFor={dependsOnId}>
@@ -1141,7 +1165,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Remover dependências" : "Clear dependencies"}
+            {localized.clearDependenciesLabel}
           </button>
 
           <button
@@ -1152,7 +1176,7 @@ export function CandidateEditor({
             style={{ minHeight: 44, minWidth: 44 }}
             type="button"
           >
-            {locale === "pt-BR" ? "Restaurar sugestão" : "Reset to suggestion"}
+            {localized.resetSuggestionLabel}
           </button>
         </div>
       )}
