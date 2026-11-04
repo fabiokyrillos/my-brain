@@ -70,9 +70,11 @@ describe("2K-CARD-003/007/008: mutability is a property of the type, not of the 
     expect([...MUTABLE_CONVERSATION_CARD_TYPES].sort()).toEqual(["memory", "task"]);
   });
 
-  it("declares entries, people, projects, organizations and files read-only", () => {
+  it("declares entries, reminders, people, projects, organizations and files read-only", () => {
+    // `reminder` joined in Life Brain B.2 (ADR-147): a cited reminder links to
+    // its page, and nothing about it is changed from a conversation.
     expect([...READ_ONLY_CONVERSATION_CARD_TYPES].sort())
-      .toEqual(["entry", "file", "organization", "person", "project"]);
+      .toEqual(["entry", "file", "organization", "person", "project", "reminder"]);
   });
 
   it("answers `mayRenderMutatingControl` from the type, for every type", () => {

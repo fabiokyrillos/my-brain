@@ -114,8 +114,15 @@ export function SourceList({
    * and those are different facts (measured in slice 2K.0).
    */
   const insufficient = citations.evidence === "no_qualifying_evidence";
-  // Life Brain B.1. Which place the answer looked in, from its own envelope.
-  const agenda = reachScope(citations.reach) === "agenda";
+  // Life Brain B.1/B.2. Which pair of sentences describes where this answer
+  // looked, from its own envelope — one per era of reach, so an older answer
+  // keeps the sentence that was true for it.
+  const scope = reachScope(citations.reach);
+  const where = {
+    knowledge: { reach: copy.reach, insufficient: copy.insufficient },
+    knowledge_wide: { reach: copy.wideReach, insufficient: copy.wideInsufficient },
+    agenda: { reach: copy.agendaReach, insufficient: copy.agendaInsufficient },
+  }[scope];
 
   // An old row recorded neither. It gets the honest "I do not know" rather than
   // either claim, and nothing else — no reach, no insufficiency.
@@ -133,7 +140,7 @@ export function SourceList({
       data-evidence={insufficient ? "insufficient" : citations.legacy ? "unknown" : "evidenced"}
     >
       {insufficient ? (
-        <p className="conversation-sources-insufficient">{agenda ? copy.agendaInsufficient : copy.insufficient}</p>
+        <p className="conversation-sources-insufficient">{where.insufficient}</p>
       ) : (
         <>
           <strong className="conversation-sources-title">{copy.title}</strong>
@@ -163,7 +170,7 @@ export function SourceList({
         Withheld only for a legacy row, which never recorded a reach.
       */}
       {citations.legacy ? null : (
-        <p className="conversation-sources-reach">{agenda ? copy.agendaReach : copy.reach}</p>
+        <p className="conversation-sources-reach">{where.reach}</p>
       )}
 
       {/*

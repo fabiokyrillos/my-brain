@@ -76,7 +76,21 @@ type ChatStub = {
   memoryLookupFails?: boolean;
   /** Earlier turns of an existing conversation (B.0), newest first as the query returns them. */
   history?: { role: string; content: string }[];
+  /** Life Brain B.2: what the title match over tasks and reminders returns, and their sources' levels. */
+  structured?: {
+    tasks?: Record<string, unknown>[];
+    reminders?: Record<string, unknown>[];
+    entries?: { id: string; sensitivity: string }[];
+  };
 };
+
+/** A query builder whose every filter returns itself and which resolves to `result`. */
+function chain(result: { data: unknown; error: unknown }) {
+  const builder: Record<string, unknown> = {};
+  for (const method of ["select", "eq", "neq", "in", "or", "order", "limit"]) builder[method] = () => builder;
+  builder.then = (resolve: (value: unknown) => unknown) => resolve(result);
+  return builder;
+}
 
 let insertedAssistantMessage: Record<string, unknown> | null = null;
 let insertedAudit: Record<string, unknown> | null = null;
@@ -123,6 +137,9 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
           return { data: null, error: null };
         },
       };
+    }
+    if (table === "tasks" || table === "reminders" || table === "entries") {
+      return chain({ data: options.structured?.[table] ?? [], error: null });
     }
     if (table === "memories") {
       return {
@@ -356,7 +373,7 @@ describe("sendChatMessage citation hydration", () => {
     expect(message?.citations).toEqual({
       v: "2026-08-09.1",
       evidence: "evidenced",
-      reach: ["entry", "memory"],
+      reach: ["entry", "memory", "task", "reminder"],
       sources: [
         {
           id: "entry:33333333-3333-4333-8333-333333333333",
@@ -385,7 +402,7 @@ describe("sendChatMessage citation hydration", () => {
     expect(message?.citations).toEqual({
       v: "2026-08-09.1",
       evidence: "evidenced",
-      reach: ["entry", "memory"],
+      reach: ["entry", "memory", "task", "reminder"],
       sources: [
         {
           id: "entry:33333333-3333-4333-8333-333333333333",
@@ -468,7 +485,7 @@ describe("Life Brain B.1: an agenda question is answered without a model (LB-B-0
     expect(message?.content).toContain("Enviar o relatório");
     expect(message?.model).toBeNull();
     expect(message).not.toHaveProperty("input_tokens");
-    expect((message?.citations as { reach: string[]; sources: { id: string }[] }).reach).toEqual(["task"]);
+    expect((message?.citations as { reach: string[]; sources: { id: string }[] }).reach).toEqual(["task", "reminder"]);
     expect((message?.citations as { sources: { id: string }[] }).sources.map((s) => s.id)).toEqual([`task:${TASK}`]);
 
     // Nothing to charge: no gate, no slot, no provider, no ledger row.
@@ -525,6 +542,82 @@ describe("Life Brain B.1: an agenda question is answered without a model (LB-B-0
   });
 });
 
+describe("Life Brain B.2: tasks and reminders are knowledge sources (LB-B-006)", () => {
+  const TASK = "44444444-4444-4444-8444-444444444444";
+  const REMINDER = "55555555-5555-4555-8555-555555555555";
+  const SECRET = "66666666-6666-4666-8666-666666666666";
+
+  function provider(cited: string[]) {
+    const answerFromKnowledge = vi.fn<(input: { sources: { id: string; content: string }[] }) => Promise<{
+      answer: string; citedSourceIds: string[]; model: string; inputTokens: number; outputTokens: number;
+    }>>(async () => ({
+      answer: "Falta o exame de sangue, até sexta.",
+      citedSourceIds: cited,
+      model: "gpt-5.6-terra",
+      inputTokens: 10,
+      outputTokens: 5,
+    }));
+    return {
+      answerFromKnowledge,
+      value: {
+        id: "openai",
+        embedText: async () => ({ embedding: [0.1], model: "text-embedding-3-small", inputTokens: 1, outputTokens: 0 }),
+        answerFromKnowledge,
+      },
+    };
+  }
+
+  function supabaseWith(structured: NonNullable<ChatStub["structured"]>) {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({ user: { id: userId }, citedSourceIds: [], matches: [], structured }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+  }
+
+  it("answers from a task the vector search could not see, and cites it content-free", async () => {
+    supabaseWith({
+      tasks: [{ id: TASK, title: "Exame de sangue", status: "todo", due_at: "2026-11-06T23:59:59-03:00", planned_at: null, source_entry_id: null, created_at: "2026-11-02T12:00:00Z" }],
+      reminders: [{ id: REMINDER, title: "Levar pedido do exame", remind_at: "2026-11-06T11:00:00Z", status: "scheduled", entry_id: null, created_at: "2026-11-02T12:00:00Z" }],
+    });
+    const stub = provider([`task:${TASK}`, `reminder:${REMINDER}`]);
+    vi.mocked(getAIProvider).mockReturnValue(stub.value as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(sendChatMessage(idleState, form({ question: "Quais exames estão pendentes?" }))).rejects.toThrow("NEXT_REDIRECT");
+
+    // Zero vector matches no longer means "nothing": the title match found two.
+    expect(stub.answerFromKnowledge).toHaveBeenCalledTimes(1);
+    const sent = stub.answerFromKnowledge.mock.calls[0]![0].sources;
+    expect(sent.map((source) => source.id)).toEqual([`task:${TASK}`, `reminder:${REMINDER}`]);
+    expect(sent[0]!.content).toContain("Situação: a fazer");
+
+    const citations = insertedAssistantMessage?.citations as { reach: string[]; evidence: string; sources: Record<string, string>[] };
+    expect(citations.evidence).toBe("evidenced");
+    expect(citations.reach).toEqual(["entry", "memory", "task", "reminder"]);
+    expect(citations.sources).toEqual([
+      { id: `task:${TASK}`, type: "task", sourceId: TASK, support: "product_state" },
+      { id: `reminder:${REMINDER}`, type: "reminder", sourceId: REMINDER, support: "product_state" },
+    ]);
+    // `2K-PRIVACY-003`: the reference carries no title.
+    expect(JSON.stringify(citations)).not.toContain("Exame de sangue");
+  });
+
+  it("never sends the model a task whose source entry is highly sensitive", async () => {
+    supabaseWith({
+      tasks: [{ id: SECRET, title: "Exame da biópsia", status: "todo", due_at: null, planned_at: null, source_entry_id: "e-secret", created_at: "2026-11-02T12:00:00Z" }],
+      entries: [{ id: "e-secret", sensitivity: "highly_sensitive" }],
+    });
+    const stub = provider([]);
+    vi.mocked(getAIProvider).mockReturnValue(stub.value as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(sendChatMessage(idleState, form({ question: "Quais exames estão pendentes?" }))).rejects.toThrow("NEXT_REDIRECT");
+
+    // Withheld before the prompt is built, so with nothing else this is the
+    // fixed "não encontrei" and the provider is not asked at all.
+    expect(stub.answerFromKnowledge).not.toHaveBeenCalled();
+    expect((insertedAssistantMessage?.citations as { evidence: string }).evidence).toBe("no_qualifying_evidence");
+    expect(JSON.stringify(insertedAssistantMessage)).not.toContain("biópsia");
+  });
+});
+
 describe("Life Brain B.1: zero sources answers 'não encontrei' without the answer call (LB-B-008)", () => {
   function provider() {
     const answerFromKnowledge = vi.fn(async () => ({
@@ -558,7 +651,7 @@ describe("Life Brain B.1: zero sources answers 'não encontrei' without the answ
     // row is the one that disappears.
     expect(vi.mocked(recordAIUsage).mock.calls.map(([, usage]) => usage.operation)).toEqual(["semantic_search"]);
     expect(insertedAssistantMessage?.content).toBe(
-      "I found nothing of yours about this in your records or your memories. If you have not recorded it yet, write \"note that…\" and I will keep it.",
+      "I found nothing of yours about this in your records, memories, tasks or reminders. If you have not recorded it yet, write \"note that…\" and I will keep it.",
     );
     expect(insertedAssistantMessage?.model).toBeNull();
     expect((insertedAssistantMessage?.citations as { evidence: string }).evidence).toBe("no_qualifying_evidence");

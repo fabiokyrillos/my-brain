@@ -79,6 +79,7 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
     },
     types: {
       task: "Tarefa",
+      reminder: "Lembrete",
       memory: "Memória",
       entry: "Registro",
       person: "Pessoa",
@@ -123,6 +124,7 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
     },
     types: {
       task: "Task",
+      reminder: "Reminder",
       memory: "Memory",
       entry: "Record",
       person: "Person",

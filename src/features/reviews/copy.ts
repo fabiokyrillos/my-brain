@@ -1,3 +1,4 @@
+import type { CitedSourceType } from "@/features/conversation-sources/contracts";
 import type { ReviewTab } from "./review-periods";
 
 /**
@@ -29,7 +30,7 @@ export type ReviewDetailCopy = {
    * for ordinary objects and withheld them for sensitive ones would disclose
    * the classification by its shape.
    */
-  readonly sourceKind: (type: "entry" | "memory" | "task") => string;
+  readonly sourceKind: (type: CitedSourceType) => string;
   /** The accessible name of the link, built from the kind and the date alone. */
   readonly sourceOpen: (kind: string, when: string | null) => string;
   /** Removed, unreadable and foreign all read exactly this. */
@@ -58,7 +59,7 @@ const PT_BR: ReviewDetailCopy = {
   sourcesNotLinked:
     "As referências desta revisão não foram registradas quando ela foi escrita, então o Brain não pode apontar quais itens entraram nela. Use o período no calendário para ver o que existia na época.",
   sourcesListHeading: "Itens citados",
-  sourceKind: (type) => (type === "entry" ? "Registro" : type === "task" ? "Tarefa" : "Memória"),
+  sourceKind: (type) => ({ entry: "Registro", task: "Tarefa", memory: "Memória", reminder: "Lembrete" })[type],
   sourceOpen: (kind, when) => (when ? `Abrir ${kind.toLowerCase()} de ${when}` : `Abrir ${kind.toLowerCase()}`),
   sourceUnavailable: "Não está mais disponível",
   periodLabel: "Período gravado",
@@ -85,7 +86,7 @@ const EN: ReviewDetailCopy = {
   sourcesNotLinked:
     "This review's references were not recorded when it was written, so Brain cannot say which items went into it. Use the period in the calendar to see what existed at the time.",
   sourcesListHeading: "Cited items",
-  sourceKind: (type) => (type === "entry" ? "Record" : type === "task" ? "Task" : "Memory"),
+  sourceKind: (type) => ({ entry: "Record", task: "Task", memory: "Memory", reminder: "Reminder" })[type],
   sourceOpen: (kind, when) => (when ? `Open ${kind.toLowerCase()} from ${when}` : `Open ${kind.toLowerCase()}`),
   sourceUnavailable: "No longer available",
   periodLabel: "Stored period",

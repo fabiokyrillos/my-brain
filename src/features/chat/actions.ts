@@ -26,6 +26,7 @@ import { isMemoryInForce } from "@/features/memories/lifecycle";
 import { detectAgendaQuestion, type AgendaSpan } from "@/features/assistant/agenda-intent";
 import { loadAgendaAnswer } from "@/features/assistant/agenda-answer";
 import type { ChatState } from "./chat-state";
+import { loadStructuredSources, type StructuredSourceClient } from "./structured-sources";
 import { AI_INPUT_BOUNDS } from "@/lib/ai-input-bounds";
 
 const chatInputSchema = z.object({
@@ -74,7 +75,7 @@ const chatCopy = {
     conversationNotStarted: "Não foi possível iniciar a conversa.",
     questionNotSaved: "Não foi possível salvar sua pergunta.",
     noEvidenceAnswer:
-      "Não encontrei nada seu sobre isso nos seus registros nem nas suas memórias. Se ainda não registrou, escreva \"registre que…\" e eu guardo.",
+      "Não encontrei nada seu sobre isso nos seus registros, memórias, tarefas ou lembretes. Se ainda não registrou, escreva \"registre que…\" e eu guardo.",
   },
   en: {
     invalidQuestion: "Write a valid question.",
@@ -84,7 +85,7 @@ const chatCopy = {
     conversationNotStarted: "We could not start the conversation.",
     questionNotSaved: "We could not save your question.",
     noEvidenceAnswer:
-      "I found nothing of yours about this in your records or your memories. If you have not recorded it yet, write \"note that…\" and I will keep it.",
+      "I found nothing of yours about this in your records, memories, tasks or reminders. If you have not recorded it yet, write \"note that…\" and I will keep it.",
   },
 } satisfies Record<Locale, ChatCopy>;
 
@@ -380,7 +381,7 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     // predicate, which `phase-2n-knowledge-guard.test.ts` holds together.
     const relevant = ((matches ?? []) as KnowledgeRow[]).filter((match) => match.similarity >= 0.2);
     const inForce = await memoriesInForce(supabase, relevant);
-    const sources: ChatSource[] = relevant
+    const vectorSources: ChatSource[] = relevant
       .filter((match) => match.source_type !== "memory" || inForce.has(match.source_id))
       .map((match) => ({
         id: `${match.source_type}:${match.source_id}`,
@@ -389,6 +390,24 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
         occurredAt: match.occurred_at,
         similarity: match.similarity,
       }));
+
+    /*
+     * Life Brain B.2 (`LB-B-006`, ADR-147). Tasks and reminders have no vector,
+     * so they are matched by their titles and appended after the ranked
+     * sources. The zone is read here rather than only before the model call,
+     * because their sentences carry local dates. A highly sensitive or
+     * unreadable source never reaches this list (`structured-sources.ts`).
+     */
+    const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
+    const profile = requireSupabaseData(profileResult, "load chat profile");
+    const timezone = profile?.timezone ?? defaultAgentPreferences.timezone;
+    const structured = await loadStructuredSources(supabase as unknown as StructuredSourceClient, {
+      userId: user.id,
+      question: parsed.data.question,
+      locale: parsed.data.locale,
+      timezone,
+    });
+    const sources: ChatSource[] = [...vectorSources, ...structured.sources];
     /*
      * Life Brain B.1 (`LB-B-008`). Nothing qualified and nothing earlier in the
      * conversation: the model's instruction for this case is to say the sources
@@ -406,12 +425,10 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     if (answeredWithoutModel) {
       answer = { answer: copy.noEvidenceAnswer, citedSourceIds: [], model: null };
     } else {
-      const profileResult = await supabase.from("profiles").select("timezone").eq("user_id", user.id).maybeSingle();
-      const profile = requireSupabaseData(profileResult, "load chat profile");
       const answered = await provider.answerFromKnowledge({
         question: parsed.data.question,
         locale: parsed.data.locale,
-        timezone: profile?.timezone ?? defaultAgentPreferences.timezone,
+        timezone,
         // `LB-B-003`: the model finally learns what day it is.
         now: new Date().toISOString(),
         history,
