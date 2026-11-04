@@ -392,9 +392,19 @@ describe("2S-TRUST-003: the central grant census knows about the fourteenth tabl
     expect(missing, "a table left the RPC-closed set without a slice arguing for it").toEqual([]);
   });
 
-  it("admits nothing beyond those thirteen and this slice's one addition", () => {
+  /*
+   * Additions after Phase 2S, each named with the slice that argued for it, so
+   * the set still cannot grow silently. Life Brain C.3 (`202611040106`,
+   * ADR-152): `events` is written only by `confirm_entry_event_candidates` and
+   * `cancel_event`, both definers, and no service_role path touches it.
+   */
+  const ADDED_AFTER_2S = ["events"];
+
+  it("admits nothing beyond those thirteen, this slice's one addition and the named later ones", () => {
     const unexpected = rpcClosedTables().filter(
-      (table) => !THIRTEEN_BEFORE_2S.includes(table) && table !== "notification_suppressions",
+      (table) => !THIRTEEN_BEFORE_2S.includes(table)
+        && table !== "notification_suppressions"
+        && !ADDED_AFTER_2S.includes(table),
     );
     expect(unexpected, "an unexpected table entered the RPC-closed set").toEqual([]);
   });
