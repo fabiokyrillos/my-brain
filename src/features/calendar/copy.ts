@@ -21,7 +21,6 @@ import type { CalendarCommitment, CalendarLane, CalendarOrientation } from "./ca
 
 export type CalendarCopy = {
   readonly title: string;
-  readonly description: string;
   readonly orientation: {
     readonly label: string;
     readonly options: Record<CalendarOrientation, string>;
@@ -39,6 +38,8 @@ export type CalendarCopy = {
      */
     readonly stateShown: string;
     readonly stateHidden: string;
+    /** Life Brain A.4: the filter button's name when lanes are hidden. */
+    readonly hiddenLabel: (count: number) => string;
   };
   readonly commitment: Record<CalendarCommitment, string>;
   readonly navigation: {
@@ -55,7 +56,6 @@ export type CalendarCopy = {
      * differently from every other word in the band would be the band lying
      * about what it is.
      */
-    readonly allReminders: string;
   };
   readonly states: {
     readonly empty: string;
@@ -111,16 +111,18 @@ export type CalendarCopy = {
 };
 
 const PT_BR: CalendarCopy = {
-  title: "Calendário",
-  description: "O que os seus dias contêm, reunido a partir do que você já registrou.",
+  title: "Agenda",
   orientation: {
     label: "Formato",
-    options: { day: "Dia", week: "Semana", month: "Mês", agenda: "Agenda" },
+    // Life Brain A.4: the list layout reads "Lista", so "Agenda" names the
+    // destination alone. The URL value stays `agenda`.
+    options: { day: "Dia", week: "Semana", month: "Mês", agenda: "Lista" },
   },
   lanes: {
     label: "O que mostrar",
     stateShown: ", mostrando",
     stateHidden: ", oculto",
+    hiddenLabel: (count) => `O que mostrar, ${count} ${count === 1 ? "oculto" : "ocultos"}`,
     names: {
       deadline: "Prazos",
       intention: "Intenções",
@@ -148,7 +150,6 @@ const PT_BR: CalendarCopy = {
     today: "Hoje",
     atEarliest: "Este é o começo do período que o calendário cobre.",
     atLatest: "Este é o fim do período que o calendário cobre.",
-    allReminders: "Todos os lembretes",
   },
   states: {
     empty: "Nada marcado para este período.",
@@ -183,16 +184,16 @@ const PT_BR: CalendarCopy = {
 };
 
 const EN: CalendarCopy = {
-  title: "Calendar",
-  description: "What your days actually contain, gathered from what you have already recorded.",
+  title: "Agenda",
   orientation: {
     label: "Layout",
-    options: { day: "Day", week: "Week", month: "Month", agenda: "Agenda" },
+    options: { day: "Day", week: "Week", month: "Month", agenda: "List" },
   },
   lanes: {
     label: "What to show",
     stateShown: ", showing",
     stateHidden: ", hidden",
+    hiddenLabel: (count) => `What to show, ${count} hidden`,
     names: {
       deadline: "Deadlines",
       intention: "Intentions",
@@ -220,7 +221,6 @@ const EN: CalendarCopy = {
     today: "Today",
     atEarliest: "This is the start of the period the calendar covers.",
     atLatest: "This is the end of the period the calendar covers.",
-    allReminders: "All reminders",
   },
   states: {
     empty: "Nothing scheduled for this period.",

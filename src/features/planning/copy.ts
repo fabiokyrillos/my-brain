@@ -20,15 +20,12 @@ import type { PlannerConflictKind } from "./planner-conflicts";
 
 export type PlannerCopy = {
   readonly title: string;
-  readonly eyebrow: string;
-  readonly description: string;
   /** The two lists this surface has, and nothing else. */
   readonly planned: string;
   readonly available: string;
   readonly plannedEmpty: string;
   readonly availableEmpty: string;
   readonly backToCalendar: string;
-  readonly dayLabel: string;
   readonly previousDay: string;
   readonly nextDay: string;
   readonly today: string;
@@ -57,14 +54,11 @@ export type PlannerCopy = {
 
 const ptBR: PlannerCopy = {
   title: "Planejar o dia",
-  eyebrow: "CICLO DIÁRIO",
-  description: "Escolha o que você pretende fazer, entre o que já existe.",
   planned: "Planejado para este dia",
   available: "Disponível para planejar",
   plannedEmpty: "Você ainda não planejou nada para este dia.",
   availableEmpty: "Não há tarefas em aberto sem dia planejado.",
   backToCalendar: "Voltar para o calendário",
-  dayLabel: "Dia",
   previousDay: "Dia anterior",
   nextDay: "Próximo dia",
   today: "Hoje",
@@ -93,14 +87,11 @@ const ptBR: PlannerCopy = {
 
 const en: PlannerCopy = {
   title: "Plan the day",
-  eyebrow: "DAILY CYCLE",
-  description: "Choose what you mean to do, from what already exists.",
   planned: "Planned for this day",
   available: "Available to plan",
   plannedEmpty: "You have not planned anything for this day yet.",
   availableEmpty: "There are no open tasks without a planned day.",
   backToCalendar: "Back to the calendar",
-  dayLabel: "Day",
   previousDay: "Previous day",
   nextDay: "Next day",
   today: "Today",

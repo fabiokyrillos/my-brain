@@ -40,9 +40,8 @@ import type {
  */
 
 type ReminderCopy = {
-  readonly eyebrow: string;
+  /** The banner's label; the page itself is the Agenda's Lembretes lens (Life Brain A.4). */
   readonly heading: string;
-  readonly intro: string;
   readonly emptyTitle: string;
   /** Takes the assistant's configured name — never a hardcoded "Brain". */
   readonly emptyBody: (agentName: string) => string;
@@ -308,9 +307,7 @@ type ReminderCopy = {
 
 const COPY = {
   "pt-BR": {
-    eyebrow: "NÃO ESQUECER",
     heading: "Lembretes",
-    intro: "Alertas internos respeitando seu fuso e período silencioso.",
     emptyTitle: "Nenhum lembrete",
     emptyBody: (agentName: string) =>
       `Crie um lembrete acima ou peça ao ${agentName} durante uma captura.`,
@@ -551,9 +548,7 @@ const COPY = {
     },
   },
   en: {
-    eyebrow: "DON'T FORGET",
     heading: "Reminders",
-    intro: "Internal alerts that respect your timezone and quiet hours.",
     emptyTitle: "No reminders",
     emptyBody: (agentName: string) => `Create one above or ask ${agentName} during capture.`,
 

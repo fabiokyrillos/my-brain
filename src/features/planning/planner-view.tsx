@@ -57,7 +57,7 @@ import { UniversalStateLine } from "@/features/experience/universal-state";
 import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-day";
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
-import { WorkModeTabs } from "@/features/daily-cycle/work-modes";
+import { AgendaHeader, AgendaStepper } from "@/features/calendar/agenda-header";
 import { BulkBar, type BulkCommandHandler } from "@/features/operations/bulk-bar";
 import { getWorkCopy } from "@/features/operations/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -230,24 +230,27 @@ export function PlannerView({
   return (
     <div className="content-page planner-page">
       {/*
-        Planejar is the third mode of Trabalho (`02-arquitetura-e-rotas.md`): it
-        proposes dates for the rows Lista holds. The tab strip makes that
-        relationship visible; the route is unchanged.
+        Life Brain A.4 (`LB-A-007`). Planejar is a lens of the Agenda, under the
+        Agenda's one compact header, with the day stepper in its action slot.
+        The eyebrow, the title and the description went with the
+        "Lista · Calendário · Planejar" strip; the one sentence that is a
+        guarantee rather than an explanation stays.
       */}
-      <WorkModeTabs active="plan" locale={locale} />
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.description}</p>
-          <p className="quiet-state">{copy.createsNothing}</p>
-        </div>
-        <nav aria-label={copy.dayLabel} className="planner-day-nav">
-          <a href={`${dayHrefBase}?date=${shiftDay(projection.day, -1)}`}>{copy.previousDay}</a>
-          <strong>{projection.day}{projection.isToday ? ` · ${copy.today}` : ""}</strong>
-          <a href={`${dayHrefBase}?date=${shiftDay(projection.day, 1)}`}>{copy.nextDay}</a>
-        </nav>
-      </header>
+      <AgendaHeader
+        lens="plan"
+        locale={locale}
+        actions={(
+          <AgendaStepper
+            className="planner-day-nav"
+            locale={locale}
+            next={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, 1)}`, label: copy.nextDay }}
+            previous={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, -1)}`, label: copy.previousDay }}
+            rangeLabel={`${dayLabel(projection.day, locale)}${projection.isToday ? ` · ${copy.today}` : ""}`}
+            today={{ href: dayHrefBase, label: copy.today }}
+          />
+        )}
+      />
+      <p className="quiet-state planner-guarantee">{copy.createsNothing}</p>
 
       {/*
         `2M-ACCESS-004`. One region, announced, above both lists — so the answer
@@ -371,6 +374,16 @@ export function PlannerView({
  * instant: a day is not always 24 hours long, and the arithmetic that assumes it
  * is is the defect slice 2M.0 removed from two other places.
  */
+/** The day, said as a date rather than as ISO digits. */
+function dayLabel(day: string, locale: Locale): string {
+  const parsed = parseLocalDate(day);
+  if (parsed === null) return day;
+  // A calendar date has no instant: noon UTC, formatted in UTC, is that date
+  // in every zone (the reasoning of `calendar-view.tsx`'s `formatDayLabel`).
+  const instant = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, 12));
+  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(instant);
+}
+
 function shiftDay(day: string, delta: number): string {
   /*
    * `LDC-MISC-001`. This was already **correct** — `Date.UTC(y, m, d + delta)`

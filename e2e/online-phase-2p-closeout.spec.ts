@@ -46,7 +46,8 @@ const onlineConfigured = onlineEnvironment.configured;
  * that matches nothing passes every `toHaveCount(0)` in this file.
  */
 const NAVIGATION_SURFACES = [
-  { name: "work-modes", selector: ".work-modes", route: "/pt-BR/app/work" },
+  // Life Brain A.4: the work-modes strip is gone; the Agenda's lenses replaced it.
+  { name: "agenda-lenses", selector: ".agenda-lenses", route: "/pt-BR/app/calendar" },
   { name: "brain-lenses", selector: ".brain-lenses", route: "/pt-BR/app/contexts" },
   { name: "relation-view-controls", selector: ".relations-tabs", route: "/pt-BR/app/relations" },
   { name: "settings-section-nav", selector: ".settings-nav", route: "/pt-BR/app/settings" },
@@ -401,7 +402,7 @@ test.describe("Phase 2P closeout — access and phone evidence", () => {
       { route: "/pt-BR/app/reminders", selector: ".reminder-compose-open, .reminder-button" },
       { route: "/pt-BR/app/settings", selector: ".settings-nav a" },
       { route: "/pt-BR/app/relations?view=list", selector: ".relations-tabs a" },
-      { route: "/pt-BR/app/calendar?orientation=month", selector: ".work-modes a" },
+      { route: "/pt-BR/app/calendar?orientation=month", selector: ".agenda-lenses a" },
     ];
 
     for (const scope of scopes) {

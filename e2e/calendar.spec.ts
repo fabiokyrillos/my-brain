@@ -74,19 +74,17 @@ type Locale = "pt-BR" | "en";
  */
 const COPY = {
   "pt-BR": {
-    title: "Calendário",
+    title: "Agenda",
     reschedule: "Datas",
     unavailable: "Este item não tem datas que possam ser alteradas aqui.",
     empty: "Nada marcado para este período.",
-    description: "O que os seus dias contêm, reunido a partir do que você já registrou.",
     atLatest: "Este é o fim do período que o calendário cobre.",
   },
   en: {
-    title: "Calendar",
+    title: "Agenda",
     reschedule: "Dates",
     unavailable: "This item has no dates that can be changed here.",
     empty: "Nothing scheduled for this period.",
-    description: "What your days actually contain, gathered from what you have already recorded.",
     atLatest: "This is the end of the period the calendar covers.",
   },
 } as const;
@@ -154,6 +152,49 @@ function itemMarkup(options: {
   </li>`;
 }
 
+/**
+ * The Agenda's header and control band, mirroring Life Brain A.4's
+ * `AgendaHeader` + `AgendaStepper` and `calendar-view.tsx`'s toolbar: a compact
+ * title with the date stepper in its action slot, the three lenses, then the
+ * orientation `SegmentedControl` and the lanes behind one ghost button.
+ */
+function agendaHead(
+  copy: { readonly title: string },
+  range: string,
+  orientation: "day" | "week" | "month" | "agenda",
+  lanes: string = "",
+  narrowed = false,
+): string {
+  const option = (value: string, label: string) =>
+    `<a class="ui-segmented__option" href="?orientation=${value}"${value === orientation ? ' aria-current="page"' : ""}>${label}</a>`;
+  return `
+    <header class="ui-page-header ui-page-header--compact agenda-header">
+      <div class="ui-page-header__text"><h1 class="ui-page-header__title"><span id="cal">${copy.title}</span></h1></div>
+      <div class="ui-page-header__actions">
+        <nav aria-label="Navegar pelas datas" class="agenda-stepper calendar-navigation">
+          <a aria-label="Período anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=prev" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
+          <p aria-live="polite" class="agenda-stepper-range calendar-range">${range}</p>
+          <a aria-label="Próximo período" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=next" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
+          <a class="ui-button ui-button--secondary ui-button--sm" href="?date=today"><span class="ui-button__label">Hoje</span></a>
+        </nav>
+      </div>
+    </header>
+    <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
+      <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
+      <a class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
+      <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
+    </nav>
+    <div class="calendar-toolbar">
+      <nav aria-label="Formato" class="ui-segmented ui-segmented--sm calendar-orientation">
+        ${option("day", "Dia")}${option("week", "Semana")}${option("month", "Mês")}${option("agenda", "Lista")}
+      </nav>
+      <details class="calendar-filters"${narrowed ? " open" : ""}>
+        <summary class="ui-button ui-button--ghost ui-button--sm"><span class="ui-button__label">O que mostrar</span></summary>
+        <nav aria-label="O que mostrar" class="calendar-lanes"><ul>${lanes}</ul></nav>
+      </details>
+    </div>`;
+}
+
 /** The day orientation, mirroring `calendar-view.tsx`'s `<ol className="calendar-days">`. */
 function page(locale: Locale, items: string[]): string {
   const copy = COPY[locale];
@@ -162,21 +203,7 @@ function page(locale: Locale, items: string[]): string {
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
-    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
-    <nav aria-label="Orientação" class="calendar-orientation">
-      <span aria-hidden="true" class="calendar-control-label">Formato</span>
-      <ul>
-      <li><a href="?orientation=day" aria-current="true">Dia</a></li>
-      <li><a href="?orientation=week">Semana</a></li>
-      <li><a href="?orientation=agenda">Agenda</a></li>
-    </ul></nav>
-    <nav aria-label="Anterior" class="calendar-navigation">
-      <a href="?date=2026-08-14" rel="prev">Anterior</a>
-      <p aria-live="polite" class="calendar-range">sáb., 15 ago.</p>
-      <a href="?date=2026-08-15">Hoje</a>
-      <a href="?date=2026-08-16" rel="next">Próximo</a>
-    </nav>
-    <p class="calendar-destinations"><a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a></p>
+    ${agendaHead(copy, "sáb., 15 ago.", "day")}
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <ol class="calendar-days"><li class="calendar-day" data-today="true">
       <h2>sáb., 15 ago.</h2>
@@ -213,28 +240,7 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
-    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
-    <div class="calendar-toolbar">
-      <nav aria-label="Orientação" class="calendar-orientation">
-        <span aria-hidden="true" class="calendar-control-label">Formato</span>
-        <ul>
-        <li><a href="?orientation=day">Dia</a></li>
-        <li><a href="?orientation=week" aria-current="true">Semana</a></li>
-        <li><a href="?orientation=agenda">Agenda</a></li>
-      </ul></nav>
-      <nav aria-label="Faixas" class="calendar-lanes">
-        <span aria-hidden="true" class="calendar-control-label">O que mostrar</span>
-        <ul>
-        ${lane("Prazos", true)}${lane("Intenções", false)}
-      </ul></nav>
-      <nav aria-label="Anterior" class="calendar-navigation">
-        <a href="?date=2026-08-03" rel="prev">Anterior</a>
-        <p aria-live="polite" class="calendar-range">seg., 10 ago. – dom., 16 ago.</p>
-        <a href="?date=2026-08-15">Hoje</a>
-        <a href="?date=2026-08-17" rel="next">Próximo</a>
-      </nav>
-    </div>
-    <p class="calendar-destinations"><a class="calendar-reminders-link" href="/pt-BR/app/reminders">Todos os lembretes</a></p>
+    ${agendaHead(copy, "seg., 10 ago. – dom., 16 ago.", "week", `${lane("Prazos", true)}${lane("Intenções", false)}`, true)}
     <p class="calendar-bound" role="status">${copy.atLatest}</p>
     <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     <div class="calendar-week-scroll"><table class="calendar-week">
@@ -651,21 +657,7 @@ function monthPage(locale: Locale, busyCount = 0): string {
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
   <section aria-labelledby="cal" class="calendar">
-    <header class="calendar-header"><h1 id="cal">${copy.title}</h1><p class="calendar-description">${copy.description}</p></header>
-    <div class="calendar-toolbar">
-      <nav aria-label="Orientação" class="calendar-orientation"><ul>
-        <li><a href="?orientation=day">Dia</a></li>
-        <li><a href="?orientation=week">Semana</a></li>
-        <li><a href="?orientation=month" aria-current="true">${locale === "en" ? "Month" : "Mês"}</a></li>
-        <li><a href="?orientation=agenda">Agenda</a></li>
-      </ul></nav>
-      <nav aria-label="Anterior" class="calendar-navigation">
-        <a href="?date=2026-07-15" rel="prev">Anterior</a>
-        <p aria-live="polite" class="calendar-range">${locale === "en" ? "August 2026" : "agosto de 2026"}</p>
-        <a href="?date=2026-08-15">Hoje</a>
-        <a href="?date=2026-09-15" rel="next">Próximo</a>
-      </nav>
-    </div>
+    ${agendaHead(copy, locale === "en" ? "August 2026" : "agosto de 2026", "month")}
     <div class="calendar-month-scroll"><table class="calendar-month">
       <caption class="visually-hidden">${locale === "en" ? "Month grid for August 2026" : "Grade do mês de agosto de 2026"}</caption>
       <thead><tr>${weekdays.map((day) => `<th scope="col">${day}</th>`).join("")}</tr></thead>

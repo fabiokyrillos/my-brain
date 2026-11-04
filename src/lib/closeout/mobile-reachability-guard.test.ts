@@ -140,14 +140,22 @@ describe("the rest of the census, path by path", () => {
     expect(before, "the destination strip became conditional").not.toMatch(/\?\s*\(|&&\s*\(/);
   });
 
-  it("Agenda reaches Trabalho and the planner through the mode tabs", () => {
-    const modes = code("src/features/daily-cycle/work-modes.tsx");
-    expect(modes).toContain("/app/work");
-    expect(modes).toContain("/app/calendar/plan");
-    // …and the calendar mounts them, or the tabs reach nothing. Trabalho
-    // mounts them too, so the pair stays two-way.
-    expect(code("src/features/calendar/calendar-view.tsx")).toContain("<WorkModeTabs");
-    expect(code("src/features/daily-cycle/work-view.tsx")).toContain("<WorkModeTabs");
+  /**
+   * Life Brain A.4 (`LB-A-007`). The mode tabs ("Lista · Calendário ·
+   * Planejar") are gone from every page at once; the Agenda's three lenses
+   * replace them. What this held — the calendar reaches the planner, and the
+   * planner reaches back — is now the lens control, mounted on all three lens
+   * pages. Trabalho stopped being one of them: it is reached from the rail and
+   * from Hoje's destination strip, asserted above.
+   */
+  it("Agenda reaches Planejar and Lembretes through its lenses, from every lens", () => {
+    const copy = code("src/features/calendar/agenda-copy.ts");
+    expect(copy).toContain("/app/calendar/plan");
+    expect(copy).toContain("/app/reminders");
+    expect(code("src/features/calendar/agenda-header.tsx")).toContain('const lenses: readonly AgendaLens[] = ["calendar", "plan", "reminders"]');
+    expect(code("src/features/calendar/calendar-view.tsx")).toContain("<AgendaHeader");
+    expect(code("src/features/planning/planner-view.tsx")).toContain("<AgendaHeader");
+    expect(code("src/app/[locale]/app/reminders/page.tsx")).toContain("<AgendaHeader");
   });
 
   /**
@@ -290,17 +298,20 @@ describe("the rest of the census, path by path", () => {
    * and you cannot create a reminder from a page you cannot open.
    */
   it("the calendar reaches Lembretes whether or not any exist", () => {
+    // Life Brain A.4: the path is the Lembretes lens, no longer the
+    // "Todos os lembretes" link below the band. Same standard: unconditional.
     const view = code("src/features/calendar/calendar-view.tsx");
-    expect(view, "the unconditional reminders link is gone").toContain("/app/reminders");
-    expect(view).toContain("copy.navigation.allReminders");
-    // Unconditional: not inside a `&&`, a ternary or a `.map` over reminders.
-    const at = view.indexOf("calendar-reminders-link");
-    const link = view.slice(Math.max(0, at - 400), at);
+    const at = view.indexOf("<AgendaHeader");
+    expect(at, "the Agenda header is gone from the calendar").toBeGreaterThan(-1);
+    const before = view.slice(Math.max(0, at - 400), at);
     // Non-vacuity: an empty window matches nothing and would pass for free.
-    expect(link.length, "no code preceded the link to inspect").toBeGreaterThan(100);
-    expect(link, "the reminders link is conditional on there being reminders").not.toMatch(
-      /reminders\.length|hasReminders|\?\s*\(/,
+    expect(before.length, "no code preceded the header to inspect").toBeGreaterThan(100);
+    expect(before, "the Agenda header became conditional").not.toMatch(
+      /reminders\.length|hasReminders|\?\s*\(|&&\s*\(/,
     );
+    // And the header always offers the lens, whatever the props.
+    const header = code("src/features/calendar/agenda-header.tsx");
+    expect(header).toMatch(/options=\{lenses\.map/);
   });
 
   it("Ajustes reaches all three transparency views", () => {

@@ -1252,7 +1252,7 @@ test.describe("the person-candidate card stays usable at every width", () => {
 /*
  * Life Brain A.3 (`LB-A-006`) — the compact Tarefas page, mirroring what
  * `WorkView` renders: `PageHeader compact` with the quick add as its action,
- * the Lista · Calendário · Planejar modes, the `SegmentedControl` for the
+ * (since Life Brain A.4, no Lista · Calendário · Planejar strip), the `SegmentedControl` for the
  * views, and the toolbar of ghost buttons. The baseline recorded a two-line
  * "Adicionar" and segmented options under the touch minimum on a phone.
  */
@@ -1272,7 +1272,6 @@ function tarefasBody(options: { quickAddOpen?: boolean } = {}) {
         </form></div>
       </details></div>
     </header>
-    <nav aria-label="Modos das tarefas" class="work-modes"><a aria-current="page" class="work-mode" href="#">Lista</a><a class="work-mode" href="#">Calendário</a><a class="work-mode" href="#">Planejar</a></nav>
     <div class="work-controls">
       <nav aria-label="Visões das tarefas" class="ui-segmented work-view-tabs">
         <a aria-current="page" class="ui-segmented__option" href="#">Hoje</a><a class="ui-segmented__option" href="#">Todas</a><a class="ui-segmented__option" href="#">Aguardando</a>
@@ -1332,6 +1331,19 @@ test.describe("Life Brain A.3: the compact Tarefas page on a phone", () => {
     );
     expect(tops).toHaveLength(3);
     expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(8);
+  });
+
+  /*
+   * Life Brain A.4 removed the Lista · Calendário · Planejar strip (~66px).
+   * A.3 measured the first task at 286px with it; the plan's target is 180px.
+   * What is left above the first task is the top bar and the page padding,
+   * a shell change recorded for A.6 — so the bound here is the measured
+   * result, held so it cannot creep back.
+   */
+  test("the first task starts higher now that the modes strip is gone", async ({ page }) => {
+    await render(page, tarefasBody(), 390, 844);
+    const top = Math.round((await page.locator("#first-task").boundingBox())!.y);
+    expect(top, `the first task starts at ${top}px`).toBeLessThanOrEqual(230);
   });
 
   test("the add control is one square that never wraps, and the field takes the width", async ({ page }) => {

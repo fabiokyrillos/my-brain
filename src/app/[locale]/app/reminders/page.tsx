@@ -10,6 +10,7 @@ import {
 import { NotificationInvitation } from "@/features/notifications/notification-invitation";
 import { deriveThreeFacts, mayInviteAtMomentOfValue } from "@/features/notifications/three-facts";
 
+import { AgendaHeader } from "@/features/calendar/agenda-header";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { createReminderOrSeries } from "@/features/reminders/series-actions";
 import { ReminderComposer } from "@/features/reminders/reminder-composer";
@@ -138,23 +139,23 @@ export default async function RemindersPage({
 
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.heading}</h1>
-          <p>{copy.intro}</p>
-        </div>
-        {/*
-          `2P-REMINDER-001`. A single action, not a form.
+      {/*
+        Life Brain A.4 (`LB-A-007`). Lembretes is a lens of the Agenda, under
+        the Agenda's one compact header. Its one action stays where it was, in
+        the header.
 
-          The header used to carry `ReminderForm` — three controls and a submit
-          button, permanently open above the list. The options are resolved on
-          the server because the picker renders task titles, which are governed
-          content; see `task-options.ts` for why that resolution cannot happen
-          inside an `<option>`.
-        */}
-        <ReminderComposer action={createReminderOrSeries} locale={locale} taskOptions={taskOptions} />
-      </header>
+        `2P-REMINDER-001`. A single action, not a form: the header used to
+        carry `ReminderForm` — three controls and a submit button, permanently
+        open above the list. The options are resolved on the server because the
+        picker renders task titles, which are governed content; see
+        `task-options.ts` for why that resolution cannot happen inside an
+        `<option>`.
+      */}
+      <AgendaHeader
+        actions={<ReminderComposer action={createReminderOrSeries} locale={locale} taskOptions={taskOptions} />}
+        lens="reminders"
+        locale={locale}
+      />
 
       <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />
 

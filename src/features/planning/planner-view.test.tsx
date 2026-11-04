@@ -10,6 +10,7 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
 }));
 
 import { getPlannerCopy } from "./copy";
+import { getAgendaHeaderCopy } from "@/features/calendar/agenda-copy";
 import { getPlannedAtCopy } from "./planned-at";
 import type { PlannerProjection } from "./planner-projection";
 
@@ -193,7 +194,17 @@ describe("2M-ACCESS-004 — every region a user perceives is addressable", () =>
 
   it("gives the day navigation an accessible name", () => {
     renderPlanner();
-    expect(screen.getByRole("navigation", { name: copy.dayLabel })).toBeVisible();
+    // Life Brain A.4: the day stepper is the Agenda's, in the header.
+    expect(screen.getByRole("navigation", { name: getAgendaHeaderCopy("en").stepperLabel })).toBeVisible();
+  });
+
+  it("is the Agenda's Planejar lens, under the Agenda's one header (Life Brain A.4)", () => {
+    renderPlanner();
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agenda");
+    const current = screen.getByRole("navigation", { name: getAgendaHeaderCopy("en").lensesLabel })
+      .querySelector("[aria-current='page']");
+    expect(current?.textContent).toBe("Plan");
+    expect(document.querySelector(".work-modes")).toBeNull();
   });
 });
 
@@ -202,6 +213,7 @@ describe("both locales", () => {
     renderPlanner({ locale: "pt-BR" });
     const ptBR = getPlannerCopy("pt-BR");
     expect(screen.getByText(ptBR.createsNothing)).toBeVisible();
-    expect(screen.getByRole("heading", { level: 1, name: ptBR.title })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "Agenda" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Planejar" })).toHaveAttribute("aria-current", "page");
   });
 });

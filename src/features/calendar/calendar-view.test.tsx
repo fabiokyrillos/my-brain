@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -248,11 +248,13 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
     // IS the URL, which is what makes `2M-CAL-004` true rather than aspirational.
     view();
     const controls = Array.from(document.querySelectorAll("nav a"));
-    // The three orientations, five lanes, three navigation controls — and, since
-    // the Papel e Console recomposition, the three mode tabs.
-    expect(controls.length).toBeGreaterThanOrEqual(3 + 5 + 3 + 3);
+    // Four orientations, five lanes, the stepper's three and the three lenses
+    // (Life Brain A.4). Every one has a name — the stepper's arrows are
+    // icon-only, so theirs is the period word, carried by `aria-label`.
+    expect(controls.length).toBeGreaterThanOrEqual(4 + 5 + 3 + 3);
     for (const control of controls) {
-      expect((control.textContent ?? "").trim().length).toBeGreaterThan(0);
+      const name = control.getAttribute("aria-label") ?? control.textContent ?? "";
+      expect(name.trim().length).toBeGreaterThan(0);
     }
     expect(document.querySelector("nav [role='button']")).toBeNull();
   });
@@ -260,100 +262,84 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
   /**
    * The href-shape assertion, kept but scoped.
    *
-   * It used to run over every `nav a` on the page and required each one to be a
-   * `/app/calendar?…` URL. That was a proxy for "the control IS the URL", and it
-   * stopped being true of the whole page when Calendário became a *mode* of
-   * Trabalho: the tab strip's three links point at `/app/work`,
-   * `/app/calendar` and `/app/calendar/plan` by design, which is the whole point
-   * of the consolidation preserving the routes.
-   *
-   * Narrowed rather than weakened: the calendar's own controls are still held to
-   * carrying the query, and the tabs get their own two-sided check below.
-   *
-   * **The reminders link is excluded by name, and only that one.** It is the
-   * product's one unconditional path to `/app/reminders` and it deliberately
-   * leaves the calendar rather than narrowing it, so holding it to the query
-   * shape would be holding a destination to a filter's contract. Excluding it by
-   * class rather than by loosening the pattern keeps the rule intact for every
-   * other control in the band — a regex widened to `\/app\/` would have admitted
-   * anything.
+   * The calendar's own controls — orientation, lanes and the date stepper —
+   * are still held to carrying the query: the control IS the URL. The lens
+   * control above them (Life Brain A.4) leaves the calendar by design, so it
+   * gets its own two-sided check below rather than a loosened pattern.
    */
   it("keeps the calendar's own controls addressed by query", () => {
     view();
     const owned = Array.from(document.querySelectorAll(
-      ".calendar-orientation a, .calendar-lanes a, .calendar-navigation a:not(.calendar-reminders-link)",
+      ".calendar-orientation a, .calendar-lanes a, .calendar-navigation a",
     ));
     // The control on the control: if a refactor renamed these regions, an empty
     // list would satisfy every assertion in the loop below.
-    expect(owned.length).toBeGreaterThanOrEqual(3 + 5 + 2);
+    expect(owned.length).toBeGreaterThanOrEqual(4 + 5 + 3);
     for (const control of owned) {
       expect(control.getAttribute("href")).toMatch(/^\/pt-BR\/app\/calendar\?/);
     }
   });
 
   /**
-   * The excluded link, asserted rather than merely excluded.
+   * Life Brain A.4 (`LB-A-007`): the page is the Agenda, and Calendário,
+   * Planejar and Lembretes are its lenses.
    *
-   * An exclusion with no positive counterpart is how a control disappears and a
-   * test keeps passing. This is the only path to Lembretes that does not require
-   * a reminder to already exist, so its absence is a route becoming unreachable.
+   * Superseded, and recorded rather than deleted: the "Todos os lembretes" link
+   * below the band was the unconditional path to `/app/reminders`, and before
+   * that the "Lista · Calendário · Planejar" strip related this page to
+   * Trabalho. The lens control is now both — unconditional, outside every
+   * ternary, and the only selection control above the band.
    */
-  it("offers Lembretes unconditionally, below the band rather than inside it", () => {
-    /*
-      Retargeted after the owner's device findings of 2026-08-20, and **not
-      weakened**: the link is still asserted to exist, to be unconditional, to
-      carry the same href and the same words. What changed is where it may sit.
-
-      It used to be the last child of `.calendar-navigation`, which put a link to
-      another page in the row with *previous period*, *today* and *next period*,
-      wearing the same pill. That is half of what the owner reported as
-      *"filtros estranhos e pouco claros"*, and the assertion below now requires
-      the opposite arrangement — inside `.calendar-destinations`, and provably
-      **not** inside the control band.
-
-      This is no longer the product's only path to Lembretes either; Hoje offers
-      it directly. The sentence above that called this "the only path" was true
-      when it was written and is recorded here as superseded rather than deleted.
-    */
+  it("is the Agenda, with Lembretes as an unconditional lens", () => {
     view();
-    const link = document.querySelector(".calendar-destinations .calendar-reminders-link");
-    expect(link, "the unconditional reminders link is gone").not.toBeNull();
-    expect(link!.getAttribute("href")).toBe("/pt-BR/app/reminders");
-    expect(link!.textContent).toBe("Todos os lembretes");
-    // The other direction, so a revert cannot pass this test silently.
-    expect(
-      document.querySelector(".calendar-toolbar .calendar-reminders-link"),
-      "a destination is back inside the control band",
-    ).toBeNull();
-  });
-
-  it("relates the calendar to Trabalho without moving its route", () => {
-    view();
-    const tabs = Array.from(document.querySelectorAll(".work-modes a"));
-
-    expect(tabs.map((tab) => tab.getAttribute("href"))).toEqual([
-      "/pt-BR/app/work",
-      "/pt-BR/app/calendar",
-      "/pt-BR/app/calendar/plan",
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Agenda");
+    const lenses = Array.from(document.querySelectorAll(".agenda-lenses a"));
+    expect(lenses.map((lens) => [lens.textContent, lens.getAttribute("href")])).toEqual([
+      ["Calendário", "/pt-BR/app/calendar"],
+      ["Planejar", "/pt-BR/app/calendar/plan"],
+      ["Lembretes", "/pt-BR/app/reminders"],
     ]);
-    // "Where am I" is answerable without colour, on the mode strip too.
-    expect(tabs.filter((tab) => tab.getAttribute("aria-current") === "page")).toHaveLength(1);
+    expect(lenses.filter((lens) => lens.getAttribute("aria-current") === "page").map((lens) => lens.textContent))
+      .toEqual(["Calendário"]);
+    // The old strip and the old link are gone, so a revert cannot pass silently.
+    expect(document.querySelector(".work-modes")).toBeNull();
+    expect(document.querySelector(".calendar-reminders-link")).toBeNull();
   });
 
   it("marks the current orientation, so 'where am I' is answerable without colour", () => {
     view({ query: query({ orientation: "week" }) });
     const current = Array.from(document.querySelectorAll(".calendar-orientation a"))
-      .filter((link) => link.getAttribute("aria-current") === "true")
+      .filter((link) => link.getAttribute("aria-current") === "page")
       .map((link) => link.textContent);
     expect(current).toEqual(["Semana"]);
   });
 
+  it("calls the list layout Lista, so Agenda names the destination alone", () => {
+    view();
+    const labels = Array.from(document.querySelectorAll(".calendar-orientation a")).map((link) => link.textContent);
+    expect(labels).toEqual(["Dia", "Semana", "Mês", "Lista"]);
+    const list = document.querySelector(".calendar-orientation a:last-child");
+    expect(list?.getAttribute("href")).toContain("orientation=agenda");
+  });
+
+  it("keeps the lanes behind one button, open and counted when something is hidden", () => {
+    view();
+    const closed = document.querySelector("details.calendar-filters");
+    expect(closed?.hasAttribute("open")).toBe(false);
+    expect(closed?.querySelector("summary")?.getAttribute("aria-label")).toBeNull();
+    cleanup();
+
+    view({ query: query({ lanes: ["deadline", "reminder", "review"] }) });
+    const narrowed = document.querySelector("details.calendar-filters");
+    expect(narrowed?.hasAttribute("open")).toBe(true);
+    expect(narrowed?.querySelector("summary")?.getAttribute("aria-label")).toBe("O que mostrar, 2 ocultos");
+  });
+
   it("announces the range and the count", () => {
     view();
-    const live = Array.from(document.querySelectorAll("[aria-live='polite']"))
-      .map((node) => node.className);
-    expect(live).toContain("calendar-range");
-    expect(live).toContain("calendar-summary");
+    const live = Array.from(document.querySelectorAll("[aria-live='polite']"));
+    expect(live.some((node) => node.classList.contains("calendar-range"))).toBe(true);
+    expect(live.some((node) => node.classList.contains("calendar-summary"))).toBe(true);
   });
 
   it("labels today in words as well as by position", () => {
@@ -641,7 +627,8 @@ describe("2P-CALENDAR-001: the month is a grid, not a renamed list", () => {
   it("offers the month as a fourth orientation control", () => {
     monthView();
     const link = screen.getByRole("link", { name: getCalendarCopy("pt-BR").orientation.options.month });
-    expect(link.getAttribute("aria-current")).toBe("true");
+    // `page` since Life Brain A.4 made orientation a `SegmentedControl`.
+    expect(link.getAttribute("aria-current")).toBe("page");
   });
 });
 

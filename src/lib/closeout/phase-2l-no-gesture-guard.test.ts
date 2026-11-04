@@ -58,12 +58,11 @@ const WORK_SURFACES = [
   "src/features/daily-cycle/work-view.tsx",
   "src/features/daily-cycle/work-filters.tsx",
   /*
-    The Lista/Calendário/Planejar strip, added by the Papel e Console
-    recomposition. It is exactly the kind of control OD-2L-5 is about — a mode
-    switcher is the first place a swipe gets proposed — and it is three `<Link>`s
-    for that reason.
+    The Lista/Calendário/Planejar strip (`work-modes.tsx`) was named here; Life
+    Brain A.4 (ADR-149) removed it from every page and deleted the file. Its
+    successor, the Agenda's lens control, is named under the calendar's list
+    below, where its routes live.
   */
-  "src/features/daily-cycle/work-modes.tsx",
   "src/features/daily-cycle/task-detail-view.tsx",
   "src/features/daily-cycle/task-detail-surface.tsx",
   "src/features/daily-cycle/task-panel-close.tsx",
@@ -162,6 +161,12 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * second occasion.
      */
     "src/features/calendar/calendar-outcome.tsx",
+    /*
+     * Life Brain A.4 (ADR-149): the Agenda's header — the lens control and the
+     * date stepper. A lens switcher and a period stepper are the two places a
+     * swipe gets proposed first, and both are `<Link>`s for that reason.
+     */
+    "src/features/calendar/agenda-header.tsx",
     /*
      * Added by slice 2M.2. The planner lives under `/app/calendar` and is
      * governed by the same OD-2M-6 A signature, and it is the surface where a
