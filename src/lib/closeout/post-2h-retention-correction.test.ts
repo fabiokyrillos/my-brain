@@ -228,6 +228,13 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // tolerated, because the property this assertion protects is "nothing
       // follows that somebody did not deliberately account for".
       "202611040104_life_brain_m1_life_areas.sql",
+      // Life Brain LB-M3 (slice B.3, ADR-150): the chat's retrieval date
+      // window — a four-argument `match_internal_knowledge` and the
+      // two-argument one delegating to it. It touches no schedule, no
+      // retention job and no cron, and writes no data. Named here rather than
+      // tolerated, because the property this assertion protects is "nothing
+      // follows that somebody did not deliberately account for".
+      "202611040105_life_brain_m3_retrieval_window.sql",
     ]);
   });
 });

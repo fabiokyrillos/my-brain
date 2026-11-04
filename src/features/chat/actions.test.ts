@@ -682,3 +682,67 @@ describe("Life Brain B.1: zero sources answers 'não encontrei' without the answ
     expect(insertedAssistantMessage?.content).toBe("Resposta do modelo.");
   });
 });
+
+describe("Life Brain B.3: a dated question is retrieved inside its period (LB-B-007)", () => {
+  function provider() {
+    const answerFromKnowledge = vi.fn<(input: { sources: { id: string; occurredAt: string }[] }) => Promise<{
+      answer: string; citedSourceIds: string[]; model: string; inputTokens: number; outputTokens: number;
+    }>>(async () => ({ answer: "Em março você falou da viagem.", citedSourceIds: [], model: "gpt-5.6-terra", inputTokens: 10, outputTokens: 5 }));
+    vi.mocked(getAIProvider).mockReturnValue({
+      id: "openai",
+      embedText: async () => ({ embedding: [0.1], model: "text-embedding-3-small", inputTokens: 1, outputTokens: 0 }),
+      answerFromKnowledge,
+    } as unknown as ReturnType<typeof getAIProvider>);
+    return answerFromKnowledge;
+  }
+
+  function supabaseWith(matches: NonNullable<ChatStub["matches"]>) {
+    const stub = stubSupabase({ user: { id: userId }, citedSourceIds: [], matches });
+    vi.mocked(createClient).mockResolvedValue(stub as unknown as Awaited<ReturnType<typeof createClient>>);
+    return stub;
+  }
+
+  const entry = (id: string, occurredAt: string, similarity = 0.8) => ({
+    source_type: "entry" as const, source_id: id, content: `registro ${id}`, similarity, occurred_at: occurredAt,
+  });
+
+  it("sends a named month to the windowed retrieval, in the owner's days", async () => {
+    const stub = supabaseWith([entry("e-march", "2026-03-10T12:00:00Z")]);
+    provider();
+    await expect(sendChatMessage(idleState, form({ question: "O que falei sobre a viagem em março?" }))).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(stub.rpc).toHaveBeenCalledTimes(1);
+    const args = (stub.rpc.mock.calls as unknown as [string, Record<string, unknown>][])[0]![1];
+    expect(args.p_match_count).toBe(8);
+    expect(typeof args.p_since).toBe("string");
+    expect(typeof args.p_until).toBe("string");
+    // A March: thirty-one local days, whichever year the clock puts it in.
+    const days = (new Date(args.p_until as string).getTime() - new Date(args.p_since as string).getTime()) / 86_400_000;
+    expect(days).toBe(31);
+  });
+
+  it("keeps a question with no period on the two-argument retrieval", async () => {
+    const stub = supabaseWith([entry("e1", "2026-03-10T12:00:00Z")]);
+    provider();
+    await expect(sendChatMessage(idleState, form({ question: "O que falei sobre a viagem?" }))).rejects.toThrow("NEXT_REDIRECT");
+    const args = (stub.rpc.mock.calls as unknown as [string, Record<string, unknown>][])[0]![1];
+    expect(Object.keys(args).sort()).toEqual(["p_match_count", "p_query_embedding"]);
+  });
+
+  it("asks for the whole bound and sends the newest first for 'a última vez'", async () => {
+    const matches = Array.from({ length: 12 }, (_, index) =>
+      entry(`e${index}`, `2026-${String(index + 1).padStart(2, "0")}-05T12:00:00Z`, 0.9 - index * 0.01));
+    const stub = supabaseWith(matches);
+    const answer = provider();
+    await expect(sendChatMessage(idleState, form({ question: "Quando foi a última vez que fui ao dentista?" }))).rejects.toThrow("NEXT_REDIRECT");
+
+    const args = (stub.rpc.mock.calls as unknown as [string, Record<string, unknown>][])[0]![1];
+    expect(args.p_match_count).toBe(20);
+    expect(args.p_since).toBeUndefined();
+    const sent = answer.mock.calls[0]![0].sources.filter((source) => source.id.startsWith("entry:"));
+    expect(sent).toHaveLength(8);
+    expect(sent.map((source) => source.id)).toEqual(
+      ["e11", "e10", "e9", "e8", "e7", "e6", "e5", "e4"].map((id) => `entry:${id}`),
+    );
+  });
+});

@@ -486,7 +486,8 @@ describe("Phase 2S: allocated is not created, and the ceiling did not move", () 
     // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and Phase 2S's allocation of exactly one is untouched above.
     // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     expect(migrations.length, "an unattributed migration arrived beside the allocated one")
-      .toBe(104);
+      // Chain head moved to 105 by Life Brain LB-M3, the ONE migration slice B.3 was allocated (ADR-145 Decision 7): the chat's retrieval gains a date window (ADR-150). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+      .toBe(105);
     // The migration names the allocation it consumes, so a budget line nobody
     // can trace back to a signature cannot exist.
     const header = read(`supabase/migrations/${mine[0]}`).slice(0, 4000);

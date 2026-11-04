@@ -8,6 +8,7 @@ Todas as entidades do usuário carregam `user_id uuid not null`; horários usam 
 
 - Identidade: `profiles`, `agent_preferences`.
 - Conhecimento: `contexts`, `organizations`, `projects`, `people`, `person_relationships`, `person_contexts`, `person_projects`, `tags`, `entity_tags`. Desde `202611040104` (LB-M1, ADR-148), `contexts.kind` admite oito **áreas da vida** (`health`, `family`, `home`, `finance`, `travel`, `study`, `leisure`, `ideas`) além de `work`, `personal` e `custom`, com um contexto por área por dono (`contexts_user_life_area_idx`). O worker liga registros às áreas por `link_entry_life_area` (só `service_role`) e o dono ajusta a sensibilidade de um registro por `set_entry_sensitivity` (só `authenticated`); as duas auditam.
+- Recuperação do chat: desde `202611040105` (LB-M3, ADR-150), `match_internal_knowledge` tem uma assinatura de quatro argumentos com `p_since`/`p_until` (inclusivo/exclusivo sobre `occurred_at`, aplicados em cada ramo antes do limite); a de dois argumentos delega a ela.
 - Captura: `entries`, `entry_interpretations`, `entry_entities`.
 - Trabalho: `tasks`, `task_dependencies`, `task_people`, `task_projects`, `task_contexts`, `reminders`, `pending_questions`.
 - Inteligência: `memories`, `entry_embeddings`, `conversations`, `conversation_messages`.

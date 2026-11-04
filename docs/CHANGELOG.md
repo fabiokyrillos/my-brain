@@ -1,5 +1,14 @@
 # Technical Changelog
 
+## 2026-11-04 — Life Brain B.3: the chat retrieves inside the period a question names (LB-M3)
+
+- **Migration `202611040105_life_brain_m3_retrieval_window.sql`** (LB-M3, ADR-150). A four-argument `match_internal_knowledge(vector, integer, timestamptz, timestamptz)`: `p_since` inclusive and `p_until` exclusive on the row's `occurred_at`, applied inside each union arm before the bound; validity still applied. The two-argument signature delegates to it with both bounds null. Both invoker, empty `search_path`, authenticated-only; a post-deploy block asserts all of it. **Not applied to the hosted project** (owner's go, LB-X-002).
+- **pgTAP `supabase/tests/life_brain_m3_retrieval_window.sql`**, 19 assertions: structure, invoker, grants, the window on both arms, since inclusive and until exclusive, the window before the bound (at one row, March still answers), validity kept, owner scoping, no session → nothing, and the two-argument answer unchanged. CI runs it (no pgvector here).
+- **`chat/temporal-window.ts`**: a declared pt-BR/en parser — today, yesterday, the day before; this/last week, month, year; a named month with or without a year; a year; the last N days or weeks — and a recency flag ("última vez", "recentemente", "quando foi", "when did I"). Two periods are doubt. Windows are the owner's local days.
+- **Chat.** A named period goes to the windowed retrieval; recency asks for 20 and sends the eight newest (`byRecency`); no period is unchanged. The zone is read before retrieval. `chat/knowledge-retrieval.ts` falls back to the unwindowed call on `PGRST202` only, for the gap between this merge and the hosted apply.
+- **Fourteen guards** move the chain to 105 / head `202611040105`, each with its reason; `SECURITY.md` and `DATABASE.md` name the migration; `database.types.ts` carries the overload in the generated shape.
+- **Gates:** typecheck 0 errors; lint 0 errors; Vitest 547 files, 10,227 passed.
+
 ## 2026-11-04 — Life Brain A.4: the Agenda's three lenses, one control band, and a task's own reminder on its line
 
 - **One destination, three lenses** (`LB-A-007`, ADR-149). `AgendaHeader` — `PageHeader compact` "Agenda" and a `SegmentedControl` **Calendário · Planejar · Lembretes** — on `/app/calendar`, `/app/calendar/plan` and `/app/reminders`. The routes are unchanged; the lens control is the unconditional path to Lembretes ("Todos os lembretes" left).
