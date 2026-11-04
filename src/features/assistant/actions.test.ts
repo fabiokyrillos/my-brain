@@ -112,11 +112,14 @@ describe("runAssistantTurn — fallthrough is classified, never caught", () => {
     commandMock.mockResolvedValue(
       commandState({ unsupportedReason: "not_a_task_command", terminal: true }),
     );
-    await runAssistantTurn(idleAssistantComposerState, ask("O que combinei com Jaime?"));
+    // A statement, not a question: since `LB-B-009` a question skips the parse,
+    // so the fallthrough is exercised by text the parse still sees.
+    await runAssistantTurn(idleAssistantComposerState, ask("Combinei algo com Jaime"));
 
+    expect(commandMock).toHaveBeenCalledTimes(1);
     expect(chatMock).toHaveBeenCalledTimes(1);
     const [, submitted] = chatMock.mock.calls[0]!;
-    expect(submitted.get("question")).toBe("O que combinei com Jaime?");
+    expect(submitted.get("question")).toBe("Combinei algo com Jaime");
   });
 
   it("never converts any other refusal into a chat question", async () => {
@@ -174,7 +177,7 @@ describe("runAssistantTurn — fallthrough is classified, never caught", () => {
 
   it("keeps the conversation id on the fallthrough so a thread answer joins its thread", async () => {
     commandMock.mockResolvedValue(commandState({ unsupportedReason: "not_a_task_command" }));
-    await runAssistantTurn(idleAssistantComposerState, ask("E depois?", { conversationId: "c-9" }));
+    await runAssistantTurn(idleAssistantComposerState, ask("E depois disso", { conversationId: "c-9" }));
 
     expect(chatMock.mock.calls[0]![1].get("conversationId")).toBe("c-9");
   });
@@ -240,6 +243,22 @@ describe("runAssistantTurn — an agenda question skips the command parse (Life 
 
   it("still parses a command that only mentions a day", async () => {
     await runAssistantTurn(idleAssistantComposerState, ask("Mova a tarefa do relatório para amanhã"));
+
+    expect(commandMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("runAssistantTurn — a plain question skips the command parse (Life Brain B.2, LB-B-009)", () => {
+  it("answers a question with no change verb from knowledge, with no task-command call", async () => {
+    await runAssistantTurn(idleAssistantComposerState, ask("Quais exames estão pendentes?"));
+
+    expect(commandMock).not.toHaveBeenCalled();
+    expect(chatMock).toHaveBeenCalledTimes(1);
+    expect(chatMock.mock.calls[0]![1].get("question")).toBe("Quais exames estão pendentes?");
+  });
+
+  it("still parses a polite command phrased as a question", async () => {
+    await runAssistantTurn(idleAssistantComposerState, ask("Pode concluir a tarefa do exame?"));
 
     expect(commandMock).toHaveBeenCalledTimes(1);
   });

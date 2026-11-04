@@ -22,13 +22,14 @@ import { MAX_COMMAND_TEXT_LENGTH } from "@/lib/ai/task-command-schema";
 import { detectAgendaQuestion, type AgendaSpan } from "./agenda-intent";
 import { classifyCaptureIntent } from "./capture-intent";
 import { looksLikeMemoryIntent } from "./memory-intent";
+import { isPlainQuestion } from "./question-form";
 
 export type AssistantDecision =
   | { readonly kind: "memory_intent" }
   | { readonly kind: "capture_intent" }
   | { readonly kind: "capture_ambiguous" }
   | { readonly kind: "agenda"; readonly span: AgendaSpan }
-  | { readonly kind: "knowledge"; readonly reason: "too_long_for_command" }
+  | { readonly kind: "knowledge"; readonly reason: "too_long_for_command" | "question_form" }
   | { readonly kind: "command_first" };
 
 /**
@@ -78,6 +79,9 @@ export function decideAssistantRoute(text: string): AssistantDecision {
   if (text.length > MAX_COMMAND_TEXT_LENGTH) {
     return { kind: "knowledge", reason: "too_long_for_command" };
   }
+  // Life Brain B.2, `LB-B-009`: a question that asks for no change skips the
+  // command parse, which could only have answered `not_a_task_command`.
+  if (isPlainQuestion(text)) return { kind: "knowledge", reason: "question_form" };
   return { kind: "command_first" };
 }
 
