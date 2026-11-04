@@ -88,6 +88,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### B.3 — Recência e janela de datas (1 d, **LB-M3**)
 
 - Parser temporal pt-BR/en ("semana passada", "em março", "última vez") → `p_since/p_until`; re-rank por `occurred_at`. pgTAP para a RPC (M7/M8 do TODO).
+- **Implementado 2026-11-04 (ADR-150):** migration `202611040105` (assinatura de quatro argumentos, janela dentro de cada ramo antes do limite; a de dois delega), `chat/temporal-window.ts` (um período por pergunta; recência só reordena), `chat/knowledge-retrieval.ts` (fallback só para `PGRST202` até a aplicação no hospedado). pgTAP de 19 asserções. Aplicação no hospedado aguarda o dono.
 
 ### B.4 — Sensibilidade no chat (0,5 d)
 
