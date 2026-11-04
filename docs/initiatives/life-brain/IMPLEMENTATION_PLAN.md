@@ -111,6 +111,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - Schema `lifeArea` na extração (ambos os runtimes + paridade + corpus com ≥ 20 casos de vida); `contexts.kind` ampliado; `ensure_life_area_context`; vínculo na persistência; sensibilidade padrão por área; chip de área em Registros.
 - pgTAP: CHECK, índice único, função definer, negação cross-user, idempotência.
+- **Implementado 2026-11-04 (ADR-148, LB-M1 `202611040104`):** o vínculo é um passo separado e não bloqueante depois da persistência (`link_entry_life_area`), em vez de recriar `persist_entry_interpretation`; o dono ganhou `set_entry_sensitivity` e o controle na página do registro, porque nada escrevia `entries.sensitivity`. **Migration escrita e testada, não aplicada no hospedado** até o "pode aplicar" do dono no PR.
 
 ### C.2 — Pessoas com papel e memórias propostas (1 d)
 
