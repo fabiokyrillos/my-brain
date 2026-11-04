@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-04 — Life Brain C.2: a person's role becomes their note, and a lasting record is offered as a memory
+
+- **`people[].role`** in the extraction (ADR-151): required and nullable in both runtimes (Zod `personCandidateSchema`, the worker's validator, its strict JSON Schema), only when the entry says it; `storedEntryExtractionSchema` reads older people as `role: null`; 8 parity cases; `entry-extraction-v3` / `2026-11-04.2`.
+- **The role becomes the note** of a person a confirmed resolution created, only while the note is empty, never for a linked person; best effort. No column (the 2P-PERSON-001 amendment and `phase-2p-person-role-guard` hold). The suggestion shows "Dr. Silva · cardiologista".
+- **"Guardar como memória?"** on a record whose reading carries `lasting_preference` or `personal_memory`: the assistant's `MemoryProposalCard`, prefilled with the owner's words (`record-memory-proposal.ts`), until a memory names the record. `createProposedMemory` takes `sourceEntryId` (origin `record`): the memory names the record and inherits its sensitivity.
+- **Recorded:** LB-M3 applied to the hosted project on 2026-11-04 (6,836 bytes, md5 `2da47d8c…`; parity **105 = 105**, head `202611040105`; `anon` lost the PUBLIC execute on the two-argument retrieval; a rolled-back owner-session check returned 7 = 7 unwindowed, 1 in the last 7 days, 0 in 2000). The owner's standing authorization is recorded as an amendment to ADR-151.
+- **Gates:** typecheck 0 errors; lint 0 errors; Vitest 548 files, 10,251 passed; worker `deno check` clean and `deno test` 220 passed.
+
 ## 2026-11-04 — Life Brain B.3: the chat retrieves inside the period a question names (LB-M3)
 
 - **Migration `202611040105_life_brain_m3_retrieval_window.sql`** (LB-M3, ADR-150). A four-argument `match_internal_knowledge(vector, integer, timestamptz, timestamptz)`: `p_since` inclusive and `p_until` exclusive on the row's `occurred_at`, applied inside each union arm before the bound; validity still applied. The two-argument signature delegates to it with both bounds null. Both invoker, empty `search_path`, authenticated-only; a post-deploy block asserts all of it. **Not applied to the hosted project** (owner's go, LB-X-002).
