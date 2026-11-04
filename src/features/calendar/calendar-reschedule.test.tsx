@@ -76,6 +76,7 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     href: "/pt-BR/app/work/t1?from=abc",
     elapsed: false,
     reschedule: { taskId: TASK_ID, controls: schedulingControlsFor("todo") },
+    joinedReminders: [],
     ...overrides,
   };
 }

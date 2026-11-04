@@ -22,6 +22,7 @@ import type { createClient } from "@/lib/supabase/server";
 import type {
   CalendarDayView,
   CalendarItemView,
+  CalendarJoinedReminder,
   CalendarLaneFailure,
   CalendarProjection,
   CalendarRescheduleTarget,
@@ -357,7 +358,7 @@ export async function loadCalendarProjection(
     reminders projection already fell into once.
   */
   const push = (
-    item: Omit<CalendarItemView, "date" | "elapsed" | "commitment" | "repeats">
+    item: Omit<CalendarItemView, "date" | "elapsed" | "commitment" | "repeats" | "joinedReminders">
       & { readonly repeats?: string | null },
   ) => {
     const at = new Date(item.at);
@@ -373,6 +374,7 @@ export async function loadCalendarProjection(
       date: formatLocalDate(localDateOf(at, timezone)),
       elapsed: at.getTime() < nowMs,
       repeats: item.repeats ?? null,
+      joinedReminders: [],
     });
   };
 
@@ -402,7 +404,44 @@ export async function loadCalendarProjection(
     });
   }
 
+  /*
+    Life Brain A.4 (owner decision 2026-10-31). A reminder whose `task_id` is a
+    task already on this page joins that task's line instead of becoming a
+    second line for the same task — the hour-early reminder
+    `tasks_create_due_reminder` gives every deadline was the common case. The
+    deadline line is preferred, then the planned one; a reminder whose task is
+    not on the page (outside the window, or its lane hidden) stays a line of its
+    own, because then it is the only trace of the task here.
+
+    The reminder's time travels and its title does not, so joining discloses
+    nothing the task's own line, under the task's own classification, does not.
+  */
+  const taskLines = new Map<string, CalendarItemView[]>();
+  for (const item of items) {
+    if (item.lane !== "deadline" && item.lane !== "intention") continue;
+    const taskId = item.id.slice(item.lane.length + 1);
+    taskLines.set(taskId, [...(taskLines.get(taskId) ?? []), item]);
+  }
+  const joinedByLine = new Map<CalendarItemView, CalendarJoinedReminder[]>();
+  const standaloneReminders: ReminderRow[] = [];
   for (const row of reminderRows) {
+    const lines = row.task_id === null ? undefined : taskLines.get(row.task_id);
+    const line = lines?.find((item) => item.lane === "deadline") ?? lines?.[0];
+    if (line === undefined || !Number.isFinite(new Date(row.remind_at).getTime())) {
+      standaloneReminders.push(row);
+      continue;
+    }
+    joinedByLine.set(line, [
+      ...(joinedByLine.get(line) ?? []),
+      { id: row.id, at: row.remind_at, repeats: repeatLabels.get(row.id) ?? null },
+    ]);
+  }
+  for (const [line, joined] of joinedByLine) {
+    const index = items.indexOf(line);
+    items[index] = { ...line, joinedReminders: joined.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0)) };
+  }
+
+  for (const row of standaloneReminders) {
     push({
       id: `reminder:${row.id}`,
       lane: "reminder",

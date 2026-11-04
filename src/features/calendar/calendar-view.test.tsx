@@ -47,6 +47,7 @@ function item(overrides: Partial<CalendarItemView> = {}): CalendarItemView {
     // command path — which is what a component test of those properties should
     // be looking at. Rescheduling has its own fixture and its own file.
     reschedule: null,
+    joinedReminders: [],
     ...overrides,
   };
 }
@@ -691,5 +692,30 @@ describe("2R-SURFACE-003: a recurring occurrence says so on the calendar", () =>
     // Absent, not empty: an element rendered with no text is still an element a
     // screen reader walks past.
     expect(container.querySelector(".calendar-item-repeats")).toBeNull();
+  });
+});
+
+describe("Life Brain A.4: a task's own reminder is on the task's line", () => {
+  it("shows the reminder's time on the one line, and no second line", () => {
+    view({ projection: projection({
+      days: [{ date: "2026-08-15", isToday: true, items: [
+        item({ joinedReminders: [{ id: "r1", at: "2026-08-15T17:00:00.000Z", repeats: null }] }),
+      ] }],
+    }) });
+    expect(document.querySelectorAll(".calendar-item")).toHaveLength(1);
+    expect(screen.getByText("Lembrete às 14:00")).toBeTruthy();
+  });
+
+  it("keeps the reminder's time even when the title is withheld", () => {
+    view({ projection: projection({
+      days: [{ date: "2026-08-15", isToday: true, items: [
+        item({
+          sensitivity: { kind: "derived", level: "highly_sensitive" },
+          joinedReminders: [{ id: "r1", at: "2026-08-15T17:00:00.000Z", repeats: null }],
+        }),
+      ] }],
+    }) });
+    expect(screen.queryByText("Entregar o relatório")).toBeNull();
+    expect(screen.getByText("Lembrete às 14:00")).toBeTruthy();
   });
 });

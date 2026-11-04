@@ -67,6 +67,8 @@ export type CalendarCopy = {
   };
   readonly item: {
     readonly elapsed: string;
+    /** Life Brain A.4: the task's own reminder, on the task's line. */
+    readonly joinedReminder: (times: string) => string;
     readonly open: (label: string) => string;
     readonly at: (time: string) => string;
   };
@@ -158,6 +160,7 @@ const PT_BR: CalendarCopy = {
   },
   item: {
     elapsed: "Já passou",
+    joinedReminder: (times) => `Lembrete às ${times}`,
     open: (label) => `Abrir ${label}`,
     at: (time) => `às ${time}`,
   },
@@ -229,6 +232,7 @@ const EN: CalendarCopy = {
   },
   item: {
     elapsed: "Already passed",
+    joinedReminder: (times) => `Reminder at ${times}`,
     open: (label) => `Open ${label}`,
     at: (time) => `at ${time}`,
   },

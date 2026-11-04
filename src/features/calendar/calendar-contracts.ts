@@ -104,6 +104,33 @@ export type CalendarItemView = {
    * is every other lane and most reminders.
    */
   readonly repeats: string | null;
+  /**
+   * Life Brain A.4 (owner decision 2026-10-31, found by B.1): the reminders of
+   * **this task** that fall in the window, joined to its line instead of listed
+   * as lines of their own.
+   *
+   * `tasks_create_due_reminder` (`202607160007`) gives every task with a
+   * `due_at` a reminder one hour earlier, so the same task used to appear twice
+   * — "14:00 · X · lembrete" and "15:00 · X · prazo". A reminder whose
+   * `task_id` is a task already on the page now rides on that task's line, in
+   * the projection, so the Agenda, Home and the chat's agenda answer change
+   * together and `itemCount` stays what the page shows (`2M-PRIVACY-006`).
+   *
+   * The time travels, the title does not: the line's own title, under the
+   * line's own classification, is the only text rendered. Always empty for
+   * anything that is not a task line.
+   */
+  readonly joinedReminders: readonly CalendarJoinedReminder[];
+};
+
+/** A reminder carried on its task's line rather than as a line of its own. */
+export type CalendarJoinedReminder = {
+  /** The reminder's own id (not prefixed), so a surface can cite it. */
+  readonly id: string;
+  /** Its instant, ISO-8601, rendered in the owner's zone. */
+  readonly at: string;
+  /** The rule in words when it repeats (`2R-SURFACE-003`), else `null`. */
+  readonly repeats: string | null;
 };
 
 /** One day column, whether or not anything is in it. */

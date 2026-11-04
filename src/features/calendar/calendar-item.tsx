@@ -102,6 +102,16 @@ export function CalendarItem({
         {item.repeats === null ? null : (
           <span className="calendar-item-repeats">{item.repeats}</span>
         )}
+        {/*
+          Life Brain A.4: the task's own reminder, said on its line rather than
+          listed as a second line for the same task. Time only — the title is
+          the line's, under the line's classification.
+        */}
+        {item.joinedReminders.length === 0 ? null : (
+          <span className="calendar-item-repeats" data-joined-reminder="true">
+            {copy.item.joinedReminder(item.joinedReminders.map((reminder) => formatTime(reminder.at, locale, timezone)).join(", "))}
+          </span>
+        )}
       </span>
       <span className="calendar-item-body">
         {item.title === null ? (

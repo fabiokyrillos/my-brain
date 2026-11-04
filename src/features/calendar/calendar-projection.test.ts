@@ -556,3 +556,84 @@ describe("2R-SURFACE-005: a series occurrence is on the calendar like any remind
     expect(item?.repeats).toBeNull();
   });
 });
+
+describe("Life Brain A.4: a task's own reminder rides on the task's line", () => {
+  /*
+   * Owner decision 2026-10-31, found by B.1. `tasks_create_due_reminder` gives
+   * every task with a deadline a reminder an hour earlier, and the projection
+   * listed both — the same task twice on the Agenda, on Home and in the chat's
+   * agenda answer. A reminder whose `task_id` is a task already in the window
+   * joins that task's line; everything else is unchanged.
+   */
+  const dueTask = { id: "t1", title: "Exame de sangue", due_at: "2026-08-15T18:00:00.000Z", planned_at: null, status: "todo", source_entry_id: null };
+  const dueReminder = { id: "r1", title: "Exame de sangue", remind_at: "2026-08-15T17:00:00.000Z", status: "pending", entry_id: null, task_id: "t1" };
+
+  it("lists a task with a deadline once, with its reminder's time on the line", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at" ? { data: [dueTask], error: null } : { data: [], error: null }),
+      reminders: { data: [dueReminder], error: null },
+    }), { lanes: ["deadline", "reminder"] });
+
+    const items = result.days.flatMap((day) => day.items);
+    expect(items.map((item) => item.id)).toEqual(["deadline:t1"]);
+    expect((items[0] as ItemView & { joinedReminders: unknown }).joinedReminders).toEqual([
+      { id: "r1", at: "2026-08-15T17:00:00.000Z", repeats: null },
+    ]);
+    // The count is what the page shows: one line, not two (`2M-PRIVACY-006`).
+    expect(result.itemCount).toBe(1);
+  });
+
+  it("joins a planned task's reminder too, preferring the deadline line when both exist", async () => {
+    const both = { ...dueTask, planned_at: "2026-08-15T13:00:00.000Z" };
+    const result = await load(client({
+      tasks: () => ({ data: [both], error: null }),
+      reminders: { data: [dueReminder], error: null },
+    }), { lanes: ["deadline", "intention", "reminder"] });
+
+    const items = result.days.flatMap((day) => day.items) as (ItemView & { joinedReminders: readonly { id: string }[] })[];
+    expect(items.map((item) => item.id)).toEqual(["intention:t1", "deadline:t1"]);
+    expect(items.find((item) => item.lane === "deadline")?.joinedReminders.map((r) => r.id)).toEqual(["r1"]);
+    expect(items.find((item) => item.lane === "intention")?.joinedReminders).toEqual([]);
+
+    const planned = await load(client({
+      tasks: (column) => (column === "planned_at" ? { data: [both], error: null } : { data: [], error: null }),
+      reminders: { data: [dueReminder], error: null },
+    }), { lanes: ["intention", "reminder"] });
+    const only = planned.days.flatMap((day) => day.items) as (ItemView & { joinedReminders: readonly { id: string }[] })[];
+    expect(only.map((item) => item.id)).toEqual(["intention:t1"]);
+    expect(only[0].joinedReminders.map((r) => r.id)).toEqual(["r1"]);
+  });
+
+  it("keeps a reminder as its own line when its task is not on the page", async () => {
+    // The task's deadline is outside the window, or its lane is hidden: the
+    // reminder is the only trace of it here, so it stays.
+    const outside = await load(client({
+      tasks: { data: [], error: null },
+      reminders: { data: [dueReminder], error: null },
+    }), { lanes: ["deadline", "reminder"] });
+    expect(outside.days.flatMap((day) => day.items).map((item) => item.id)).toEqual(["reminder:r1"]);
+
+    const hidden = await load(client({
+      tasks: (column) => (column === "due_at" ? { data: [dueTask], error: null } : { data: [], error: null }),
+      reminders: { data: [dueReminder], error: null },
+    }), { lanes: ["reminder"] });
+    expect(hidden.days.flatMap((day) => day.items).map((item) => item.id)).toEqual(["reminder:r1"]);
+  });
+
+  it("never joins a reminder that belongs to no task, or to another task", async () => {
+    const result = await load(client({
+      tasks: (column) => (column === "due_at" ? { data: [dueTask], error: null } : { data: [], error: null }),
+      reminders: {
+        data: [
+          { ...dueReminder, id: "r2", task_id: null },
+          { ...dueReminder, id: "r3", task_id: "t-other" },
+        ],
+        error: null,
+      },
+    }), { lanes: ["deadline", "reminder"] });
+    const items = result.days.flatMap((day) => day.items) as (ItemView & { joinedReminders: readonly unknown[] })[];
+    expect(items.map((item) => item.id).sort()).toEqual(["deadline:t1", "reminder:r2", "reminder:r3"]);
+    expect(items.every((item) => item.joinedReminders.length === 0)).toBe(true);
+    expect(result.itemCount).toBe(3);
+  });
+});
