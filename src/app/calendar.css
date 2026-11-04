@@ -153,9 +153,17 @@
     width: 100%;
   }
 
+  /*
+   * A week's period ("seg., 10 ago. – dom., 16 ago.") is wider than what is
+   * left beside three 44 px buttons at 375 px, and `nowrap` pushed the page
+   * 8 px sideways (`2M-MOBILE-001`). On a phone it may break, and it may
+   * shrink below its text width.
+   */
   .agenda-stepper-range {
     flex: 1;
+    min-width: 0;
     text-align: center;
+    white-space: normal;
   }
 }
 
