@@ -208,12 +208,15 @@ test.describe("the owner's device findings", () => {
 
       // The selected orientation really is the one asked for — the assertion
       // that would have caught the parameter mistake above.
-      await expect(page.locator(`.calendar-orientation a[aria-current="true"]`)).toHaveCount(1);
+      // `page` since Life Brain A.4 made orientation a `SegmentedControl`.
+      await expect(page.locator(`.calendar-orientation a[aria-current="page"]`)).toHaveCount(1);
 
       const measured = await page.evaluate(() => {
         const page_ = document.querySelector(".calendar-page");
-        const heading = document.querySelector(".calendar-header h1");
-        const description = document.querySelector(".calendar-description");
+        // Life Brain A.4: the Agenda's compact header, which has no description
+        // on a phone — the lens control under it is measured in its place.
+        const heading = document.querySelector(".agenda-header h1");
+        const description = document.querySelector(".agenda-lenses");
         const left = (element: Element | null) =>
           element ? Math.round(element.getBoundingClientRect().left) : -1;
         return {
@@ -369,17 +372,15 @@ test.describe("the owner's device findings", () => {
     await signIn(page);
     await page.goto("/pt-BR/app/calendar?orientation=month");
 
-    // The owner's words were *"filtros estranhos e pouco claros"*. Both families
-    // carried an `aria-label` and neither showed one, so a sighted reader saw
-    // thirteen identical pills with nothing naming them.
-    const labels = page.locator(".calendar-control-label");
-    await expect(labels).toHaveCount(2);
-    await expect(labels.first()).toHaveText("Formato");
-    await expect(labels.last()).toHaveText("O que mostrar");
+    // The owner's words were *"filtros estranhos e pouco claros"*. Since Life
+    // Brain A.4 there is one family on show — orientation, named by its
+    // segmented control — and the lanes wait behind one button that says what
+    // it holds.
+    await expect(page.locator(".calendar-orientation")).toHaveAttribute("aria-label", "Formato");
+    await expect(page.locator(".calendar-filters summary")).toContainText("O que mostrar");
 
-    // The destination left the band: a link to another page is not a control
-    // that changes this one.
-    await expect(page.locator(".calendar-toolbar .calendar-reminders-link")).toHaveCount(0);
-    await expect(page.locator(".calendar-destinations .calendar-reminders-link")).toHaveCount(1);
+    // Lembretes is a lens, never a control in the band.
+    await expect(page.locator(".calendar-toolbar a[href$='/app/reminders']")).toHaveCount(0);
+    await expect(page.locator(".agenda-lenses a[href$='/app/reminders']")).toHaveCount(1);
   });
 });

@@ -39,12 +39,16 @@ import type {
   TaskDetailDateBounds,
 } from "@/features/task-commands/task-detail-controls";
 
-import { WorkModeTabs } from "@/features/daily-cycle/work-modes";
+import { Badge, SegmentedControl, buttonVariants } from "@/components/ui";
+import { SlidersHorizontal } from "lucide-react";
+
+import { AgendaHeader, AgendaStepper } from "./agenda-header";
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
 import {
   CALENDAR_LANES,
+  CALENDAR_ORIENTATIONS,
   boundState,
   calendarHref,
   isNarrowed,
@@ -53,7 +57,6 @@ import {
   step,
   withLaneToggled,
   withOrientation,
-  type CalendarOrientation,
   type CalendarQuery,
 } from "./calendar-query";
 import { getCalendarCopy } from "./copy";
@@ -134,6 +137,7 @@ export function CalendarView({
   const bound = boundState(query, today);
   const headingId = useId();
   const lanesId = useId();
+  const hiddenLanes = CALENDAR_LANES.length - query.lanes.length;
 
   /**
    * `2M-CAL-010`. The outcome of the last applied command, held **here**.
@@ -224,164 +228,100 @@ export function CalendarView({
     */
     <div className="content-page calendar-page">
     <section aria-labelledby={headingId} className="calendar">
-      <header className="calendar-header">
-        <h1 id={headingId}>{copy.title}</h1>
-        <p className="calendar-description">{copy.description}</p>
-      </header>
-
       {/*
-        `02-arquitetura-e-rotas.md` makes Calendário a **mode of Trabalho**: it
-        answers *when* about the rows Lista answers *what* about. The tab strip
-        is what makes that relationship visible, and it navigates — the route
-        stays exactly where it was, per the consolidation table's compatibility
-        rule that no existing URL dies at this step.
+        Life Brain A.4 (`LB-A-007`). One compact header for the Agenda's three
+        lenses, with the date stepper in its action slot, replacing the title,
+        the description, the "Lista · Calendário · Planejar" strip and a
+        navigation row of their own. The stepper keeps the bounded range: at
+        either edge it is still a link and the bound notice below says why.
+
+        Lembretes is a lens now, in the lens control under the title — the
+        unconditional path to `/app/reminders` that the "Todos os lembretes"
+        link used to be (`mobile-reachability-guard`).
       */}
-      <WorkModeTabs active="calendar" locale={locale} />
+      <AgendaHeader
+        headingId={headingId}
+        lens="calendar"
+        locale={locale}
+        actions={(
+          <AgendaStepper
+            className="calendar-navigation"
+            locale={locale}
+            next={{ href: calendarHref(locale, step(query, 1, today)), label: copy.navigation.next, disabled: bound.atLatest }}
+            previous={{ href: calendarHref(locale, step(query, -1, today)), label: copy.navigation.previous, disabled: bound.atEarliest }}
+            rangeClassName="calendar-range"
+            rangeLabel={rangeLabel}
+            today={{ href: calendarHref(locale, { ...query, anchor: today }), label: copy.navigation.today }}
+          />
+        )}
+      />
 
       {/*
-        The three control rows, in one band.
+        Orientation and lanes, in one band (`03-componentes.md`): which slice of
+        time, and which of it. Orientation is the one selection control
+        (Dia · Semana · Mês · Lista); the lanes wait behind one ghost button
+        with the number hidden, open by default when something is hidden — a
+        narrowing you cannot see is a calendar that lies about what it holds.
 
-        Orientation, lanes and navigation were three stacked rows above the
-        grid. They answer one question between them — *which slice of time am I
-        looking at, and which of it* — and `03-componentes.md` puts the controls
-        that scope a view in one band above it rather than in a stack that
-        competes with it.
+        **The status regions below stay out of the band.** The bound notice,
+        the partial-read notice and the summary are statements about the
+        result, and two of them are live regions; folding a live region into a
+        row of controls is how an announcement ends up read as a control.
 
-        **The three status regions below are deliberately not in the band.** The
-        bound notice, the partial-read notice and the summary are statements
-        about the result rather than ways to change it, and two of them are live
-        regions; folding a live region into a row of navigation is how an
-        announcement ends up read as a control.
-
-        Nothing about the controls changed: still links, still the URL, still
-        keyboard-operable, still no gesture anywhere.
+        Still links, still the URL, still keyboard-operable, no gesture.
       */}
       <div className="calendar-toolbar">
-      {/* Orientation. Links, so the URL is the state and the keyboard works. */}
-      <nav aria-label={copy.orientation.label} className="calendar-orientation">
-        {/*
-          The label, made visible (`2P-CALENDAR-005`, owner report of 2026-08-20:
-          *"filtros estranhos e pouco claros"*).
+        <SegmentedControl
+          className="calendar-orientation"
+          label={copy.orientation.label}
+          options={CALENDAR_ORIENTATIONS.map((orientation) => ({
+            value: orientation,
+            label: copy.orientation.options[orientation],
+            href: calendarHref(locale, withOrientation(query, orientation)),
+          }))}
+          size="sm"
+          value={query.orientation}
+        />
 
-          It was already here as `aria-label`, so a screen reader has always been
-          told what this row is and a sighted reader never was: thirteen
-          identically-shaped pills in one band, with nothing saying which of them
-          choose a period and which of them filter its contents.
-
-          `aria-hidden` because the `<nav>` already carries the same string as
-          its accessible name — rendering it visibly must not make a screen
-          reader say it twice.
-        */}
-        <span aria-hidden="true" className="calendar-control-label">{copy.orientation.label}</span>
-        <ul>
-          {(Object.keys(copy.orientation.options) as CalendarOrientation[]).map((orientation) => {
-            const active = query.orientation === orientation;
-            return (
-              <li key={orientation}>
-                <Link
-                  aria-current={active ? "true" : undefined}
-                  href={calendarHref(locale, withOrientation(query, orientation))}
-                >
-                  {copy.orientation.options[orientation]}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* Lane visibility. Same shape, same reasons. */}
-      <nav aria-label={copy.lanes.label} className="calendar-lanes" id={lanesId}>
-        <span aria-hidden="true" className="calendar-control-label">{copy.lanes.label}</span>
-        <ul>
-          {CALENDAR_LANES.map((lane) => {
-            const shown = query.lanes.includes(lane);
-            return (
-              <li key={lane}>
-                <Link
-                  /*
-                    No `aria-pressed`. It is only valid on `role="button"`, and
-                    axe flagged all five of these on the live page — a link that
-                    claims to be a toggle button is an invalid ARIA attribute,
-                    not a shortcut. The state belongs in the accessible name, so
-                    it is a visually hidden word inside the link: screen readers
-                    hear "Prazos, mostrando", pointer users see the same chip,
-                    and the element stays a real link that can be opened in a new
-                    tab. OD-2M-6 A is unaffected — the control is still the URL.
-                  */
-                  /*
-                    `data-shown`, and it is not cosmetic.
-
-                    Removing the invalid `aria-pressed` also removed the only
-                    thing `calendar.css` keyed the *visible* off-state off —
-                    `.calendar-lanes a[aria-pressed="false"]` stopped matching
-                    anything, and a hidden lane lost its dashed edge and its
-                    reduced opacity. What remained was a `sr-only` word: correct
-                    for a screen reader and **nothing at all** for a sighted
-                    user, which is `2M-ACCESS-005` failed in the opposite
-                    direction from the one it was written for. The state is
-                    carried by a data attribute, which no ARIA rule governs.
-                  */
-                  data-lane={lane}
-                  data-shown={shown ? "true" : "false"}
-                  href={calendarHref(locale, withLaneToggled(query, lane))}
-                  title={copy.lanes.descriptions[lane]}
-                >
-                  {copy.lanes.names[lane]}
-                  <span className="sr-only">{shown ? copy.lanes.stateShown : copy.lanes.stateHidden}</span>
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-
-      {/* Range navigation, bounded and saying so rather than going quiet. */}
-      <nav aria-label={copy.navigation.previous} className="calendar-navigation">
-        <Link
-          aria-disabled={bound.atEarliest ? "true" : undefined}
-          href={calendarHref(locale, step(query, -1, today))}
-          rel="prev"
-        >
-          {copy.navigation.previous}
-        </Link>
-        <p aria-live="polite" className="calendar-range">{rangeLabel}</p>
-        <Link href={calendarHref(locale, { ...query, anchor: today })}>{copy.navigation.today}</Link>
-        <Link
-          aria-disabled={bound.atLatest ? "true" : undefined}
-          href={calendarHref(locale, step(query, 1, today))}
-          rel="next"
-        >
-          {copy.navigation.next}
-        </Link>
-      </nav>
+        <details className="calendar-filters" open={hiddenLanes > 0}>
+          <summary
+            aria-label={hiddenLanes > 0 ? copy.lanes.hiddenLabel(hiddenLanes) : undefined}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            <SlidersHorizontal aria-hidden="true" className="ui-button__icon" />
+            <span className="ui-button__label">{copy.lanes.label}</span>
+            {hiddenLanes > 0 ? <Badge aria-hidden="true" size="sm" tone="accent">{hiddenLanes}</Badge> : null}
+          </summary>
+          {/* Lane visibility: links, so the URL is the state. */}
+          <nav aria-label={copy.lanes.label} className="calendar-lanes" id={lanesId}>
+            <ul>
+              {CALENDAR_LANES.map((lane) => {
+                const shown = query.lanes.includes(lane);
+                return (
+                  <li key={lane}>
+                    <Link
+                      /*
+                        No `aria-pressed`: it is only valid on `role="button"`,
+                        and axe flagged all five on the live page. The state is a
+                        visually hidden word in the accessible name ("Prazos,
+                        mostrando") and `data-shown` for the eye, so a hidden lane
+                        looks hidden as well as sounding hidden (`2M-ACCESS-005`).
+                      */
+                      data-lane={lane}
+                      data-shown={shown ? "true" : "false"}
+                      href={calendarHref(locale, withLaneToggled(query, lane))}
+                      title={copy.lanes.descriptions[lane]}
+                    >
+                      {copy.lanes.names[lane]}
+                      <span className="sr-only">{shown ? copy.lanes.stateShown : copy.lanes.stateHidden}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        </details>
       </div>
-
-      {/*
-        Lembretes — a **destination**, and no longer dressed as a control.
-
-        It used to be the last child of `.calendar-navigation`, inside the
-        control band, which put a link to another page in the same row as
-        *previous period*, *today* and *next period* and gave it the same pill.
-        The owner's report of 2026-08-20 names the consequence twice over: the
-        band reads as *"filtros estranhos"*, and Lembretes was so hard to find on
-        a phone that this three-hop path — Trabalho → Calendário → here — was the
-        only one they could locate.
-
-        **This is no longer the product's only path to Lembretes**, and that is
-        the other half of the fix: Hoje now offers it directly. What stays here
-        is the contextual offer, which is truthful on the one surface that
-        already draws reminders beside tasks — but it sits below the band, with
-        the statements about the result, rather than among the ways to change it.
-
-        `mobile-reachability-guard.test.ts` still requires this link to be
-        unconditional, and it still is: it is outside every ternary on this page.
-      */}
-      <p className="calendar-destinations">
-        <Link className="calendar-reminders-link" href={`/${locale}/app/reminders`}>
-          {copy.navigation.allReminders}
-        </Link>
-      </p>
 
       {/* `2M-CAL-006`: reaching the bound is a visible state, not an empty grid. */}
       {bound.atEarliest ? <p className="calendar-bound" role="status">{copy.navigation.atEarliest}</p> : null}

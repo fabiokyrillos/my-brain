@@ -16,11 +16,12 @@ import { signInOnline } from "./support/online-session";
  * provider. One task is seeded for the disposable account only — never for the
  * owner's test account — and the account's deletion cascades it away.
  *
- * **Two items, not one.** `tasks_create_due_reminder` (`202607160007`) gives
- * every task inserted with a `due_at` a reminder one hour earlier, and the
- * calendar projection shows both. The first run of this spec expected one item
- * and was wrong about the product, not the other way round: the answer must say
- * what the Agenda shows.
+ * **One item, with its reminder on the line.** `tasks_create_due_reminder`
+ * (`202607160007`) gives every task inserted with a `due_at` a reminder one hour
+ * earlier. Until Life Brain A.4 the projection listed both, and this spec
+ * expected two items; since A.4 (owner decision 2026-10-31) the reminder rides
+ * on its task's line, on the Agenda and here alike — the answer must say what
+ * the Agenda shows.
  *
  * Evidence: set `LIFE_BRAIN_EVIDENCE=docs/reports/life-brain/evidence/slice-b1`
  * to keep the screenshots.
@@ -40,8 +41,8 @@ const strings = {
     submit: "Enviar",
     tomorrow: "O que tenho amanhã?",
     dayAfter: "O que tenho depois de amanhã?",
-    found: "Amanhã, você tem 2 itens na agenda:",
-    reminderLane: "lembrete",
+    found: "Amanhã, você tem 1 item na agenda:",
+    joinedReminder: "lembrete às 14:00",
     deadlineLane: "prazo",
     empty: "Não encontrei nada na sua agenda depois de amanhã.",
     reach: "Olhei só a sua agenda: tarefas com prazo ou planejadas e lembretes nesse período.",
@@ -52,8 +53,8 @@ const strings = {
     submit: "Send",
     tomorrow: "What do I have tomorrow?",
     dayAfter: "What do I have the day after tomorrow?",
-    found: "Tomorrow, you have 2 items on your agenda:",
-    reminderLane: "reminder",
+    found: "Tomorrow, you have 1 item on your agenda:",
+    joinedReminder: "reminder at 14:00",
     deadlineLane: "deadline",
     empty: "I found nothing on your agenda the day after tomorrow.",
     reach: "I looked only at your agenda: tasks due or planned and reminders in that period.",
@@ -129,12 +130,13 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       await expect(page).toHaveURL(new RegExp(`/${locale}/app/chat/[0-9a-f-]+$`), { timeout: 60_000 });
       const answer = page.locator(".chat-message.assistant").last();
       await expect(answer.locator(".chat-message-body")).toContainText(text.found);
-      await expect(answer.locator(".chat-message-body")).toContainText(`14:00 · ${TASK_TITLE} · ${text.reminderLane}`);
-      await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE} · ${text.deadlineLane}`);
+      await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE} · ${text.deadlineLane} · ${text.joinedReminder}`);
+      await expect(answer.locator(".chat-message-body")).not.toContainText(`14:00 · ${TASK_TITLE}`);
       // Where it looked, said for the agenda — not "records and memories only".
       await expect(answer.getByText(text.reach)).toBeVisible();
       // The task is a navigable source, carrying no title in the card, and
-      // since Life Brain B.2 (ADR-147) so is its reminder, on the reminder page.
+      // since Life Brain B.2 (ADR-147) so is its reminder, on the reminder page
+      // — still cited after A.4 joined it to the task's line.
       await expect(answer.locator(`a[href^="/${locale}/app/work/"]`)).toHaveCount(1);
       await expect(answer.locator(`a[href^="/${locale}/app/reminders/"]`)).toHaveCount(1);
       // No model answered, so no model id is printed under the message.

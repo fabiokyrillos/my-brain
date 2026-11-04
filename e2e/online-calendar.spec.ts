@@ -46,7 +46,8 @@ type Locale = "pt-BR" | "en";
  */
 const COPY = {
   "pt-BR": {
-    calendar: "Calendário",
+    // Life Brain A.4: the page is the Agenda; Calendário is its lens.
+    calendar: "Agenda",
     reschedule: "Datas",
     apply: "Aplicar",
     resultRegion: "Resultado da alteração",
@@ -54,7 +55,7 @@ const COPY = {
     back: "Calendário",
   },
   en: {
-    calendar: "Calendar",
+    calendar: "Agenda",
     reschedule: "Dates",
     apply: "Apply",
     resultRegion: "Change result",

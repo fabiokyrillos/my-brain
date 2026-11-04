@@ -32,6 +32,8 @@ export type AgendaCopy = {
   readonly empty: (after: string) => string;
   /** One item's kind, after its title. */
   readonly lanes: Record<AgendaLane, string>;
+  /** Life Brain A.4: a task's own reminder, said on the task's line. */
+  readonly joinedReminder: (times: string) => string;
   /** What a lane is called when it could not be read. */
   readonly laneNames: Record<AgendaLane, string>;
   readonly joinLanes: (names: readonly string[]) => string;
@@ -70,6 +72,7 @@ const AGENDA_COPY = {
     found: (lead, count) => `${lead}, você tem ${count} ${count === 1 ? "item" : "itens"} na agenda:`,
     empty: (after) => `Não encontrei nada na sua agenda ${after}.`,
     lanes: { deadline: "prazo", intention: "planejado", reminder: "lembrete" },
+    joinedReminder: (times) => `lembrete às ${times}`,
     laneNames: { deadline: "os prazos", intention: "as tarefas planejadas", reminder: "os lembretes" },
     joinLanes: joinWith("e"),
     partial: (lanes) => `Não consegui ler ${lanes} agora, então pode haver mais.`,
@@ -97,6 +100,7 @@ const AGENDA_COPY = {
     found: (lead, count) => `${lead}, you have ${count} ${count === 1 ? "item" : "items"} on your agenda:`,
     empty: (after) => `I found nothing on your agenda ${after}.`,
     lanes: { deadline: "deadline", intention: "planned", reminder: "reminder" },
+    joinedReminder: (times) => `reminder at ${times}`,
     laneNames: { deadline: "the deadlines", intention: "the planned tasks", reminder: "the reminders" },
     joinLanes: joinWith("and"),
     partial: (lanes) => `I could not read ${lanes} right now, so there may be more.`,

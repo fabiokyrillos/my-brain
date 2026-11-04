@@ -84,7 +84,8 @@ type Locale = "pt-BR" | "en";
  */
 const COPY = {
   "pt-BR": {
-    plannerTitle: "Planejar o dia",
+    // Life Brain A.4: Planejar is a lens of the Agenda, under its title.
+    plannerTitle: "Agenda",
     plannedEmpty: "Nada planejado para este dia ainda.",
     reviewTitle: "Hoje",
     reviewDescription: "O que este dia realmente conteve, montado a partir dos seus próprios registros.",
@@ -117,7 +118,7 @@ const COPY = {
     notifyHistoryHeading: "Avisos recebidos",
   },
   en: {
-    plannerTitle: "Plan the day",
+    plannerTitle: "Agenda",
     plannedEmpty: "Nothing planned for this day yet.",
     reviewTitle: "Today",
     reviewDescription: "What this day actually contained, composed from your own records.",
@@ -233,18 +234,23 @@ function shell(locale: Locale, body: string): string {
 function plannerPage(locale: Locale, rows: string[]): string {
   const copy = COPY[locale];
   return shell(locale, `<div class="content-page planner-page">
-    <header class="list-header">
-      <div>
-        <p class="eyebrow">PLANEJAR</p>
-        <h1>${copy.plannerTitle}</h1>
-        <p class="quiet-state">Nada é criado aqui.</p>
+    <header class="ui-page-header ui-page-header--compact agenda-header">
+      <div class="ui-page-header__text"><h1 class="ui-page-header__title"><span>${copy.plannerTitle}</span></h1></div>
+      <div class="ui-page-header__actions">
+        <nav aria-label="Navegar pelas datas" class="agenda-stepper planner-day-nav">
+          <a aria-label="Dia anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-10" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
+          <p aria-live="polite" class="agenda-stepper-range">ter., 11 ago.</p>
+          <a aria-label="Próximo dia" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-12" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
+          <a class="ui-button ui-button--secondary ui-button--sm" href="?"><span class="ui-button__label">Hoje</span></a>
+        </nav>
       </div>
-      <nav aria-label="Dia" class="planner-day-nav">
-        <a href="?date=2026-08-10">Dia anterior</a>
-        <strong>2026-08-11</strong>
-        <a href="?date=2026-08-12">Próximo dia</a>
-      </nav>
     </header>
+    <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
+      <a class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
+      <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
+      <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
+    </nav>
+    <p class="quiet-state planner-guarantee">Nada é criado aqui.</p>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
     <div class="planner-orientation">
       <section aria-label="Capacidade" class="planner-capacity">

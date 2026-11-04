@@ -24,255 +24,151 @@
 }
 
 /*
- * The page header, which had no rule at all.
+ * Life Brain A.4 (`LB-A-007`) — the Agenda's header and its one control band.
  *
- * `.calendar-header` was styled by nothing, so its `<h1>` inherited the body
- * size and rendered **smaller than the range label beside the arrows** — the
- * page's own title read as a caption while "agosto de 2026" read as the
- * heading. Every other surface gets this from `.list-header h1`; the calendar
- * never had a `.list-header`, so it got nothing.
+ * The title, the lenses and the date stepper are the shared `AgendaHeader`
+ * (`PageHeader compact` + `SegmentedControl`, styled by `ui.css`); what is here
+ * is only how they sit on this page. The old band — a visible label per row,
+ * thirteen pills in three rows, a navigation row of its own and a "Todos os
+ * lembretes" link below it — measured 286 px on an iPhone before any day.
  *
- * The scale is taken from `.list-header h1` deliberately rather than invented,
- * so Calendário sits at the same level as Registros and Trabalho instead of at
- * a third size only this page uses.
+ * Now: orientation is one `SegmentedControl` (Dia · Semana · Mês · Lista), and
+ * the five lanes wait behind one ghost button beside it, in a `<details>` that
+ * opens before hydration. Wraps rather than scrolls (`2M-MOBILE-001`).
  */
-.calendar-header {
-  display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-6);
+.agenda-lenses {
+  margin-bottom: var(--space-2);
 }
 
-.calendar-header h1 {
-  font: 500 clamp(38px, 5vw, 60px) / 1 var(--font-reading);
-  letter-spacing: -0.04em;
-  margin: 0;
+/* Planejar's one guarantee, kept when its title and description left. */
+.planner-guarantee {
+  margin: 0 0 var(--space-3);
 }
 
-.calendar-description {
-  color: var(--text-muted);
-  margin: 0;
-  max-width: var(--width-reading);
+.agenda-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
-/*
- * The control band (`03-componentes.md`).
- *
- * The three **control** rows answer one question between them — which slice of
- * time, and which of it — so they sit in one band rather than in three stacked
- * rows above the grid.
- *
- * The band holds the controls and nothing else. `.calendar-bound`,
- * `.calendar-partial`, `.calendar-summary` and the outcome region stay below it
- * and above the grid, because they are **statements about the result**, not ways
- * to change it — and two of them are live regions, which have no business
- * inside a row of navigation.
- *
- * `column-gap` is generous and `row-gap` is not: when the band wraps at a narrow
- * width the rows must read as rows, not as three separate blocks.
- */
-/*
- * The control band, re-laid as a grid on 2026-08-20.
- *
- * ## What was wrong, measured rather than felt
- *
- * As a wrapping flex row it produced **thirteen identically-shaped pills across
- * five rows, 286 px tall** on an iPhone — more than 40% of the viewport before
- * any calendar appeared — with `flex-wrap` deciding the grouping. Which chips
- * chose a period and which filtered its contents was left to the reader to
- * infer, and on a narrow screen the two families interleaved.
- *
- * ## What the grid buys
- *
- * Two rows with fixed meaning instead of whatever wrapping produces: the period
- * controls and the range navigation share the first, the filter owns the
- * second. Each keeps its own labelled `<nav>`, so the grouping a sighted reader
- * now sees is the grouping a screen reader always had.
- *
- * The band still **wraps rather than scrolls**: `2M-MOBILE-001` forbids
- * horizontal page scroll at 375 px, and a control row that scrolled would hide
- * destinations behind a gesture the phase refused.
- */
+.agenda-stepper-range {
+  margin: 0 var(--space-1);
+  font: var(--type-label);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* At the edge of the range the calendar covers: still a link, visibly spent. */
+.agenda-stepper a[aria-disabled="true"] {
+  opacity: 0.5;
+}
+
 .calendar-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-areas:
-    "orientation"
-    "navigation"
-    "lanes";
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
-  border-block: 1px solid var(--border-default);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-2) var(--space-3);
 }
 
-.calendar-toolbar .calendar-orientation { grid-area: orientation; }
-.calendar-toolbar .calendar-navigation { grid-area: navigation; }
-.calendar-toolbar .calendar-lanes { grid-area: lanes; }
+/* Orientation keeps its four options on one line; the filters wrap beside it. */
+.calendar-orientation {
+  flex: none;
+  max-width: 100%;
+}
 
-/* The two chip families and the navigation each become a labelled block. */
-.calendar-orientation,
-.calendar-lanes {
-  display: grid;
-  gap: var(--space-2);
+/* The calendar's stepper never breaks the period label off its arrows. */
+.calendar-navigation {
+  flex-wrap: nowrap;
+}
+
+.calendar-filters {
   min-width: 0;
 }
 
-/*
- * The label that was only ever an `aria-label`.
- *
- * Quiet on purpose: it names the row, it does not compete with it. Same
- * treatment as `.eyebrow`, taken from the token rather than restated, so a
- * change to the eyebrow scale reaches here too.
- */
-.calendar-control-label {
-  font: var(--type-eyebrow);
-  letter-spacing: var(--eyebrow-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
+/* The summary is the ghost button; the browser's disclosure marker goes. */
+.calendar-filters > summary {
+  list-style: none;
+  cursor: pointer;
 }
 
-/*
- * The filter row reads as secondary, because it is.
- *
- * Orientation answers *which slice of time* and is a choice among four; lanes
- * answer *which of it* and are five independent toggles. They looked identical,
- * which is most of why the band read as a pile. The filter chips lose the
- * surface fill and keep the outline, so the selected orientation stays the only
- * strongly-filled control in the band.
- */
-.calendar-lanes a {
-  background: transparent;
+.calendar-filters > summary::-webkit-details-marker {
+  display: none;
 }
 
-/*
- * Lembretes, below the band.
- *
- * It is a link to another page, so it stops sitting among controls that change
- * this one — and it stops wearing their pill.
- */
-.calendar-destinations {
-  margin: var(--space-3) 0 0;
+.calendar-filters[open] {
+  flex-basis: 100%;
 }
 
-.calendar-destinations .calendar-reminders-link {
-  min-height: 44px;
-  display: inline-flex;
-  align-items: center;
-  /*
-   * The separator goes with the row it separated.
-   *
-   * The base rule gives this link a `border-inline-start`, which was correct
-   * while it sat at the end of the navigation row and divided it from the
-   * arrows. On its own line that border is a stray vertical bar floating to the
-   * left of a link, which is precisely the *"aparência de interface inacabada"*
-   * the owner reported — a rule outliving the arrangement that motivated it.
-   */
-  margin-inline-start: 0;
-  padding-inline-start: 0;
-  border-inline-start: 0;
-}
-
-/*
- * Above the phone, the period controls and the range share one row.
- *
- * `auto` for the navigation rather than a fraction: the range label is a date
- * whose width is content, and giving it a fraction of the row made it wrap
- * mid-month at some widths while leaving the chips short of space at others.
- */
-@media (min-width: 48rem) {
-  .calendar-toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "orientation navigation"
-      "lanes lanes";
-    column-gap: var(--space-6);
-  }
-
-  .calendar-toolbar .calendar-navigation {
-    justify-self: end;
-    align-self: end;
-  }
-}
-
-/*
- * The three control rows. Wrapping rather than scrolling: `2M-MOBILE-001`
- * forbids horizontal page scroll at 375 px, and a control row that scrolled
- * would hide destinations behind a gesture the phase refused.
- */
-.calendar-orientation ul,
-.calendar-lanes ul,
-.calendar-navigation {
+.calendar-lanes ul {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-2, 0.5rem);
+  gap: var(--space-2);
   list-style: none;
-  margin: 0;
+  margin: var(--space-2) 0 0;
   padding: 0;
-  align-items: center;
 }
 
-.calendar-orientation a,
-.calendar-lanes a,
-.calendar-navigation a {
+.calendar-lanes a {
   display: inline-flex;
   align-items: center;
   /*
-   * `2M-MOBILE-002`. 44 px is the declared minimum target, and it is set as a
-   * min-height plus padding rather than a fixed size so a longer word in either
-   * locale grows the control instead of clipping it.
+   * `2M-MOBILE-002`. 44 px is the declared minimum target, set as a min-height
+   * plus padding so a longer word in either locale grows the chip instead of
+   * clipping it.
    */
   min-height: 44px;
-  padding: 0 var(--space-3, 0.75rem);
+  padding: 0 var(--space-3);
   border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  text-decoration: none;
-}
-
-.calendar-orientation a,
-.calendar-lanes a {
   border-radius: var(--radius-full);
-  background: var(--background-surface);
+  background: transparent;
   color: var(--text-secondary);
   font: var(--type-label);
-}
-
-.calendar-orientation a[aria-current="true"] {
-  background: var(--action-primary);
-  color: var(--action-primary-text);
-  border-color: var(--action-primary);
-  font-weight: 600;
+  text-decoration: none;
 }
 
 /*
  * A hidden lane, said by a dashed edge AND by reduced opacity — never by colour
- * alone (`2M-ACCESS-005`).
- *
- * Keyed on `data-shown` because the selector this replaced read
- * `a[aria-pressed="false"]`, and `aria-pressed` was removed from these links
- * when axe flagged it as invalid on an anchor. The attribute went and the rule
- * stayed, matching nothing: a hidden lane became visually identical to a shown
- * one, and its state survived only in the visually-hidden word beside it.
- * Correct for a screen reader, and nothing at all for everyone else.
+ * alone (`2M-ACCESS-005`). Keyed on `data-shown`: `aria-pressed` is invalid on
+ * a link, and the selector it once fed matched nothing after axe removed it.
  */
 .calendar-lanes a[data-shown="false"] {
   border-style: dashed;
   opacity: 0.65;
 }
 
-.calendar-navigation a[aria-disabled="true"] {
-  opacity: 0.5;
+/*
+ * On a phone the stepper takes the row under the title: the period is the
+ * thing being read, so it gets the width, and the arrows keep their 44 px.
+ */
+@media (max-width: 47.99rem) {
+  .agenda-header {
+    flex-wrap: wrap;
+  }
+
+  .agenda-header .ui-page-header__actions {
+    flex-basis: 100%;
+  }
+
+  .agenda-stepper {
+    width: 100%;
+  }
+
+  /*
+   * A week's period ("seg., 10 ago. – dom., 16 ago.") is wider than what is
+   * left beside three 44 px buttons at 375 px, and `nowrap` pushed the page
+   * 8 px sideways (`2M-MOBILE-001`). On a phone it may break, and it may
+   * shrink below its text width.
+   */
+  .agenda-stepper-range {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+    white-space: normal;
+  }
 }
 
-.calendar-range,
 .calendar-summary {
   margin: 0;
-}
-
-/* The range is the band's subject, so it is set in the reading face at the
-   weight a heading would carry — the two arrows beside it are the controls. */
-.calendar-range {
-  font: var(--type-reading);
-  color: var(--text-primary);
-  white-space: nowrap;
 }
 
 .calendar-summary {
@@ -1120,38 +1016,6 @@
 }
 
 /*
- * The one link in the band that leaves the calendar.
- *
- * Every other control in `.calendar-navigation` narrows or moves the range; this
- * one goes to Lembretes. Set apart by a rule and the link colour so a reader can
- * see, before pressing it, that it is a destination rather than another step —
- * a band word that behaved differently from every other word in the band would
- * be the band lying about what it is.
- */
-.calendar-reminders-link {
-  margin-inline-start: var(--space-3);
-  padding-inline-start: var(--space-3);
-  border-inline-start: 1px solid var(--border-divider);
-  color: var(--link);
-}
-
-.calendar-reminders-link:hover {
-  color: var(--link-hover);
-}
-
-@media (max-width: 899px) {
-  /* Wrapped onto its own line, the rule and the inset read as a stray divider,
-     so both go and the target grows to the phone minimum. */
-  .calendar-reminders-link {
-    margin-inline-start: 0;
-    padding-inline-start: 0;
-    border-inline-start: none;
-    min-height: var(--touch-target);
-    display: inline-flex;
-    align-items: center;
-  }
-}
-/*
  * `2P-CALENDAR-001` — the phone gets a legible month, not a squeezed one.
  *
  * Seven columns at 375 px is 53 px each, which cannot hold a day number, a lane
@@ -1171,100 +1035,4 @@
 @media (max-width: 47.99rem) {
   .calendar-month-scroll { display: none; }
   .calendar-month-list { display: block; }
-
-  /*
-   * The control band on a phone — **arranged**, not shrunk (owner report of
-   * 2026-08-20: *"os filtros não estão suficientemente responsivos"*).
-   *
-   * ## What wrapping produced, measured at 393 px
-   *
-   * Every group was a `flex-wrap` row, so the last item of each fell alone onto
-   * a line of its own: *Datas sugeridas* by itself under four lane chips, and
-   * *Próximo período* by itself under *Período anterior · agosto de 2026 ·
-   * Hoje*. Chips took whatever width their word needed, so the rows were ragged
-   * on both edges — *"pílulas espremidas, quebras desorganizadas e grupos
-   * visualmente confusos"* is exactly what a wrap does when nothing tells it
-   * where to break.
-   *
-   * ## Grids, because a grid decides where the break goes
-   *
-   * Each group becomes equal columns at a width chosen for the group's own item
-   * count, which is what "adapt the arrangement to the available width" means
-   * here — **no font is reduced**, and every control keeps its 44 px height.
-   *
-   * Formato is four equal columns, which is the segmented control the owner
-   * suggested and which also makes the selected period unmistakable: it is the
-   * one filled cell in a row of four identical ones.
-   */
-  .calendar-orientation ul {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  /* Five lanes in two columns: three tidy rows instead of 4 + 1 ragged. The
-     last cell spans, so a lone chip fills its row rather than floating. */
-  .calendar-lanes ul {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .calendar-lanes li:last-child:nth-child(odd) {
-    grid-column: 1 / -1;
-  }
-
-  /*
-   * The chip fills its cell, and that is what makes the grid worth having.
-   *
-   * The `<li>` is the grid item and the `<a>` inside it is `inline-flex`, so
-   * without this each chip was only as wide as its own word and sat at the left
-   * of a wide cell — *Dia* a small pill, *Mês* a **circle**, the row as ragged
-   * as the wrap it replaced. Equal columns only read as a segmented control
-   * when the controls are equal.
-   */
-  .calendar-orientation li,
-  .calendar-lanes li {
-    display: grid;
-  }
-
-  /* Centred text, and padding that yields rather than forcing an overflow. */
-  .calendar-orientation a,
-  .calendar-lanes a {
-    width: 100%;
-    justify-content: center;
-    text-align: center;
-    padding-inline: var(--space-2);
-  }
-
-  /*
-   * The pager: the period on its own line, then three equal controls.
-   *
-   * `Período anterior` and `Próximo período` are long enough that a
-   * prev/label/next row leaves the month name ~90 px and breaks it mid-word.
-   * Giving the label its own row costs one line and keeps the date readable,
-   * which is the trade this surface should make — the label is the thing being
-   * read, and the three controls are the thing being pressed.
-   *
-   * Placed by area rather than by source order, so the DOM keeps prev → label →
-   * today → next and the keyboard order is unchanged.
-   */
-  .calendar-toolbar .calendar-navigation {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-areas:
-      "range range range"
-      "prev today next";
-    gap: var(--space-2);
-    margin-inline-start: 0;
-  }
-
-  .calendar-navigation .calendar-range { grid-area: range; text-align: center; }
-  .calendar-navigation a[rel="prev"] { grid-area: prev; }
-  .calendar-navigation a[rel="next"] { grid-area: next; }
-  .calendar-navigation a:not([rel]) { grid-area: today; }
-
-  .calendar-navigation a {
-    justify-content: center;
-    text-align: center;
-    padding-inline: var(--space-2);
-  }
 }

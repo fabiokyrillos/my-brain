@@ -25,6 +25,7 @@ function item(overrides: Partial<CalendarItemView> & Pick<CalendarItemView, "id"
     elapsed: false,
     reschedule: null,
     repeats: null,
+    joinedReminders: [],
     ...overrides,
   };
 }
@@ -117,6 +118,42 @@ describe("composeAgendaAnswer — the projection, said as an answer", () => {
       { id: `task:${TASK_A}`, type: "task", sourceId: TASK_A, support: "product_state" },
     ]);
     expect(answer.citedSourceIds).toEqual([`reminder:${REMINDER}`, `task:${TASK_A}`]);
+  });
+
+  it("says a task's own reminder on the task's line, once, and still cites it (Life Brain A.4)", () => {
+    const answer = composeAgendaAnswer({
+      span: TOMORROW,
+      locale: "pt-BR",
+      projection: projection([{
+        date: "2026-11-01",
+        items: [
+          item({
+            id: `deadline:${TASK_A}`, lane: "deadline", at: "2026-11-01T18:00:00.000Z", date: "2026-11-01", title: "Exame de sangue",
+            joinedReminders: [{ id: REMINDER, at: "2026-11-01T17:00:00.000Z", repeats: null }],
+          }),
+        ],
+      }]),
+    });
+
+    expect(answer.content).toContain("Amanhã, você tem 1 item na agenda:");
+    expect(answer.content).toContain("• 15:00 · Exame de sangue · prazo · lembrete às 14:00");
+    expect(answer.content).not.toContain("14:00 · Exame de sangue");
+    expect(answer.citedSourceIds).toEqual([`task:${TASK_A}`, `reminder:${REMINDER}`]);
+
+    const english = composeAgendaAnswer({
+      span: TOMORROW,
+      locale: "en",
+      projection: projection([{
+        date: "2026-11-01",
+        items: [
+          item({
+            id: `deadline:${TASK_A}`, lane: "deadline", at: "2026-11-01T18:00:00.000Z", date: "2026-11-01", title: "Blood test",
+            joinedReminders: [{ id: REMINDER, at: "2026-11-01T17:00:00.000Z", repeats: null }],
+          }),
+        ],
+      }]),
+    });
+    expect(english.content).toContain("• 15:00 · Blood test · deadline · reminder at 14:00");
   });
 
   it("cites only ids the projection returned, once each", () => {

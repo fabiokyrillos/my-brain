@@ -668,32 +668,6 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 }
 
 /*
- * Lista · Calendário · Planejar — the three modes of Trabalho.
- *
- * A segmented control on a track, which is `03-componentes.md`'s shape for two
- * or three short mutually-exclusive options. Visually distinct from the view
- * chips below it on purpose: the modes change *how you look*, the views change
- * *what you look at*, and two identical strips would read as one six-item row.
- */
-.work-modes{
-  display:inline-flex;gap:var(--space-1);
-  margin-bottom:var(--space-4);padding:3px;
-  border-radius:var(--radius-full);
-  background:var(--background-subtle);
-  max-width:100%;overflow-x:auto;scrollbar-width:none;
-}
-.work-modes::-webkit-scrollbar{display:none}
-.work-mode{
-  flex:none;display:inline-flex;align-items:center;
-  min-height:36px;padding:0 var(--space-4);
-  border-radius:var(--radius-full);
-  color:var(--text-secondary);font:var(--type-label);
-}
-.work-mode:hover{color:var(--text-primary)}
-.work-mode[aria-current="page"]{background:var(--background-surface);color:var(--text-primary);box-shadow:var(--elevation-1)}
-@media(max-width:899px){.work-mode{min-height:var(--touch-target)}}
-
-/*
  * The toolbar's disclosures — `03-componentes.md`, ListToolbar.
  *
  * `<details>`, so they work before hydration and need no keyboard code. The

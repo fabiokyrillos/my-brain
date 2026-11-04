@@ -183,7 +183,14 @@ export function composeAgendaAnswer(input: {
         if (!shown) masked = true;
         const time = formatInstant(item.at, "time", locale, projection.timezone);
         const lane = copy.lanes[item.lane as AgendaLane];
-        lines.push(`• ${[time, shown ? item.title : copy.maskedItem, lane].filter(Boolean).join(" · ")}`);
+        // Life Brain A.4: the task's own reminder is said on its line, by time only.
+        const joined = item.joinedReminders.length === 0
+          ? null
+          : copy.joinedReminder(item.joinedReminders
+            .map((reminder) => formatInstant(reminder.at, "time", locale, projection.timezone))
+            .filter(Boolean)
+            .join(", "));
+        lines.push(`• ${[time, shown ? item.title : copy.maskedItem, lane, joined].filter(Boolean).join(" · ")}`);
         listed += 1;
       }
     }
@@ -194,9 +201,14 @@ export function composeAgendaAnswer(input: {
 
   const seen = new Set<string>();
   const sources: PersistedSourceReference[] = [];
-  for (const item of items) {
-    const citable = citableOf(item);
-    if (citable === null) continue;
+  // A joined reminder (Life Brain A.4) is still a thing the answer listed, so
+  // it is cited right after its task, as B.2 cites every listed reminder.
+  const citables = items.flatMap((item) => {
+    const own = citableOf(item);
+    const joined = item.joinedReminders.map((reminder) => ({ type: "reminder" as const, id: reminder.id }));
+    return own === null ? joined : [own, ...joined];
+  });
+  for (const citable of citables) {
     const key = `${citable.type}:${citable.id}`;
     if (seen.has(key)) continue;
     seen.add(key);

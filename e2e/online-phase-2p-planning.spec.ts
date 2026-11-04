@@ -36,7 +36,8 @@ type Locale = "pt-BR" | "en";
 /** The words, taken from the modules that own them rather than guessed. */
 const COPY = {
   "pt-BR": {
-    calendar: "Calendário",
+    // Life Brain A.4: the page title is the Agenda's.
+    calendar: "Agenda",
     month: "Mês",
     day: "Dia",
     reminders: "Lembretes",
@@ -51,7 +52,7 @@ const COPY = {
     monthList: "Dias com itens neste mês",
   },
   en: {
-    calendar: "Calendar",
+    calendar: "Agenda",
     month: "Month",
     day: "Day",
     reminders: "Reminders",
@@ -130,7 +131,7 @@ test.describe("the calendar has a real month", () => {
     await page.goto("/pt-BR/app/calendar");
     // The default is still the narrowest orientation, which `2M-CAL-005`
     // requires and the month must not have quietly widened.
-    await expect(page.locator('.calendar-orientation a[aria-current="true"]'))
+    await expect(page.locator('.calendar-orientation a[aria-current="page"]'))
       .toHaveText(COPY["pt-BR"].day);
 
     await page.locator(".calendar-orientation").getByRole("link", { name: COPY["pt-BR"].month }).click();
@@ -147,7 +148,7 @@ test.describe("the calendar has a real month", () => {
      * the label naming a month.
      */
     await expect(page).toHaveURL(/orientation=month/);
-    await expect(page.locator('.calendar-orientation a[aria-current="true"]'))
+    await expect(page.locator('.calendar-orientation a[aria-current="page"]'))
       .toHaveText(COPY["pt-BR"].month);
     await expect(page.locator(".calendar-range")).not.toHaveText("");
     // Exactly one of the two presentations is live, whichever width this is.

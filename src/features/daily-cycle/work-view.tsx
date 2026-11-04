@@ -20,7 +20,6 @@ import type { WorkItemView } from "./contracts";
 import { WorkFilters } from "./work-filters";
 import { getWorkFiltersCopy } from "./work-filters-copy";
 import { groupWorkItems } from "./work-grouping";
-import { WorkModeTabs } from "./work-modes";
 import { activeFilterCount, isNarrowed, toWorkQueryParams, workHref, type WorkQuery } from "./work-query";
 import { workViews, type WorkViewId } from "./work-projection";
 import { withAgentName } from "@/lib/agent-name";
@@ -151,15 +150,10 @@ export function WorkView({
       <p className="work-position-adjusted" role="status">{filtersCopy.positionAdjusted}</p>
     ) : null}
 
-    {/* Lista · Calendário · Planejar — the same work, three ways of looking at
-        it. The Lista tab carries the current narrowing so a trip through the
-        calendar does not silently reset it. */}
-    <WorkModeTabs
-      active="list"
-      listHref={query ? workHref(locale, query) : undefined}
-      locale={locale}
-    />
-
+    {/* Life Brain A.4: the Lista · Calendário · Planejar strip is gone from
+        every page at once — Calendário and Planejar are lenses of the Agenda,
+        a destination of their own on the bar, and Tarefas is reached from the
+        rail and from Hoje. */}
     {/* Hoje · Todas · Aguardando — the one selection control for the views
         (Life Brain A.3). Switching view keeps the narrowing but returns to
         page 1: page 7 of Hoje is very rarely page 7 of Todas. */}
