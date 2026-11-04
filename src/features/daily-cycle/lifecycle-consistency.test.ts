@@ -87,6 +87,7 @@ describe("Inbox and Review lifecycle consistency (F1 regression)", () => {
         language: "pt-BR",
         occurredAt: "2026-07-18T09:00:00.000Z",
         isRetroactive: false,
+        lifeArea: null,
         summary: "Ligar para a Marina",
         concepts: ["task"],
         contexts: [],

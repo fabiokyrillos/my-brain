@@ -87,6 +87,7 @@ describe("toEntryTechnicalDetailsView", () => {
       revisions: [current],
       extraction: {
         language: "pt-BR", occurredAt: "2026-07-18T09:00:00.000Z", isRetroactive: false, summary: "Ligar", concepts: ["task"],
+        lifeArea: null,
         contexts: [{ name: "Reunião", confidence: 0.7, evidence: "menção direta", inferred: false }],
         organizations: [], projects: [], people: [], taskCandidates: [], pendingQuestions: [], confidence: 0.9,
       },

@@ -171,3 +171,68 @@ describe("the extraction prompt separates people, organizations, projects and co
     }
   });
 });
+
+/*
+ * Life Brain C.1 (`LB-C-002`, `LB-C-007`, ADR-148). The prompt defines the
+ * life area with every member of the vocabulary, teaches it with whole-life
+ * examples beside the corporate ones (extend, never replace), and the worker's
+ * strict JSON Schema carries the key with the same closed enum.
+ */
+describe("the extraction prompt and schema carry the life area", () => {
+  const prompt = () => templateLiteral(nodeProvider, "systemPrompt");
+
+  it("defines lifeArea and names every area in the vocabulary", () => {
+    const body = prompt();
+    expect(body).toContain("- lifeArea:");
+    for (const area of ["health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other"]) {
+      expect(body, `the prompt never names the ${area} area`).toMatch(new RegExp(`\\b${area}\\b`));
+    }
+  });
+
+  it("teaches it with life examples and keeps the corporate ones", () => {
+    const body = prompt();
+    expect(body).toMatch(/lifeArea: health/);
+    expect(body).toMatch(/lifeArea: finance/);
+    expect(body).toMatch(/lifeArea: travel/);
+    expect(body).toMatch(/lifeArea: family/);
+    expect(body).toContain("Assinei o contrato com a Ambev");
+  });
+
+  it("sends the key in the worker's strict schema with the closed enum", () => {
+    expect(denoWorker).toMatch(/required: \[[^\]]*"lifeArea"/);
+    expect(denoWorker).toContain('enum: ["health", "family", "home", "finance", "travel", "work", "study", "leisure", "ideas", "other"]');
+  });
+
+  it("moved both versions together, past the pre-C.1 pair", () => {
+    expect(stringConstant(nodeProvider, "EXTRACTION_PROMPT_VERSION")).not.toBe("2026-08-22.1");
+    expect(stringConstant(nodeProvider, "EXTRACTION_STRATEGY_VERSION")).not.toBe("entry-extraction-v1");
+  });
+});
+
+/*
+ * Life Brain C.1 (ADR-148). There is no flow test for `entry.ts`, so the order
+ * of the area link is pinned here, the way the provider pipeline's order is:
+ * after the interpretation is persisted (it links the current one), before the
+ * job completes, and inside its own try so a failed link never fails the job.
+ */
+describe("worker life-area link order", () => {
+  const persistInitial = denoWorker.indexOf('service.rpc("persist_entry_interpretation"');
+  const persistReprocessed = denoWorker.indexOf('service.rpc("persist_reprocessed_entry_interpretation"');
+  const link = denoWorker.indexOf('service.rpc("link_entry_life_area"');
+  const complete = denoWorker.indexOf('service.rpc("complete_job"', link);
+
+  it("links after both persist paths and before the job completes", () => {
+    expect(link, "the worker never links an area").toBeGreaterThan(-1);
+    expect(link).toBeGreaterThan(persistInitial);
+    expect(link).toBeGreaterThan(persistReprocessed);
+    expect(complete).toBeGreaterThan(link);
+  });
+
+  it("asks the shared rule first and never lets a failed link fail the job", () => {
+    const block = denoWorker.slice(denoWorker.lastIndexOf("lifeAreaToLink(", link), complete);
+    expect(block).toContain("lifeAreaToLink(extracted.extraction.lifeArea)");
+    expect(block).toMatch(/try \{[\s\S]*link_entry_life_area[\s\S]*\} catch/);
+    expect(block).toContain('console.error("Entry life area link failed", { code: classifyJobFailure(');
+  });
+});
+

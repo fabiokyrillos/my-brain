@@ -52,7 +52,24 @@ function baseExtraction() {
     pendingQuestions: [
       { question: "Qual é o prazo real?", reason: "A data não estava explícita.", confidence: 0.4 },
     ],
+    // Life Brain C.1 (`LB-C-002`): one area per entry, or null.
+    lifeArea: { kind: "work", confidence: 0.9 },
     confidence: 0.77,
+  } as Record<string, unknown>;
+}
+
+/** A whole-life entry, so the corpus is not only about work (`LB-C-007`). */
+function lifeExtraction(summary: string, kind: string, confidence = 0.85) {
+  return {
+    ...baseExtraction(),
+    summary,
+    concepts: ["completed_activity"],
+    contexts: [],
+    projects: [],
+    people: [],
+    taskCandidates: [],
+    pendingQuestions: [],
+    lifeArea: { kind, confidence },
   } as Record<string, unknown>;
 }
 
@@ -271,11 +288,41 @@ const corpus: { name: string; input: unknown }[] = [
   { name: "sparse taskCandidates array", input: withRoot({ taskCandidates: sparse([undefined]) }) },
   { name: "sparse pendingQuestions array", input: withRoot({ pendingQuestions: sparse([undefined]) }) },
   { name: "explicit undefined concept", input: withRoot({ concepts: ["task", undefined] }) },
+
+  // Life area (Life Brain C.1, `LB-C-002`) — every area, null, and the ways it
+  // can be wrong. Both runtimes must agree on all of them.
+  { name: "life area: health consultation", input: lifeExtraction("Consulta no cardiologista, Dr. Silva.", "health") },
+  { name: "life area: blood test", input: lifeExtraction("Exame de sangue até sexta.", "health", 0.95) },
+  { name: "life area: family birthday", input: lifeExtraction("Ana faz aniversário em 5 de maio.", "family") },
+  { name: "life area: home repair", input: lifeExtraction("O encanador vem consertar a pia.", "home") },
+  { name: "life area: finance bill", input: lifeExtraction("Paguei R$ 350 de conta de luz.", "finance") },
+  { name: "life area: travel trip", input: lifeExtraction("Viagem para Lisboa de 3 a 10 de dezembro.", "travel") },
+  { name: "life area: work meeting", input: lifeExtraction("Reunião com o cliente às 10h.", "work") },
+  { name: "life area: study course", input: lifeExtraction("Comecei o curso de italiano.", "study") },
+  { name: "life area: leisure", input: lifeExtraction("Jogo de futebol no sábado.", "leisure") },
+  { name: "life area: an idea", input: lifeExtraction("Ideia: app para organizar receitas.", "ideas", 0.7) },
+  { name: "life area: other", input: lifeExtraction("Anotação solta.", "other", 0.3) },
+  { name: "life area: English entry", input: { ...lifeExtraction("Dentist appointment on Friday.", "health"), language: "en" } },
+  { name: "life area: null", input: withRoot({ lifeArea: null }) },
+  { name: "life area: confidence zero", input: withRoot({ lifeArea: { kind: "home", confidence: 0 } }) },
+  { name: "life area: confidence one", input: withRoot({ lifeArea: { kind: "home", confidence: 1 } }) },
+  { name: "life area: unknown kind", input: withRoot({ lifeArea: { kind: "pets", confidence: 0.8 } }) },
+  { name: "life area: legacy kind personal", input: withRoot({ lifeArea: { kind: "personal", confidence: 0.8 } }) },
+  { name: "life area: kind as a number", input: withRoot({ lifeArea: { kind: 3, confidence: 0.8 } }) },
+  { name: "life area: kind missing", input: withRoot({ lifeArea: { confidence: 0.8 } }) },
+  { name: "life area: confidence above one", input: withRoot({ lifeArea: { kind: "travel", confidence: 1.5 } }) },
+  { name: "life area: confidence as a string", input: withRoot({ lifeArea: { kind: "travel", confidence: "0.8" } }) },
+  { name: "life area: confidence missing", input: withRoot({ lifeArea: { kind: "travel" } }) },
+  { name: "life area: a bare string", input: withRoot({ lifeArea: "health" }) },
+  { name: "life area: missing entirely", input: (() => { const v = baseExtraction(); delete v.lifeArea; return v; })() },
+  { name: "life area: an array", input: withRoot({ lifeArea: [{ kind: "health", confidence: 0.9 }] }) },
 ];
 
 describe("extraction validator parity with the Zod source of truth", () => {
   it("covers a meaningful corpus", () => {
-    expect(corpus.length).toBeGreaterThanOrEqual(110);
+    expect(corpus.length).toBeGreaterThanOrEqual(130);
+    // `LB-C-007`: at least twenty whole-life cases sit beside the work ones.
+    expect(corpus.filter((entry) => entry.name.startsWith("life area:")).length).toBeGreaterThanOrEqual(20);
     expect(new Set(corpus.map((entry) => entry.name)).size).toBe(corpus.length);
   });
 
