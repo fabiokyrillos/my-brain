@@ -50,6 +50,9 @@ export const HISTORY_ENTITY_TYPES = [
   "project",
   "person",
   "memory",
+  // Life Brain C.3 (ADR-152): `confirm_entry_event_candidates`, its undo and
+  // `cancel_event` record the event as the subject.
+  "event",
   // Slice G5: `apply_reminder_command_v1` is the first writer to record
   // `entity_type = 'reminder'`. `audit_logs.entity_type` carries no CHECK
   // (`202607160003:132`), so nothing in the database gated this — the surface
@@ -137,6 +140,9 @@ export const HISTORY_ACTION_TYPES = [
   // Life Brain C.1 (ADR-148): written by `link_entry_life_area` and `set_entry_sensitivity`.
   "entry_life_area_linked",
   "entry_sensitivity_set",
+  "entry_event_candidates_confirmed",
+  "entry_event_candidates_undone",
+  "event_cancelled",
   "entry_person_candidates_undone",
   "entry_interpretation_failed",
   "entry_interpreted",
@@ -261,6 +267,11 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // sensitivity both change an attribute of a record that stays.
   entry_life_area_linked: "changed",
   entry_sensitivity_set: "changed",
+  // Life Brain C.3 (ADR-152): an event put on the agenda, taken back, or
+  // cancelled by the owner.
+  entry_event_candidates_confirmed: "created",
+  entry_event_candidates_undone: "undone",
+  event_cancelled: "lifecycle",
   entry_person_candidates_undone: "undone",
   entry_interpretation_failed: "failed",
   entry_interpreted: "interpreted",

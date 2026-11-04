@@ -133,7 +133,8 @@ describe("2R-FOUNDATION-001: recurrence is absent, re-proved rather than inherit
     // Chain head moved to 103 by ADR-144's ONE authorized migration: the heartbeat's reminder notice points at the item rather than the list. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and Phase 2R's own claim is untouched.
     // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 105 by Life Brain LB-M3, the ONE migration slice B.3 was allocated (ADR-145 Decision 7): the chat's retrieval gains a date window (ADR-150). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
-    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(105);
+    // Chain head moved to 106 by Life Brain LB-M2, the ONE migration slice C.3 was allocated (ADR-145 Decision 7) and the third and last of Life Brain's three: events with a period (ADR-152). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations.filter((name) => name.endsWith(".sql")).length).toBe(106);
   });
 
   it("is not vacuous: the column reader really reads, and the closed list really closes", () => {

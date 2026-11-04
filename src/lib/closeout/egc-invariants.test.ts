@@ -164,7 +164,9 @@ const REPO = resolve(__dirname, "../../..");
 // the chat's retrieval date window, the second of the three migrations ADR-145
 // allocated. Moved in the commit that adds it; Entity Graph Completion still
 // spends nothing.
-const AUTHORIZED_MIGRATION_HEAD = "202611040105";
+// Chain head moved to 202611040106 by Life Brain LB-M2 (slice C.3, ADR-152):
+// events with a period, the last of the three migrations ADR-145 allocated.
+const AUTHORIZED_MIGRATION_HEAD = "202611040106";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

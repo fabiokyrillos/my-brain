@@ -235,6 +235,13 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // tolerated, because the property this assertion protects is "nothing
       // follows that somebody did not deliberately account for".
       "202611040105_life_brain_m3_retrieval_window.sql",
+      // Life Brain LB-M2 (slice C.3, ADR-152): the `events` table, its
+      // confirmation, its registered undo and its cancel. It registers NO
+      // retention window, schedules nothing and creates no sweep: an event
+      // lives as long as the owner's account. Named here rather than
+      // tolerated, because the property this assertion protects is "nothing
+      // follows that somebody did not deliberately account for".
+      "202611040106_life_brain_m2_events.sql",
     ]);
   });
 });

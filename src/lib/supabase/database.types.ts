@@ -1431,6 +1431,79 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          all_day: boolean
+          candidate_index: number | null
+          context_id: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          location: string | null
+          source_entry_id: string | null
+          source_interpretation_id: string | null
+          starts_at: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          candidate_index?: number | null
+          context_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          source_entry_id?: string | null
+          source_interpretation_id?: string | null
+          starts_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean
+          candidate_index?: number | null
+          context_id?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          location?: string | null
+          source_entry_id?: string | null
+          source_interpretation_id?: string | null
+          starts_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "events_context_owned"
+            columns: ["user_id", "context_id"]
+            isOneToOne: false
+            referencedRelation: "contexts"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "events_source_entry_owned"
+            columns: ["user_id", "source_entry_id"]
+            isOneToOne: false
+            referencedRelation: "entries"
+            referencedColumns: ["user_id", "id"]
+          },
+          {
+            foreignKeyName: "events_source_interpretation_owned"
+            columns: ["user_id", "source_interpretation_id"]
+            isOneToOne: false
+            referencedRelation: "entry_interpretations"
+            referencedColumns: ["user_id", "id"]
+          },
+        ]
+      }
       heartbeat_runs: {
         Row: {
           analyzed_items: number
@@ -3259,6 +3332,7 @@ export type Database = {
         }
         Returns: Json
       }
+      cancel_event: { Args: { p_event_id: string }; Returns: Json }
       claim_attachment_job: {
         Args: {
           p_job_id: string
@@ -3341,6 +3415,15 @@ export type Database = {
       }
       confirm_account_deletion_claim: {
         Args: { p_claim_token: string; p_user_id: string }
+        Returns: Json
+      }
+      confirm_entry_event_candidates: {
+        Args: {
+          p_candidate_indexes: number[]
+          p_entry_id: string
+          p_expected_interpretation_id: string
+          p_operation_key: string
+        }
         Returns: Json
       }
       confirm_entry_interpretation: {
