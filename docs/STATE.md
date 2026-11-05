@@ -279,7 +279,7 @@ Previously: 2026-08-05 (**Phase 2G — Conversational Creation is AUTHORIZED and
 
 **Relações from the person and the project shipped 2026-11-05** (PR #364, no migration). The person page opens the relations map focused on that person; the project page opens the map. The Memória lens stays, by the registry rule `2N-RELATION-006` pins.
 
-**Birthdays read from records shipped 2026-11-05** (PR #365, no migration, ADR-158). The extraction carries `people[].birthday` (`entry-extraction-v5` / prompt `2026-11-05.1`, both runtimes, parity cases); the record page offers "Guardar o aniversário de Ana: 5 de maio?" for a linked person who has no date, and accepting uses the C.5 writer. **`process-jobs` is not redeployed yet**, so new readings do not carry the field until it is.
+**Birthdays read from records shipped 2026-11-05** (PR #365, no migration, ADR-158). The extraction carries `people[].birthday` (`entry-extraction-v5` / prompt `2026-11-05.1`, both runtimes, parity cases); the record page offers "Guardar o aniversário de Ana: 5 de maio?" for a linked person who has no date, and accepting uses the C.5 writer. **`process-jobs` v36** is deployed from `8398f6f` with prompt `2026-11-05.1` (2026-11-05, owner-authorized; every deployed file compared with git), so new readings carry the field.
 
 **Screenshot lane: part 1 shipped 2026-11-05** (PR #366, ADR-159); **part 2 implemented on `claude/nice-carson-av48c9`** (PR open, no migration). `e2e/visual-regression.spec.ts` compares Hoje, Conversar, Tarefas and Agenda, signed in, light and dark, at Desktop Chrome and Pixel 7, against 16 baselines the CI runner drew through `visual-baselines.yml`; `verify`'s database job runs it on every pull request.
 
