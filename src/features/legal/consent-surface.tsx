@@ -20,6 +20,7 @@
 
 "use client";
 
+import { Button } from "@/components/ui";
 import { useActionState } from "react";
 import Link from "next/link";
 import { signOut } from "@/features/auth/actions";
@@ -61,9 +62,9 @@ export function ConsentSurface({
 
       <form action={formAction}>
         <input type="hidden" name="locale" value={locale} />
-        <button className="button-primary" disabled={pending} type="submit">
+        <Button className="auth-primary-action" loading={pending} type="submit" variant="primary" width="full">
           {pending ? copy.accepting : copy.accept}
-        </button>
+        </Button>
       </form>
 
       <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">

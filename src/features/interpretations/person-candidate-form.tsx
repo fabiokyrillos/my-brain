@@ -1,7 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { useActionState, useRef, useState } from "react";
-import { LoaderCircle, RotateCcw, UserPlus } from "lucide-react";
+import { RotateCcw, UserPlus } from "lucide-react";
 import type { UndoTasksAction, UndoTasksState } from "@/features/tasks/task-candidate-form";
 import type { PendingPersonCandidate, PersonCandidateResolutionInput } from "./person-candidate-contract";
 import type { PersonCandidateActionState } from "./person-candidate-actions";
@@ -33,10 +34,9 @@ function PersonUndoButton({
       <input type="hidden" name="undoId" value={undoId} />
       <input type="hidden" name="entryId" value={entryId} />
       <input type="hidden" name="locale" value={locale} />
-      <button type="submit" className="button-secondary" disabled={pending}>
-        {pending ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />}
+      <Button icon={<RotateCcw />} loading={pending} type="submit">
         {pending ? (pt ? "Desfazendo…" : "Undoing…") : (pt ? "Desfazer decisões" : "Undo decisions")}
-      </button>
+      </Button>
       {state.status !== "idle" && <span role={state.status === "success" ? "status" : "alert"}>{state.message}</span>}
     </form>
   );
@@ -186,16 +186,19 @@ export function PersonCandidateForm({
               );
             })}
           </fieldset>
-          <button
-            className="button-primary"
-            disabled={pending || answeredCount === 0 || hasInvalidConfirmedName}
+          <Button
+            className="form-primary-action"
+            disabled={answeredCount === 0 || hasInvalidConfirmedName}
+            icon={<UserPlus />}
+            loading={pending}
             type="submit"
+            variant="primary"
+            width="full"
           >
-            {pending ? <LoaderCircle className="spin" size={17} /> : <UserPlus size={17} />}
             {pending
               ? (pt ? "Salvando…" : "Saving…")
               : (pt ? "Salvar decisões sobre pessoas" : "Save person decisions")}
-          </button>
+          </Button>
         </form>
       )}
       {state.status !== "idle" && (

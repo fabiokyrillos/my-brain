@@ -92,7 +92,7 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
   - Birthdays are not read from records yet ("o aniversário da Ana é 5 de maio" does not fill the date); a later extraction field would propose it for confirmation.
   - The reminder title is fixed at creation; renaming the person does not rename it until the date is set again.
 - **A.6 part 1 implemented 2026-11-05.** Left open by it:
-  - **Retire `button-primary/secondary`**: 28 call sites in six forms (history filters, candidate editor, task candidates, consent, account state, interpretation editor / person candidates / confirmation panel). Each has its own width and margin rules in `operations.css` and `history.css`; migrate one form at a time with a look at each on iPhone and desktop.
+  - ~~**Retire `button-primary/secondary`**~~ — **done 2026-11-05 (A.6 part 2):** all 28 call sites on `Button` / `ButtonLink` / `buttonVariants`, one form per commit; the classes are gone from `operations.css`. The old top margin lives on as `.form-primary-action` / `.auth-primary-action`.
   - **`toHaveScreenshot` lane** for Hoje, Conversar, Tarefas and Agenda in both themes: needs baselines produced on the CI runner (not this container's Chromium), so it belongs with a CI change.
   - Breakpoint consolidation (599/600/899/900 px coexist).
 - **B.4 implemented 2026-11-05** (ADR-155). Left open by it:
@@ -128,7 +128,7 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
   - **The event band** waits for C.3 (LB-M2): with no events table there is nothing to draw, so no empty slot was added.
   - **Tarefas' first task ≤ 180px.** The strip is gone (fixture bound 230px at 390px); the rest is the top bar and the page padding, a shell change for A.6.
   - **No `/app/agenda` route.** The lenses give the structure with zero moved URLs; a route move with redirects stays possible (`INFORMATION_ARCHITECTURE.md` §2).
-  - `button-primary/secondary` still has consumers outside Tarefas (A.5 retired three in Registros; six remain for A.6).
+  - ~~`button-primary/secondary` still has consumers outside Tarefas~~ — **retired in A.6 part 2.**
   - Run `online-agenda-answer` (now one item, its reminder on the line) and `online-calendar` on the owner's account.
 - **B.1 shipped 2026-10-31** (PR #348). Left open by it:
   - ~~**A task with a deadline is listed twice**~~ — **done in A.4 (ADR-149 Decision 5).** ("14:00 · X · lembrete", "15:00 · X · prazo"): `tasks_create_due_reminder` (`202607160007`) creates a reminder one hour before every `due_at`, and the projection shows both — on the Agenda too. **Owner decision 2026-10-31: fold it in slice A.4.** A reminder whose `task_id` is a task already in the window joins that task's line, in the projection, so the Agenda and the chat answer change together; the item count must still match what the Agenda shows (`2M-PRIVACY-006`). Recorded in `IMPLEMENTATION_PLAN.md` §A.4.

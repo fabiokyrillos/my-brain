@@ -1,7 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { useActionState, useState } from "react";
-import { LoaderCircle, Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { Plus, RotateCcw, Sparkles, X } from "lucide-react";
 import type { InterpretationPatch } from "./schema";
 import { entityTypeLabel } from "@/features/vocabulary/copy";
 import {
@@ -63,10 +64,9 @@ export function EntryReprocessButton({
       <input type="hidden" name="entryId" value={entryId} />
       <input type="hidden" name="locale" value={locale} />
       <input type="hidden" name="operationKey" value={operationKey} />
-      <button type="submit" className="button-secondary" disabled={pending}>
-        {pending ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+      <Button icon={<Sparkles />} loading={pending} type="submit">
         {pending ? labels.reprocessing : labels.reprocess}
-      </button>
+      </Button>
       <ActionFeedback state={state} />
     </form>
   );
@@ -102,10 +102,9 @@ function SecondaryActions({
           <input type="hidden" name="entryId" value={entryId} />
           <input type="hidden" name="undoId" value={undoId} />
           <input type="hidden" name="locale" value={locale} />
-          <button type="submit" className="button-secondary" disabled={undoPending}>
-            {undoPending ? <LoaderCircle className="spin" size={16} /> : <RotateCcw size={16} />}
+          <Button icon={<RotateCcw />} loading={undoPending} type="submit">
             {undoPending ? labels.undoing : labels.undo}
-          </button>
+          </Button>
           <ActionFeedback state={undoState} />
         </form>
       )}
@@ -113,10 +112,9 @@ function SecondaryActions({
         <input type="hidden" name="entryId" value={entryId} />
         <input type="hidden" name="locale" value={locale} />
         <input type="hidden" name="operationKey" value={reprocessOperationKey} />
-        <button type="submit" className="button-secondary" disabled={reprocessPending}>
-          {reprocessPending ? <LoaderCircle className="spin" size={16} /> : <Sparkles size={16} />}
+        <Button icon={<Sparkles />} loading={reprocessPending} type="submit">
           {reprocessPending ? labels.reprocessing : labels.reprocess}
-        </button>
+        </Button>
         <ActionFeedback state={reprocessState} />
       </form>
     </div>
@@ -169,7 +167,7 @@ export function InterpretationRevisionEditor({
       <section className="interpretation-editor" aria-label={locale === "pt-BR" ? "Revisão da interpretação" : "Interpretation review"}>
         {showSummary && <p className="interpretation-current-summary">{current.summary}</p>}
         <div className="interpretation-editor-actions">
-          <button type="button" className="button-primary" onClick={startCorrection}>{labels.correct}</button>
+          <Button onClick={startCorrection} variant="primary">{labels.correct}</Button>
           <SecondaryActions
             canUndo={canUndo}
             entryId={entryId}
@@ -242,7 +240,7 @@ export function InterpretationRevisionEditor({
               </div>
             ))}
           </div>
-          <button type="button" className="button-secondary" onClick={() => setDates((items) => [...items, { value: "", label: null, key: createOperationKey(`${entryId}-${items.length}`) }])}><Plus size={16} />{labels.addDate}</button>
+          <Button icon={<Plus />} onClick={() => setDates((items) => [...items, { value: "", label: null, key: createOperationKey(`${entryId}-${items.length}`) }])}>{labels.addDate}</Button>
         </fieldset>
 
         <fieldset>
@@ -308,8 +306,8 @@ export function InterpretationRevisionEditor({
         </label>
 
         <div className="interpretation-form-actions">
-          <button type="submit" className="button-primary" disabled={pending}>{pending ? labels.saving : labels.save}</button>
-          <button type="button" className="button-secondary" onClick={() => setEditing(false)}>{labels.cancel}</button>
+          <Button loading={pending} type="submit" variant="primary">{pending ? labels.saving : labels.save}</Button>
+          <Button onClick={() => setEditing(false)}>{labels.cancel}</Button>
         </div>
         <ActionFeedback state={state} />
       </form>

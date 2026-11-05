@@ -3,7 +3,7 @@
  *
  * Two things live here: the filter bar, and the event list that replaced the
  * old `.timeline-list` render. Everything else — `.content-page`,
- * `.list-header`, `.empty-list`, `.button-primary` — is reused from the shared
+ * `.list-header`, `.empty-list` — is reused from the shared
  * styles, because a history event is a list row and a filter is a form.
  */
 
@@ -83,15 +83,6 @@
   flex-wrap: wrap;
 }
 
-.history-filter-actions > .button-primary {
-  width: auto;
-  margin: 0;
-  min-height: 44px;
-}
-
-.history-filter-actions > .button-secondary {
-  min-height: 44px;
-}
 
 /* Outside the disclosure: what is filtering the list stays readable while the
    controls themselves are folded away on a phone. */
@@ -243,8 +234,7 @@
     display: grid;
   }
 
-  .history-filter-actions > .button-primary,
-  .history-filter-actions > .button-secondary {
+  .history-filter-actions > .ui-button {
     width: 100%;
   }
 

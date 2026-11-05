@@ -14,6 +14,7 @@
 
 "use client";
 
+import { Button } from "@/components/ui";
 import { useActionState } from "react";
 import { LogOut } from "lucide-react";
 import { signOut } from "@/features/auth/actions";
@@ -57,10 +58,9 @@ export function AccountStateSurface({
 
         <form action={formAction}>
           <input type="hidden" name="locale" value={locale} />
-          <button className="button-primary" disabled={pending} type="submit">
-            <LogOut aria-hidden="true" size={16} />
-            <span>{pending ? copy.signingOut : copy.signOut}</span>
-          </button>
+          <Button className="auth-primary-action" icon={<LogOut />} loading={pending} type="submit" variant="primary" width="full">
+            {pending ? copy.signingOut : copy.signOut}
+          </Button>
         </form>
 
         <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Button, ButtonLink } from "@/components/ui";
 import type { Locale } from "@/lib/preferences";
 import type { HistoryCopy } from "./copy";
 import { hasActiveFilters, type HistoryFilters } from "./filters";
@@ -106,13 +106,13 @@ export function HistoryFilterControls({
           </div>
 
           <div className="history-filter-actions">
-            <button className="button-primary" type="submit">
+            <Button type="submit" variant="primary">
               {copy.filters.apply}
-            </button>
+            </Button>
             {active ? (
-              <Link className="button-secondary" href={`/${locale}/app/history`}>
+              <ButtonLink href={`/${locale}/app/history`} variant="secondary">
                 {copy.filters.clear}
-              </Link>
+              </ButtonLink>
             ) : null}
           </div>
         </form>
