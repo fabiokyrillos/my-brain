@@ -2443,3 +2443,18 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** Writing the date when the person candidate is confirmed (rejected: one click would decide two things). Offering a change when the record's date differs from the stored one (rejected for now: the record may be older or wrong, and the person page already edits it). A dismissal that remembers "não" (left out: it needs storage; the offer stays on that record only while the person has no date).
 
 - **Consequences.** Readings made before the deploy carry no birthday, so their records offer nothing; reprocessing a record reads it again. The extraction contract has one more required key per person.
+
+## ADR-159 — The screenshot lane: signed-in surfaces against the local stack, baselines drawn by the CI runner
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — Life Brain A.6's `toHaveScreenshot` lane. **No migration.** Lands in two pull requests: the lane and its baseline workflow first (a `workflow_dispatch` workflow must exist on `main` to be dispatched), then the baselines and the lane's place in `verify`.
+
+- **Context.** Every browser lane in CI was either unauthenticated or an inlined fixture; nothing compared what the signed-in product looks like from one change to the next. A baseline drawn in a development container fails on the runner for a reason that is not the product (font rasterization).
+
+- **Decision 1 — Real routes, a real session, the local stack.** `e2e/visual-regression.spec.ts` creates a disposable account through the local Auth admin API, signs in with the existing cookie helper (`signInWithoutTheLoginForm`), and compares Hoje, Conversar, Tarefas and Agenda (pinned to January 2026) in light and dark at Desktop Chrome and Pixel 7. It runs only with `VISUAL_LANE=1` and a **loopback** Supabase URL, so it can never create an account in the hosted project. What changes by itself (the day name on Hoje) is masked.
+- **Decision 2 — The runner draws the baselines; a person reviews them.** `.github/workflows/visual-baselines.yml`, dispatched by hand on a feature branch (it refuses `main`), runs the lane with `--update-snapshots` and commits the PNGs to that branch. A change that moves pixels on purpose redraws them the same way and shows the new images in its pull request.
+- **Decision 3 — The service-role guard covers it.** `online-session-boundary.test.ts` now checks every spec that imports the session helper, not only `online-*`.
+
+- **Alternatives considered.** Fixture pages with inlined CSS (rejected: "a fixture prettier than the value"; the lane exists to see the real routes). Drawing baselines in this container (rejected: they would fail on the runner). Writing missing snapshots inside `verify` (rejected: the gate would approve its own first image).
+
+- **Consequences.** An empty account only: lists full of data are not compared. WebKit is not in this lane. A runner image that changes fonts redraws the baselines through the same workflow.

@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-05 — Screenshot lane, part 1 (ADR-159)
+
+- **`e2e/visual-regression.spec.ts`:** Hoje, Conversar, Tarefas, Agenda (January 2026) signed in, light and dark, Desktop Chrome and Pixel 7, `toHaveScreenshot` with the day name masked. Opt-in (`VISUAL_LANE=1`) and loopback-only; a disposable account created and deleted through the local Auth admin API.
+- **`.github/workflows/visual-baselines.yml`:** hand-dispatched on a feature branch (refuses `main`); draws the baselines on the runner and commits them. Not part of `verify` until the baselines exist.
+- `online-session-boundary.test.ts` covers every spec that imports the session helper.
+
 ## 2026-11-05 — Birthdays read from records (ADR-158)
 
 - **Extraction:** `people[].birthday` (`{ month, day, year | null }` or `null`, a real date) in Zod and the Deno validator, the worker's strict JSON schema and both prompts; `entry-extraction-v5` / `2026-11-05.1`; 14 parity cases; stored readings default to `null`.
