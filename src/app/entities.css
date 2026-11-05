@@ -786,4 +786,9 @@
 .birthday-hint { grid-column: 1 / -1; margin: 0; font: var(--type-caption); color: var(--text-muted); }
 .birthday-status { margin: 0; font: var(--type-caption); color: var(--text-secondary); }
 .birthday-status:empty { height: 0; overflow: hidden; }
+/* ADR-158 — a birthday the record states, offered on the record's page. */
+.birthday-proposals { display: grid; gap: var(--space-2); margin-top: var(--space-5); }
+.birthday-proposals > h3 { margin: 0; font: var(--type-heading); }
+.birthday-proposal { display: grid; gap: var(--space-2); }
+.birthday-proposal-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font: var(--type-caption); }
 .birthday-status[data-status="error"] { color: var(--tone-risk-fg); }

@@ -33,6 +33,9 @@ import { recordMemoryProposal } from "@/features/memories/record-memory-proposal
 import { cancelEvent, confirmEventCandidates, undoEventCandidates } from "@/features/events/actions";
 import { loadEntryEvents } from "@/features/events/entry-events";
 import { EventCandidateForm } from "@/features/events/event-candidate-form";
+import { setPersonBirthday } from "@/features/birthdays/actions";
+import { BirthdayProposals } from "@/features/birthdays/birthday-proposal";
+import { loadEntryBirthdayProposals } from "@/features/birthdays/entry-birthdays";
 
 export default async function EntryDetailPage({
   params,
@@ -177,6 +180,11 @@ export default async function EntryDetailPage({
   const entryEvents = editableCurrent && !editableCurrent.isRecordOnly
     ? await loadEntryEvents(supabase, { entryId, interpretationId: editableCurrent.interpretationId })
     : null;
+  // ADR-158: a birthday the reading states, for a person the record is linked
+  // to who has none yet — offered, never saved on its own.
+  const birthdayProposals = editableCurrent && !editableCurrent.isRecordOnly
+    ? await loadEntryBirthdayProposals(supabase, { userId: user.id, entryId, interpretationId: editableCurrent.interpretationId })
+    : [];
 
   const nextActions = editableCurrent ? (
     <>
@@ -224,6 +232,7 @@ export default async function EntryDetailPage({
           undoAction={undoEventCandidates}
         />
       ) : null}
+      <BirthdayProposals action={setPersonBirthday} locale={locale} proposals={birthdayProposals} />
       {memoryProposal ? (
         <section aria-label={memoryCopy.recordProposalHeading} className="record-memory-proposal">
           <h3>{memoryCopy.recordProposalHeading}</h3>
