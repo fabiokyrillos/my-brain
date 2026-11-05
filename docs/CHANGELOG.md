@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain A.6 part 1: Ajustes on the compact header, sections as rows, "Avançado"
+
+- **Ajustes:** `PageHeader compact` (the eyebrow and its locale ternary are gone); on a phone the sections are list rows between dividers, the current one marked by a left rule and weight; an **Avançado** group links Histórico, Custos de IA and Em andamento under the same labels the rail uses (a test holds them equal).
+- Recorded as open: the 28 `button-primary/secondary` call sites, the `toHaveScreenshot` lane, breakpoint consolidation.
+
 ## 2026-11-05 — Life Brain B.4: highly sensitive content in the chat's prompt only when asked
 
 - **Chat:** after retrieval, `classifyKnowledgeSources` reads each entry's and memory's level and, for highly sensitive ones, the area of its current reading (fail closed). `admitsToChatPrompt` (sensitivity contract) admits `highly_sensitive` only on an explicit ask ("incluir sensíveis") or when the question names the same area (`readSensitiveAsk`, pt-BR/en lexicon). RPC unchanged.

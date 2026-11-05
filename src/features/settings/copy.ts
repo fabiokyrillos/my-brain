@@ -24,6 +24,11 @@ export type SettingsCopy = Readonly<{
   readonly intro: string;
   readonly navLabel: string;
   readonly sections: Readonly<Record<SettingsSection, SettingsSectionCopy>>;
+  /** Life Brain A.6 — the "Avançado" group of links under the sections. */
+  readonly advanced: Readonly<{
+    readonly heading: string;
+    readonly links: Readonly<Record<"history" | "costs" | "jobs", string>>;
+  }>;
   /** `2P-SETTINGS-007` — the sentence that names the section a save failed in. */
   readonly saveFailedIn: (section: string) => string;
   /** The one discreet link `2P-SETTINGS-008` allows on the notifications page. */
@@ -69,6 +74,14 @@ const copy: Readonly<Record<Locale, SettingsCopy>> = {
         summary: "Documentos, avisos recebidos e o encerramento da conta.",
       },
     },
+    advanced: {
+      heading: "Avançado",
+      links: {
+        history: "Histórico",
+        costs: "Custos de IA",
+        jobs: "Em andamento",
+      },
+    },
     saveFailedIn: (section) => `Não foi possível salvar em ${section}. Nada foi alterado — revise e tente novamente.`,
     notificationPreferencesLink: "Preferências de notificação",
   },
@@ -108,6 +121,14 @@ const copy: Readonly<Record<Locale, SettingsCopy>> = {
       account: {
         name: "Account",
         summary: "Documents, the alerts you received, and ending the account.",
+      },
+    },
+    advanced: {
+      heading: "Advanced",
+      links: {
+        history: "History",
+        costs: "AI costs",
+        jobs: "In progress",
       },
     },
     saveFailedIn: (section) => `Could not save in ${section}. Nothing changed — review the fields and try again.`,

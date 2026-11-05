@@ -5,7 +5,12 @@ import { usePathname } from "next/navigation";
 
 import type { Locale } from "@/lib/preferences";
 import { getSettingsCopy } from "./copy";
+import { getNavigationHref } from "@/features/shell/capabilities";
+
 import { SETTINGS_SECTIONS, settingsSectionFromPath, settingsSectionHref } from "./sections";
+
+/** Life Brain A.6 — the "Avançado" doors, in reading order. */
+const ADVANCED_LINKS = ["history", "costs", "jobs"] as const;
 
 /**
  * The eight sections, as links to eight documents.
@@ -52,6 +57,22 @@ export function SettingsSectionNav({ locale }: { locale: Locale }) {
               href={settingsSectionHref(locale, section)}
             >
               {copy.sections[section].name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {/*
+        Life Brain A.6 (`INFORMATION_ARCHITECTURE.md`): "Avançado" groups the
+        three places that explain what the product did — Histórico, Custos de
+        IA and Em andamento — so Ajustes is one door to them. They stay their
+        own routes; these are links, never sections, and none is ever current.
+      */}
+      <h2 className="settings-nav-group">{copy.advanced.heading}</h2>
+      <ul className="settings-nav-list">
+        {ADVANCED_LINKS.map((key) => (
+          <li key={key}>
+            <Link className="settings-nav-link" href={getNavigationHref(locale, key)}>
+              {copy.advanced.links[key]}
             </Link>
           </li>
         ))}

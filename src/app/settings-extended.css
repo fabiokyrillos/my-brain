@@ -1163,6 +1163,27 @@
   font: var(--type-label);
 }
 
+/* Life Brain A.6. On a phone the sections read as a list (`ListItem`'s shape:
+   full-width rows between dividers); "Avançado" is a second, labelled group. */
+.settings-nav-group {
+  margin: var(--space-5) 0 var(--space-2);
+  padding: 0 var(--space-3);
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.settings-page > .ui-page-header { margin-bottom: 0; }
+
+@media (max-width: 899px) {
+  .settings-layout { margin-top: var(--space-5); }
+  .settings-nav-list { gap: 0; border-top: 1px solid var(--border-divider); }
+  .settings-nav-list > li { border-bottom: 1px solid var(--border-divider); }
+  .settings-nav-link { padding: var(--space-2) 0; border-radius: 0; }
+  .settings-nav-link.active { border-color: transparent; box-shadow: inset 3px 0 0 var(--text-primary); padding-left: var(--space-3); }
+  .settings-nav-group { padding: 0; }
+}
+
 @media (min-width: 900px) {
   .settings-layout {
     grid-template-columns: 232px minmax(0, 1fr);

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { PageHeader } from "@/components/ui";
 import { getSettingsCopy } from "@/features/settings/copy";
 import { SettingsSectionFocus } from "@/features/settings/settings-section-focus";
 import { SettingsSectionNav } from "@/features/settings/settings-section-nav";
@@ -46,9 +47,8 @@ export default async function SettingsLayout({
 
   return (
     <div className="settings-page">
-      <p className="eyebrow">{locale === "pt-BR" ? "PREFERÊNCIAS OPERACIONAIS" : "OPERATIONAL PREFERENCES"}</p>
-      <h1>{copy.title}</h1>
-      <p>{copy.intro}</p>
+      {/* Life Brain A.6: the shared compact header — no eyebrow, the intro hidden on a phone. */}
+      <PageHeader description={copy.intro} size="compact" title={copy.title} />
       <div className="settings-layout">
         <SettingsSectionNav locale={locale} />
         {children}
