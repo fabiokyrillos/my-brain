@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { loadAreaEvents, loadAreaOpenTasks, loadAreaPeople, loadAreaRecords, AREA_LINK_LIMIT } = await import("./area-page");
+const { loadAreaCounts, loadAreaEvents, loadAreaOpenTasks, loadAreaPeople, loadAreaRecords, loadIdeas, AREA_COUNT_LINK_LIMIT, AREA_LINK_LIMIT, IDEAS_LIMIT } = await import("./area-page");
 
 type Answer = { data: unknown; error: unknown };
 
@@ -15,7 +15,7 @@ function client(queues: Record<string, Answer[]>) {
   const supabase = {
     from(table: string) {
       const builder: Record<string, unknown> = {};
-      for (const method of ["select", "eq", "in", "is", "not", "or", "order", "limit"]) {
+      for (const method of ["select", "eq", "in", "is", "not", "or", "order", "limit", "contains"]) {
         builder[method] = (...args: unknown[]) => {
           calls.push({ table, method, args });
           return builder;
@@ -145,5 +145,64 @@ describe("loadAreaOpenTasks and loadAreaPeople", () => {
   it("returns null, never an empty list, when a read fails", async () => {
     const { supabase } = client({ person_contexts: [{ data: null, error: { code: "42501" } }] });
     expect(await loadAreaPeople(supabase, USER, AREA, [])).toBeNull();
+  });
+});
+
+describe("loadAreaCounts — real counts, by the timeline's own rule (LB-C-009)", () => {
+  it("counts distinct records whose current reading links the area, per area", async () => {
+    const { supabase } = client({
+      entry_entities: [{
+        data: [
+          { entity_id: "a", entry_id: "e1", interpretation_id: "i1" },
+          { entity_id: "a", entry_id: "e1", interpretation_id: "i1-old" },
+          { entity_id: "a", entry_id: "e2", interpretation_id: "i2-old" },
+          { entity_id: "b", entry_id: "e3", interpretation_id: "i3" },
+        ],
+        error: null,
+      }],
+      entries: [{ data: [
+        { id: "e1", current_interpretation_id: "i1" },
+        { id: "e2", current_interpretation_id: "i2-new" },
+        { id: "e3", current_interpretation_id: "i3" },
+      ], error: null }],
+    });
+    const counts = await loadAreaCounts(supabase, USER, ["a", "b", "c"]);
+    expect(counts?.get("a")).toEqual({ count: 1, atLeast: false });
+    expect(counts?.get("b")).toEqual({ count: 1, atLeast: false });
+    expect(counts?.get("c")).toEqual({ count: 0, atLeast: false });
+  });
+
+  it("marks every count 'at least' when the link read filled, and null on failure", async () => {
+    const rows = Array.from({ length: AREA_COUNT_LINK_LIMIT }, (_, index) => ({ entity_id: "a", entry_id: `e${index}`, interpretation_id: `i${index}` }));
+    const filled = client({ entry_entities: [{ data: rows, error: null }], entries: Array.from({ length: 20 }, () => ({ data: [], error: null })) });
+    expect((await loadAreaCounts(filled.supabase, USER, ["a"]))?.get("a")?.atLeast).toBe(true);
+    const failed = client({ entry_entities: [{ data: null, error: { code: "500" } }] });
+    expect(await loadAreaCounts(failed.supabase, USER, ["a"])).toBeNull();
+  });
+});
+
+describe("loadIdeas — Ideias as a lens over the records (LB-C-011)", () => {
+  it("asks for readings with the idea concept and keeps only the current ones, newest first", async () => {
+    const { supabase, calls } = client({
+      entry_interpretations: [{ data: [
+        { id: "i1", entry_id: "e1" },
+        { id: "i2-old", entry_id: "e2" },
+        { id: "i3", entry_id: "e3" },
+      ], error: null }],
+      entries: [{ data: [
+        { id: "e1", original_content: "Ideia: um app de receitas", occurred_at: "2026-11-01T12:00:00Z", sensitivity: "normal", current_interpretation_id: "i1" },
+        { id: "e2", original_content: "Re-lido sem ideia", occurred_at: "2026-11-02T12:00:00Z", sensitivity: "normal", current_interpretation_id: "i2-new" },
+        { id: "e3", original_content: "E se a horta fosse no telhado?", occurred_at: "2026-11-03T12:00:00Z", sensitivity: "normal", current_interpretation_id: "i3" },
+      ], error: null }],
+    });
+    const result = await loadIdeas(supabase, USER);
+    expect(calls).toContainEqual({ table: "entry_interpretations", method: "contains", args: ["concepts", ["idea"]] });
+    expect(result.status === "ok" && result.records.map((record) => record.id)).toEqual(["e3", "e1"]);
+    expect(IDEAS_LIMIT).toBeGreaterThan(0);
+  });
+
+  it("reports a failed read as failed", async () => {
+    const { supabase } = client({ entry_interpretations: [{ data: null, error: { code: "500" } }] });
+    expect(await loadIdeas(supabase, USER)).toEqual({ status: "failed" });
   });
 });

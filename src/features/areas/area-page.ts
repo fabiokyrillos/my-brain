@@ -295,3 +295,101 @@ export async function loadAreaOpenTasks(
     .map((task) => ({ id: task.id, title: task.title, status: task.status, sensitivity: deriveTaskSensitivity(task.source_entry_id, levels) }))
     .sort((a, b) => a.title.localeCompare(b.title));
 }
+
+/**
+ * `LB-C-009` — how many records each area holds, by the same rule as the
+ * timeline (the CURRENT reading links it), for Memória's area doors.
+ *
+ * One bounded read of the links for every area at once; when it fills, each
+ * count is reported as "at least". `null` means the read failed, never zero.
+ */
+export const AREA_COUNT_LINK_LIMIT = 1000;
+
+export type AreaCount = { readonly count: number; readonly atLeast: boolean };
+
+export async function loadAreaCounts(
+  supabase: SupabaseClient,
+  userId: string,
+  areaIds: readonly string[],
+): Promise<ReadonlyMap<string, AreaCount> | null> {
+  if (areaIds.length === 0) return new Map();
+  const links = await supabase
+    .from("entry_entities")
+    .select("entity_id,entry_id,interpretation_id")
+    .eq("user_id", userId)
+    .eq("entity_type", "context")
+    .in("entity_id", [...areaIds])
+    .limit(AREA_COUNT_LINK_LIMIT);
+  if (links.error || !links.data) return null;
+  const rows = links.data as readonly { entity_id: string; entry_id: string; interpretation_id: string }[];
+  const bounded = rows.length >= AREA_COUNT_LINK_LIMIT;
+
+  const entryIds = [...new Set(rows.map((row) => row.entry_id))];
+  const currentOf = new Map<string, string | null>();
+  for (const slice of chunks(entryIds, ID_CHUNK)) {
+    const result = await supabase.from("entries").select("id,current_interpretation_id").eq("user_id", userId).in("id", slice);
+    if (result.error || !result.data) return null;
+    for (const row of result.data as { id: string; current_interpretation_id: string | null }[]) {
+      currentOf.set(row.id, row.current_interpretation_id);
+    }
+  }
+
+  const members = new Map<string, Set<string>>();
+  for (const row of rows) {
+    if (currentOf.get(row.entry_id) !== row.interpretation_id) continue;
+    const set = members.get(row.entity_id) ?? new Set<string>();
+    set.add(row.entry_id);
+    members.set(row.entity_id, set);
+  }
+  return new Map(areaIds.map((id) => [id, { count: members.get(id)?.size ?? 0, atLeast: bounded }]));
+}
+
+/**
+ * `LB-C-011` — Ideias as a lens of Memória: the records whose CURRENT reading
+ * carries the `idea` concept, newest first. A filter, not a table.
+ */
+export const IDEAS_LIMIT = 5;
+const IDEAS_SCAN = 60;
+
+export type IdeasResult =
+  | { readonly status: "ok"; readonly records: readonly AreaRecord[] }
+  | { readonly status: "failed" };
+
+export async function loadIdeas(supabase: SupabaseClient, userId: string): Promise<IdeasResult> {
+  const readings = await supabase
+    .from("entry_interpretations")
+    .select("id,entry_id")
+    .eq("user_id", userId)
+    .contains("concepts", ["idea"])
+    .order("created_at", { ascending: false })
+    .limit(IDEAS_SCAN);
+  if (readings.error || !readings.data) return { status: "failed" };
+  const rows = readings.data as readonly { id: string; entry_id: string }[];
+  const entryIds = [...new Set(rows.map((row) => row.entry_id))];
+  if (entryIds.length === 0) return { status: "ok", records: [] };
+
+  const ideaReadings = new Set(rows.map((row) => row.id));
+  const entries: EntryRow[] = [];
+  for (const slice of chunks(entryIds, ID_CHUNK)) {
+    const result = await supabase
+      .from("entries")
+      .select("id,original_content,occurred_at,sensitivity,current_interpretation_id")
+      .eq("user_id", userId)
+      .in("id", slice);
+    if (result.error || !result.data) return { status: "failed" };
+    entries.push(...(result.data as EntryRow[]));
+  }
+  return {
+    status: "ok",
+    records: entries
+      .filter((entry) => entry.current_interpretation_id !== null && ideaReadings.has(entry.current_interpretation_id))
+      .sort((a, b) => b.occurred_at.localeCompare(a.occurred_at) || a.id.localeCompare(b.id))
+      .slice(0, IDEAS_LIMIT)
+      .map((entry) => ({
+        id: entry.id,
+        preview: previewOf(entry.original_content),
+        occurredAt: entry.occurred_at,
+        sensitivity: { kind: "derived", level: toSensitivityLevel(entry.sensitivity) },
+      })),
+  };
+}

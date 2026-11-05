@@ -315,3 +315,20 @@
   color: var(--link);
   font: var(--type-label);
 }
+
+/* Life Brain C.4: an area's real count, and Ideias as a lens. */
+.brain-area-count { font: var(--type-caption); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.brain-ideas-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--border-divider); }
+.brain-ideas-list > li {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+  font: var(--type-body);
+  min-width: 0;
+}
+.brain-ideas-list > li a { color: var(--text-primary); text-decoration: none; overflow-wrap: anywhere; }
+.brain-ideas-list > li a:hover { text-decoration: underline; }
+.brain-idea-date { flex: none; font: var(--type-caption); color: var(--text-muted); font-variant-numeric: tabular-nums; }
