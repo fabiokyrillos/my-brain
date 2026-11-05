@@ -2,6 +2,7 @@ import { RefreshCw, Search, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import {
   retryAttachmentJob,
@@ -86,7 +87,6 @@ type FailedJob = Pick<
 
 const filesCopy = {
   "pt-BR": {
-    eyebrow: "ARQUIVOS PRIVADOS",
     title: "Arquivos",
     subtitle: "Originais privados, análise separada e acesso temporário.",
     failedTitle: "Processamentos que precisam de atenção",
@@ -109,7 +109,6 @@ const filesCopy = {
       "Os filtros ativos não encontraram nada. Seus outros arquivos continuam aqui.",
   },
   en: {
-    eyebrow: "PRIVATE FILES",
     title: "Files",
     subtitle: "Private originals, separate analysis, and temporary access.",
     failedTitle: "Processing that needs attention",
@@ -451,13 +450,9 @@ export default async function FilesPage({
   }));
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.subtitle}</p>
-        </div>
-        {/*
+      <PageHeader
+        actions={(
+        /*
           `2N-FILES-011`. Where the answer is a search, the library **links** to
           search rather than growing one of its own: no second index, no second
           snippet builder, no second copy of the seven-domain contract. The
@@ -465,12 +460,17 @@ export default async function FilesPage({
           `extracted_text` under OD-1's sensitivity predicate, and duplicating
           any of that here is precisely what "the library does not become a
           second storage system" forbids.
-        */}
-        <Link className="row-action" href={`/${locale}/app/search`}>
-          <Search aria-hidden="true" size={14} />
-          {libraryCopy.searchInFiles}
-        </Link>
-      </header>
+        */
+          <Link className="row-action" href={`/${locale}/app/search`}>
+            <Search aria-hidden="true" size={14} />
+            {libraryCopy.searchInFiles}
+          </Link>
+        )}
+        className="list-page-header"
+        description={copy.subtitle}
+        size="compact"
+        title={copy.title}
+      />
 
       <BrainLensTabs active="files" locale={locale} />
 
@@ -738,6 +738,7 @@ export default async function FilesPage({
           chip.
         */
         <UniversalStateView
+          className="ux-state-quiet"
           description={hasActiveFileFilter(filters) ? copy.emptyFilteredBody : copy.emptyBody}
           locale={locale}
           state="empty"

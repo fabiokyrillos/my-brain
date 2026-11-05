@@ -106,6 +106,8 @@
 
 .search-surface { max-width: var(--width-productivity); margin: auto; padding: var(--space-12) var(--gutter) 120px; display: grid; gap: var(--space-5); }
 .search-title { margin: 0; font: var(--type-title-1); letter-spacing: -.01em; color: var(--text-primary); }
+/* Life Brain A.5: the shared header; the surface's own grid gap spaces it. */
+.search-header.ui-page-header { margin: 0; }
 .search-form { display: grid; gap: var(--space-3); grid-template-columns: 1fr auto; align-items: center; }
 /* 16px for the same iOS reason as the palette field. */
 .search-input {

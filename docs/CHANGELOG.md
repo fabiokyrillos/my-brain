@@ -1,5 +1,17 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain A.5: compact list headers, two-line notices, Memória's areas
+
+- **List routes** (Registros, Notificações, Memória, Pessoas, Projetos, Organizações, Áreas, Arquivos, Memórias, Buscar) open with `PageHeader size="compact"`: no eyebrow, the lead hidden on a phone, the route's link or create form as the header's action. Their empty states keep the universal vocabulary and lose the box (`ux-state-quiet`). Inline locale ternaries moved into the typed copy modules. Guard: `life-brain-a5-lists-guard.test.ts`.
+- **Notificações:** each notice is `NotificationHistoryRow` — title, one meta line (state word, time, body), "Abrir" and a "⋯" with the row's verbs, primary first (`NotificationVerbs collapsed`). Fifty notices ≈ 3,320px at 390px (Playwright fixture, budget 3,500). The destination link now passes `isOwnerScopedDestination` (it rendered the stored `action_url` as-is) and still marks nothing.
+- **Registros:** retry, retry-all and load-more on the `Button` primitive.
+- **Memória** opens with the owner's areas of life (`loadLifeAreas`: life-area contexts in the product's order, bounded, failure stated), as doors to each area's page, with no count.
+- Guards that named the notifications page as the verbs' mount or the open link's owner follow the row into its component (2L no-gesture, 2M notification boundary, 2S foundation and verb authority). ADR-153.
+
+## 2026-11-05 — Life Brain: LB-M2 applied hosted, `process-jobs` v35
+
+- **Recorded:** LB-M2 applied to the hosted project on 2026-11-05 (16,066 bytes, md5 `d2c2a934…`, staged in three md5-checked chunks and applied in one block that re-checked them; parity **106 = 106**, head `202611040106`; RLS forced, SELECT-only for `authenticated`, no `anon`/`service_role`; a rolled-back owner-session check: foreign confirm and cancel → P0002, direct insert → 42501). `process-jobs` **v35** deployed from `5435e86` (prompt `2026-11-04.3`); every deployed file compared with git, the only difference being `entity-resolution.ts`'s accent range rendered as literal characters, as in v34.
+
 ## 2026-11-04 — Life Brain C.3: events with a period, confirmed by the owner, on the calendar's sixth lane (LB-M2)
 
 - **Migration `202611040106_life_brain_m2_events.sql`** (LB-M2, ADR-152, supersedes OD-2M-3 A): `public.events` (RLS forced, SELECT-only for the owner, owned composite FKs, no sensitivity column), `confirm_entry_event_candidates` (definer, owner + current-interpretation checks, candidate validation, idempotent, one event per candidate, area context, undo + audit), `private.undo_confirm_entry_event_candidates` registered with the router, `cancel_event`. pgTAP `life_brain_m2_events.sql` (30).

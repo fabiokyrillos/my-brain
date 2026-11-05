@@ -1366,3 +1366,113 @@
     min-height: 44px;
   }
 }
+
+/* ------------------------------------------------------------------------- */
+/* Life Brain A.5 — the history row: two lines, one visible control          */
+/* ------------------------------------------------------------------------- */
+
+/* A list, not a stack of cards: dividers between rows, no border box per row.
+   Fifty notices fit in 3,500px at 390px (`IMPLEMENTATION_PLAN.md` §A.5). */
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-divider);
+}
+
+.notification-item {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-height: var(--row-height);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+/* On a phone the controls are the row's height (44px), so the padding is what
+   decides whether fifty rows fit the 3,500px budget. */
+@media (max-width: 899px) {
+  .notification-item { min-height: 0; padding: var(--space-1) 0; }
+  .notification-item-meta .notification-status-badge { line-height: 18px; }
+}
+
+/* The dot is the third signal for unread, after the word and the weight —
+   never the only one (`2P-SETTINGS-008`). */
+.notification-item-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: transparent;
+}
+.notification-item[data-status="unread"] .notification-item-dot { background: var(--link); }
+
+.notification-item-main { display: grid; gap: 2px; min-width: 0; }
+.notification-item-title {
+  margin: 0;
+  font: var(--type-body);
+  font-weight: 500;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.notification-item[data-status="unread"] .notification-item-title { font-weight: 650; }
+
+.notification-item-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: var(--type-caption);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.notification-item-meta > * { flex: none; }
+.notification-item-time { font-variant-numeric: tabular-nums; }
+.notification-open-link { min-height: var(--touch-target); display: inline-flex; align-items: center; padding: 0 var(--space-2); }
+.notification-item-meta .notification-item-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+.notification-item-trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+.notification-item-trailing .notification-row-actions { gap: var(--space-1); }
+
+.notification-menu-trigger--icon {
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding: 0;
+}
+
+/* An open panel, or a message the row has to say, takes the whole width under
+   the row rather than squeezing into the trailing column. */
+.notification-item:has(.notification-verb-panel, .notification-row-outcome:not(:empty), .notice-open-outcome:not(:empty)) .notification-item-trailing {
+  grid-column: 2 / -1;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 899px) {
+  .notification-item-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* On a phone the menu is part of the flow (`2S-MOBILE-007`), so it too takes
+     the row's width when it opens. */
+  .notification-item:has(.notification-verb-menu-list) .notification-item-trailing {
+    grid-column: 2 / -1;
+    flex-wrap: wrap;
+  }
+
+  .notification-item-trailing .notification-menu-trigger--icon { flex: none; }
+}

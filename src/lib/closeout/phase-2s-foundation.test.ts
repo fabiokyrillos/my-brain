@@ -73,8 +73,15 @@ describe("2S-FOUNDATION-003: the notification surface's controls, enumerated fro
     // Unchanged by 2S.2: a Link whose destination is the row's own
     // `action_url` and nothing computed. Slice 2S.1 retargeted what that URL
     // POINTS AT; it did not move the decision into the component.
-    expect(read(SURFACE), "the open control must take its destination from the row")
-      .toContain("href={item.action_url}");
+    //
+    // Life Brain A.5: the row is `NotificationHistoryRow`, and the destination
+    // now goes through the owner-scoped whitelist the attention row already
+    // applied (`2S-ATTENTION-006`) — still the row's own URL, nothing computed.
+    const row = read("src/features/notifications/notification-history-row.tsx");
+    expect(read(SURFACE)).toContain("<NotificationHistoryRow");
+    expect(row, "the open control must take its destination from the row")
+      .toContain("href={notice.action_url}");
+    expect(row).toContain("isOwnerScopedDestination(notice.action_url)");
   });
 
   it("offers the row's verbs from the one shared source, not from inline markup", () => {
@@ -98,7 +105,7 @@ describe("2S-FOUNDATION-003: the notification surface's controls, enumerated fro
      * The chain is asserted end to end rather than at one link — the page mounts
      * the shared function, and that function mounts the shared component.
      */
-    expect(surface, "the row's controls come from the shared mount")
+    expect(read("src/features/notifications/notification-history-row.tsx"), "the row's controls come from the shared mount")
       .toContain("<NotificationVerbs");
     expect(read("src/features/notifications/notification-row-actions.tsx"),
       "the shared mount must render the shared component")

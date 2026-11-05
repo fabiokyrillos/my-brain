@@ -2,6 +2,7 @@ import { ChevronRight, Link2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getMemoryCopy } from "@/features/memories/copy";
@@ -103,13 +104,9 @@ export default async function MemoriesPage({
 
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.eyebrow}</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.intro}</p>
-        </div>
-        {/*
+      <PageHeader
+        actions={(
+        /*
           `2P-MEMORY-001` … `-004`. The one-line field this header carried is
           gone. It was an `<input maxLength={4000}>` showing about sixty
           characters, with an `sr-only` label, no explanation of what a memory is
@@ -119,13 +116,18 @@ export default async function MemoriesPage({
           assistant composer already uses, which is idempotent, audits, and
           returns the created id the undo needs. `createRecord`'s memory branch
           is deleted in the same change rather than left dormant.
-        */}
-        <MemoryComposer
-          createAction={createProposedMemory}
-          locale={locale}
-          undoAction={undoProposedMemory}
-        />
-      </header>
+        */
+          <MemoryComposer
+            createAction={createProposedMemory}
+            locale={locale}
+            undoAction={undoProposedMemory}
+          />
+        )}
+        className="list-page-header"
+        description={copy.intro}
+        size="compact"
+        title={copy.title}
+      />
 
       <BrainLensTabs active="memories" locale={locale} />
 
@@ -207,6 +209,7 @@ export default async function MemoriesPage({
         </div>
       ) : (
         <UniversalStateView
+          className="ux-state-quiet"
           description={copy.emptyBody}
           locale={locale}
           state="empty"

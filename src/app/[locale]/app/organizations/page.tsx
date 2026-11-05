@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createOrganization } from "@/features/entities/actions";
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getEntityCopy } from "@/features/entities/copy";
 import { EntityCreateForm } from "@/features/entities/entity-create-form";
@@ -44,14 +45,15 @@ export default async function OrganizationsPage({
 
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.organizationsEyebrow}</p>
-          <h1>{copy.organizations}</h1>
-          <p>{copy.organizationsIntro}</p>
-        </div>
-        <EntityCreateForm action={createOrganization} kind="organization" locale={locale} />
-      </header>
+      {/* Life Brain A.5: the shared compact header — no eyebrow, the intro
+          hides on a phone, the create form sits under the title there. */}
+      <PageHeader
+        actions={<EntityCreateForm action={createOrganization} kind="organization" locale={locale} />}
+        className="list-page-header"
+        description={copy.organizationsIntro}
+        size="compact"
+        title={copy.organizations}
+      />
 
       {/* Empresas stays a secondary lens with its list and detail pages intact
           (ADR-114 Decision 6). What it gains is the strip that says it is part
@@ -75,6 +77,7 @@ export default async function OrganizationsPage({
         </div>
       ) : (
         <UniversalStateView
+          className="ux-state-quiet"
           description={copy.organizationsEmptyHint}
           locale={locale}
           state="empty"

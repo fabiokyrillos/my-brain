@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Button } from "@/components/ui";
 import {
   NeedsAttentionViewed,
   recordAttentionItemResolved,
@@ -137,6 +137,7 @@ const filterCopy = {
     retry: "Tentar de novo",
     retryAll: "Tentar de novo tudo que falhou",
     retrying: "Tentando…",
+    loadMore: "Carregar mais",
     retryFailed: "Não foi possível tentar de novo agora. O original foi preservado.",
     masked: "Conteúdo muito sensível, oculto",
     emptyFiltered: "Nenhum item deste tipo entre os carregados.",
@@ -148,6 +149,7 @@ const filterCopy = {
     retry: "Try again",
     retryAll: "Try again for everything that failed",
     retrying: "Trying…",
+    loadMore: "Load more",
     retryFailed: "Could not try again right now. The original was preserved.",
     masked: "Highly sensitive content, hidden",
     emptyFiltered: "No item of this type among the ones loaded.",
@@ -216,7 +218,6 @@ export function NeedsAttentionList({
   const [activeFilter, setActiveFilter] = useState<AttentionFilter>("all");
   const [isPending, startTransition] = useTransition();
   const [isRetrying, startRetry] = useTransition();
-  const pt = locale === "pt-BR";
   const text = filterCopy[locale];
   const copy = getDailyCycleCopy(locale, agentName);
   const conflictText = getConflictSectionCopy(locale);
@@ -434,15 +435,14 @@ export function NeedsAttentionList({
       ) : null}
 
       {retryAction && retryable.length > 1 ? (
-        <button
-          type="button"
-          className="button-secondary attention-bulk-retry"
+        <Button
+          className="attention-bulk-retry"
+          loading={isRetrying}
           onClick={() => retry(retryable)}
-          disabled={isRetrying}
+          type="button"
         >
-          {isRetrying && <LoaderCircle className="spin" size={16} aria-hidden="true" />}
           {isRetrying ? text.retrying : text.retryAll}
-        </button>
+        </Button>
       ) : null}
 
       {/*
@@ -472,14 +472,15 @@ export function NeedsAttentionList({
           <div className="attention-entry" key={item.key}>
             <NeedsAttentionItemRow item={item} locale={locale} agentName={agentName} surface="needs_attention" timeZone={timeZone} />
             {canRetryHere ? (
-              <button
-                type="button"
-                className="button-secondary attention-inline-retry"
-                onClick={() => retry([item])}
+              <Button
+                className="attention-inline-retry"
                 disabled={isRetrying}
+                onClick={() => retry([item])}
+                size="sm"
+                type="button"
               >
                 {isRetrying ? text.retrying : text.retry}
-              </button>
+              </Button>
             ) : null}
           </div>
         );
@@ -526,15 +527,14 @@ export function NeedsAttentionList({
       */}
       {error && <p role="alert" className="form-error needs-attention-error">{error}</p>}
       {hasNext && (
-        <button
-          type="button"
-          className="button-secondary load-more-button"
+        <Button
+          className="load-more-button"
+          loading={isPending}
           onClick={handleLoadMore}
-          disabled={isPending}
+          type="button"
         >
-          {isPending && <LoaderCircle className="spin" size={16} aria-hidden="true" />}
-          {pt ? "Carregar mais" : "Load more"}
-        </button>
+          {text.loadMore}
+        </Button>
       )}
     </div>
   );

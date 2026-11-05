@@ -556,9 +556,6 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  * "just in case" — dead CSS with a plausible name is how two chip styles end up
  * in one product.
  */
-.records-page > h1,.records-header h1{font:500 clamp(38px,5vw,60px)/1 var(--font-reading);letter-spacing:-.04em;margin:var(--space-2) 0 0}
-.records-header{margin-bottom:var(--space-6)}
-.records-lead{margin:var(--space-2) 0 0;color:var(--text-secondary);font:var(--type-lead);max-width:var(--width-reading)}
 
 /* Views are links, so the strip scrolls rather than wraps on a narrow screen —
    `05-responsividade.md`: *chips roláveis*. `-webkit-overflow-scrolling` is not
@@ -893,7 +890,6 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target);
-  margin-top: var(--space-2);
   color: var(--link);
   font: var(--type-label);
 }
@@ -1021,3 +1017,9 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
+
+/* Life Brain A.5: a list lens whose header action is the inline create form
+   (Pessoas, Projetos, Organizações, Áreas). Beside the title on a wide screen;
+   under it, at full width, on a phone, so the field never squeezes the title. */
+.list-page-header{flex-wrap:wrap}
+@media(max-width:899px){.list-page-header{flex-direction:column;align-items:stretch;gap:var(--space-3)}.list-page-header .ui-page-header__actions{width:100%}.list-page-header .inline-create{width:100%}.list-page-header .inline-create input{min-width:0;flex:1}}

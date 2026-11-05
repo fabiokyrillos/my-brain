@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
-import { NotificationVerbs } from "@/features/notifications/notification-row-actions";
+import { NotificationHistoryRow } from "@/features/notifications/notification-history-row";
 import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import { projectNotificationRows } from "@/features/notifications/row-projection";
 import { settingsSectionHref } from "@/features/settings/sections";
@@ -64,7 +65,6 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const pt = locale === "pt-BR";
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
@@ -93,7 +93,6 @@ export default async function NotificationsPage({ params, searchParams }: { para
     verbs. Rendering `<NotificationVerbs>` therefore costs no query at all.
   */
   const projected = await projectNotificationRows(supabase, { rows: items, userId: user.id, locale });
-  const rowsById = new Map(projected.map((row) => [row.notification.id, row]));
 
   return <div className="content-page">{/*
     `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
@@ -114,12 +113,12 @@ export default async function NotificationsPage({ params, searchParams }: { para
     appeared twice and the second one read as the start of a different page.
     Slice 2P.5 moved that component to Settings entirely, so the page now opens
     at level one with nothing above it to compete.
-  */}<header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div>{/*
-    The one discreet contextual entry `2P-SETTINGS-008` allows, and it is
-    deliberately a link rather than a panel: the controls it points at are no
-    longer on this page, and a second copy of any of them here would be the
-    duplication the requirement exists to remove.
-  */}<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link></header>{/*
+  */}{/*
+    Life Brain A.5: the shared compact header — no eyebrow, the line under the
+    title hides on a phone. Its action is the one discreet contextual entry
+    `2P-SETTINGS-008` allows, deliberately a link rather than a panel: the
+    controls it points at live in Ajustes.
+  */}<PageHeader actions={<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link>} description={copy.pageDescription} size="compact" title={copy.pageTitle} />{/*
     The feed, as a named section of this page rather than as an unlabelled tail
     of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
     where notification CONTENT lives, behind the login — and the section keeps
@@ -133,22 +132,10 @@ export default async function NotificationsPage({ params, searchParams }: { para
     the two tints had none either. `role="status"` rather than a bare paragraph
     because the number changes when a row is marked read, and that change is the
     confirmation the action gives.
-  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p>{items.length ? <ul className="list-stack">{items.map((item) => <li className={`list-row notification-row ${item.status}`} data-status={item.status} key={item.id}><div className="list-row-main"><strong>{item.title}</strong><p>{item.body}</p></div><div className="list-meta">{/*
-    The state as a word, not only as a colour (`2P-SETTINGS-008`). It precedes
-    the timestamp because "unread, two hours ago" is the order a reader wants
-    the two facts in.
-  */}<span className="notification-status-badge" data-status={item.status}>{item.status === "unread" ? copy.unreadBadge : copy.readBadge}</span><span>{formatCreatedAt(item.created_at)}</span>{item.action_url && <Link aria-label={`${copy.openDestination}: ${item.title}`} className="row-action" href={item.action_url}>{copy.openDestination}</Link>}{/*
-    Slice 2S.2 — the verbs, replacing the single inline "Lida" form.
-
-    What was here was one control, offered only while a row was unread. It
-    stays reachable, but it is now one member of a set the OWNER chooses from:
-    the primary action derived from the subject's own state, plus one compact
-    menu holding the rest. The set and its copy come from `verbs.ts`, which the
-    attention surface reads too, so the two cannot drift.
-
-    `2S-ACT-003`/`-004`: every task write dispatches to the authority that
-    already owns it. Those actions are injected as props because this file is a
-    Server Component and the row is a Client Component — the same boundary
-    `TaskDetailSurface` crosses when it mounts `WorkItemActions`.
-  */}{(() => { const row = rowsById.get(item.id); return row ? <NotificationVerbs handlers={NOTIFICATION_VERB_HANDLERS} locale={locale} row={row} timeZone={timezone} /> : null; })()}</div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p>{/*
+    Life Brain A.5: each notice is a `NotificationHistoryRow` — two lines and one
+    visible control, the verbs behind a "⋯" (still the projected set, through
+    `NotificationVerbs`), the destination behind the owner-scoped whitelist.
+    `projectNotificationRows` returns one row per notice, in order.
+  */}{projected.length ? <ul className="notification-list">{projected.map((row) => <NotificationHistoryRow createdAtLabel={formatCreatedAt(row.notification.created_at)} handlers={NOTIFICATION_VERB_HANDLERS} key={row.notification.id} locale={locale} row={row} timeZone={timezone} />)}</ul> : <UniversalStateView className="ux-state-quiet" description={copy.emptyBody(agentName)} locale={locale} state="empty" title={copy.emptyTitle} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

@@ -24,6 +24,7 @@
  * there is no fall-through that could print raw text.
  */
 
+import { MoreHorizontal } from "lucide-react";
 import React, { useActionState, useEffect, useId, useRef, useState } from "react";
 
 import { UndoAffordance, type TaskUndoHandler } from "@/features/operations/undo-affordance";
@@ -88,9 +89,17 @@ export function NotificationVerbs({
   locale,
   timeZone,
   handlers,
+  collapsed = false,
 }: {
   row: NotificationRowView;
   locale: Locale;
+  /**
+   * Life Brain A.5 — the history page's row keeps ONE visible control ("Abrir"
+   * when there is a destination), so its verbs sit behind a "⋯" with the
+   * primary verb first. The set and its order are the row's own; this changes
+   * where they are drawn, never which ones exist.
+   */
+  collapsed?: boolean;
   /**
    * The owner's zone (`LDC-DAILY-001`). Required, never defaulted — a default
    * here would be the DEVICE's zone, which is exactly the defect
@@ -107,6 +116,7 @@ export function NotificationVerbs({
       markAction={handlers.markAction}
       menuVerbs={row.menuVerbs}
       notificationId={row.notification.id}
+      collapsed={collapsed}
       primaryVerb={row.primaryVerb}
       subject={row.subject}
       subjectLabel={row.subjectLabel}
@@ -156,8 +166,11 @@ export function NotificationRowActions({
   workAction,
   detailAction,
   undoAction,
+  collapsed = false,
 }: {
   locale: Locale;
+  /** Primary verb drawn as the menu's first item, trigger as "⋯" (see `NotificationVerbs`). */
+  collapsed?: boolean;
   /** The owner's zone (`LDC-DAILY-001`). Required, never defaulted. */
   timeZone: string;
   notificationId: string;
@@ -174,6 +187,7 @@ export function NotificationRowActions({
   const verbCopy = getVerbCopy(locale);
   const copy = getNotificationActionCopy(locale);
   const menuId = useId();
+  const listedVerbs: readonly VerbDefinition[] = collapsed && primaryVerb ? [primaryVerb, ...menuVerbs] : menuVerbs;
   const menuTrigger = useRef<HTMLButtonElement | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   /** The verb waiting on its own inline panel — a date, a reason, or a question. */
@@ -553,7 +567,7 @@ export function NotificationRowActions({
   return (
     <div className="notification-row-actions">
 
-      {primaryVerb ? renderVerbButton(primaryVerb, "row-action notification-primary-action") : null}
+      {primaryVerb && !collapsed ? renderVerbButton(primaryVerb, "row-action notification-primary-action") : null}
 
       {/*
         ESCAPE IS HEARD HERE, NOT ON THE LIST, AND THE DIFFERENCE IS A REAL
@@ -569,7 +583,7 @@ export function NotificationRowActions({
         On the container, both ways in are covered: a keydown on the trigger
         and a keydown on any item bubble to the same place.
       */}
-      {menuVerbs.length ? (
+      {listedVerbs.length ? (
         <div
           className="notification-verb-menu"
           onKeyDown={(event) => {
@@ -583,13 +597,13 @@ export function NotificationRowActions({
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
             aria-label={copy.menuLabel(subjectLabel)}
-            className="row-action notification-menu-trigger"
+            className={collapsed ? "row-action notification-menu-trigger notification-menu-trigger--icon" : "row-action notification-menu-trigger"}
             disabled={pending}
             onClick={() => setMenuOpen((open) => !open)}
             ref={menuTrigger}
             type="button"
           >
-            {copy.menuTrigger}
+            {collapsed ? <MoreHorizontal aria-hidden="true" size={18} /> : copy.menuTrigger}
           </button>
           {isMenuOpen ? (
             <ul
@@ -599,7 +613,7 @@ export function NotificationRowActions({
               ref={menu}
               role="menu"
             >
-              {menuVerbs.map((verb) => (
+              {listedVerbs.map((verb) => (
                 <li key={verb.id} role="none">
                   <div>
                     {renderVerbButton(verb, "notification-verb-menu-item", {

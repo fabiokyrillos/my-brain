@@ -21,6 +21,7 @@
 
 import { useId, useState, useTransition } from "react";
 
+import { PageHeader } from "@/components/ui";
 import { SourceCard } from "@/features/experience/trust-components";
 import { UniversalStateView, UniversalSkeleton } from "@/features/experience/universal-state";
 import type { Locale } from "@/lib/preferences";
@@ -114,7 +115,7 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
 
   return (
     <section className="search-surface">
-      <h1 className="search-title">{text.title}</h1>
+      <PageHeader className="search-header" size="compact" title={text.title} />
 
       <form className="search-form" onSubmit={submit} role="search">
         <label className="sr-only" htmlFor={inputId}>

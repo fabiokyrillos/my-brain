@@ -385,10 +385,18 @@ function brainSurface() {
       + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
   ];
 
-  return `<div class="brain-page"><header class="brain-head"><h1>Memória</h1>`
-    + `<p>Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p>`
-    + `<a class="brain-search-link" href="#">Buscar em tudo</a></header>`
+  // Life Brain A.5: the shared compact header, and the areas of life above the
+  // domain panels (mirrors `library/page.tsx`).
+  return `<div class="brain-page"><header class="ui-page-header ui-page-header--compact brain-head">`
+    + `<div class="ui-page-header__text"><h1 class="ui-page-header__title">Memória</h1>`
+    + `<p class="ui-page-header__description">Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p></div>`
+    + `<div class="ui-page-header__actions"><a class="brain-search-link" href="#">Buscar em tudo</a></div></header>`
     + strip
+    + `<section aria-labelledby="brain-areas-heading" class="brain-areas"><h2 id="brain-areas-heading">Áreas da vida</h2>`
+    + `<ul class="brain-area-list"><li><a class="brain-area" href="#"><span class="brain-area-name">Saúde</span></a></li>`
+    + `<li><a class="brain-area" href="#"><span class="brain-area-name">Terapia</span><span class="brain-area-kind">Saúde</span></a></li>`
+    + `<li><a class="brain-area" href="#"><span class="brain-area-name">Viagens</span></a></li></ul>`
+    + `<p class="brain-areas-foot"><a class="brain-areas-all" href="#">Ver todas as áreas</a></p></section>`
     + `<section class="brain-holds"><h2>O que o Brain guarda</h2>`
     + `<ul class="brain-domains">${panels.join("")}</ul></section></div>`;
 }

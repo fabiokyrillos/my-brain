@@ -244,6 +244,11 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * it would change state the owner never asked to change.
      */
     "src/features/notifications/notice-open-control.tsx",
+    /*
+     * Life Brain A.5: the history page's row, now its own component. Two lines,
+     * "Abrir" and a "⋯" that opens on a press — no swipe.
+     */
+    "src/features/notifications/notification-history-row.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createContext } from "@/features/entities/actions";
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { loadContexts } from "@/features/entities/contexts";
 import { getEntityCopy } from "@/features/entities/copy";
@@ -43,14 +44,15 @@ export default async function ContextsPage({
 
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.contextsEyebrow}</p>
-          <h1>{copy.contextsTitle}</h1>
-          <p>{copy.contextsIntro}</p>
-        </div>
-        <EntityCreateForm action={createContext} kind="context" locale={locale} />
-      </header>
+      {/* Life Brain A.5: the shared compact header — no eyebrow, the intro
+          hides on a phone, the create form sits under the title there. */}
+      <PageHeader
+        actions={<EntityCreateForm action={createContext} kind="context" locale={locale} />}
+        className="list-page-header"
+        description={copy.contextsIntro}
+        size="compact"
+        title={copy.contextsTitle}
+      />
 
       {/* Contextos is presented as a lens of Brain and keeps its own route and
           deep links (ADR-114 Decision 6). No entity became a database property
@@ -75,6 +77,7 @@ export default async function ContextsPage({
         </div>
       ) : (
         <UniversalStateView
+          className="ux-state-quiet"
           description={copy.contextsListEmptyHint}
           locale={locale}
           state="empty"
