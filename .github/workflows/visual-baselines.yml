@@ -1,0 +1,111 @@
+name: visual baselines
+
+# Life Brain A.6 — draws the screenshot lane's baselines on the CI runner and
+# commits them to the branch it was dispatched on.
+#
+# Why a separate, hand-dispatched workflow: a baseline drawn on a developer's
+# machine fails every comparison on the runner (font rasterization differs), so
+# the runner has to draw them, and drawing them must never happen silently
+# inside the gate that compares them. Run it from the Actions tab (or the API)
+# on a feature branch, look at the PNGs in the pull request, then let `verify`
+# compare against them.
+#
+# It refuses `main`: baselines reach `main` only through a reviewed pull
+# request. A push made with GITHUB_TOKEN does not start `verify`, so the next
+# commit pushed to the branch is what runs the comparison.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: visual-baselines-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  draw:
+    name: draw the baselines (Desktop Chrome, Pixel 7)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Refuse the default branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Dispatch this on a feature branch; baselines reach main only through a pull request." >&2
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # The same pin as `verify`'s database job.
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+
+      - name: Start the local Supabase stack
+        run: supabase start -x studio,imgproxy,edge-runtime
+
+      - name: Apply the migration chain
+        run: supabase db reset
+
+      - name: Export the local Supabase credentials
+        # The same block as `verify`'s; NEXT_PUBLIC_* are inlined at build time.
+        run: |
+          set -euo pipefail
+          eval "$(supabase status -o env)"
+          BROWSER_KEY="${ANON_KEY:-${PUBLISHABLE_KEY:-}}"
+          ADMIN_KEY="${SERVICE_ROLE_KEY:-${SECRET_KEY:-}}"
+          if [ -z "${API_URL:-}" ] || [ -z "$BROWSER_KEY" ] || [ -z "$ADMIN_KEY" ]; then
+            echo "supabase status did not report the URL and both keys" >&2
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$BROWSER_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_URL=$API_URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$BROWSER_KEY" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$ADMIN_KEY" >> "$GITHUB_ENV"
+
+      - name: Build the application under test
+        run: npm run build
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Draw the baselines
+        env:
+          VISUAL_LANE: "1"
+        run: npx playwright test e2e/visual-regression.spec.ts --project=desktop --project=mobile --update-snapshots
+
+      - name: Commit the baselines to this branch
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/visual-regression.spec.ts-snapshots
+          if git diff --cached --quiet; then
+            echo "The baselines are unchanged."
+            exit 0
+          fi
+          git commit -m "Draw the visual baselines on the CI runner"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Keep the drawn images as an artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: |
+            e2e/visual-regression.spec.ts-snapshots/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop the local Supabase stack
+        if: always()
+        run: supabase stop --no-backup
