@@ -49,6 +49,7 @@ import {
 } from "./composer-state";
 import { getAssistantCopy } from "./copy";
 import { buildMemoryProposal } from "./memory-proposal";
+import { looksLikeRelato } from "./relato-intent";
 import { commandTurnFallsThrough, decideAssistantRoute } from "./routing";
 
 /** The ceiling `chat/actions.ts` already enforces; repeated so the refusal can be localized here. */
@@ -71,6 +72,84 @@ function noticed(
     echo,
     announcement: `${notice.heading}. ${notice.detail}`,
   };
+}
+
+/**
+ * The one composer branch that writes, shared by "registre que…" and (Life
+ * Brain B.5) a relato. It reuses `captureEntry` whole — the same Server Action
+ * the capture page submits to — so the owner's lifecycle gate, the quota
+ * ceilings (2G-CAPTURE-005), the idempotency key (2G-CAPTURE-006), the
+ * `awaiting_ai_configuration` path (2G-CAPTURE-004) and the worker nudge are
+ * inherited rather than re-implemented beside them.
+ */
+async function captureFromChat(
+  text: string,
+  locale: Locale,
+  acknowledgement: { heading: string; detail: string; nextStep: null },
+): Promise<AssistantComposerState> {
+  const copy = getAssistantCopy(locale);
+
+    // The one composer branch that writes. It reuses `captureEntry` whole —
+    // the same Server Action the capture page submits to — so the owner's
+    // lifecycle gate, the SH.6 quota ceilings (2G-CAPTURE-005), the
+    // idempotency key (2G-CAPTURE-006), the `awaiting_ai_configuration` path
+    // when no credential exists (2G-CAPTURE-004) and the worker nudge are all
+    // inherited rather than re-implemented beside them.
+    const request = new FormData();
+    request.set("content", text);
+    request.set("locale", locale);
+    // `entries.source` has admitted `'chat'` since `202607160003`; this is
+    // where the entry came from, and `captureSource` is which surface asked.
+    request.set("source", "chat");
+    request.set("idempotencyKey", crypto.randomUUID());
+    request.set("captureSource", "composer");
+
+    const captured = await captureEntry({ status: "idle" }, request);
+    if (captured.status !== "success") {
+      return noticed(
+        "capture_intent",
+        {
+          heading: copy.captureFailedHeading,
+          // A quota ceiling and a storage fault are different facts, and
+          // `captureEntry` already localizes both — surfacing its message
+          // keeps the honest one rather than flattening them into a generic
+          // failure.
+          detail: captured.status === "error" ? captured.message : copy.captureFailedDetail,
+          nextStep: null,
+        },
+        text,
+      );
+    }
+    /**
+     * `2K-CARD-007` — the entry the turn produced, as a read-only preview.
+     *
+     * It replaces the bare "open the entry" link the route used to render.
+     * Same destination, but now inside the one card grammar, which is what
+     * makes the acknowledgment say *what kind of thing* was created and makes
+     * it impossible for this route to grow a mutating control later:
+     * `entry` is read-only by OD-2K-B and `mayRenderMutatingControl` enforces
+     * it in the renderer.
+     *
+     * The receipt deliberately carries **no content** — `CaptureReceipt` has
+     * no text field, which `sensitivity-convergence.test.ts` asserts — so the
+     * card has no snippet, and its classification defaults closed rather than
+     * being invented here.
+     */
+    const href = captured.receipt.safeHref;
+    return {
+      ...noticed(
+        "capture_intent",
+        acknowledgement,
+        text,
+      ),
+      cards: [
+        readOnlyPreviewCard({
+          cardType: "entry",
+          objectId: captured.receipt.entryId,
+          href: href ?? null,
+        }),
+      ],
+    };
 }
 
 /**
@@ -207,67 +286,7 @@ export async function runAssistantTurn(
   }
 
   if (decision.kind === "capture_intent") {
-    // The one composer branch that writes. It reuses `captureEntry` whole —
-    // the same Server Action the capture page submits to — so the owner's
-    // lifecycle gate, the SH.6 quota ceilings (2G-CAPTURE-005), the
-    // idempotency key (2G-CAPTURE-006), the `awaiting_ai_configuration` path
-    // when no credential exists (2G-CAPTURE-004) and the worker nudge are all
-    // inherited rather than re-implemented beside them.
-    const request = new FormData();
-    request.set("content", text);
-    request.set("locale", locale);
-    // `entries.source` has admitted `'chat'` since `202607160003`; this is
-    // where the entry came from, and `captureSource` is which surface asked.
-    request.set("source", "chat");
-    request.set("idempotencyKey", crypto.randomUUID());
-    request.set("captureSource", "composer");
-
-    const captured = await captureEntry({ status: "idle" }, request);
-    if (captured.status !== "success") {
-      return noticed(
-        "capture_intent",
-        {
-          heading: copy.captureFailedHeading,
-          // A quota ceiling and a storage fault are different facts, and
-          // `captureEntry` already localizes both — surfacing its message
-          // keeps the honest one rather than flattening them into a generic
-          // failure.
-          detail: captured.status === "error" ? captured.message : copy.captureFailedDetail,
-          nextStep: null,
-        },
-        text,
-      );
-    }
-    /**
-     * `2K-CARD-007` — the entry the turn produced, as a read-only preview.
-     *
-     * It replaces the bare "open the entry" link the route used to render.
-     * Same destination, but now inside the one card grammar, which is what
-     * makes the acknowledgment say *what kind of thing* was created and makes
-     * it impossible for this route to grow a mutating control later:
-     * `entry` is read-only by OD-2K-B and `mayRenderMutatingControl` enforces
-     * it in the renderer.
-     *
-     * The receipt deliberately carries **no content** — `CaptureReceipt` has
-     * no text field, which `sensitivity-convergence.test.ts` asserts — so the
-     * card has no snippet, and its classification defaults closed rather than
-     * being invented here.
-     */
-    const href = captured.receipt.safeHref;
-    return {
-      ...noticed(
-        "capture_intent",
-        { heading: copy.captureHeading, detail: copy.captureDetail, nextStep: null },
-        text,
-      ),
-      cards: [
-        readOnlyPreviewCard({
-          cardType: "entry",
-          objectId: captured.receipt.entryId,
-          href: href ?? null,
-        }),
-      ],
-    };
+    return captureFromChat(text, locale, { heading: copy.captureHeading, detail: copy.captureDetail, nextStep: null });
   }
 
   if (decision.kind === "knowledge") {
@@ -292,6 +311,16 @@ export async function runAssistantTurn(
 
   const command = await runTaskCommand(idleTaskCommandState, request);
   if (commandTurnFallsThrough(command)) {
+    /*
+      Life Brain B.5 (LB-OD-8 option A, ADR-157): not a command, and told as
+      something that happened — "fui no cardiologista hoje" — so it is kept as
+      a record, through the same capture path as "registre que", and the turn
+      says so in one sentence. Anything else that is not a command is still a
+      question to answer (`looksLikeRelato`).
+    */
+    if (looksLikeRelato(text)) {
+      return captureFromChat(text, locale, { heading: copy.relatoHeading, detail: copy.relatoDetail, nextStep: null });
+    }
     return answerFromKnowledge(text, locale, conversationId);
   }
   return {
