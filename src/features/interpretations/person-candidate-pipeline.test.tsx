@@ -72,7 +72,7 @@ function extraction(overrides: Partial<Extraction> = {}): Extraction {
     contexts: [],
     organizations: [{ name: "Royal Caribbean", evidence: "faz parte da Royal Caribbean", confidence: 0.99, inferred: false }],
     projects: [],
-    people: [{ name: "Garo", evidence: "relatório de Sweepstakes pra Garo", confidence: 0.9, inferred: false, role: null }],
+    people: [{ name: "Garo", evidence: "relatório de Sweepstakes pra Garo", confidence: 0.9, inferred: false, role: null, birthday: null }],
     taskCandidates: [],
     pendingQuestions: [],
     confidence: 0.9,

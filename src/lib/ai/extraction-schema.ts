@@ -68,8 +68,27 @@ export const entityCandidateSchema = z.object({
  * nullable, like every optional fact in a strict schema. Only people carry a
  * role; contexts, organizations and projects keep the plain candidate shape.
  */
+/**
+ * Backlog item 3 (ADR-158): a person's birthday when the entry states it ("a
+ * Ana faz aniversário em 5 de maio"). Month and day are required, the year is
+ * null unless the entry gives it; the date must exist (29 February only with
+ * no year or a leap year) — the rule `set_person_birthday` applies. A proposal
+ * for the owner to confirm, never written by the model.
+ */
+export const personBirthdaySchema = z
+  .object({
+    month: z.number().int().min(1).max(12),
+    day: z.number().int().min(1).max(31),
+    year: z.number().int().min(1900).max(2100).nullable(),
+  })
+  .refine(
+    (value) => value.day <= new Date(Date.UTC(value.year ?? 2000, value.month, 0)).getUTCDate(),
+    { message: "not a real date" },
+  );
+
 export const personCandidateSchema = entityCandidateSchema.extend({
   role: z.string().trim().min(1).max(80).nullable(),
+  birthday: personBirthdaySchema.nullable(),
 });
 
 export const taskCandidateSchema = z.object({
@@ -156,7 +175,11 @@ export const storedEntryExtractionSchema = entryExtractionSchema.extend({
   // C.3: every reading stored before it has no `eventCandidates`.
   eventCandidates: z.array(eventCandidateSchema).max(MAX_EVENT_CANDIDATES).default([]),
   // C.2: every reading stored before it has people without `role`.
-  people: z.array(personCandidateSchema.extend({ role: personCandidateSchema.shape.role.default(null) })),
+  // Backlog item 3: and every reading stored before it has people without `birthday`.
+  people: z.array(personCandidateSchema.extend({
+    role: personCandidateSchema.shape.role.default(null),
+    birthday: personCandidateSchema.shape.birthday.default(null),
+  })),
 });
 
 export type EntryExtraction = z.infer<typeof entryExtractionSchema>;

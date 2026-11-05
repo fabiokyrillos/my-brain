@@ -11,8 +11,8 @@ const validExtraction = {
   organizations: [{ name: "Royal Caribbean", confidence: 0.78, evidence: "Next Cruise", inferred: true }],
   projects: [{ name: "Next Cruise", confidence: 0.99, evidence: "relatório de Next Cruise", inferred: false }],
   people: [
-    { name: "Jaime", confidence: 0.99, evidence: "Jaime pediu", inferred: false, role: null },
-    { name: "Maria", confidence: 0.99, evidence: "conversar com Maria", inferred: false, role: "gerente" },
+    { name: "Jaime", confidence: 0.99, evidence: "Jaime pediu", inferred: false, role: null, birthday: null },
+    { name: "Maria", confidence: 0.99, evidence: "conversar com Maria", inferred: false, role: "gerente", birthday: null },
   ],
   lifeArea: { kind: "work", confidence: 0.95 },
   taskCandidates: [
@@ -54,7 +54,7 @@ describe("entryExtractionSchema", () => {
 describe("people[].role (Life Brain C.2, ADR-151)", () => {
   const withRole = (role: unknown) => ({
     ...validExtraction,
-    people: [{ name: "Dr. Silva", confidence: 0.9, evidence: "Dr. Silva", inferred: false, role }],
+    people: [{ name: "Dr. Silva", confidence: 0.9, evidence: "Dr. Silva", inferred: false, role, birthday: null }],
   });
 
   it("accepts a role and null", () => {
@@ -73,6 +73,37 @@ describe("people[].role (Life Brain C.2, ADR-151)", () => {
     const stored = { ...validExtraction, people: [{ name: "Ana", confidence: 0.9, evidence: "Ana", inferred: false }] };
     const parsed = storedEntryExtractionSchema.parse(stored);
     expect(parsed.people[0]?.role).toBeNull();
+  });
+});
+
+/**
+ * people[].birthday (backlog: birthday read from records, ADR-158) — the date
+ * the entry states, or null. Stored readings from before it read as null.
+ */
+describe("people[].birthday (ADR-158)", () => {
+  const withBirthday = (birthday: unknown) => ({
+    ...validExtraction,
+    people: [{ name: "Ana", confidence: 0.9, evidence: "Ana faz aniversário em 5 de maio", inferred: false, role: null, birthday }],
+  });
+
+  it("accepts a day and month, with or without a year, and null", () => {
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 5, day: 5, year: null })).success).toBe(true);
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 2, day: 29, year: 2000 })).success).toBe(true);
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 2, day: 29, year: null })).success).toBe(true);
+    expect(entryExtractionSchema.safeParse(withBirthday(null)).success).toBe(true);
+  });
+
+  it("refuses a date that does not exist and a person without the key from the model", () => {
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 4, day: 31, year: null })).success).toBe(false);
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 2, day: 29, year: 2023 })).success).toBe(false);
+    expect(entryExtractionSchema.safeParse(withBirthday({ month: 13, day: 1, year: null })).success).toBe(false);
+    const missing = { ...validExtraction, people: [{ name: "Ana", confidence: 0.9, evidence: "Ana", inferred: false, role: null }] };
+    expect(entryExtractionSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it("reads a reading stored before it as a person with no birthday", () => {
+    const stored = { ...validExtraction, people: [{ name: "Ana", confidence: 0.9, evidence: "Ana", inferred: false, role: null }] };
+    expect(storedEntryExtractionSchema.parse(stored).people[0]?.birthday).toBeNull();
   });
 });
 
