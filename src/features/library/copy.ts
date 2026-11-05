@@ -41,6 +41,21 @@ export type LibraryCopy = {
   readonly countUnavailable: string;
   /** The overview's own section heading, above the domain panels. */
   readonly holdsHeading: string;
+  /**
+   * Life Brain A.5: the People and Projects lenses' header and empty state,
+   * which were inline ternaries on two one-line pages.
+   */
+  readonly lists: {
+    readonly people: ListPageCopy & { readonly rowMeta: string };
+    readonly projects: ListPageCopy & { readonly rowFallback: string };
+  };
+};
+
+export type ListPageCopy = {
+  readonly title: string;
+  readonly description: string;
+  readonly emptyTitle: string;
+  readonly emptyBody: string;
 };
 
 const copy: Record<Locale, LibraryCopy> = {
@@ -80,6 +95,22 @@ const copy: Record<Locale, LibraryCopy> = {
     recentUnavailable: "Não foi possível ler os recentes agora. Isso não quer dizer que não existam.",
     countUnavailable: "Não foi possível contar agora.",
     holdsHeading: "O que o Brain guarda",
+    lists: {
+      people: {
+        title: "Pessoas",
+        description: "Quem aparece nas suas conversas, decisões e acompanhamentos.",
+        emptyTitle: "Nenhuma pessoa ainda",
+        emptyBody: "Pessoas citadas nas capturas aparecem aqui automaticamente.",
+        rowMeta: "Aparece no seu contexto",
+      },
+      projects: {
+        title: "Projetos",
+        description: "Frentes ativas reconhecidas nas suas entradas ou criadas por você.",
+        emptyTitle: "Nenhum projeto ainda",
+        emptyBody: "Projetos citados nas capturas aparecem aqui automaticamente.",
+        rowFallback: "Projeto ativo",
+      },
+    },
   },
   en: {
     title: "Memory",
@@ -103,6 +134,22 @@ const copy: Record<Locale, LibraryCopy> = {
     recentUnavailable: "The recent items could not be read right now. That does not mean there are none.",
     countUnavailable: "Could not count right now.",
     holdsHeading: "What the Brain holds",
+    lists: {
+      people: {
+        title: "People",
+        description: "People who appear in your conversations, decisions, and follow-ups.",
+        emptyTitle: "No people yet",
+        emptyBody: "People mentioned in captures appear here automatically.",
+        rowMeta: "Appears in your context",
+      },
+      projects: {
+        title: "Projects",
+        description: "Active workstreams recognized in your entries or created by you.",
+        emptyTitle: "No projects yet",
+        emptyBody: "Projects mentioned in captures appear here automatically.",
+        rowFallback: "Active project",
+      },
+    },
   },
 };
 

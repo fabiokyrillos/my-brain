@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHeader } from "@/components/ui";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getLibraryCopy } from "@/features/library/copy";
 import { loadBrainOverview } from "@/features/library/overview";
@@ -70,13 +71,18 @@ export default async function LibraryPage({
 
   return (
     <div className="brain-page">
-      <header className="brain-head">
-        <h1>{text.title}</h1>
-        <p>{text.intro}</p>
-        <Link className="brain-search-link" href={`/${locale}/app/search`}>
-          {text.searchLink}
-        </Link>
-      </header>
+      {/* Life Brain A.5: the shared compact header; the search link is its action. */}
+      <PageHeader
+        actions={(
+          <Link className="brain-search-link" href={`/${locale}/app/search`}>
+            {text.searchLink}
+          </Link>
+        )}
+        className="brain-head"
+        description={text.intro}
+        size="compact"
+        title={text.title}
+      />
 
       <BrainLensTabs active="overview" locale={locale} />
 

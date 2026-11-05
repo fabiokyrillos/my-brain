@@ -22,7 +22,6 @@ import type { MemoryKind, MemorySensitivity } from "./schema";
 
 type MemoryCopy = {
   /** What this thing is, said once, where the owner first meets it. */
-  readonly eyebrow: string;
   readonly title: string;
   readonly intro: string;
   readonly whatIsIt: string;
@@ -192,7 +191,6 @@ type MemoryCopy = {
 
 const copy = {
   "pt-BR": {
-    eyebrow: "CONHECIMENTO DURADOURO",
     title: "Memórias",
     intro: "O que continua valendo depois que a conversa acaba.",
     whatIsIt:
@@ -306,7 +304,6 @@ const copy = {
     conversationalRestored: "Memória de volta em uso.",
   },
   en: {
-    eyebrow: "LASTING KNOWLEDGE",
     title: "Memories",
     intro: "What stays true after the conversation ends.",
     whatIsIt:

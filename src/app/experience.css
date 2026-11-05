@@ -191,6 +191,18 @@
 }
 @media (max-width: 899px) { .ux-state-action { min-height: 44px; width: 100%; text-align: center; } }
 
+/* Life Brain A.5 (`DESIGN_DIRECTION.md` §4: the blue box is for a fact the user
+   must act on, and an empty list is not one). Same state, same vocabulary, same
+   `data-ux-state` — only the box goes: no border, no tinted background, a muted
+   icon, and the title at body size. A list route opts in with this class. */
+.ux-state.ux-state-quiet {
+  padding: var(--space-6) 0;
+  border: 0;
+  background: transparent;
+}
+.ux-state-quiet .ux-state-icon { color: var(--mark-decorative, var(--text-muted)); }
+.ux-state-quiet .ux-state-title { font: var(--type-body); font-weight: 500; }
+
 /* `2O-RECOVER-002` — the same vocabulary at section density.
    One section of a populated page saying that one relation is empty is not the
    page saying it is empty, and the bordered block repeated five times on a

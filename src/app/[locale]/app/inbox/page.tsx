@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { loadMoreNeedsAttention } from "@/features/daily-cycle/attention-actions";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
@@ -158,15 +159,10 @@ function AwaitingAiNotice({
  * camel-cased copy keys — and an index expression that has to spell both is
  * where a fifth view would silently pick the wrong sentence.
  */
-function emptyCopyFor(view: InboxView, copy: ReturnType<typeof getRecordsCopy>, pt: boolean) {
+function emptyCopyFor(view: InboxView, copy: ReturnType<typeof getRecordsCopy>) {
   switch (view) {
     case "all":
-      return {
-        title: pt ? "Nenhum registro ainda" : "No entries yet",
-        body: pt
-          ? "Use a captura rápida para registrar algo sem interromper seu fluxo."
-          : "Use quick capture to save something without breaking your flow.",
-      };
+      return copy.empty.all;
     case "record-only":
       return { title: copy.views.recordOnly, body: copy.emptyByView.recordOnly };
     case "awaiting-ai":
@@ -177,36 +173,27 @@ function emptyCopyFor(view: InboxView, copy: ReturnType<typeof getRecordsCopy>, 
 }
 
 function RecordsHeader({ locale, lead }: { locale: Locale; lead: string }) {
-  const pt = locale === "pt-BR";
+  const copy = getRecordsCopy(locale);
   return (
-    <header className="records-header">
-      <p className="eyebrow">{pt ? "REGISTROS" : "RECORDS"}</p>
-      <h1>{pt ? "Registros" : "Records"}</h1>
-      <p className="records-lead">{lead}</p>
-      {/*
-        Slice 2P.5, and it is what let the mobile bar's fifth slot free up.
+    /*
+      Life Brain A.5: the shared header, compact — the eyebrow that repeated the
+      title is gone and the lead hides on a phone, so the first row is higher.
 
-        `capabilities.ts`'s census names Perguntas as one of exactly two
-        destinations `Mais` was the only mobile route to: Hoje's link sits inside
-        `{view.openQuestion ? … : null}`, and `conversational-questions.tsx`
-        returns `null` on an empty list, so an owner with no open question had no
-        path at all.
-
-        The census also names the fix and rejects the obvious alternative:
-        Perguntas is *"a view of Registros rather than a destination Hoje
-        advertises"*, and putting a permanent control on the cockpit to make the
-        census true would be arranging the product around its own bookkeeping.
-        Registros is a bar slot, so this is one tap from the bar.
-
-        **Unconditional, deliberately.** A link that appears only once there is
-        something to see is not a path — it is the same shape the calendar's
-        reminders link had before an earlier part fixed it, and you cannot answer
-        a question from a page you cannot open.
-      */}
-      <Link className="records-questions-link" href={`/${locale}/app/questions`}>
-        {getRecordsCopy(locale).questionsLink}
-      </Link>
-    </header>
+      The link to Perguntas stays, unconditional (slice 2P.5): `capabilities.ts`'s
+      census names Registros as the one-tap path to Perguntas since `Mais` left
+      the bar, and a link that appeared only when there was a question would not
+      be a path.
+    */
+    <PageHeader
+      actions={(
+        <Link className="records-questions-link" href={`/${locale}/app/questions`}>
+          {copy.questionsLink}
+        </Link>
+      )}
+      description={lead}
+      size="compact"
+      title={copy.title}
+    />
   );
 }
 
@@ -220,7 +207,6 @@ export default async function InboxPage({
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const pt = locale === "pt-BR";
   const resolvedSearchParams = await searchParams;
   const requested = resolvedSearchParams.view;
   /*
@@ -303,7 +289,7 @@ export default async function InboxPage({
         ) : (
           <>
             <NeedsAttentionViewed surface="needs_attention" itemCount={0} locale={locale} />
-            <UniversalStateView description={pt ? "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." : "When an already-supported decision needs your confirmation, it appears here."} locale={locale} state="empty" title={pt ? "Nada precisa de você agora" : "Nothing needs you right now"} />
+            <UniversalStateView className="ux-state-quiet" description={copy.empty.needsYou.body} locale={locale} state="empty" title={copy.empty.needsYou.title} />
           </>
         )}
       </div>
@@ -321,7 +307,7 @@ export default async function InboxPage({
     yet" — the first-use copy would be a lie on an account with two hundred
     records and no failures (`04-estados.md`: *vazio por visão*).
   */
-  const emptyCopy = emptyCopyFor(view, copy, pt);
+  const emptyCopy = emptyCopyFor(view, copy);
 
   return (
     <div className="content-page records-page">
@@ -349,9 +335,9 @@ export default async function InboxPage({
           caminho." above a "Próxima" link, with a terminal_error on page three —
           a categorical claim that is false, which is worse than saying nothing.
         */
-        <UniversalStateView description={copy.emptyPage.body} locale={locale} state="empty" title={copy.emptyPage.title} />
+        <UniversalStateView className="ux-state-quiet" description={copy.emptyPage.body} locale={locale} state="empty" title={copy.emptyPage.title} />
       ) : (
-        <UniversalStateView description={emptyCopy.body} locale={locale} state="empty" title={emptyCopy.title} />
+        <UniversalStateView className="ux-state-quiet" description={emptyCopy.body} locale={locale} state="empty" title={emptyCopy.title} />
       )}
       {/*
         The view has to survive the page change, or page 2 of "falhas" silently

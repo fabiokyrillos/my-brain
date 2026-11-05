@@ -145,10 +145,13 @@ describe("the history surface keeps everything that makes it one", () => {
     // `2O-PREF-002`. A reader who arrived from the bell or a deep link needs to
     // know where they are before they read what is here.
     const strip = code.indexOf("<AccountDataStrip");
-    const heading = code.indexOf("<h1>");
+    // Life Brain A.5: the heading is the shared `PageHeader`, which renders the
+    // route's one `<h1>` (its default `headingLevel`).
+    const heading = code.indexOf("<PageHeader");
     expect(strip).toBeGreaterThan(-1);
     expect(heading).toBeGreaterThan(-1);
     expect(strip).toBeLessThan(heading);
+    expect(code).not.toMatch(/<PageHeader[^>]*headingLevel=\{2\}/);
   });
 
   it("names the feed instead of leaving it as an unlabelled tail", () => {

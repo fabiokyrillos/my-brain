@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
+import { getLibraryCopy } from "@/features/library/copy";
 import { createRecord } from "@/features/operations/actions";
 import { InlineCreateForm } from "@/features/operations/inline-create-form";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -15,7 +17,7 @@ export default async function ProjectsPage({ params, searchParams }: { params: P
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const pt = locale === "pt-BR";
+  const copy = getLibraryCopy(locale).lists.projects;
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase } = await requireUser(locale);
@@ -24,5 +26,5 @@ export default async function ProjectsPage({ params, searchParams }: { params: P
 
   // A lens of Brain, at its own URL. See `people/page.tsx` on why the strip
   // follows the `<h1>` rather than preceding it.
-  return <div className="content-page"><header className="list-header"><div><p className="eyebrow">{pt ? "CONTEXTO" : "CONTEXT"}</p><h1>{pt ? "Projetos" : "Projects"}</h1><p>{pt ? "Frentes ativas reconhecidas nas suas entradas ou criadas por você." : "Active workstreams recognized in your entries or created by you."}</p></div><InlineCreateForm action={createRecord} kind="project" locale={locale} /></header><BrainLensTabs active="projects" locale={locale} />{items.length ? <div className="list-stack">{items.map((project) => <Link href={`/${locale}/app/projects/${project.id}`} className="list-row" key={project.id}><div className="list-row-main"><strong>{project.name}</strong><p>{project.description ?? (pt ? "Projeto ativo" : "Active project")}</p></div><div className="list-meta"><span className={`status-badge ${project.status}`}>{projectStatusLabel(locale, project.status) ?? getVocabularyCopy(locale).unknownState}</span></div></Link>)}</div> : <UniversalStateView description={pt ? "Projetos citados nas capturas aparecem aqui automaticamente." : "Projects mentioned in captures appear here automatically."} locale={locale} state="empty" title={pt ? "Nenhum projeto ainda" : "No projects yet"} />}<PaginationLinks locale={locale} path="projects" page={page} hasNext={hasNext} /></div>;
+  return <div className="content-page"><PageHeader actions={<InlineCreateForm action={createRecord} kind="project" locale={locale} />} className="list-page-header" description={copy.description} size="compact" title={copy.title} /><BrainLensTabs active="projects" locale={locale} />{items.length ? <div className="list-stack">{items.map((project) => <Link href={`/${locale}/app/projects/${project.id}`} className="list-row" key={project.id}><div className="list-row-main"><strong>{project.name}</strong><p>{project.description ?? copy.rowFallback}</p></div><div className="list-meta"><span className={`status-badge ${project.status}`}>{projectStatusLabel(locale, project.status) ?? getVocabularyCopy(locale).unknownState}</span></div></Link>)}</div> : <UniversalStateView className="ux-state-quiet" description={copy.emptyBody} locale={locale} state="empty" title={copy.emptyTitle} />}<PaginationLinks locale={locale} path="projects" page={page} hasNext={hasNext} /></div>;
 }

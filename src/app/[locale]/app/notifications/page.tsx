@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { PageHeader } from "@/components/ui";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
@@ -64,7 +65,6 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const pt = locale === "pt-BR";
   const page = parsePage((await searchParams).page);
   const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
@@ -114,12 +114,12 @@ export default async function NotificationsPage({ params, searchParams }: { para
     appeared twice and the second one read as the start of a different page.
     Slice 2P.5 moved that component to Settings entirely, so the page now opens
     at level one with nothing above it to compete.
-  */}<header className="list-header"><div><p className="eyebrow">{pt ? "BRAIN PROATIVO" : "PROACTIVE BRAIN"}</p><h1>{pt ? "Notificações" : "Notifications"}</h1><p>{pt ? "Somente sinais relevantes, com deduplicação e respeito ao silêncio." : "Only relevant signals, deduplicated and respectful of quiet hours."}</p></div>{/*
-    The one discreet contextual entry `2P-SETTINGS-008` allows, and it is
-    deliberately a link rather than a panel: the controls it points at are no
-    longer on this page, and a second copy of any of them here would be the
-    duplication the requirement exists to remove.
-  */}<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link></header>{/*
+  */}{/*
+    Life Brain A.5: the shared compact header — no eyebrow, the line under the
+    title hides on a phone. Its action is the one discreet contextual entry
+    `2P-SETTINGS-008` allows, deliberately a link rather than a panel: the
+    controls it points at live in Ajustes.
+  */}<PageHeader actions={<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link>} description={copy.pageDescription} size="compact" title={copy.pageTitle} />{/*
     The feed, as a named section of this page rather than as an unlabelled tail
     of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
     where notification CONTENT lives, behind the login — and the section keeps
@@ -150,5 +150,5 @@ export default async function NotificationsPage({ params, searchParams }: { para
     already owns it. Those actions are injected as props because this file is a
     Server Component and the row is a Client Component — the same boundary
     `TaskDetailSurface` crosses when it mounts `WorkItemActions`.
-  */}{(() => { const row = rowsById.get(item.id); return row ? <NotificationVerbs handlers={NOTIFICATION_VERB_HANDLERS} locale={locale} row={row} timeZone={timezone} /> : null; })()}</div></li>)}</ul> : <UniversalStateView description={pt ? `O ${agentName} permanece em silêncio quando não há nada realmente útil.` : `${agentName} stays quiet when there is nothing genuinely useful.`} locale={locale} state="empty" title={pt ? "Tudo tranquilo" : "All quiet"} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+  */}{(() => { const row = rowsById.get(item.id); return row ? <NotificationVerbs handlers={NOTIFICATION_VERB_HANDLERS} locale={locale} row={row} timeZone={timezone} /> : null; })()}</div></li>)}</ul> : <UniversalStateView className="ux-state-quiet" description={copy.emptyBody(agentName)} locale={locale} state="empty" title={copy.emptyTitle} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
 }

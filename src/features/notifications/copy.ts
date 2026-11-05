@@ -145,6 +145,11 @@ export type NotificationSettingsCopy = {
    * `2P-SETTINGS-008` allows. Its href is the Settings notifications section.
    */
   readonly preferencesLink: string;
+  /** Life Brain A.5: the page header and its empty state, out of the page's ternaries. */
+  readonly pageTitle: string;
+  readonly pageDescription: string;
+  readonly emptyTitle: string;
+  readonly emptyBody: (agentName: string) => string;
 };
 
 const PT_BR: NotificationSettingsCopy = {
@@ -235,6 +240,10 @@ const PT_BR: NotificationSettingsCopy = {
   markRead: "Marcar como lida",
   openDestination: "Abrir",
   preferencesLink: "Ajustar preferências de notificação",
+  pageTitle: "Notificações",
+  pageDescription: "Somente sinais relevantes, com deduplicação e respeito ao silêncio.",
+  emptyTitle: "Tudo tranquilo",
+  emptyBody: (agentName) => `O ${agentName} permanece em silêncio quando não há nada realmente útil.`,
 };
 
 const EN: NotificationSettingsCopy = {
@@ -325,6 +334,10 @@ const EN: NotificationSettingsCopy = {
   markRead: "Mark as read",
   openDestination: "Open",
   preferencesLink: "Adjust notification preferences",
+  pageTitle: "Notifications",
+  pageDescription: "Only relevant signals, deduplicated and respectful of quiet hours.",
+  emptyTitle: "All quiet",
+  emptyBody: (agentName) => `${agentName} stays quiet when there is nothing genuinely useful.`,
 };
 
 export function getNotificationSettingsCopy(locale: string): NotificationSettingsCopy {

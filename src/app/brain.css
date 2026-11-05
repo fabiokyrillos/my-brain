@@ -124,6 +124,10 @@
   align-items: center;
   min-height: 24px;
 }
+/* Life Brain A.5: as the shared header's action it is a full touch target and
+   needs no offset; the page grid already spaces the header. */
+.brain-head.ui-page-header { margin: 0; }
+.brain-head .brain-search-link { margin-top: 0; min-height: var(--touch-target); }
 
 .brain-holds {
   display: grid;

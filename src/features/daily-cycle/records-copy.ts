@@ -88,6 +88,13 @@ export type RecordsCopy = {
    * while later pages hold matches would make them false.
    */
   readonly emptyPage: { readonly title: string; readonly body: string };
+  /** Life Brain A.5: the page's title, once, with no eyebrow repeating it. */
+  readonly title: string;
+  /** The two first-use sentences that used to be inline ternaries on the page. */
+  readonly empty: {
+    readonly all: { readonly title: string; readonly body: string };
+    readonly needsYou: { readonly title: string; readonly body: string };
+  };
   /** The queue's own subtitle under the heading, per view. */
   readonly lead: {
     readonly needsYou: string;
@@ -137,6 +144,11 @@ export const recordsCopy = {
       title: "Nada desta visão nesta página",
       body: "Há mais registros adiante. Continue para a próxima página.",
     },
+    title: "Registros",
+    empty: {
+      all: { title: "Nenhum registro ainda", body: "Use a captura rápida para registrar algo sem interromper seu fluxo." },
+      needsYou: { title: "Nada precisa de você agora", body: "Quando uma decisão já suportada exigir sua confirmação, ela aparece aqui." },
+    },
     lead: {
       needsYou: "Nada aqui virou tarefa, memória ou lembrete ainda.",
       all: "Tudo que você entregou ao Brain, com o original sempre preservado.",
@@ -182,6 +194,11 @@ export const recordsCopy = {
     emptyPage: {
       title: "Nothing from this view on this page",
       body: "There are more records ahead. Continue to the next page.",
+    },
+    title: "Records",
+    empty: {
+      all: { title: "No entries yet", body: "Use quick capture to save something without breaking your flow." },
+      needsYou: { title: "Nothing needs you right now", body: "When an already-supported decision needs your confirmation, it appears here." },
     },
     lead: {
       needsYou: "Nothing here has become a task, memory or reminder yet.",
