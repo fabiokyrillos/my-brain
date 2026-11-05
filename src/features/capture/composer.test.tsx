@@ -41,7 +41,7 @@ import {
 
 import { ATTACHMENT_LIMITS } from "@/lib/quotas";
 
-import { Composer, type CaptureAction } from "./composer";
+import { Composer, type CaptureAction, type CaptureComposerProps } from "./composer";
 import { composerCopy } from "./composer-copy";
 import { draftKey, readDraft } from "./composer-draft";
 import type { TranscribeAction } from "./voice-composer";
@@ -138,7 +138,7 @@ function transcribes(text: string): TranscribeAction {
   return async () => ({ status: "success" as const, text });
 }
 
-function renderComposer(overrides: Partial<Parameters<typeof Composer>[0]> = {}) {
+function renderComposer(overrides: Partial<CaptureComposerProps> = {}) {
   return render(
     <Composer
       action={overrides.action ?? succeed}

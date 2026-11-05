@@ -515,7 +515,7 @@ describe("2P-CHAT-004/005: Conversation is reachable, and the way in carries no 
   });
 
   it("seeds the composer without submitting it", () => {
-    const composer = tsCode(read("src/features/assistant/assistant-composer.tsx"));
+    const composer = tsCode(read("src/features/capture/chat-composer.tsx"));
     // `idle`-only, so a resolved turn never has its field refilled, and the
     // owner's restored echo always wins over a seed.
     expect(composer).toContain('state.route === "idle" && initialText');

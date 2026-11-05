@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { MemoryProposalAction } from "@/features/memories/memory-proposal-card";
 import { idleTaskCommandState } from "@/features/task-commands/console-state";
 
-import { AssistantComposer, type AssistantComposerAction } from "./assistant-composer";
-import { idleAssistantComposerState, type AssistantComposerState } from "./composer-state";
+import { ChatComposer as AssistantComposer, type AssistantComposerAction } from "./chat-composer";
+import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
 
 // `MemoryProposalCard` now emits a product event, and the emitter reaches a
 // `"use server"` module that cannot be imported from a client component under
@@ -318,5 +318,39 @@ describe("AssistantComposer memory proposal (DEC-5)", () => {
     await submitMemoryTurn("en");
     expect(screen.getByRole("button", { name: "Keep memory" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Discard" })).toBeTruthy();
+  });
+});
+
+describe("Life Brain B.5: one composer, the chat mode", () => {
+  it("is what the shared Composer renders for mode='chat'", async () => {
+    const { Composer } = await import("./composer");
+    render(
+      <Composer
+        action={resolvesTo(idleAssistantComposerState)}
+        agentName="Brain"
+        locale="pt-BR"
+        memoryAction={noopMemoryAction()}
+        memoryUndoAction={noopMemoryAction()}
+        mode="chat"
+      />,
+    );
+    expect(document.querySelector("form.assistant-composer-form")).not.toBeNull();
+    expect(document.querySelector('input[name="intent"][value="ask"]')).not.toBeNull();
+  });
+
+  it("offers voice when the page binds a transcriber, and none otherwise", () => {
+    const transcribe = vi.fn(async () => ({ status: "success" as const, text: "olá" }));
+    const { unmount } = render(
+      <AssistantComposer action={resolvesTo(idleAssistantComposerState)} agentName="Brain" locale="pt-BR" memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} transcribeAction={transcribe} />,
+    );
+    // jsdom has no MediaRecorder, so the shared control renders its
+    // "unsupported" sentence — which is still the voice control mounting.
+    const withVoice = document.querySelectorAll(".voice-control, .voice-unsupported").length;
+    unmount();
+    render(
+      <AssistantComposer action={resolvesTo(idleAssistantComposerState)} agentName="Brain" locale="pt-BR" memoryAction={noopMemoryAction()} memoryUndoAction={noopMemoryAction()} />,
+    );
+    expect(document.querySelectorAll(".voice-control, .voice-unsupported").length).toBe(0);
+    expect(withVoice).toBe(1);
   });
 });

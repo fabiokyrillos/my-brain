@@ -3,7 +3,8 @@ import { ButtonLink, EmptyState, List, ListItem, PageHeader } from "@/components
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { runAssistantTurn } from "@/features/assistant/actions";
-import { AssistantComposer } from "@/features/assistant/assistant-composer";
+import { Composer } from "@/features/capture/composer";
+import { transcribeRecording } from "@/features/capture/transcribe-action";
 import { getAssistantCopy } from "@/features/assistant/copy";
 import { askAboutCopy, parseAskAbout } from "@/features/conversation-cards/ask-about";
 import { AskingAboutBanner } from "@/features/conversation-cards/asking-about-banner";
@@ -84,7 +85,9 @@ export default async function ChatPage({
         <AskingAboutBanner locale={locale} resolved={askingAbout} />
       )}
 
-      <AssistantComposer
+      <Composer
+        mode="chat"
+        transcribeAction={transcribeRecording}
         action={runAssistantTurn}
         agentName={agentName}
         initialText={initialText}

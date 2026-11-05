@@ -2,7 +2,8 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PageHeader, TextLink } from "@/components/ui";
 import { runAssistantTurn } from "@/features/assistant/actions";
-import { AssistantComposer } from "@/features/assistant/assistant-composer";
+import { Composer } from "@/features/capture/composer";
+import { transcribeRecording } from "@/features/capture/transcribe-action";
 import { getAssistantCopy } from "@/features/assistant/copy";
 import { messageAnchorId } from "@/features/conversation-cards/continuity";
 import { resumeConversationCard } from "@/features/conversation-cards/resume";
@@ -198,7 +199,9 @@ export default async function ConversationPage({
         ))}
       </div>
 
-      <AssistantComposer
+      <Composer
+        mode="chat"
+        transcribeAction={transcribeRecording}
         action={runAssistantTurn}
         agentName={agentName}
         conversationId={conversationId}

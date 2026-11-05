@@ -129,7 +129,7 @@ describe("2K-CARD-005: the task pipeline keeps its single implementation", () =>
   it("keeps the composer rendering the console's own task renderer", () => {
     // If this ever stops being true, the composer has started re-modelling
     // command states — the failure `composer-state.ts:9-15` warns about.
-    expect(code("src/features/assistant/assistant-composer.tsx")).toMatch(/<TaskCommandResult/);
+    expect(code("src/features/capture/chat-composer.tsx")).toMatch(/<TaskCommandResult/);
   });
 });
 

@@ -56,6 +56,7 @@ import type { DailyCycleActionFailureCode } from "@/features/daily-cycle/action-
 
 import { clearDraft, draftKey, readDraft, writeDraft } from "./composer-draft";
 import { composerCopy } from "./composer-copy";
+import { ChatComposer, type ChatComposerProps } from "./chat-composer";
 import { VoiceComposer, type TranscribeAction } from "./voice-composer";
 
 export type CaptureState =
@@ -85,7 +86,38 @@ const ACCEPT_ATTRIBUTE = [...ATTACHMENT_LIMITS.mimeAllowlist, ".docx", ".xlsx"].
 
 type ModalityChoice = "text" | "attachment" | "voice";
 
-export function Composer({
+export type CaptureComposerProps = {
+  /** Bound to `captureEntry` by the page. Never imported here. */
+  action: CaptureAction;
+  /** Bound to `uploadAttachment` by the page. Never imported here. */
+  attachmentAction: AgentFormAction;
+  transcribeAction: TranscribeAction;
+  initialState?: CaptureState;
+  locale: "pt-BR" | "en";
+  agentName: string;
+  captureSource: CaptureSource;
+};
+
+/**
+ * Life Brain B.5 (LB-OD-8 option A, ADR-157) — ONE composer, two modes.
+ *
+ * `capture` (the default, so Hoje and the capture page are unchanged) keeps
+ * text, attachment and voice and writes an entry. `chat` asks the assistant —
+ * a question is answered, a command runs, and a relato is kept as a record —
+ * and shares the same voice control. The two bodies stay separate components
+ * because their actions and states differ; what is one is the entry point,
+ * the voice, and the rule that nothing is sent without the owner pressing send.
+ */
+export type ComposerProps =
+  | ({ readonly mode?: "capture" } & CaptureComposerProps)
+  | ({ readonly mode: "chat" } & ChatComposerProps);
+
+export function Composer(props: ComposerProps) {
+  if (props.mode === "chat") return <ChatComposer {...props} />;
+  return <CaptureComposer {...props} />;
+}
+
+function CaptureComposer({
   action,
   attachmentAction,
   transcribeAction,
