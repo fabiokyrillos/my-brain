@@ -138,6 +138,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - `people.birthday` + série anual (reutiliza `reminder_series`). Pode exigir uma quarta migration → **condição de parada**, decidir com o dono.
 - **Implementado 2026-11-05 (ADR-156, LB-M4 autorizada pelo dono):** `people.birthday_month/_day/_year`, `reminder_series.person_id`, `set_person_birthday` (data e lembrete anual juntos), a página da pessoa mostra e edita o aniversário.
+- **Depois (ADR-158, sem migration):** a extração lê `people[].birthday` (`entry-extraction-v5` / `2026-11-05.1`) e a página do registro propõe "Guardar o aniversário de Ana: 5 de maio?" para a pessoa vinculada que ainda não tem data; aceitar usa `set_person_birthday`.
 
 ## 4. Resumo
 

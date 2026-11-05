@@ -28,7 +28,7 @@ function baseExtraction() {
     contexts: [{ name: "Trabalho", confidence: 0.9, evidence: "reunião", inferred: false }],
     organizations: [],
     projects: [{ name: "Relatório", confidence: 0.6, evidence: "relatório trimestral", inferred: true }],
-    people: [{ name: "Ana", confidence: 0.95, evidence: "com Ana", inferred: false, role: null }],
+    people: [{ name: "Ana", confidence: 0.95, evidence: "com Ana", inferred: false, role: null, birthday: null }],
     taskCandidates: [
       {
         title: "Enviar o relatório",
@@ -215,6 +215,27 @@ const corpus: { name: string; input: unknown }[] = [
     delete person.role;
     return { ...base, people: [person] };
   })() },
+  // Backlog item 3 (ADR-158): a stated birthday, required and nullable.
+  { name: "birthday: a day and a month", input: withEntityCandidate({ birthday: { month: 5, day: 5, year: null } }) },
+  { name: "birthday: with a year", input: withEntityCandidate({ birthday: { month: 5, day: 5, year: 1990 } }) },
+  { name: "birthday: null", input: withEntityCandidate({ birthday: null }) },
+  { name: "birthday: 29 February without a year", input: withEntityCandidate({ birthday: { month: 2, day: 29, year: null } }) },
+  { name: "birthday: 29 February in a leap year", input: withEntityCandidate({ birthday: { month: 2, day: 29, year: 2024 } }) },
+  { name: "birthday: 29 February in a common year", input: withEntityCandidate({ birthday: { month: 2, day: 29, year: 2023 } }) },
+  { name: "birthday: 31 April", input: withEntityCandidate({ birthday: { month: 4, day: 31, year: null } }) },
+  { name: "birthday: month 13", input: withEntityCandidate({ birthday: { month: 13, day: 1, year: null } }) },
+  { name: "birthday: day 0", input: withEntityCandidate({ birthday: { month: 1, day: 0, year: null } }) },
+  { name: "birthday: a fractional day", input: withEntityCandidate({ birthday: { month: 1, day: 1.5, year: null } }) },
+  { name: "birthday: year 1899", input: withEntityCandidate({ birthday: { month: 1, day: 1, year: 1899 } }) },
+  { name: "birthday: year missing", input: withEntityCandidate({ birthday: { month: 1, day: 1 } }) },
+  { name: "birthday: a string", input: withEntityCandidate({ birthday: "5 de maio" }) },
+  { name: "birthday: missing", input: (() => {
+    const base = baseExtraction();
+    const people = base.people as Record<string, unknown>[];
+    const person = { ...people[0] };
+    delete person.birthday;
+    return { ...base, people: [person] };
+  })() },
   { name: "entity not an object", input: withRoot({ people: ["Ana"] }) },
   { name: "entity list not an array", input: withRoot({ organizations: {} }) },
 
@@ -342,7 +363,7 @@ const corpus: { name: string; input: unknown }[] = [
   // 4. Array holes. `Array.prototype.forEach` skips them entirely; the schema
   // sees `undefined` and rejects.
   { name: "sparse concepts array", input: withRoot({ concepts: sparse(["task", undefined, "reminder"]) }) },
-  { name: "sparse people array", input: withRoot({ people: sparse([{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }, undefined]) }) },
+  { name: "sparse people array", input: withRoot({ people: sparse([{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null, birthday: null }, undefined]) }) },
   { name: "sparse taskCandidates array", input: withRoot({ taskCandidates: sparse([undefined]) }) },
   { name: "sparse pendingQuestions array", input: withRoot({ pendingQuestions: sparse([undefined]) }) },
   { name: "explicit undefined concept", input: withRoot({ concepts: ["task", undefined] }) },

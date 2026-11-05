@@ -2429,3 +2429,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** Keeping two composers (LB-OD-8 option B, declined by the owner). Classifying relatos before the command model (rejected: "terminei a tarefa X" is a command). Asking a model to classify (rejected: an extra call per turn for a decision a small declared rule answers).
 
 - **Consequences.** The chat writes in one more case than before: a statement that reads as something that happened. The confirmation sentence and the record card make it visible, and the record can be deleted like any other.
+
+## ADR-158 — A birthday a record states is read by the extraction and offered to the owner on the record
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — backlog after Life Brain C.5 (ADR-156's "Extracting birthdays from records … left for later"). **No migration.** Needs `process-jobs` deployed with prompt `2026-11-05.1` before new readings carry the field.
+
+- **Context.** "Ana faz aniversário em 5 de maio" was kept as a record and linked to Ana, but her page still said "Sem data de aniversário": the date had to be typed again on the person page.
+
+- **Decision 1 — The reading carries the date, nothing more.** `people[].birthday` is a required, nullable `{ month, day, year | null }` in both runtimes (Zod `personBirthdaySchema` and the Deno validator), checked to be a real date (29 February without a year passes, with 2023 it does not); `storedEntryExtractionSchema` reads older readings as `null`. The prompt asks for it only when the entry states it and forbids inferring one from an age, a party or another anniversary. `entry-extraction-v5` / `2026-11-05.1`; the parity suite carries 14 birthday cases.
+- **Decision 2 — The owner accepts it, on the record.** The record page (`loadEntryBirthdayProposals`) matches each stated birthday to the person the record is about — the owner's own decision on that candidate first, else a person link of the same reading by mention or name — and offers "Guardar o aniversário de Ana: 5 de maio?" only when that person has **no** birthday. Accepting calls the C.5 writer (`setPersonBirthday` → `set_person_birthday`), which creates the yearly reminder and audits; a different date is a link to the person page. Nothing is written without the click, and a record never overwrites a date the owner already set.
+
+- **Alternatives considered.** Writing the date when the person candidate is confirmed (rejected: one click would decide two things). Offering a change when the record's date differs from the stored one (rejected for now: the record may be older or wrong, and the person page already edits it). A dismissal that remembers "não" (left out: it needs storage; the offer stays on that record only while the person has no date).
+
+- **Consequences.** Readings made before the deploy carry no birthday, so their records offer nothing; reprocessing a record reads it again. The extraction contract has one more required key per person.

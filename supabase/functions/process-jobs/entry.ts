@@ -51,8 +51,8 @@ async function fetchProvider(url: string, init: RequestInit): Promise<Response> 
 // (verified in node_modules/server-only/index.js), so it is not portable to
 // the Deno Edge Function runtime. Keep these constants and the prompt text
 // in sync with the Node source — see docs/DECISIONS.md ADR-021.
-const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v4";
-const EXTRACTION_PROMPT_VERSION = "2026-11-04.3";
+const EXTRACTION_STRATEGY_VERSION = "entry-extraction-v5";
+const EXTRACTION_PROMPT_VERSION = "2026-11-05.1";
 
 const SYSTEM_PROMPT = `You extract personal knowledge and possible actions from one user entry.
 
@@ -72,6 +72,7 @@ Security and truth rules:
 Entity fields, and the line between them:
 - people: individual human beings named or unambiguously identified in the entry. A first name on its own is enough, and a person named for the first time belongs here just as much as a familiar one — "Known user context" lists who is already registered, it is not the set of people you are allowed to return. A role, a pronoun or a group is not a name.
 - people[].role: what that person is — their occupation or what they are to the owner — when the entry says it, in a few words of the entry's own language (cardiologista, dentista, advogada, irmã, chefe, professor da Ana). null when the entry does not say; never guess one from the name.
+- people[].birthday: that person's birthday when the entry states it — month and day as numbers, year only when the entry gives it, otherwise null. null when the entry states no birthday; never infer one from an age, a party or the anniversary of something else.
 - organizations: companies, clients, institutions, schools, public bodies — something a person can belong to or work for.
 - projects: a named, continuing body of work the entry treats as a thing in its own right. A deliverable somebody is asking for is not a project, and a task title is never a project.
 - contexts: the area of life or work the entry belongs to, such as Trabalho, Casa, Saúde or Estudos.
@@ -91,7 +92,7 @@ Examples of the area:
 - "Fui no cardiologista hoje, Dr. Silva" -> lifeArea: health. people: Dr. Silva (role: cardiologista).
 - "Paguei R$ 350 de conta de luz" -> lifeArea: finance.
 - "Vou viajar pra Lisboa de 3 a 10 de dezembro" -> lifeArea: travel.
-- "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana.
+- "Ana faz aniversário em 5 de maio" -> lifeArea: family. people: Ana (birthday: month 5, day 5, year null).
 - "Reunião do Projeto Aurora com a Marina" -> lifeArea: work.
 
 Events:
@@ -156,8 +157,22 @@ const entryExtractionSchema = {
       type: "array",
       items: {
         ...entityCandidateSchema,
-        required: [...entityCandidateSchema.required, "role"],
-        properties: { ...entityCandidateSchema.properties, role: { type: ["string", "null"] } },
+        required: [...entityCandidateSchema.required, "role", "birthday"],
+        properties: {
+          ...entityCandidateSchema.properties,
+          role: { type: ["string", "null"] },
+          // Backlog item 3 (ADR-158): a stated birthday, proposed for confirmation.
+          birthday: {
+            type: ["object", "null"],
+            additionalProperties: false,
+            required: ["month", "day", "year"],
+            properties: {
+              month: { type: "integer" },
+              day: { type: "integer" },
+              year: { type: ["integer", "null"] },
+            },
+          },
+        },
       },
     },
     // Life Brain C.3 (ADR-152): proposed for the agenda, never written by the model.

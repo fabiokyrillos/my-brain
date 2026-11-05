@@ -89,7 +89,10 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
 - **C.5 implemented 2026-11-05** (ADR-156, LB-M4). Left open by it:
   - ~~**Apply LB-M4 to the hosted project**~~ — **done 2026-11-05:** byte-identical to `main` (11,823 bytes, md5 `d2150441…`), parity **107 = 107**, posture read back (writer definer with empty `search_path`, authenticated-only, no `anon`; three triggers; four constraints; the one-active-series index); a rolled-back check refused a foreign person (P0002) and an impossible date (22023); the types regenerated from the hosted project equal the hand-written ones.
   - Run a live check: set a birthday on a person, see it on the page and the reminder on the Agenda; change it and see one series active.
-  - Birthdays are not read from records yet ("o aniversário da Ana é 5 de maio" does not fill the date); a later extraction field would propose it for confirmation.
+  - ~~Birthdays are not read from records yet~~ — **implemented 2026-11-05 (ADR-158):** the reading carries `people[].birthday` (`entry-extraction-v5` / `2026-11-05.1`) and the record page offers "Guardar o aniversário de Ana: 5 de maio?" for a linked person with no date. Left open by it:
+    - **Deploy `process-jobs`** with prompt `2026-11-05.1`; until then no new reading carries a birthday.
+    - Run a live check: capture "a Ana faz aniversário em 5 de maio", link Ana, accept the offer, see the date on her page and the reminder on the Agenda.
+    - No "não, obrigado" that is remembered; the offer stays on that record while the person has no date.
   - The reminder title is fixed at creation; renaming the person does not rename it until the date is set again.
 - **A.6 part 1 implemented 2026-11-05.** Left open by it:
   - ~~**Retire `button-primary/secondary`**~~ — **done 2026-11-05 (A.6 part 2):** all 28 call sites on `Button` / `ButtonLink` / `buttonVariants`, one form per commit; the classes are gone from `operations.css`. The old top margin lives on as `.form-primary-action` / `.auth-primary-action`.

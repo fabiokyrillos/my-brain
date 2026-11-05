@@ -88,6 +88,8 @@ export type TaskCandidateValue = {
 /** Life Brain C.2 (ADR-151): a person carries what they are to the owner, or null. */
 export type PersonCandidateValue = EntityCandidateValue & {
   role: string | null;
+  /** Backlog item 3 (ADR-158): a stated birthday, or null. */
+  birthday: { month: number; day: number; year: number | null } | null;
 };
 
 /** Life Brain C.3 (ADR-152): something that happens from X to Y, for the agenda. */
@@ -279,6 +281,27 @@ function readNumber(
   return raw;
 }
 
+/** An integer within an inclusive range, mirroring `z.number().int().min().max()`. */
+function readInteger(
+  collector: Collector,
+  raw: unknown,
+  path: string,
+  min: number,
+  max: number,
+): number | null {
+  const value = readNumber(collector, raw, path, Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY);
+  if (value === null) return null;
+  if (!Number.isInteger(value)) {
+    fail(collector, path, "expected_integer");
+    return null;
+  }
+  if (value < min || value > max) {
+    fail(collector, path, "out_of_range");
+    return null;
+  }
+  return value;
+}
+
 function readBoolean(collector: Collector, raw: unknown, path: string): boolean | null {
   if (typeof raw !== "boolean") {
     fail(collector, path, "expected_boolean");
@@ -358,10 +381,48 @@ function readPersonCandidates(
       role = readString(collector, item.role, `${itemPath}.role`, 1, 80);
       roleValid = role !== null;
     }
-    if (name === null || confidence === null || evidence === null || inferred === null || !roleValid) continue;
-    values.push({ name, confidence, evidence, inferred, role });
+    let birthday: PersonCandidateValue["birthday"] = null;
+    let birthdayValid = true;
+    if (!("birthday" in item)) {
+      fail(collector, `${itemPath}.birthday`, "required");
+      birthdayValid = false;
+    } else if (item.birthday !== null) {
+      birthday = readBirthday(collector, item.birthday, `${itemPath}.birthday`);
+      birthdayValid = birthday !== null;
+    }
+    if (name === null || confidence === null || evidence === null || inferred === null || !roleValid || !birthdayValid) continue;
+    values.push({ name, confidence, evidence, inferred, role, birthday });
   }
   return values;
+}
+
+/** Month 1–12, day 1–31, year 1900–2100 or null, and a date that exists. */
+function readBirthday(
+  collector: Collector,
+  raw: unknown,
+  path: string,
+): { month: number; day: number; year: number | null } | null {
+  if (!isPlainObject(raw)) {
+    fail(collector, path, "expected_object");
+    return null;
+  }
+  const month = readInteger(collector, raw.month, `${path}.month`, 1, 12);
+  const day = readInteger(collector, raw.day, `${path}.day`, 1, 31);
+  let year: number | null = null;
+  let yearValid = true;
+  if (!("year" in raw)) {
+    fail(collector, `${path}.year`, "required");
+    yearValid = false;
+  } else if (raw.year !== null) {
+    year = readInteger(collector, raw.year, `${path}.year`, 1900, 2100);
+    yearValid = year !== null;
+  }
+  if (month === null || day === null || !yearValid) return null;
+  if (day > new Date(Date.UTC(year ?? 2000, month, 0)).getUTCDate()) {
+    fail(collector, path, "invalid_date");
+    return null;
+  }
+  return { month, day, year };
 }
 
 function readEventCandidates(

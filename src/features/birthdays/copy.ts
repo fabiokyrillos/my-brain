@@ -22,6 +22,11 @@ export type BirthdayCopy = {
   readonly unchanged: string;
   readonly invalid: string;
   readonly failed: string;
+  /** ADR-158: the record page offers a birthday the record states. */
+  readonly proposalHeading: string;
+  readonly proposal: (name: string, date: string) => string;
+  readonly accept: string;
+  readonly adjust: (name: string) => string;
 };
 
 const PT_MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -49,6 +54,10 @@ const copy: Record<Locale, BirthdayCopy> = {
     unchanged: "Nada mudou.",
     invalid: "Essa data não existe. Revise o dia e o mês.",
     failed: "Não foi possível salvar o aniversário agora.",
+    proposalHeading: "Aniversário no registro",
+    proposal: (name, date) => `Guardar o aniversário de ${name}: ${date}?`,
+    accept: "Guardar aniversário",
+    adjust: (name) => `Outra data? Ajuste na página de ${name}.`,
   },
   en: {
     label: "Birthday",
@@ -71,6 +80,10 @@ const copy: Record<Locale, BirthdayCopy> = {
     unchanged: "Nothing changed.",
     invalid: "That date does not exist. Check the day and the month.",
     failed: "Could not save the birthday right now.",
+    proposalHeading: "Birthday in this record",
+    proposal: (name, date) => `Keep ${name}'s birthday: ${date}?`,
+    accept: "Keep birthday",
+    adjust: (name) => `A different date? Adjust it on ${name}'s page.`,
   },
 };
 

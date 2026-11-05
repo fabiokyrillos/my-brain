@@ -28,7 +28,7 @@ function validExtraction(): Record<string, unknown> {
     contexts: [],
     organizations: [],
     projects: [],
-    people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }],
+    people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null, birthday: null }],
     // Life Brain C.3: a required, possibly empty list.
     eventCandidates: [],
     // Life Brain C.1: a required, nullable key.
@@ -147,11 +147,11 @@ Deno.test("an over-length candidate title is refused before it can break tasks.t
 Deno.test("entity candidate evidence and confidence are bounded", () => {
   const base = validExtraction();
   assertEquals(
-    issuesOf({ ...base, people: [{ name: "Ana", confidence: 0.9, evidence: "a".repeat(501), inferred: false, role: null }] }),
+    issuesOf({ ...base, people: [{ name: "Ana", confidence: 0.9, evidence: "a".repeat(501), inferred: false, role: null, birthday: null }] }),
     [{ path: "people.0.evidence", code: "too_long" }],
   );
   assertEquals(
-    issuesOf({ ...base, people: [{ name: "", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }] }),
+    issuesOf({ ...base, people: [{ name: "", confidence: 0.9, evidence: "com Ana", inferred: false, role: null, birthday: null }] }),
     [{ path: "people.0.name", code: "too_short" }],
   );
 });
@@ -179,8 +179,8 @@ Deno.test("a bad element never stops the loop: entity candidates", () => {
   const issues = issuesOf({
     ...base,
     people: [
-      { name: "", confidence: 0.9, evidence: "trecho", inferred: false, role: null },
-      { name: "Ana", confidence: 5, evidence: "trecho", inferred: false, role: null },
+      { name: "", confidence: 0.9, evidence: "trecho", inferred: false, role: null, birthday: null },
+      { name: "Ana", confidence: 5, evidence: "trecho", inferred: false, role: null, birthday: null },
     ],
   });
   assertEquals(issues, [
@@ -324,4 +324,22 @@ Deno.test("isIsoInstant requires a calendar-real instant with a timezone", () =>
   assertFalse(isIsoInstant("2026-07-24T24:00:00Z"));
   assertFalse(isIsoInstant("2026-07-24"));
   assertFalse(isIsoInstant(17));
+});
+
+// ADR-158: a person's birthday, when the entry states it.
+Deno.test("a person's stated birthday is kept, and an impossible one is refused", () => {
+  const withBirthday = (birthday: unknown) => ({
+    ...validExtraction(),
+    people: [{ name: "Ana", confidence: 0.9, evidence: "aniversário de Ana", inferred: false, role: null, birthday }],
+  });
+  const kept = validateExtraction(withBirthday({ month: 5, day: 5, year: null }));
+  assert(kept.ok);
+  if (kept.ok) assertEquals(kept.value.people[0].birthday, { month: 5, day: 5, year: null });
+  assert(validateExtraction(withBirthday({ month: 2, day: 29, year: null })).ok);
+  assertEquals(issuesOf(withBirthday({ month: 2, day: 29, year: 2023 })).map((issue) => issue.code), ["invalid_date"]);
+  assertFalse(validateExtraction(withBirthday({ month: 4, day: 31, year: null })).ok);
+  assertFalse(validateExtraction(withBirthday({ month: 5, day: 5 })).ok);
+  assertFalse(validateExtraction(withBirthday("5 de maio")).ok);
+  const missing = { ...validExtraction(), people: [{ name: "Ana", confidence: 0.9, evidence: "com Ana", inferred: false, role: null }] };
+  assertFalse(validateExtraction(missing).ok);
 });

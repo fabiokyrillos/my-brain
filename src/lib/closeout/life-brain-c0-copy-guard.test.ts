@@ -156,10 +156,11 @@ describe("Life Brain C.0 — destinations named for a whole life", () => {
     // purpose. C.1 did (ADR-148): the life-area section was added and the
     // corporate examples stay beside it (`LB-C-007` extends, never replaces).
     // C.2 moved it again (ADR-151) for `people[].role`, and C.3 (ADR-152) for
-    // `eventCandidates`; same rule.
+    // `eventCandidates`; same rule. Backlog item 3 moved it to 2026-11-05.1
+    // for `people[].birthday` (ADR-158); same rule.
     for (const file of ["src/lib/ai/openai-provider.ts", "supabase/functions/process-jobs/entry.ts"]) {
       const source = readFileSync(join(REPO, file), "utf8");
-      expect(source, file).toContain('EXTRACTION_PROMPT_VERSION = "2026-11-04.3"');
+      expect(source, file).toContain('EXTRACTION_PROMPT_VERSION = "2026-11-05.1"');
       expect(source, file).toContain("such as Trabalho, Casa, Saúde or Estudos.");
       expect(source, file).toContain("Assinei o contrato com a Ambev");
     }
