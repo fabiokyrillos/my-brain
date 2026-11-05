@@ -428,8 +428,8 @@
    with visible labels -- no icon-only affordance and no gesture, because
    2J-ATTN-011 requires the mobile interaction to have a visible equivalent. */
 .attention-entry { display: grid; gap: 6px; }
-.attention-inline-retry { justify-self: start; min-height: 32px; }
-.attention-bulk-retry { margin-bottom: 12px; min-height: 36px; }
+.attention-inline-retry { justify-self: start; }
+.attention-bulk-retry { justify-self: start; margin-bottom: 12px; }
 
 /* `2N-CONFLICT-002`/`006`. The conflict row.
 
