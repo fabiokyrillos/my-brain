@@ -79,7 +79,10 @@ function sourceLinesMentioning(source: string, identifier: string): readonly str
 
 function onlineSpecFiles(): readonly string[] {
   return readdirSync(e2eDirectory)
-    .filter((name) => name.startsWith("online-") && name.endsWith(".spec.ts"))
+    // Every spec that holds the key: the online ones, and any other that signs
+    // in through the helper (the visual lane, against the local stack).
+    .filter((name) => name.endsWith(".spec.ts")
+      && (name.startsWith("online-") || readFileSync(path.join(e2eDirectory, name), "utf8").includes("./support/online-session")))
     .map((name) => path.join(e2eDirectory, name));
 }
 
