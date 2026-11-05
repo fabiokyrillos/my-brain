@@ -60,6 +60,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - Registros e Notificações com `ListItem` e uma ação por linha; Memória (antigo Brain) com áreas; Pessoas/Projetos/Organizações/Arquivos/Memórias/Buscar com `PageHeader compact` e estados vazios quietos. Retira a pilha eyebrow+display+lead dessas rotas.
 - Aceite: Notificações com 50 avisos ≤ 3.500px.
+- **Implementado 2026-11-05 (ADR-153):** `PageHeader compact` em Registros, Notificações, Memória, Pessoas, Projetos, Organizações, Áreas, Arquivos, Memórias e Buscar (sem eyebrow; a ação ou o formulário de criar no cabeçalho, embaixo do título no celular); estados vazios quietos (`ux-state-quiet`); aviso do histórico em duas linhas com "Abrir" e um "⋯" (verbos com o primário primeiro) — **50 avisos ≈ 3.320px a 390px**; "Abrir" passa pela whitelist de destino e continua sem marcar como lido; botões de Registros (tentar de novo, carregar mais) no `Button`; Memória abre com as **áreas da vida** do dono, como portas, sem contagem. Ficam: o rótulo "Contextos" → "Áreas da vida" (C.4) e os demais consumidores de `button-primary/secondary` (A.6).
 
 ### A.6 — Ajustes, Avançado e regressão visual (1 d)
 
