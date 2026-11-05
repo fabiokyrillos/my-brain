@@ -1023,3 +1023,8 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
    under it, at full width, on a phone, so the field never squeezes the title. */
 .list-page-header{flex-wrap:wrap}
 @media(max-width:899px){.list-page-header{flex-direction:column;align-items:stretch;gap:var(--space-3)}.list-page-header .ui-page-header__actions{width:100%}.list-page-header .inline-create{width:100%}.list-page-header .inline-create input{min-width:0;flex:1}}
+
+/* Life Brain A.6 part 2: the one action of an auth-card form (accept the
+   terms, sign out of a closed account), on the Button primitive. The old
+   `.button-primary` carried this top margin; the primitive carries none. */
+.auth-primary-action{margin-top:var(--space-4)}
