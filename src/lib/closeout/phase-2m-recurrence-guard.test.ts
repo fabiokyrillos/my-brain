@@ -163,6 +163,15 @@ const REMINDER_RECURRENCE_ALLOWLIST: readonly string[] = [
   "src/lib/closeout/phase-2p-reminder-recurrence-guard.test.ts",
   "src/lib/closeout/phase-2r-foundation.test.ts",
   /*
+   * Life Brain LB-M4 (slice C.5, ADR-156). A person's birthday is a yearly
+   * reminder SERIES, created by the existing reminders' recurrence model and
+   * linked to the person (`reminder_series.person_id`). It adds no rule shape,
+   * no second materializer and no recurrence outside reminders: the migration
+   * names `series_id` because it ends a person's series and cancels its live
+   * occurrence exactly as `apply_reminder_series_command_v1` does.
+   */
+  "supabase/migrations/202611050107_life_brain_m4_birthdays.sql",
+  /*
    * **Generated, and listed for exactly that reason.**
    *
    * `database.types.ts` is emitted from the schema. Once the migration adds
@@ -386,16 +395,21 @@ describe("2M-RECUR-001: no recurrence artifact exists anywhere the decision gove
       "src/lib/closeout/phase-2r-model-guard.test.ts",
       "src/lib/closeout/phase-2p-reminder-recurrence-guard.test.ts",
       "src/lib/closeout/phase-2r-foundation.test.ts",
+      "supabase/migrations/202611050107_life_brain_m4_birthdays.sql",
       "src/lib/supabase/database.types.ts",
     ]);
     // Nothing under tasks or the calendar is lifted, and no migration other
-    // than the one ADR-132 allocated.
+    // than the one ADR-132 allocated — plus Life Brain LB-M4 (ADR-156), which
+    // links a yearly series to a person and adds no recurrence shape.
     for (const entry of REMINDER_RECURRENCE_ALLOWLIST) {
       expect(entry).not.toMatch(/features\/tasks\//);
       expect(entry).not.toMatch(/features\/calendar\//);
     }
     expect(REMINDER_RECURRENCE_ALLOWLIST.filter((entry) => entry.startsWith("supabase/migrations/")))
-      .toHaveLength(1);
+      .toEqual([
+        "supabase/migrations/202608230101_phase_2r_slice_1_reminder_recurrence.sql",
+        "supabase/migrations/202611050107_life_brain_m4_birthdays.sql",
+      ]);
   });
 
   it("does NOT fire on the refusal, the memory kind, the label, or String.repeat", () => {

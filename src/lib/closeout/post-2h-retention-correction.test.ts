@@ -242,6 +242,12 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // tolerated, because the property this assertion protects is "nothing
       // follows that somebody did not deliberately account for".
       "202611040106_life_brain_m2_events.sql",
+      // Life Brain LB-M4 (slice C.5, ADR-156): a person's birthday columns, the
+      // series' link to the person, `set_person_birthday` and the trigger that
+      // ends a deleted person's series. No retention window, no schedule, no
+      // sweep: the yearly reminder is materialised by the existing series
+      // trigger, and the date lives as long as the person.
+      "202611050107_life_brain_m4_birthdays.sql",
     ]);
   });
 });
