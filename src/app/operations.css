@@ -1028,3 +1028,7 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
    terms, sign out of a closed account), on the Button primitive. The old
    `.button-primary` carried this top margin; the primitive carries none. */
 .auth-primary-action{margin-top:var(--space-4)}
+/* The one primary action at the foot of a decision form (confirm a reading,
+   save person decisions, confirm candidates): full width with the top margin
+   `.button-primary` used to carry. */
+.form-primary-action{margin-top:var(--space-3)}

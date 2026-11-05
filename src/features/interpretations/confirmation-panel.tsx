@@ -1,7 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui";
 import { useActionState, useMemo } from "react";
-import { CheckCheck, LoaderCircle, RotateCcw } from "lucide-react";
+import { CheckCheck, RotateCcw } from "lucide-react";
 
 /**
  * Slice 2P.1 — the terminal act on an entry whose only remaining "decision" is
@@ -87,10 +88,9 @@ export function ConfirmationPanel({
           <input type="hidden" name="interpretationId" value={interpretationId} />
           <input type="hidden" name="operationKey" value={operationKey} />
           <input type="hidden" name="locale" value={locale} />
-          <button type="submit" className="button-primary" disabled={confirming}>
-            {confirming ? <LoaderCircle aria-hidden className="spin" /> : <CheckCheck aria-hidden />}
+          <Button className="form-primary-action" icon={<CheckCheck />} loading={confirming} type="submit" variant="primary" width="full">
             {confirming ? text.confirming : text.confirm}
-          </button>
+          </Button>
         </form>
       )}
 
@@ -102,10 +102,9 @@ export function ConfirmationPanel({
           <input type="hidden" name="entryId" value={entryId} />
           <input type="hidden" name="undoId" value={confirmState.undoId} />
           <input type="hidden" name="locale" value={locale} />
-          <button type="submit" className="button-secondary" disabled={undoing}>
-            {undoing ? <LoaderCircle aria-hidden className="spin" /> : <RotateCcw aria-hidden />}
+          <Button icon={<RotateCcw />} loading={undoing} type="submit">
             {undoing ? text.undoing : text.undo}
-          </button>
+          </Button>
         </form>
       ) : null}
 

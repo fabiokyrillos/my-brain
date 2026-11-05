@@ -953,7 +953,7 @@ function personCandidateBody(candidates: CandidateFixture[]) {
                 <p id="person-candidate-help" class="field-hint">Confirme apenas quem deve virar uma pessoa permanente. Você pode corrigir o nome ou ignorar a menção.</p>
                 ${candidates.map(personCandidate).join("")}
               </fieldset>
-              <button class="button-primary" type="submit">${ICON}Salvar decisões sobre pessoas</button>
+              <button class="ui-button ui-button--primary ui-button--md ui-button--full form-primary-action" type="submit"><span aria-hidden="true" class="ui-button__icon">${ICON}</span>Salvar decisões sobre pessoas</button>
             </form>
           </div>
         </section>
