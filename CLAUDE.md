@@ -40,7 +40,7 @@ npm run test:remote:product-events        # product-events smoke
 CI (`.github/workflows/ci.yml`) runs three parallel jobs (ADR-038):
 - `app` — `npm ci`, `lint`, `typecheck`, `test`, `build`.
 - `worker` — `deno check` on both deployed Edge Function entrypoints, then `deno test` over every directory under `supabase/functions/`, with no `--allow-*` flags so it can never reach a network.
-- `database` — a local Supabase stack, `supabase db reset` (the whole migration chain applied from an empty database), the full pgTAP suite, `supabase db lint --schema public,private`, then `e2e/foundation.spec.ts` against the production build on desktop and Pixel 7.
+- `database` — a local Supabase stack, `supabase db reset` (the whole migration chain applied from an empty database), the full pgTAP suite, `supabase db lint --schema public,private`, then `e2e/foundation.spec.ts` against the production build on desktop and Pixel 7, and the signed-in screenshot lane `e2e/visual-regression.spec.ts` (ADR-159; baselines are redrawn only through the hand-dispatched `visual-baselines.yml`).
 
 Remote smokes and the authenticated online journeys stay manual. There is no lint/format-on-save autofixer configured — fix reported errors directly.
 

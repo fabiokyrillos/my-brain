@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Screenshot lane, part 2: baselines and the gate (ADR-159)
+
+- 16 baselines drawn by `visual-baselines.yml` on the runner (`e2e/visual-regression.spec.ts-snapshots/`), reviewed by eye.
+- `verify`'s database job runs the lane after the accessibility lane (`VISUAL_LANE=1`, desktop + mobile); on failure the `playwright-report` artifact now carries `test-results/` with the diff images.
+
 ## 2026-11-05 — Screenshot lane, part 1 (ADR-159)
 
 - **`e2e/visual-regression.spec.ts`:** Hoje, Conversar, Tarefas, Agenda (January 2026) signed in, light and dark, Desktop Chrome and Pixel 7, `toHaveScreenshot` with the day name masked. Opt-in (`VISUAL_LANE=1`) and loopback-only; a disposable account created and deleted through the local Auth admin API.
