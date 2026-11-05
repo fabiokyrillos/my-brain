@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain B.4: highly sensitive content in the chat's prompt only when asked
+
+- **Chat:** after retrieval, `classifyKnowledgeSources` reads each entry's and memory's level and, for highly sensitive ones, the area of its current reading (fail closed). `admitsToChatPrompt` (sensitivity contract) admits `highly_sensitive` only on an explicit ask ("incluir sensíveis") or when the question names the same area (`readSensitiveAsk`, pt-BR/en lexicon). RPC unchanged.
+- **Disclosure:** the exclusion is silent (`2K-EXPL-005`); an answer that read such content carries `readSensitive: true` in its citations envelope (optional, so old envelopes parse) and says so under its sources. ADR-155.
+
 ## 2026-11-05 — Life Brain C.4: area pages, real counts, Ideias, "Áreas da vida"
 
 - **Area page:** a context whose kind is a life area shows next events (each trip with the area's records inside its period), the timeline of records the current reading files under it (bounded, with a real count), open linked tasks and the people linked or named (`src/features/areas/`). Every owner text renders through `ProtectedContent surface="area"`; events and tasks derive sensitivity from their source, failing closed.

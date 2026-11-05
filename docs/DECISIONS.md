@@ -2383,3 +2383,18 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** A new `/app/memory/areas/[kind]` route (rejected by LB-OD-2: no moved routes). Counting `entry_entities` with a head count (rejected: counts re-readings). A `trip_records` link table (rejected by `LIFE_DATA_MODEL.md` §3). An `ideas` table or route (rejected by `LB-C-011`). Folding Relações into the person and project pages in this slice (deferred: it removes a lens and its guards, and is its own change).
 
 - **Consequences.** Opening Saúde shows the consultations, exams and the next appointment in one place. Records filed before C.1 have no area link and do not appear until re-read. Relações stays a lens of Memória.
+
+## ADR-155 — A highly sensitive record reaches the chat's prompt only when the owner asks, and the answer says it read one
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — Life Brain slice B.4 (ADR-145; PRD `LB-B-010`). **No migration.**
+
+- **Context.** Phase 2K masked sensitive content on the chat *surface* (`RULES.chat`) and sent everything retrieval returned to the model. A record the owner marked `highly_sensitive` — a diagnosis, a debt — therefore reached the prompt of any question it happened to be similar to.
+
+- **Decision 1 — In the application, after retrieval.** `match_internal_knowledge` and its bound are unchanged. `classifyKnowledgeSources` reads each retrieved entry's and memory's level under the owner's session and, for the highly sensitive ones only, the area its **current** reading files it under (C.4's rule; a memory takes its source entry's). A row that cannot be read is classified `highly_sensitive` with no area.
+- **Decision 2 — The rule lives in the sensitivity contract.** `admitsToChatPrompt(level, { explicit, sameArea })`: `normal` and `private` always; `highly_sensitive` only when the owner asked for sensitive content in words ("incluir sensíveis", "include sensitive") or the question names the same area of life (`readSensitiveAsk`, a declared pt-BR/en lexicon). The chat carries no level literal (2J-PRIVACY-001).
+- **Decision 3 — Silent exclusion, marked inclusion.** Nothing about a withheld source reaches the answer, its explanation or its envelope (`2K-EXPL-005`: no count, rate or existence). An answer whose prompt held a highly sensitive source carries `readSensitive: true` in its citations envelope and says, under its sources, that it used content the owner marked as highly sensitive. The field is optional and present only when true, so every earlier envelope parses unchanged.
+
+- **Alternatives considered.** Filtering in the RPC (rejected by the plan: it would spend a migration, and the area rule needs the current reading). Disclosing "some sensitive records were left out" (rejected by `2K-EXPL-005`). Asking the model to decide (rejected: an authorization decision inside the provider, which the architecture forbids).
+
+- **Consequences.** A question about health reads the owner's highly sensitive health records and says so; the same records stay out of a question about money. A highly sensitive record with no area enters only on an explicit ask. Tasks from highly sensitive records stay withheld as B.2 made them.
