@@ -3,7 +3,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getLibraryCopy } from "@/features/library/copy";
+import { loadLifeAreas } from "@/features/library/life-areas";
 import { loadBrainOverview } from "@/features/library/overview";
+import { getNavigationHref } from "@/features/shell/capabilities";
+import { contextKindLabel } from "@/features/vocabulary/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import { requireUser } from "@/lib/auth/require-user";
 import { getMessages } from "@/i18n/messages";
@@ -67,7 +70,12 @@ export default async function LibraryPage({
   // for a destination that deliberately has none.
   const navLabels = messages.nav as Record<string, string>;
 
-  const domains = await loadBrainOverview(supabase, locale);
+  // Two independent reads: an area read that fails says so in its own section
+  // and never fails the overview (or the other way round).
+  const [domains, areas] = await Promise.all([loadBrainOverview(supabase, locale), loadLifeAreas(supabase)]);
+  // The area doors and "see all" hang off the registry's href for the
+  // contexts lens, never a hand-written path (`2I-LIB-006`).
+  const contextsHref = getNavigationHref(locale, "contexts");
 
   return (
     <div className="brain-page">
@@ -85,6 +93,42 @@ export default async function LibraryPage({
       />
 
       <BrainLensTabs active="overview" locale={locale} />
+
+      {/*
+        Life Brain A.5: Memória opens with the owner's areas of life — the
+        contexts the reading files records under (C.1). Doors, not a dashboard:
+        no count (see `life-areas.ts`), each one the area's own page.
+      */}
+      <section aria-labelledby="brain-areas-heading" className="brain-areas">
+        <h2 id="brain-areas-heading">{text.areas.heading}</h2>
+        {areas.status === "failed" ? (
+          <p className="brain-domain-quiet" role="note">{text.areas.failed}</p>
+        ) : areas.areas.length ? (
+          <>
+            <ul className="brain-area-list">
+              {areas.areas.map((area) => {
+                const kindLabel = contextKindLabel(locale, area.kind);
+                return (
+                  <li key={area.id}>
+                    <Link className="brain-area" href={`${contextsHref}/${area.id}`}>
+                      <span className="brain-area-name">{area.name}</span>
+                      {kindLabel && kindLabel.localeCompare(area.name, locale, { sensitivity: "base" }) !== 0 ? (
+                        <span className="brain-area-kind">{kindLabel}</span>
+                      ) : null}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="brain-areas-foot">
+              {areas.bounded ? <span>{text.areas.more} </span> : null}
+              <Link className="brain-areas-all" href={contextsHref}>{text.areas.seeAll}</Link>
+            </p>
+          </>
+        ) : (
+          <p className="brain-domain-quiet">{text.areas.empty}</p>
+        )}
+      </section>
 
       <section className="brain-holds">
         <h2>{text.holdsHeading}</h2>

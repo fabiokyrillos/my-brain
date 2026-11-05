@@ -258,3 +258,60 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Life Brain A.5: the areas of life ------------------------------------ */
+
+.brain-areas {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.brain-areas > h2 {
+  margin: 0;
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Doors, so each is a real target: a pill at the touch minimum, wrapping on a
+   phone rather than scrolling sideways. */
+.brain-area-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.brain-area {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-label);
+  text-decoration: none;
+}
+.brain-area:hover { background: var(--background-subtle); }
+.brain-area:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.brain-area-name { overflow-wrap: anywhere; }
+.brain-area-kind { font: var(--type-caption); color: var(--text-muted); }
+
+.brain-areas-foot {
+  margin: 0;
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+.brain-areas-all {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+}

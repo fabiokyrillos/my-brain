@@ -45,6 +45,15 @@ export type LibraryCopy = {
    * Life Brain A.5: the People and Projects lenses' header and empty state,
    * which were inline ternaries on two one-line pages.
    */
+  /** Life Brain A.5: the life areas Memória opens with (`life-areas.ts`). */
+  readonly areas: {
+    readonly heading: string;
+    readonly empty: string;
+    readonly failed: string;
+    readonly seeAll: string;
+    /** Said when the overview read its bound and there are more areas. */
+    readonly more: string;
+  };
   readonly lists: {
     readonly people: ListPageCopy & { readonly rowMeta: string };
     readonly projects: ListPageCopy & { readonly rowFallback: string };
@@ -95,6 +104,13 @@ const copy: Record<Locale, LibraryCopy> = {
     recentUnavailable: "Não foi possível ler os recentes agora. Isso não quer dizer que não existam.",
     countUnavailable: "Não foi possível contar agora.",
     holdsHeading: "O que o Brain guarda",
+    areas: {
+      heading: "Áreas da vida",
+      empty: "As áreas aparecem quando você registra algo sobre saúde, família, casa, dinheiro, viagens, trabalho ou estudos.",
+      failed: "Não foi possível ler as áreas agora. Isso não quer dizer que não existam.",
+      seeAll: "Ver todas as áreas",
+      more: "Há mais áreas do que cabem aqui.",
+    },
     lists: {
       people: {
         title: "Pessoas",
@@ -134,6 +150,13 @@ const copy: Record<Locale, LibraryCopy> = {
     recentUnavailable: "The recent items could not be read right now. That does not mean there are none.",
     countUnavailable: "Could not count right now.",
     holdsHeading: "What the Brain holds",
+    areas: {
+      heading: "Areas of life",
+      empty: "Areas appear when you record something about health, family, home, money, travel, work or study.",
+      failed: "Could not read the areas right now. That does not mean there are none.",
+      seeAll: "See all areas",
+      more: "There are more areas than fit here.",
+    },
     lists: {
       people: {
         title: "People",
