@@ -1,5 +1,5 @@
 import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
-import { ArrowLeft, UserRound } from "lucide-react";
+import { ArrowLeft, Network, UserRound } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -51,6 +51,8 @@ import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { attachmentStatusLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
 import { setPersonBirthday } from "@/features/birthdays/actions";
 import { BirthdayPanel } from "@/features/birthdays/birthday-panel";
+import { getRelationsCopy } from "@/features/relations/copy";
+import { relationViewHref } from "@/features/relations/view";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
@@ -399,6 +401,17 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           conversation surface under RLS, so no copy of it travels in a URL.
         */}
         <AskAboutLink locale={locale} name={person.name} about={{ type: "person", id: person.id }} />
+        {/*
+          Relações, from the person it is about: the map focused on this person.
+          Offered only when they have a link to show — a focus that resolves to
+          nothing would open the whole map under a promise of this person's.
+        */}
+        {relationships.length || projectLinks.length || contextLinks.length ? (
+          <Link className="relations-open-link" href={relationViewHref(locale, "diagram", person.id)}>
+            <Network aria-hidden="true" size={16} />
+            {getRelationsCopy(locale).openForPerson}
+          </Link>
+        ) : null}
       </div>
 
       <header className="entity-hero">

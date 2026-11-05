@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-05 — Relações from the person and the project
+
+- The person page offers "Ver no mapa de relações" (the map focused on that person) when they have a relationship, a project or an area; the project page offers the map when it has people. The Memória lens stays (it mirrors the navigation registry pinned by `2N-RELATION-006`). Source test `relations/entity-links.test.ts`.
+
 ## 2026-11-05 — Life Brain A.6 part 2: `button-primary/secondary` retired
 
 - The last 28 call sites move to `Button` / `ButtonLink` / `buttonVariants`, one form per commit: history filters, consent, closed account, ConfirmationPanel, the person-candidate form, the interpretation editor, the candidate editor and the task candidate form. `.button-primary` and `.button-secondary` are removed from `operations.css`; the old top margin survives as `.form-primary-action` and `.auth-primary-action`.
