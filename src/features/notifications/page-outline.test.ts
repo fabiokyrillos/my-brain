@@ -54,10 +54,15 @@ const source = readFileSync(PAGE, "utf8");
  * `{/* … *\/}` JSX comment blocks go too: this page keeps its reasoning inside
  * the tree, so a block comment there is prose in exactly the same way.
  */
-const code = source
-  .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
-  .replace(/\/\*[\s\S]*?\*\//g, "")
-  .replace(/^\s*\/\/.*$/gm, "");
+function stripComments(text: string): string {
+  return text
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+}
+const code = stripComments(source);
+/** Life Brain A.5: each notice renders through this component, read the same way. */
+const rowCode = stripComments(readFileSync(join(__dirname, "notification-history-row.tsx"), "utf8"));
 
 describe("the guard has a page to read", () => {
   /**
@@ -171,15 +176,18 @@ describe("the history surface keeps everything that makes it one", () => {
 
   it("keeps the empty state and the destination link", () => {
     expect(code).toContain("<UniversalStateView");
-    expect(code).toContain("item.action_url");
+    // Life Brain A.5: the row is its own component; the link is still the
+    // row's own URL, now behind the owner-scoped whitelist.
+    expect(rowCode).toContain("href={notice.action_url}");
+    expect(rowCode).toContain("isOwnerScopedDestination(notice.action_url)");
   });
 });
 
 describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () => {
   it("renders the state as a badge with its own copy", () => {
-    expect(code).toContain('className="notification-status-badge"');
-    expect(code).toContain("copy.unreadBadge");
-    expect(code).toContain("copy.readBadge");
+    expect(rowCode).toContain('className="notification-status-badge"');
+    expect(rowCode).toContain("copy.unreadBadge");
+    expect(rowCode).toContain("copy.readBadge");
   });
 
   it("announces the unread count above the list", () => {
@@ -212,7 +220,7 @@ describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () =
 
   it("names each row's controls after the row, so twenty are distinguishable", () => {
     // The destination link still carries its own name here.
-    expect(code).toContain("aria-label={`${copy.openDestination}: ${item.title}`}");
+    expect(rowCode).toContain("aria-label={`${copy.openDestination}: ${notice.title}`}");
     /*
      * The verb controls moved into `NotificationRowActions`, and their names are
      * built from the shared copy — `accessibleName(subject)` — rather than
@@ -230,8 +238,10 @@ describe("`2P-SETTINGS-008`: read and unread are words, not only a colour", () =
      * mount reads `subjectLabel` off it, and the control's accessible name is
      * built from it. Weakening any link would break one of these three.
      */
-    expect(code).toContain("<NotificationVerbs");
+    expect(code).toContain("<NotificationHistoryRow");
     expect(code).toContain("row={row}");
+    expect(rowCode).toContain("<NotificationVerbs");
+    expect(rowCode).toContain("row={row}");
     const row = readFileSync(
       join(__dirname, "notification-row-actions.tsx"),
       "utf8",

@@ -54,8 +54,8 @@ const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey
  * failed four tests because one selector was applied to all three: `/app` and
  * `/app/inbox?view=needs-you` both mount `AttentionNoticeRow`, whose element
  * carries `.notice-attention-row` — and `/app/notifications` does not mount it
- * at all. That page renders `li.list-row.notification-row`, its own contract
- * since long before this phase, and it renders **three** rows where the
+ * at all. That page renders `li.notification-item` (Life Brain A.5; it was
+ * `li.list-row.notification-row`), its own contract since long before this phase, and it renders **three** rows where the
  * attention surface renders two, because the collapse by subject is the
  * attention surface's rule and not the history's.
  *
@@ -66,7 +66,7 @@ const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey
  */
 const SURFACES = [
   { name: "home (pt-BR)", path: "/pt-BR/app", rowSelector: ".notice-attention-row" },
-  { name: "notifications (en)", path: "/en/app/notifications", rowSelector: "li.notification-row" },
+  { name: "notifications (en)", path: "/en/app/notifications", rowSelector: "li.notification-item" },
   { name: "needs-you queue (pt-BR)", path: "/pt-BR/app/inbox?view=needs-you", rowSelector: ".notice-attention-row" },
 ] as const;
 
@@ -296,7 +296,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
    * are both true of a page with nothing on it — and the selector is a
    * parameter rather than a constant because the first version of this helper
    * hard-coded the attention surface's class and then asked `/app/notifications`
-   * about it. The history page renders `li.notification-row`, has never
+   * about it. The history page renders `li.notification-item`, has never
    * rendered `.notice-attention-row`, and was reported empty for four tests
    * while it was in fact rendering all three planted notices.
    */

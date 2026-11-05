@@ -61,6 +61,8 @@ const HOME_DATA = "src/features/shell/home-dashboard.tsx";
 
 /** The two surfaces, named — and re-derived below rather than trusted. */
 const NOTIFICATIONS_PAGE = "src/app/[locale]/app/notifications/page.tsx";
+/** Life Brain A.5: the page's row moved into its own component, which mounts the verbs. */
+const HISTORY_ROW = "src/features/notifications/notification-history-row.tsx";
 const ATTENTION_ROW = "src/features/notifications/attention-notice-row.tsx";
 
 /** Every non-test source file, so a census cannot miss a caller by guessing a directory. */
@@ -134,8 +136,10 @@ describe("2S-ACT-011 (2/4): every surface mounts the verbs through one function"
      */
     const surfaces = mountingSurfaces();
     expect(surfaces.length, "the census found no surface mounting the verbs").toBeGreaterThanOrEqual(2);
-    expect(surfaces).toContain(NOTIFICATIONS_PAGE);
+    expect(surfaces).toContain(HISTORY_ROW);
     expect(surfaces).toContain(ATTENTION_ROW);
+    // …and the page hands every row to that component, nothing else.
+    expect(code(NOTIFICATIONS_PAGE)).toContain("<NotificationHistoryRow");
   });
 
   it("has every surface hand over the projection's own row, and build no verb props itself", () => {

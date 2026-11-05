@@ -483,12 +483,14 @@ function notificationPage(locale: Locale, state: PushState = "granted"): string 
     </section>
     <section class="notification-history">
       <h2>${copy.notifyHistoryHeading}</h2>
-      <div class="list-stack">
-        <article class="list-row notification-row unread">
-          <div class="list-row-main"><strong>Um lembrete</strong><p>Corpo do lembrete.</p></div>
-          <div class="list-meta"><span>11 de ago. de 2026, 14:00</span></div>
-        </article>
-      </div>
+      <ul class="notification-list">
+        <li class="notification-item" data-status="unread">
+          <span aria-hidden="true" class="notification-item-dot"></span>
+          <div class="notification-item-main"><p class="notification-item-title">Um lembrete</p>
+            <p class="notification-item-meta"><span class="notification-status-badge" data-status="unread">Não lida</span><span class="notification-item-time">11 de ago. de 2026, 14:00</span><span class="notification-item-body">Corpo do lembrete.</span></p></div>
+          <div class="notification-item-trailing"></div>
+        </li>
+      </ul>
     </section>
   </div>`);
 }

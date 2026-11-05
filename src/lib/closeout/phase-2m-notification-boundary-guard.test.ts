@@ -159,6 +159,11 @@ const DELIVERY_MODULES = [
    * it is HANDED, navigates with the router, and reaches no client of its own.
    */
   "src/features/notifications/notice-open-control.tsx",
+  /*
+   * Life Brain A.5. The history page's row: it renders the notice the page read
+   * and mounts the two controls above; it reaches no client of its own.
+   */
+  "src/features/notifications/notification-history-row.tsx",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));

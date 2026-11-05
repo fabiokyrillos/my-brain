@@ -1435,3 +1435,81 @@ test.describe("Life Brain A.3 part 3: the task row and its sheet", () => {
     expect(Math.abs(sheet.x + sheet.width / 2 - 640)).toBeLessThanOrEqual(2);
   });
 });
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Life Brain A.5 — Notificações with fifty notices fits in 3,500px on a phone
+ * (`IMPLEMENTATION_PLAN.md` §A.5). Each row is two lines and one visible
+ * control; the verbs wait behind a "⋯".
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/** Mirrors `NotificationHistoryRow` with `NotificationVerbs collapsed`. */
+function notificationItem(index: number) {
+  const status = index % 3 === 0 ? "unread" : "read";
+  const title = index % 5 === 0 ? LONG_TITLE : `Tarefa atrasada ${index}`;
+  return `<li class="notification-item" data-status="${status}">`
+    + `<span aria-hidden="true" class="notification-item-dot"></span>`
+    + `<div class="notification-item-main"><p class="notification-item-title">${title}</p>`
+    + `<p class="notification-item-meta"><span class="notification-status-badge" data-status="${status}">${status === "unread" ? "Não lida" : "Lida"}</span>`
+    + `<span class="notification-item-time">04/11/2026, 14:00</span>`
+    + `<span class="notification-item-body">Pagar a conta de luz antes do vencimento, que é amanhã de manhã</span></p></div>`
+    + `<div class="notification-item-trailing">`
+    + `<a aria-label="Abrir: ${title}" class="row-action notification-open-link" href="#">Abrir</a>`
+    + `<div class="notification-row-actions"><div class="notification-verb-menu">`
+    + `<button aria-haspopup="menu" aria-label="Mais ações para: ${title}" class="row-action notification-menu-trigger notification-menu-trigger--icon" type="button">${ICON}</button></div>`
+    + `<p aria-live="polite" class="notification-row-outcome" role="status"></p></div>`
+    + `</div></li>`;
+}
+
+function notificationsBody(count: number) {
+  return `<div class="content-page">`
+    + `<header class="ui-page-header ui-page-header--compact"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Notificações</h1>`
+    + `<p class="ui-page-header__description">Somente sinais relevantes, com deduplicação e respeito ao silêncio.</p></div>`
+    + `<div class="ui-page-header__actions"><a class="notification-preferences-link" href="#">Ajustar preferências de notificação</a></div></header>`
+    + `<section class="notification-history"><h2>Avisos recebidos</h2><p class="notification-unread-summary" role="status">17 não lidas</p>`
+    + `<ul class="notification-list">${Array.from({ length: count }, (_, index) => notificationItem(index)).join("")}</ul>`
+    + `<nav class="pagination-links" aria-label="Paginação"><a href="#">Próxima</a></nav></section></div>`;
+}
+
+test.describe("Life Brain A.5: Notificações on a phone", () => {
+  test("fifty notices fit in 3,500px at 390px", async ({ page }) => {
+    await render(page, notificationsBody(50), 390, 844);
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(height).toBeLessThanOrEqual(3500);
+  });
+
+  test("each row is two lines high, with one visible control and the “⋯”", async ({ page }) => {
+    await render(page, notificationsBody(6), 390, 844);
+    const rows = await page.locator(".notification-item").evaluateAll((nodes) =>
+      nodes.map((node) => Math.round(node.getBoundingClientRect().height)));
+    for (const height of rows) expect(height).toBeLessThanOrEqual(70);
+    for (const control of await page.locator(".notification-open-link, .notification-menu-trigger").all()) {
+      const box = (await control.boundingBox())!;
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+    // The trailing controls sit on the title's row, never under it.
+    const first = page.locator(".notification-item").first();
+    const title = (await first.locator(".notification-item-title").boundingBox())!;
+    const trigger = (await first.locator(".notification-menu-trigger").boundingBox())!;
+    expect(trigger.x).toBeGreaterThan(title.x + title.width - 1);
+  });
+
+  test("the page never scrolls sideways at 320 CSS px", async ({ page }) => {
+    await render(page, notificationsBody(6), 320, 700);
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test("the fixture still mirrors the markup the component emits", () => {
+    const row = readFileSync(join(ROOT, "src", "features", "notifications", "notification-history-row.tsx"), "utf8");
+    for (const name of ["notification-item", "notification-item-dot", "notification-item-main", "notification-item-title",
+      "notification-item-meta", "notification-status-badge", "notification-item-time", "notification-item-body",
+      "notification-item-trailing", "row-action notification-open-link"]) {
+      expect(row, `the row lost ${name}`).toContain(`className="${name}"`);
+    }
+    const actions = readFileSync(join(ROOT, "src", "features", "notifications", "notification-row-actions.tsx"), "utf8");
+    expect(actions).toContain("notification-menu-trigger notification-menu-trigger--icon");
+    expect(actions).toContain('className="notification-row-outcome"');
+  });
+});
