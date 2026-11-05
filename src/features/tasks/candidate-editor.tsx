@@ -1,5 +1,6 @@
 "use client";
 
+import { buttonVariants } from "@/components/ui";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent } from "react";
 import type { ActionableCandidateView } from "@/features/daily-cycle/contracts";
 import {
@@ -737,7 +738,7 @@ export function CandidateEditor({
           aria-controls={editorPanelId}
           aria-expanded={expanded}
           aria-label={localized.edit(candidate.title)}
-          className="button-secondary"
+          className={buttonVariants({ variant: "secondary" })}
           disabled={!selected}
           onClick={() => setExpanded((current) => !current)}
           style={{ minHeight: 44, minWidth: 44 }}
@@ -816,7 +817,7 @@ export function CandidateEditor({
           )}
           <button
             aria-label={localized.clearDescription(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected}
             onClick={clearDescription}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -860,7 +861,7 @@ export function CandidateEditor({
           )}
           <button
             aria-label={localized.clearDueDate(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected}
             onClick={clearDueDate}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -895,7 +896,7 @@ export function CandidateEditor({
           )}
           <button
             aria-label={localized.clearPlannedDate(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected}
             onClick={clearPlannedDate}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -983,7 +984,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearProjects(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || relationOptions.projects.length === 0}
             onClick={clearProjectIds}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1012,7 +1013,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearContexts(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || relationOptions.contexts.length === 0}
             onClick={clearContextIds}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1041,7 +1042,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearPeople(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || relationOptions.people.length === 0}
             onClick={clearPersonIds}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1070,7 +1071,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearWaitingOn(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || relationOptions.people.length === 0}
             onClick={clearWaitingOnPersonIds}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1111,7 +1112,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearParentTask(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || parentRef === ""}
             onClick={clearParentRef}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1159,7 +1160,7 @@ export function CandidateEditor({
           </label>
           <button
             aria-label={localized.clearDependsOn(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected || dependsOn.length === 0}
             onClick={clearDependsOn}
             style={{ minHeight: 44, minWidth: 44 }}
@@ -1170,7 +1171,7 @@ export function CandidateEditor({
 
           <button
             aria-label={localized.reset(candidate.title)}
-            className="button-secondary"
+            className={buttonVariants({ variant: "secondary" })}
             disabled={!selected}
             onClick={resetSuggestion}
             style={{ minHeight: 44, minWidth: 44 }}
