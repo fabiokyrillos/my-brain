@@ -38,8 +38,8 @@ describe("EntityCreateForm", () => {
     const { unmount } = render(
       <EntityCreateForm action={resolvesTo(idle)} kind="context" locale="pt-BR" />,
     );
-    await userEvent.click(screen.getByRole("button", { name: "Novo contexto" }));
-    expect(screen.getByRole("button", { name: "Criar contexto" })).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Nova área" }));
+    expect(screen.getByRole("button", { name: "Criar área" })).toBeVisible();
     unmount();
 
     render(<EntityCreateForm action={resolvesTo(idle)} kind="organization" locale="en" />);
@@ -59,7 +59,7 @@ describe("EntityCreateForm", () => {
     unmount();
 
     render(<EntityCreateForm action={resolvesTo(idle)} kind="context" locale="pt-BR" />);
-    await userEvent.click(screen.getByRole("button", { name: "Novo contexto" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova área" }));
     expect(screen.getByLabelText("Nome")).toHaveAttribute("maxlength", "120");
   });
 
@@ -72,7 +72,7 @@ describe("EntityCreateForm", () => {
     unmount();
 
     render(<EntityCreateForm action={resolvesTo(idle)} kind="context" locale="pt-BR" />);
-    await userEvent.click(screen.getByRole("button", { name: "Novo contexto" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova área" }));
     const kind = screen.getByLabelText("Tipo");
     expect(Array.from(kind.querySelectorAll("option")).map((option) => option.textContent)).toEqual([
       "Trabalho",
@@ -85,10 +85,10 @@ describe("EntityCreateForm", () => {
     const action = resolvesTo(created);
     render(<EntityCreateForm action={action} kind="context" locale="pt-BR" />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Novo contexto" }));
+    await userEvent.click(screen.getByRole("button", { name: "Nova área" }));
     await userEvent.type(screen.getByLabelText("Nome"), "Pessoal");
     await userEvent.selectOptions(screen.getByLabelText("Tipo"), "personal");
-    await userEvent.click(screen.getByRole("button", { name: "Criar contexto" }));
+    await userEvent.click(screen.getByRole("button", { name: "Criar área" }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());
     const submitted = action.mock.calls[0]![1] as FormData;

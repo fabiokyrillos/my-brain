@@ -144,11 +144,11 @@ test.describe("the entity graph's own surfaces", () => {
     await signIn(page, "en");
     await page.goto("/en/app/contexts");
 
-    await expect(page.getByRole("heading", { name: "Contexts", level: 1 })).toBeVisible();
-    await page.getByRole("button", { name: "New context" }).click();
+    await expect(page.getByRole("heading", { name: "Life areas", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "New area" }).click();
     await page.getByLabel("Name").fill(name);
     await page.getByLabel("Kind").selectOption("personal");
-    await page.getByRole("button", { name: "Create context" }).click();
+    await page.getByRole("button", { name: "Create area" }).click();
 
     await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible({ timeout: 30_000 });
 

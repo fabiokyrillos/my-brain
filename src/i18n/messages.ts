@@ -72,7 +72,12 @@ const messages = {
        * key and the table stay `organizations`.
        */
       organizations: "Organizações",
-      contexts: "Contextos",
+      /*
+       * Life Brain C.4 (`INFORMATION_ARCHITECTURE.md` §3): a context is an area
+       * of life now (C.1), so the destination says so. The route key and the
+       * table stay `contexts`.
+       */
+      contexts: "Áreas da vida",
       reminders: "Lembretes",
       questions: "Perguntas pendentes",
       /*
@@ -137,7 +142,7 @@ const messages = {
       projects: "Projects",
       people: "People",
       organizations: "Organizations",
-      contexts: "Contexts",
+      contexts: "Life areas",
       reminders: "Reminders",
       questions: "Pending questions",
       chat: "Talk",

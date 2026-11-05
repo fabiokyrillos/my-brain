@@ -353,7 +353,7 @@ function brainSurface() {
     "Pessoas",
     "Projetos",
     "Organizações",
-    "Contextos",
+    "Áreas da vida",
     "Memórias",
     "Arquivos",
     "Relações",
@@ -376,7 +376,7 @@ function brainSurface() {
       + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
       + `</ul></article></li>`,
     `<li><article class="brain-domain"><div class="brain-domain-head">`
-      + `<h3><a href="#">Contextos</a></h3><span class="brain-domain-count">3</span></div>`
+      + `<h3><a href="#">Áreas da vida</a></h3><span class="brain-domain-count">3</span></div>`
       + `<p class="brain-domain-note">Áreas da sua vida.</p>`
       + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
     `<li><article class="brain-domain"><div class="brain-domain-head">`

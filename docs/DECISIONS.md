@@ -2365,3 +2365,21 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** Changing the `empty` tone globally (rejected for this slice: every other surface would change without its own review). Keeping the primary verb visible beside "Abrir" (rejected: two buttons and a menu do not fit beside a title at 390px, and the budget fails). Using `NoticeOpenControl` on the history (rejected: it marks the notice read, which the history recorded it must not). A count per area from `entry_entities` (rejected above).
 
 - **Consequences.** `button-secondary` loses three consumers (Registros' retry, retry-all, load more). The "Contextos" label is unchanged: renaming it "Áreas da vida" is C.4's, with the area page. The online journeys that address notification rows moved from `li.notification-row` to `li.notification-item`.
+
+## ADR-154 — An area of life has its own page, Memória counts its records for real, and Ideias is a lens
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — Life Brain slice C.4 (ADR-145; PRD `LB-C-009`, `-010`, `-011`; `INFORMATION_ARCHITECTURE.md` §3). **No migration.**
+
+- **Context.** C.1 made the areas real and C.3 gave them events, but an area's page was still a generic context page: two lists (linked people, linked tasks) and nothing the owner had recorded about the area. Memória's doors (A.5) had no count, because the obvious count — `entry_entities` rows — counts re-readings. "What belongs to the trip" was left by C.3 for this slice, and Ideias had nowhere to live.
+
+- **Decision 1 — The context page is the area page, at the URL it already has.** A context whose kind is a life area (the eight LB-M1 kinds plus `work`) renders: next confirmed events; the timeline of records filed under it; open linked tasks; the people linked to it or named by its readings. Every other context keeps its page. No route moved (LB-OD-2), so `/app/memory/areas/[area]` from the plan is this page.
+- **Decision 2 — "Filed under" means the current reading.** A record belongs to an area while its `current_interpretation_id` is an interpretation that links it; a record re-read out of the area leaves it. The timeline, the page's count and Memória's counts use the same rule. Reads are bounded and say so ("at least", "there are older records").
+- **Decision 3 — A trip lists what happened inside it, by area and dates.** For an event with an end, the area's records whose fact time falls inside the period are offered under it (`LB-C-010`), excluding the record that proposed it. No link table.
+- **Decision 4 — A new governed surface, `area`, with the contextual posture.** Normal and private show; `highly_sensitive` is masked in position with a local reveal. Records carry their own classification; events and tasks derive theirs from their source record, failing closed to the most protective level. `GOVERNED_SURFACES` gains `area` at the end; the thirteen surfaces 2Q-TRUST-007 pinned are unchanged.
+- **Decision 5 — Ideias is a filter over records.** Memória lists the newest records whose current reading carries the `idea` concept (`LB-C-011`), masked by the same rule, with a link to the Ideias area when the owner has one. No table, no route.
+- **Decision 6 — The destination is "Áreas da vida" / "Life areas".** The nav label, the list title and the create control ("Nova área"). The route key and the table stay `contexts`; the person page's section and the task editor's field keep their labels.
+
+- **Alternatives considered.** A new `/app/memory/areas/[kind]` route (rejected by LB-OD-2: no moved routes). Counting `entry_entities` with a head count (rejected: counts re-readings). A `trip_records` link table (rejected by `LIFE_DATA_MODEL.md` §3). An `ideas` table or route (rejected by `LB-C-011`). Folding Relações into the person and project pages in this slice (deferred: it removes a lens and its guards, and is its own change).
+
+- **Consequences.** Opening Saúde shows the consultations, exams and the next appointment in one place. Records filed before C.1 have no area link and do not appear until re-read. Relações stays a lens of Memória.

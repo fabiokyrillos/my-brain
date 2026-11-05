@@ -122,10 +122,10 @@ test.describe("relationships and associations", () => {
     // something to offer. EGC-ASSOC-008: with none, the panel explains itself
     // rather than opening onto an empty dropdown.
     await page.goto("/pt-BR/app/contexts");
-    await page.getByRole("button", { name: "Novo contexto" }).click();
+    await page.getByRole("button", { name: "Nova área" }).click();
     await page.getByLabel("Nome").fill(context);
     await page.getByLabel("Tipo").selectOption("personal");
-    await page.getByRole("button", { name: "Criar contexto" }).click();
+    await page.getByRole("button", { name: "Criar área" }).click();
     await expect(page.getByRole("link", { name: new RegExp(context) })).toBeVisible({ timeout: 30_000 });
 
     await page.goto("/pt-BR/app/projects");

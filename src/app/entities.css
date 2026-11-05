@@ -724,7 +724,7 @@
   min-width: 0;
 }
 .area-event-title, .area-task > :first-child, .area-record-text { font: var(--type-body); color: var(--text-primary); overflow-wrap: anywhere; }
-.area-event-title a, .area-task a, .area-record-text a { color: inherit; text-decoration: none; }
+.area-event-title a, .area-task a, .area-record-text a { display: inline-flex; align-items: center; min-height: var(--touch-target); color: inherit; text-decoration: none; }
 .area-event-title a:hover, .area-task a:hover, .area-record-text a:hover { text-decoration: underline; }
 
 /* The timeline: the fact date in its own column on a wide screen, above the

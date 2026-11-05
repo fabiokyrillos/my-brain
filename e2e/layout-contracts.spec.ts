@@ -99,7 +99,7 @@ const MOBILE_BAR = ["Hoje", "Conversar", "Captura rápida", "Agenda", "Memória"
 const GROUPS = [
   // Conversar and Calendário (Agenda) left these two groups' copies in Life
   // Brain A.2: both are primary now, while keeping their registry groups.
-  ["Contexto", ["Projetos", "Pessoas", "Organizações", "Contextos", "Memórias", "Arquivos", "Relações"]],
+  ["Contexto", ["Projetos", "Pessoas", "Organizações", "Áreas da vida", "Memórias", "Arquivos", "Relações"]],
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
   ["Organização", ["Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],
