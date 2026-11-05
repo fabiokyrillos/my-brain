@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain A.6 part 2: `button-primary/secondary` retired
+
+- The last 28 call sites move to `Button` / `ButtonLink` / `buttonVariants`, one form per commit: history filters, consent, closed account, ConfirmationPanel, the person-candidate form, the interpretation editor, the candidate editor and the task candidate form. `.button-primary` and `.button-secondary` are removed from `operations.css`; the old top margin survives as `.form-primary-action` and `.auth-primary-action`.
+
 ## 2026-11-05 — Life Brain B.5: one composer with modes, voice in the chat, relatos kept
 
 - **`Composer mode="capture" | "chat"`** is the one entry point; `ChatComposer` (moved from `assistant/assistant-composer.tsx`) mounts the shared `VoiceComposer` (chat pages bind `transcribeRecording`).
