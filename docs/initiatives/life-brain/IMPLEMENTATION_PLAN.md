@@ -94,6 +94,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### B.4 — Sensibilidade no chat (0,5 d)
 
 - Predicado de sensibilidade na aplicação (não na RPC): `highly_sensitive` só com pedido explícito ou mesma área; marcador na resposta.
+- **Implementado 2026-11-05 (ADR-155):** `classifyKnowledgeSources` lê o nível e a área (leitura atual) das fontes recuperadas, falhando fechado; `admitsToChatPrompt` no contrato de sensibilidade; léxico pt-BR/en para "incluir sensíveis" e para as áreas; exclusão silenciosa (`2K-EXPL-005`), `readSensitive` no envelope e uma frase sob as fontes quando a resposta leu conteúdo muito sensível.
 
 ### B.5 — Composer único com voz e captura pela conversa (1,5 d)
 

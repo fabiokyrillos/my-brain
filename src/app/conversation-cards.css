@@ -416,6 +416,15 @@
   color: var(--tone-archived-fg);
 }
 
+/* Life Brain B.4 (`LB-B-010`): the answer read highly sensitive content. A
+   plain sentence with the attention tone, not an alarm. */
+.conversation-sources-sensitive {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--tone-attention-fg);
+}
+
 /*
  * `2K-EXPL-001` — the disclosure panel.
  *

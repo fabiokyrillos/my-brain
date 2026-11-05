@@ -223,3 +223,19 @@ describe("the parser is total", () => {
     }
   });
 });
+
+describe("Life Brain B.4: the readSensitive flag (LB-B-010)", () => {
+  it("is written only when true, and round-trips", () => {
+    const plain = buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: ["entry", "memory"] });
+    expect("readSensitive" in plain).toBe(false);
+    expect(parseCitations(plain).readSensitive).toBe(false);
+    const marked = buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: ["entry", "memory"], readSensitive: true });
+    expect(marked.readSensitive).toBe(true);
+    expect(parseCitations(marked).readSensitive).toBe(true);
+  });
+
+  it("refuses a false or foreign value rather than reading it as a flag", () => {
+    const tampered = { ...buildCitationsEnvelope({ retrievedAnyQualifyingSource: true, sources: [], reach: ["entry"] }), readSensitive: "yes" };
+    expect(parseCitations(tampered).evidence).toBe("unknown");
+  });
+});

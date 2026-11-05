@@ -82,6 +82,11 @@ type ChatStub = {
     reminders?: Record<string, unknown>[];
     entries?: { id: string; sensitivity: string }[];
   };
+  /** Life Brain B.4: a matched source's classification (default `normal`). */
+  levels?: Record<string, string>;
+  /** Life Brain B.4: the area links the current readings carry, and their contexts. */
+  areaLinks?: { entry_id: string; interpretation_id: string; entity_id: string }[];
+  contexts?: { id: string; kind: string }[];
 };
 
 /** A query builder whose every filter returns itself and which resolves to `result`. */
@@ -138,17 +143,33 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
         },
       };
     }
-    if (table === "tasks" || table === "reminders" || table === "entries") {
+    if (table === "tasks" || table === "reminders") {
       return chain({ data: options.structured?.[table] ?? [], error: null });
     }
+    if (table === "entries") {
+      // The structured sources' levels, and (B.4) the matched entries' own
+      // classification with a current reading id the area links can name.
+      const matched = (options.matches ?? [])
+        .filter((match) => match.source_type === "entry")
+        .map((match) => ({ id: match.source_id, sensitivity: options.levels?.[match.source_id] ?? "normal", current_interpretation_id: `i-${match.source_id}` }));
+      return chain({ data: [...(options.structured?.entries ?? []), ...matched], error: null });
+    }
+    if (table === "entry_entities") return chain({ data: options.areaLinks ?? [], error: null });
+    if (table === "contexts") return chain({ data: options.contexts ?? [], error: null });
     if (table === "memories") {
       return {
-        select: () => ({
-          in: async () =>
-            options.memoryLookupFails
-              ? { data: null, error: { message: "lookup failed" } }
-              : { data: options.memoryRows ?? [], error: null },
-        }),
+        select: (columns: string) =>
+          columns.includes("sensitivity")
+            ? chain({
+              data: (options.memoryRows ?? []).map((row) => ({ id: row.id, sensitivity: options.levels?.[row.id] ?? "normal", source_entry_id: null })),
+              error: null,
+            })
+            : {
+              in: async () =>
+                options.memoryLookupFails
+                  ? { data: null, error: { message: "lookup failed" } }
+                  : { data: options.memoryRows ?? [], error: null },
+            },
       };
     }
     throw new Error(`unexpected table ${table}`);
@@ -744,5 +765,81 @@ describe("Life Brain B.3: a dated question is retrieved inside its period (LB-B-
     expect(sent.map((source) => source.id)).toEqual(
       ["e11", "e10", "e9", "e8", "e7", "e6", "e5", "e4"].map((id) => `entry:${id}`),
     );
+  });
+});
+
+describe("Life Brain B.4: a highly sensitive source reaches the prompt only when asked (LB-B-010)", () => {
+  const SECRET_ENTRY = "77777777-7777-4777-8777-777777777777";
+  const PLAIN_ENTRY = "88888888-8888-4888-8888-888888888888";
+  const HEALTH = "99999999-9999-4999-8999-999999999999";
+  const matches = [
+    { source_type: "entry" as const, source_id: SECRET_ENTRY, content: "Resultado da biópsia: benigno.", similarity: 0.9, occurred_at: "2026-11-01T10:00:00Z" },
+    { source_type: "entry" as const, source_id: PLAIN_ENTRY, content: "Marquei o retorno para dezembro.", similarity: 0.8, occurred_at: "2026-11-02T10:00:00Z" },
+  ];
+
+  function provider() {
+    const answerFromKnowledge = vi.fn<(input: { sources: { id: string; content: string }[] }) => Promise<{
+      answer: string; citedSourceIds: string[]; model: string; inputTokens: number; outputTokens: number;
+    }>>(async () => ({ answer: "Resposta.", citedSourceIds: [], model: "gpt-5.6-terra", inputTokens: 10, outputTokens: 5 }));
+    return {
+      answerFromKnowledge,
+      value: { id: "openai", embedText: async () => ({ embedding: [0.1], model: "text-embedding-3-small", inputTokens: 1, outputTokens: 0 }), answerFromKnowledge },
+    };
+  }
+
+  async function ask(question: string, extra: Partial<ChatStub> = {}) {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({
+        user: { id: userId },
+        citedSourceIds: [],
+        matches,
+        levels: { [SECRET_ENTRY]: "highly_sensitive" },
+        ...extra,
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    const stub = provider();
+    vi.mocked(getAIProvider).mockReturnValue(stub.value as unknown as ReturnType<typeof getAIProvider>);
+    await expect(sendChatMessage(idleState, form({ question }))).rejects.toThrow("NEXT_REDIRECT");
+    const sent = stub.answerFromKnowledge.mock.calls[0]?.[0].sources.map((source) => source.id) ?? [];
+    return { sent, citations: insertedAssistantMessage?.citations as Record<string, unknown> };
+  }
+
+  it("withholds it from an ordinary question, silently", async () => {
+    const { sent, citations } = await ask("O que ficou pendente?");
+    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
+    expect(citations.readSensitive).toBeUndefined();
+    // `2K-EXPL-005`: nothing about the withheld source reaches the envelope.
+    expect(JSON.stringify(citations)).not.toMatch(/sensitiv|biópsia/i);
+  });
+
+  it("admits it when the owner asks for sensitive content in words, and marks the answer", async () => {
+    const { sent, citations } = await ask("O que ficou pendente? Pode incluir os sensíveis.");
+    expect(sent).toEqual([`entry:${SECRET_ENTRY}`, `entry:${PLAIN_ENTRY}`]);
+    expect(citations.readSensitive).toBe(true);
+  });
+
+  it("admits it when the question names the area the record is filed under", async () => {
+    const { sent, citations } = await ask("Como estão meus exames de saúde?", {
+      areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: `i-${SECRET_ENTRY}`, entity_id: HEALTH }],
+      contexts: [{ id: HEALTH, kind: "health" }],
+    });
+    expect(sent).toContain(`entry:${SECRET_ENTRY}`);
+    expect(citations.readSensitive).toBe(true);
+  });
+
+  it("does not admit it for a question about another area", async () => {
+    const { sent } = await ask("Quanto gastei com a viagem?", {
+      areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: `i-${SECRET_ENTRY}`, entity_id: HEALTH }],
+      contexts: [{ id: HEALTH, kind: "health" }],
+    });
+    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
+  });
+
+  it("ignores an area link from a reading that is no longer current", async () => {
+    const { sent } = await ask("Como estão meus exames de saúde?", {
+      areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: "an-old-reading", entity_id: HEALTH }],
+      contexts: [{ id: HEALTH, kind: "health" }],
+    });
+    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
   });
 });

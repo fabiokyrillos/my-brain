@@ -47,6 +47,8 @@ export type ConversationSourcesCopy = {
   readonly wideInsufficient: string;
   /** An old row, which recorded neither reach nor evidence state. */
   readonly legacyUnknown: string;
+  /** Life Brain B.4 (`LB-B-010`): the answer read highly sensitive content. */
+  readonly readSensitive: string;
   readonly freshnessLabel: string;
   /** A row with no date. Absent, never fabricated. */
   readonly freshnessUnknown: string;
@@ -90,6 +92,7 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     wideInsufficient:
       "Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros, memórias, tarefas nem lembretes.",
     legacyUnknown: "Esta resposta é de antes de eu passar a anotar onde procurei.",
+    readSensitive: "Esta resposta usou conteúdo que você marcou como muito sensível.",
     freshnessLabel: "De",
     freshnessUnknown: "Sem data",
     explanation: {
@@ -117,6 +120,7 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     wideInsufficient:
       "I found nothing of yours about this. What I answered above does not come from your records, memories, tasks or reminders.",
     legacyUnknown: "This answer predates my keeping track of where I looked.",
+    readSensitive: "This answer used content you marked as highly sensitive.",
     freshnessLabel: "From",
     freshnessUnknown: "No date",
     explanation: {
