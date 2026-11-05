@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain C.5: birthdays on the person, with a yearly reminder (LB-M4)
+
+- **Migration `202611050107_life_brain_m4_birthdays.sql`** (LB-M4, ADR-156, the fourth Life Brain migration, owner-authorized): `people.birthday_month/_day/_year` with a real-date check and a trigger refusing direct writes; `reminder_series.person_id` (owned FK, one active series per person); `set_person_birthday` (definer, authenticated only) keeps the date and a yearly 09:00 series together and audits; deleting a person ends their series. pgTAP `life_brain_m4_birthdays.sql` (24). Chain guards → 107; Life Brain ceiling → 4. **Not applied to the hosted project yet.**
+- **Person page:** `BirthdayPanel` shows "Aniversário · 5 de maio" and sets, changes or removes it (`src/features/birthdays/`).
+
 ## 2026-11-05 — Life Brain A.6 part 1: Ajustes on the compact header, sections as rows, "Avançado"
 
 - **Ajustes:** `PageHeader compact` (the eyebrow and its locale ternary are gone); on a phone the sections are list rows between dividers, the current one marked by a left rule and weight; an **Avançado** group links Histórico, Custos de IA and Em andamento under the same labels the rail uses (a test holds them equal).

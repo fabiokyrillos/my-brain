@@ -1977,6 +1977,9 @@ export type Database = {
       }
       people: {
         Row: {
+          birthday_day: number | null
+          birthday_month: number | null
+          birthday_year: number | null
           created_at: string
           id: string
           name: string
@@ -1986,6 +1989,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          birthday_day?: number | null
+          birthday_month?: number | null
+          birthday_year?: number | null
           created_at?: string
           id?: string
           name: string
@@ -1995,6 +2001,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          birthday_day?: number | null
+          birthday_month?: number | null
+          birthday_year?: number | null
           created_at?: string
           id?: string
           name?: string
@@ -2446,6 +2455,7 @@ export type Database = {
           ended_at: string | null
           id: string
           important: boolean
+          person_id: string | null
           rule: Json
           status: string
           task_id: string | null
@@ -2461,6 +2471,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           important?: boolean
+          person_id?: string | null
           rule: Json
           status?: string
           task_id?: string | null
@@ -2476,6 +2487,7 @@ export type Database = {
           ended_at?: string | null
           id?: string
           important?: boolean
+          person_id?: string | null
           rule?: Json
           status?: string
           task_id?: string | null
@@ -2484,6 +2496,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "reminder_series_person_owner_fk"
+            columns: ["user_id", "person_id"]
+            isOneToOne: false
+            referencedRelation: "people"
+            referencedColumns: ["user_id", "id"]
+          },
           {
             foreignKeyName: "reminder_series_task_owner_fk"
             columns: ["user_id", "task_id"]
@@ -4124,6 +4143,16 @@ export type Database = {
       }
       set_entry_sensitivity: {
         Args: { p_entry_id: string; p_sensitivity: string }
+        Returns: Json
+      }
+      set_person_birthday: {
+        Args: {
+          p_day: number
+          p_month: number
+          p_person_id: string
+          p_reminder_title: string
+          p_year: number
+        }
         Returns: Json
       }
       suppress_notification_subject: {

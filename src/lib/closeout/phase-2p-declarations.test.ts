@@ -226,13 +226,14 @@ describe("Phase 2P declarations", () => {
       `ADR-144 is allocated exactly one migration: ${laterNotifyHeartbeat.join(", ")}`,
     ).toHaveLength(1);
     // Life Brain (ADR-145 Decision 7): three migrations allocated, LB-M1/M2/M3,
-    // each one only with the owner's authorization for its PR. A fourth is a
-    // stop condition, so the ceiling is asserted here as well.
-    const laterLifeBrain = migrations.filter((name) => /life_brain_m[123]_/i.test(name));
+    // each one only with the owner's authorization for its PR. A fourth was a
+    // stop condition; the owner lifted it for LB-M4 alone (ADR-156, 2026-11-05),
+    // so the ceiling is four and a fifth is a stop condition again.
+    const laterLifeBrain = migrations.filter((name) => /life_brain_m[1234]_/i.test(name));
     expect(
       laterLifeBrain.length,
-      `Life Brain is allocated at most three migrations: ${laterLifeBrain.join(", ")}`,
-    ).toBeLessThanOrEqual(3);
+      `Life Brain is allocated at most four migrations: ${laterLifeBrain.join(", ")}`,
+    ).toBeLessThanOrEqual(4);
     expect(migrations).toHaveLength(
       99 + laterPhase2q.length + laterPhase2r.length + laterPhase2s.length
       + laterNotifyHeartbeat.length + laterLifeBrain.length,

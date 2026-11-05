@@ -240,8 +240,9 @@ describe("2N.4 spends no migration, no RPC and no new authority", () => {
     // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 105 by Life Brain LB-M3, the ONE migration slice B.3 was allocated (ADR-145 Decision 7): the chat's retrieval gains a date window (ADR-150). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 106 by Life Brain LB-M2, the ONE migration slice C.3 was allocated (ADR-145 Decision 7) and the third and last of Life Brain's three: events with a period (ADR-152). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
-    expect(migrations).toHaveLength(106);
-    expect(migrations[migrations.length - 1]).toBe("202611040106_life_brain_m2_events.sql");
+    // Chain head moved to 107 by Life Brain LB-M4, a FOURTH Life Brain migration: ADR-145 Decision 7 made it a stop condition and the owner lifted it explicitly on 2026-11-05 ("Sim, autorizo LB-M4") for slice C.5, a person's birthday and its yearly reminder (ADR-156). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations).toHaveLength(107);
+    expect(migrations[migrations.length - 1]).toBe("202611050107_life_brain_m4_birthdays.sql");
     for (const file of migrations) {
       expect(file, "no migration may belong to this slice").not.toContain("phase_2n_slice_4");
     }

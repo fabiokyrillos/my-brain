@@ -2398,3 +2398,19 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** Filtering in the RPC (rejected by the plan: it would spend a migration, and the area rule needs the current reading). Disclosing "some sensitive records were left out" (rejected by `2K-EXPL-005`). Asking the model to decide (rejected: an authorization decision inside the provider, which the architecture forbids).
 
 - **Consequences.** A question about health reads the owner's highly sensitive health records and says so; the same records stay out of a question about money. A highly sensitive record with no area enters only on an explicit ask. Tasks from highly sensitive records stay withheld as B.2 made them.
+
+## ADR-156 — A person's birthday is a date on the person and a yearly reminder linked to them (LB-M4, the fourth Life Brain migration)
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — Life Brain slice C.5 (PRD `LB-C-012`). Spends **LB-M4**: ADR-145 Decision 7 allocated three migrations and made a fourth a stop condition; the owner lifted it for this one explicitly ("Seria bom ter o lembrete e mostrar na página da pessoa", then "Sim, autorizo LB-M4", 2026-11-05). A fifth is a stop condition again.
+
+- **Context.** A birthday could only be a free-text note or a hand-made yearly reminder with no link to the person, so the person's page could not say it and nothing kept the reminder in step with the date.
+
+- **Decision 1 — The date lives on the person.** `people.birthday_month` and `birthday_day` (both or neither) and an optional `birthday_year`, checked to be a real date (29 February allowed without a year). A trigger refuses any direct write to them.
+- **Decision 2 — One writer keeps the date and the reminder together.** `set_person_birthday` (definer, empty `search_path`, authenticated only) checks the owner, validates, and is idempotent; it ends the person's active series (history kept, next occurrence cancelled, as `apply_reminder_series_command_v1` ends one) and, when a date remains, creates a yearly series at 09:00 in the owner's zone with its first occurrence, then audits (`person_birthday_set` / `person_birthday_cleared`). The yearly rule and its materializer are the existing reminders' (ADR-132); no recurrence shape is added.
+- **Decision 3 — The series knows whose birthday it is.** `reminder_series.person_id`, owned through `(user_id, person_id)`, at most one active series per person. Deleting the person ends the series (a definer trigger), except while the account itself is being deleted.
+- **Decision 4 — No undo row.** Setting a birthday is an explicit owner edit, reversed by setting it again or removing it — the shape of every other field on the person.
+
+- **Alternatives considered.** A reminder only, unlinked (option 1 offered to the owner; rejected by them: the page could not show the date). A `birthday date` column (rejected: a date type needs a year, and most birthdays are kept without one). Extracting birthdays from records automatically (left for later: an AI→domain write the owner would still confirm).
+
+- **Consequences.** Migrations: **107** local. The person page shows the birthday and the reminder reaches the Agenda, Home and notifications like any yearly reminder.

@@ -166,7 +166,9 @@ const REPO = resolve(__dirname, "../../..");
 // spends nothing.
 // Chain head moved to 202611040106 by Life Brain LB-M2 (slice C.3, ADR-152):
 // events with a period, the last of the three migrations ADR-145 allocated.
-const AUTHORIZED_MIGRATION_HEAD = "202611040106";
+// Chain head moved to 202611050107 by Life Brain LB-M4 (slice C.5, ADR-156):
+// a person's birthday, the fourth Life Brain migration, authorized by the owner.
+const AUTHORIZED_MIGRATION_HEAD = "202611050107";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

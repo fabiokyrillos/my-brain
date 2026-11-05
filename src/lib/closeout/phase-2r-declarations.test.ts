@@ -407,7 +407,8 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
     // Chain head moved to 104 by Life Brain LB-M1, the ONE migration slice C.1 was allocated (ADR-145 Decision 7) and the owner authorized for its PR (LB-OD-9, 2026-11-04): life areas as contexts (ADR-148). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 105 by Life Brain LB-M3, the ONE migration slice B.3 was allocated (ADR-145 Decision 7): the chat's retrieval gains a date window (ADR-150). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 106 by Life Brain LB-M2, the ONE migration slice C.3 was allocated (ADR-145 Decision 7) and the third and last of Life Brain's three: events with a period (ADR-152). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
-    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(106);
+    // Chain head moved to 107 by Life Brain LB-M4, a FOURTH Life Brain migration: ADR-145 Decision 7 made it a stop condition and the owner lifted it explicitly on 2026-11-05 ("Sim, autorizo LB-M4") for slice C.5, a person's birthday and its yearly reminder (ADR-156). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(107);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {
