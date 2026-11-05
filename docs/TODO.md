@@ -100,7 +100,8 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
   - The area lexicon is small and declared; a question that names an area in other words ("o cardio", "a grana") does not open it.
   - Run a live check: a `highly_sensitive` health record, asked about with and without "saúde", and with "incluir sensíveis".
 - **C.4 implemented 2026-11-05** (ADR-154). Left open by it:
-  - **Relações is still its own lens.** `INFORMATION_ARCHITECTURE.md` §1 folds it into the person and project pages; that removes a lens and its guards, so it is its own change (A.6 or later).
+  - **Relações is reached from the person and the project** (done 2026-11-05): the person page opens the map focused on that person, the project page opens the map. **The Memória lens stays**, deliberately: the lens strip mirrors the navigation registry (`relations` is `group: "context"`, pinned by `2N-RELATION-006` and the 2I library guard), so dropping only the lens would break that rule, and changing the group moves the rail. Decide it with the owner if the lens should go.
+  - The map's focus is a person's only (`2P-RELATION-003`); a project-focused map is a small change to `resolveFocus` and its pinned test, if wanted.
   - Records filed before C.1 carry no area link; they reach an area only when re-read.
   - The trip's "what happened inside it" uses the area only; a record about the trip filed elsewhere (e.g. Lazer) is not listed.
   - Run a live check on the owner's account: open Saúde and Viagens, see the timeline, the counts on Memória and Ideias.

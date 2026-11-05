@@ -1,5 +1,5 @@
 import { AskAboutLink } from "@/features/conversation-cards/ask-about-link";
-import { ArrowLeft, FolderKanban } from "lucide-react";
+import { ArrowLeft, FolderKanban, Network } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -41,6 +41,8 @@ import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
 import { PROJECT_STATUSES, type ProjectStatus } from "@/features/entities/schema";
 import { attachmentStatusLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
+import { getRelationsCopy } from "@/features/relations/copy";
+import { relationViewHref } from "@/features/relations/view";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
@@ -331,6 +333,13 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <Link className="back-link" href={`/${locale}/app/projects`}><ArrowLeft size={16} />{copy.allProjects}</Link>
         {/* `2P-CHAT-005`. See the person workspace for why only `project:<id>` travels. */}
         <AskAboutLink locale={locale} name={project.name} about={{ type: "project", id: project.id }} />
+        {/* Relações, from the project it is about (the map's focus is a person's, so this opens the whole map). */}
+        {people.length ? (
+          <Link className="relations-open-link" href={relationViewHref(locale, "diagram", null)}>
+            <Network aria-hidden="true" size={16} />
+            {getRelationsCopy(locale).openForProject}
+          </Link>
+        ) : null}
       </div>
 
       <header className="entity-hero">

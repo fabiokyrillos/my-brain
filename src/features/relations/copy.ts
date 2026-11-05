@@ -35,6 +35,13 @@ import type { RelationEdgeKind, RelationNodeType } from "./contracts";
 
 export type RelationsCopy = {
   readonly pageTitle: string;
+  /**
+   * Life Brain (backlog item 2, `INFORMATION_ARCHITECTURE.md` §1): the way from a
+   * person's or a project's own page into the map, so Relações is reached from
+   * the entity it is about.
+   */
+  readonly openForPerson: string;
+  readonly openForProject: string;
   readonly pageEyebrow: string;
   readonly pageIntro: string;
 
@@ -140,6 +147,8 @@ const EN_EDGE_KIND: Record<RelationEdgeKind, string> = {
 
 const PT: RelationsCopy = {
   pageTitle: "Relações",
+  openForPerson: "Ver no mapa de relações",
+  openForProject: "Ver o mapa de relações",
   pageEyebrow: "Contexto",
   pageIntro:
     "As ligações que o Cérebro guarda entre pessoas, projetos, contextos e organizações. A lista abaixo é a versão completa; o desenho mostra a parte que pode ser explicada.",
@@ -208,6 +217,8 @@ const PT: RelationsCopy = {
 
 const EN: RelationsCopy = {
   pageTitle: "Relations",
+  openForPerson: "See on the relations map",
+  openForProject: "See the relations map",
   pageEyebrow: "Context",
   pageIntro:
     "The links the Brain holds between people, projects, contexts and organizations. The list below is the complete version; the drawing shows the part that can be explained.",

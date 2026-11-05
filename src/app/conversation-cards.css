@@ -632,3 +632,16 @@
     justify-content: center;
   }
 }
+
+/* Backlog item 2: the way into the relations map from a person's or a
+   project's page, beside "Perguntar sobre". */
+.relations-open-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+  text-decoration: none;
+}
+.relations-open-link:hover { text-decoration: underline; }
