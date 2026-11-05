@@ -695,3 +695,66 @@
     min-height: var(--touch-target);
   }
 }
+
+/* ---- Life Brain C.4: an area of life's page ------------------------------- */
+
+.area-sections { display: grid; gap: var(--space-8); margin-top: var(--space-6); }
+.area-section { display: grid; gap: var(--space-3); min-width: 0; }
+.area-section > h2 {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.area-count { font: var(--type-caption); letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+.area-quiet { margin: 0; font: var(--type-body); color: var(--text-secondary); }
+.area-meta { font: var(--type-caption); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.area-list, .area-timeline, .area-people { margin: 0; padding: 0; list-style: none; }
+.area-list, .area-timeline { border-top: 1px solid var(--border-divider); }
+.area-event, .area-task, .area-record {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+  min-width: 0;
+}
+.area-event-title, .area-task > :first-child, .area-record-text { font: var(--type-body); color: var(--text-primary); overflow-wrap: anywhere; }
+.area-event-title a, .area-task a, .area-record-text a { color: inherit; text-decoration: none; }
+.area-event-title a:hover, .area-task a:hover, .area-record-text a:hover { text-decoration: underline; }
+
+/* The timeline: the fact date in its own column on a wide screen, above the
+   words on a phone. */
+.area-record { grid-template-columns: 7.5rem minmax(0, 1fr); column-gap: var(--space-4); align-items: baseline; }
+@media (max-width: 599px) { .area-record { grid-template-columns: minmax(0, 1fr); } }
+
+.area-in-period { margin-top: var(--space-2); }
+.area-in-period > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+  cursor: pointer;
+}
+.area-in-period .area-timeline { margin-top: var(--space-1); }
+
+.area-columns { display: grid; gap: var(--space-8); grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+
+.area-people { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.area-person {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-full);
+  color: var(--text-primary);
+  font: var(--type-label);
+  text-decoration: none;
+}
+.area-person:hover { background: var(--background-subtle); }

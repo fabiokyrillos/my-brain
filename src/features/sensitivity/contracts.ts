@@ -171,6 +171,9 @@ export const GOVERNED_SURFACES = [
   "memory",
   "file",
   "graph",
+  // Life Brain C.4: an area of life's page (`contexts/[contextId]` for a
+  // life-area kind) — its timeline renders the owner's own records.
+  "area",
 ] as const;
 export type GovernedSurface = (typeof GOVERNED_SURFACES)[number];
 
@@ -241,6 +244,12 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   // is not a gap the reader can see — it looks exactly like a person who has no
   // links. The relation stays, its own sentence does not.
   graph: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  // Life Brain C.4. The area page takes the contextual surfaces' posture, and a
+  // health area is where it matters most: its records default to `private`
+  // (C.1) and the owner opened the area to read them, so `private` shows; a
+  // `highly_sensitive` record stays in the timeline, in position, masked — a
+  // timeline with a silent gap would misdate the owner's own history.
+  area: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
 /** The single entry point. Every governed surface asks this and obeys it. */

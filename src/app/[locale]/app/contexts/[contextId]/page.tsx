@@ -9,6 +9,11 @@ import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { asContextKind } from "@/features/entities/schema";
 import { contextKindLabel, getVocabularyCopy, taskStatusLabel } from "@/features/vocabulary/copy";
+import { PageHeader } from "@/components/ui";
+import { AREA_KINDS } from "@/features/library/life-areas";
+import { loadAreaEvents, loadAreaOpenTasks, loadAreaPeople, loadAreaRecords } from "@/features/areas/area-page";
+import { AreaSections } from "@/features/areas/area-sections";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
@@ -35,7 +40,7 @@ export default async function ContextDetailPage({
   const locale = candidate;
   const copy = getEntityCopy(locale);
   const vocabulary = getVocabularyCopy(locale);
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
 
   const [contextResult, personLinkResult, taskLinkResult] = await Promise.all([
     supabase
@@ -75,6 +80,15 @@ export default async function ContextDetailPage({
   const people = requireSupabaseData(peopleResult, "load context person names") ?? [];
   const tasks = requireSupabaseData(tasksResult, "load context task titles") ?? [];
 
+  /*
+    Life Brain C.4 (ADR-154): a context whose kind is an area of life opens as
+    the area's page — its next events (a trip with what happened inside it),
+    the timeline of records filed under it, what is still open, and the people.
+    Every other context keeps the two lists below, unchanged.
+  */
+  const isArea = (AREA_KINDS as readonly string[]).includes(context.kind);
+  const area = isArea ? await loadArea(supabase, user.id, context.id) : null;
+
   return (
     <div className="content-page entity-detail">
       <div className="entity-workspace-actions">
@@ -86,6 +100,13 @@ export default async function ContextDetailPage({
         <AskAboutLink locale={locale} name={context.name} about={{ type: "context", id: context.id }} />
       </div>
 
+      {area ? (
+        <PageHeader
+          description={context.description ?? contextKindLabel(locale, context.kind) ?? undefined}
+          size="compact"
+          title={context.name}
+        />
+      ) : (
       <header className="entity-hero">
         <Layers size={28} />
         <div>
@@ -96,6 +117,18 @@ export default async function ContextDetailPage({
           <p>{context.description ?? copy.noDescription}</p>
         </div>
       </header>
+      )}
+
+      {area ? (
+        <AreaSections
+          events={area.events}
+          locale={locale}
+          people={area.people}
+          records={area.records}
+          tasks={area.tasks}
+          timeZone={area.timeZone}
+        />
+      ) : null}
 
       <EntityEditForm
         action={updateContext}
@@ -110,6 +143,7 @@ export default async function ContextDetailPage({
         organizations={[]}
       />
 
+      {area ? null : (
       <div className="entity-columns">
         <section>
           <h2>{copy.linkedPeople}</h2>
@@ -141,6 +175,22 @@ export default async function ContextDetailPage({
           )}
         </section>
       </div>
+      )}
     </div>
   );
 }
+
+/** The four reads an area page needs; independent, so one failure is one section. */
+async function loadArea(supabase: Awaited<ReturnType<typeof requireUser>>["supabase"], userId: string, contextId: string) {
+  const [records, tasks, timeZone] = await Promise.all([
+    loadAreaRecords(supabase, userId, contextId),
+    loadAreaOpenTasks(supabase, userId, contextId),
+    getOwnerTimeZone(),
+  ]);
+  const [events, people] = await Promise.all([
+    loadAreaEvents(supabase, userId, contextId, new Date(), records.status === "ok" ? records.records : []),
+    loadAreaPeople(supabase, userId, contextId, records.status === "ok" ? (records.interpretationIds ?? []) : []),
+  ]);
+  return { records, tasks, timeZone, events, people };
+}
+
