@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Birthdays read from records (ADR-158)
+
+- **Extraction:** `people[].birthday` (`{ month, day, year | null }` or `null`, a real date) in Zod and the Deno validator, the worker's strict JSON schema and both prompts; `entry-extraction-v5` / `2026-11-05.1`; 14 parity cases; stored readings default to `null`.
+- **Record page:** `loadEntryBirthdayProposals` (`src/features/birthdays/entry-birthdays.ts`) matches a stated birthday to the linked person (candidate decision first, then a person link by mention or name) and `BirthdayProposals` offers it when the person has none; accepting calls `setPersonBirthday`. No migration. `process-jobs` must be redeployed for new readings to carry the field.
+
 ## 2026-11-05 — Relações from the person and the project
 
 - The person page offers "Ver no mapa de relações" (the map focused on that person) when they have a relationship, a project or an area; the project page offers the map when it has people. The Memória lens stays (it mirrors the navigation registry pinned by `2N-RELATION-006`). Source test `relations/entity-links.test.ts`.

@@ -277,7 +277,9 @@ Previously: 2026-08-05 (**Phase 2G — Conversational Creation is AUTHORIZED and
 
 **A.6 part 2 shipped 2026-11-05** (PR #363, no migration). The last 28 `button-primary/secondary` call sites (history filters, consent, closed account, the reading's confirmation, person decisions, the interpretation editor, the task candidate forms) are on the `Button` primitive, and the two classes are removed.
 
-**Relações from the person and the project implemented 2026-11-05 on `claude/nice-carson-av48c9`** (PR open, no migration). The person page opens the relations map focused on that person; the project page opens the map. The Memória lens stays, by the registry rule `2N-RELATION-006` pins.
+**Relações from the person and the project shipped 2026-11-05** (PR #364, no migration). The person page opens the relations map focused on that person; the project page opens the map. The Memória lens stays, by the registry rule `2N-RELATION-006` pins.
+
+**Birthdays read from records implemented 2026-11-05 on `claude/nice-carson-av48c9`** (PR open, no migration, ADR-158). The extraction carries `people[].birthday` (`entry-extraction-v5` / prompt `2026-11-05.1`, both runtimes, parity cases); the record page offers "Guardar o aniversário de Ana: 5 de maio?" for a linked person who has no date, and accepting uses the C.5 writer. **`process-jobs` is not redeployed yet**, so new readings do not carry the field until it is.
 
 **What is true now.** Zero product code changed by the investigation. Migrations: 3 allocated · 0 created · 0 applied. The baseline instrument runs against the dev server and the linked project with the test account; it captured every list route in pt-BR on iPhone 390 and desktop 1440 (en for home, capture, inbox, work, calendar, chat, settings) and **no detail route**, because the test account holds no entries, people, projects, memories, reminders or conversations and the dense-fixture seed was refused by the session's permission classifier.
 
