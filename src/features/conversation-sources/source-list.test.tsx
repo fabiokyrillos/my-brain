@@ -203,3 +203,13 @@ describe("2K-PRIVACY-004: a legacy row says less rather than guessing", () => {
     expect(screen.queryByText(copy.reach)).not.toBeInTheDocument();
   });
 });
+
+describe("Life Brain B.4: an answer that read highly sensitive content says so (LB-B-010)", () => {
+  it("draws the note only when the envelope carries the flag", () => {
+    const { unmount } = render(<SourceList timeZone={OWNER_TIME_ZONE} citations={{ ...evidenced, readSensitive: true }} locale="pt-BR" sources={[entrySource]} />);
+    expect(screen.getByRole("note")).toHaveTextContent(copy.readSensitive);
+    unmount();
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]} />);
+    expect(screen.queryByText(copy.readSensitive)).toBeNull();
+  });
+});

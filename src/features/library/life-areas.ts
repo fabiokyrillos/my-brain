@@ -1,7 +1,8 @@
 import "server-only";
 
-import { LIFE_AREAS } from "@/lib/ai/extraction-schema";
 import type { createClient } from "@/lib/supabase/server";
+
+import { AREA_KINDS, isAreaKind, type AreaKind } from "./life-area-kinds";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
@@ -27,8 +28,7 @@ type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
  * name is a structural identifier, like a project's (ADR-110 Decision 2), so it
  * renders unmasked.
  */
-export const AREA_KINDS = LIFE_AREAS.filter((kind) => kind !== "other");
-export type AreaKind = (typeof AREA_KINDS)[number];
+export { AREA_KINDS, type AreaKind };
 
 /** Bound on what one overview render reads; the contexts lens lists the rest. */
 export const LIFE_AREA_LIMIT = 24;
@@ -42,10 +42,6 @@ export type LifeAreaDoor = {
 export type LifeAreasResult =
   | { readonly status: "ok"; readonly areas: readonly LifeAreaDoor[]; readonly bounded: boolean }
   | { readonly status: "failed" };
-
-function isAreaKind(value: unknown): value is AreaKind {
-  return typeof value === "string" && (AREA_KINDS as readonly string[]).includes(value);
-}
 
 export async function loadLifeAreas(supabase: SupabaseClient): Promise<LifeAreasResult> {
   const { data, error } = await supabase

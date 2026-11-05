@@ -252,6 +252,32 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   area: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
 };
 
+/**
+ * Life Brain B.4 (`LB-B-010`, ADR-155) — whether a source may enter the chat's
+ * PROMPT, which is a different question from how the chat SURFACE renders it
+ * (`RULES.chat`).
+ *
+ * `normal` and `private` always may. `highly_sensitive` may only when the owner
+ * asked for sensitive content in words, or when the question names the same
+ * area of life the source is filed under. Decided here, beside the rendering
+ * rules, so no surface carries a sensitivity branch of its own (2J-PRIVACY-001).
+ */
+export function admitsToChatPrompt(
+  level: SensitivityLevel,
+  ask: { readonly explicit: boolean; readonly sameArea: boolean },
+): boolean {
+  if (level !== "highly_sensitive") return true;
+  return ask.explicit || ask.sameArea;
+}
+
+/** Whether a level is the one `admitsToChatPrompt` asks an area or a request of. */
+export function needsAskForChatPrompt(level: SensitivityLevel): boolean {
+  return !admitsToChatPrompt(level, { explicit: false, sameArea: false });
+}
+
+/** The level an unreadable source is treated as: the most protective one. */
+export const UNREADABLE_LEVEL: SensitivityLevel = "highly_sensitive";
+
 /** The single entry point. Every governed surface asks this and obeys it. */
 export function presentationFor(
   surface: GovernedSurface,

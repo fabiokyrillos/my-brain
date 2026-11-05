@@ -174,6 +174,15 @@ export function SourceList({
       )}
 
       {/*
+        Life Brain B.4 (`LB-B-010`): the answer read content the owner marked as
+        highly sensitive — said as a fact about this answer, never about what
+        was withheld (`2K-EXPL-005`).
+      */}
+      {citations.readSensitive ? (
+        <p className="conversation-sources-sensitive" role="note">{copy.readSensitive}</p>
+      ) : null}
+
+      {/*
         `2K-EXPL-001`. Last, closed, and drawn only when there is something to
         say — the answer is above it and stays readable whether or not this is
         ever opened.

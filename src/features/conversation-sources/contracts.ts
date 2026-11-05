@@ -222,6 +222,17 @@ const envelopeSchema = z
      * as well, which is a worse answer to a smaller problem.
      */
     explanation: answerExplanationSchema.optional(),
+    /**
+     * Life Brain B.4 (`LB-B-010`, ADR-155): the answer READ content the owner
+     * marked as highly sensitive (admitted because they asked for it, or
+     * because the question named its area). Present only when true, so every
+     * envelope written before it parses unchanged.
+     *
+     * The opposite fact — that something was WITHHELD — has no field and no
+     * sentence: `2K-EXPL-005` forbids disclosing a sensitivity exclusion in
+     * count, rate or existence.
+     */
+    readSensitive: z.literal(true).optional(),
   })
   .strict();
 
@@ -256,6 +267,8 @@ export type ParsedCitations = {
    * recorded none — which is different from "nothing was excluded".
    */
   readonly explanation: AnswerExplanation | null;
+  /** Life Brain B.4: the answer read highly sensitive content. Absent means no. */
+  readonly readSensitive?: boolean;
   /** True when this row predates the envelope, so the surface can say less. */
   readonly legacy: boolean;
 };
@@ -265,6 +278,7 @@ export const NO_CITATIONS: ParsedCitations = {
   reach: [],
   sources: [],
   explanation: null,
+  readSensitive: false,
   legacy: false,
 };
 
@@ -283,6 +297,7 @@ export function parseCitations(raw: unknown): ParsedCitations {
       reach: envelope.data.reach,
       sources: envelope.data.sources,
       explanation: envelope.data.explanation ?? null,
+      readSensitive: envelope.data.readSensitive === true,
       legacy: false,
     };
   }
@@ -311,6 +326,7 @@ export function parseCitations(raw: unknown): ParsedCitations {
     reach: [],
     sources,
     explanation: null,
+    readSensitive: false,
     legacy: true,
   };
 }
@@ -335,6 +351,8 @@ export function buildCitationsEnvelope(input: {
    * caller knows; the constant cannot.
    */
   readonly reach: readonly AnswerReach[];
+  /** Life Brain B.4: set when the answer read highly sensitive content. */
+  readonly readSensitive?: boolean;
 }): CitationsEnvelope {
   return {
     v: CITATIONS_ENVELOPE_VERSION,
@@ -342,5 +360,6 @@ export function buildCitationsEnvelope(input: {
     reach: [...input.reach],
     sources: [...input.sources],
     ...(input.explanation === undefined ? {} : { explanation: input.explanation }),
+    ...(input.readSensitive === true ? { readSensitive: true as const } : {}),
   };
 }

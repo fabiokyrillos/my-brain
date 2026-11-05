@@ -16,6 +16,9 @@ import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordErrorEvent, type ErrorOperation } from "@/lib/observability/error-sink";
 import { chatFailureMessage, classifyChatFailure, withChatFailureReference } from "./diagnostics";
+import { needsAskForChatPrompt } from "@/features/sensitivity/contracts";
+import { admitsSource, readSensitiveAsk } from "./sensitive-admission";
+import { classifyKnowledgeSources, FAIL_CLOSED, sourceKey, type ClassificationClient } from "./source-classification";
 import {
   buildCitationsEnvelope,
   CHAT_REACH,
@@ -401,8 +404,20 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
     // predicate, which `phase-2n-knowledge-guard.test.ts` holds together.
     const relevant = matches.filter((match) => match.similarity >= 0.2);
     const inForce = await memoriesInForce(supabase, relevant);
-    const ranked: ChatSource[] = relevant
+    /*
+      Life Brain B.4 (`LB-B-010`, ADR-155). A `highly_sensitive` record or
+      memory enters the prompt only when the owner asked for it in words or the
+      question names its area of life; every other level is unchanged. In the
+      application, after retrieval, so the RPC and its bound are untouched.
+      The exclusion is silent (`2K-EXPL-005`); the inclusion is marked.
+    */
+    const sensitiveAsk = readSensitiveAsk(parsed.data.question);
+    const classifications = await classifyKnowledgeSources(supabase as unknown as ClassificationClient, user.id, relevant);
+    const classificationOf = (match: KnowledgeRow) => classifications.get(sourceKey(match.source_type, match.source_id)) ?? FAIL_CLOSED;
+    const admitted = relevant
       .filter((match) => match.source_type !== "memory" || inForce.has(match.source_id))
+      .filter((match) => admitsSource(classificationOf(match), sensitiveAsk));
+    const ranked: ChatSource[] = admitted
       .map((match) => ({
         id: `${match.source_type}:${match.source_id}`,
         type: match.source_type,
@@ -412,6 +427,11 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
       }));
     // "Última vez", "recentemente", "quando foi": newest first, never fewer rows.
     const vectorSources = temporal.recency ? byRecency(ranked).slice(0, 8) : ranked;
+    // Over what actually reaches the prompt, after the recency cut.
+    const readSensitive = vectorSources.some((source) => {
+      const classification = classifications.get(source.id);
+      return classification !== undefined && needsAskForChatPrompt(classification.level);
+    });
 
     /*
      * Life Brain B.2 (`LB-B-006`, ADR-147). Tasks and reminders have no vector,
@@ -540,6 +560,8 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
        * sentence.
        */
       reach: CHAT_REACH,
+      // `LB-B-010`: only when a highly sensitive source reached the prompt.
+      readSensitive: readSensitive && !answeredWithoutModel,
     });
 
     const { error: answerError } = await supabase.from("conversation_messages").insert({
