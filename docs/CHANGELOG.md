@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain B.5: one composer with modes, voice in the chat, relatos kept
+
+- **`Composer mode="capture" | "chat"`** is the one entry point; `ChatComposer` (moved from `assistant/assistant-composer.tsx`) mounts the shared `VoiceComposer` (chat pages bind `transcribeRecording`).
+- **Chat routing:** after the command model says "not a command", `looksLikeRelato` keeps a narrative statement as a record through `captureFromChat` (shared with "registre que") and answers "Guardei isso como registro". ADR-157.
+
+## 2026-11-05 — Life Brain: LB-M4 applied hosted; LB-OD-8 decided
+
+- **Recorded:** LB-M4 applied to the hosted project on 2026-11-05 (11,823 bytes, md5 `d2150441…`, three md5-checked chunks; parity **107 = 107**, head `202611050107`; writer definer, authenticated-only; rolled-back check: foreign person → P0002, 30 February → 22023; regenerated types equal the hand-written ones).
+- **LB-OD-8 decided by the owner ("B5 a"):** one composer with modes; a relato in the chat becomes a capture with a confirmation sentence.
+
 ## 2026-11-05 — Life Brain C.5: birthdays on the person, with a yearly reminder (LB-M4)
 
 - **Migration `202611050107_life_brain_m4_birthdays.sql`** (LB-M4, ADR-156, the fourth Life Brain migration, owner-authorized): `people.birthday_month/_day/_year` with a real-date check and a trigger refusing direct writes; `reminder_series.person_id` (owned FK, one active series per person); `set_person_birthday` (definer, authenticated only) keeps the date and a yearly 09:00 series together and audits; deleting a person ends their series. pgTAP `life_brain_m4_birthdays.sql` (24). Chain guards → 107; Life Brain ceiling → 4. **Not applied to the hosted project yet.**

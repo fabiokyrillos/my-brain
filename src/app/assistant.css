@@ -53,6 +53,15 @@
   color: var(--text-muted);
 }
 
+/* Life Brain B.5: the capture composer's voice control, shared. It sits beside
+   the send button; while recording (or where the browser has no microphone
+   path) it takes the row's full width under the field rather than squeezing it. */
+.assistant-composer-row { flex-wrap: wrap; }
+.assistant-composer-row > textarea { flex: 1 1 0; min-width: 0; width: auto; }
+.assistant-composer-row > .voice-control { flex: none; display: flex; align-items: center; }
+.assistant-composer-row > .voice-control:has(.voice-live),
+.assistant-composer-row > .voice-unsupported { order: 3; flex-basis: 100%; margin: 0; }
+
 
 
 .assistant-composer-hint {

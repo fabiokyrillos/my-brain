@@ -114,12 +114,29 @@ describe("runAssistantTurn — fallthrough is classified, never caught", () => {
     );
     // A statement, not a question: since `LB-B-009` a question skips the parse,
     // so the fallthrough is exercised by text the parse still sees.
-    await runAssistantTurn(idleAssistantComposerState, ask("Combinei algo com Jaime"));
+    // Not a relato either (B.5), so it is answered rather than kept.
+    await runAssistantTurn(idleAssistantComposerState, ask("Algo sobre o Jaime e a proposta"));
 
     expect(commandMock).toHaveBeenCalledTimes(1);
     expect(chatMock).toHaveBeenCalledTimes(1);
     const [, submitted] = chatMock.mock.calls[0]!;
-    expect(submitted.get("question")).toBe("Combinei algo com Jaime");
+    expect(submitted.get("question")).toBe("Algo sobre o Jaime e a proposta");
+  });
+
+  it("keeps a relato that is not a command as a record, and says so (Life Brain B.5)", async () => {
+    commandMock.mockResolvedValue(
+      commandState({ unsupportedReason: "not_a_task_command", terminal: true }),
+    );
+    const result = await runAssistantTurn(idleAssistantComposerState, ask("Combinei algo com Jaime ontem à noite"));
+
+    expect(commandMock).toHaveBeenCalledTimes(1);
+    expect(chatMock).not.toHaveBeenCalled();
+    expect(captureMock).toHaveBeenCalledTimes(1);
+    const submitted = captureMock.mock.calls[0]?.[1] as FormData;
+    expect(submitted.get("content")).toBe("Combinei algo com Jaime ontem à noite");
+    expect(submitted.get("source")).toBe("chat");
+    expect(result.route).toBe("capture_intent");
+    expect(result.notice?.heading).toBe("Guardei isso como registro");
   });
 
   it("never converts any other refusal into a chat question", async () => {

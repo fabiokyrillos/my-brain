@@ -61,6 +61,9 @@ type AssistantCopy = {
    */
   readonly captureHeading: string;
   readonly captureDetail: string;
+  /** Life Brain B.5 (ADR-157): a relato kept as a record, with the way back if it was a question. */
+  readonly relatoHeading: string;
+  readonly relatoDetail: string;
   readonly captureAmbiguousHeading: string;
   readonly captureAmbiguousDetail: string;
   readonly captureFailedHeading: string;
@@ -103,6 +106,8 @@ export const assistantCopy = {
     memoryNextStep: "Criar essa memória em Memórias",
     captureHeading: "Anotei isso para você",
     captureDetail: "Guardei o texto como uma entrada e comecei a interpretá-la.",
+    relatoHeading: "Guardei isso como registro",
+    relatoDetail: "Vou organizar e te mostrar o que entendi. Se era uma pergunta, escreva de novo terminando com “?”.",
     captureAmbiguousHeading: "Uma nota ou uma tarefa?",
     captureAmbiguousDetail:
       "Você pediu para registrar e mencionou uma tarefa, e eu não quero escolher por você. Para uma nota, escreva sem a palavra “tarefa”; para uma tarefa, comece com “adicione uma tarefa…”.",
@@ -143,6 +148,8 @@ export const assistantCopy = {
     memoryNextStep: "Create this memory in Memories",
     captureHeading: "I noted that for you",
     captureDetail: "I kept your text as an entry and started interpreting it.",
+    relatoHeading: "I kept that as a record",
+    relatoDetail: "I'll organize it and show you what I understood. If it was a question, write it again ending with “?”.",
     captureAmbiguousHeading: "A note or a task?",
     captureAmbiguousDetail:
       "You asked me to record something and mentioned a task, and I do not want to choose for you. For a note, write it without the word “task”; for a task, start with “add a task…”.",

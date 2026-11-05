@@ -27,7 +27,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { AssistantComposer } from "@/features/assistant/assistant-composer";
+import { ChatComposer as AssistantComposer } from "@/features/capture/chat-composer";
 import { idleAssistantComposerState } from "@/features/assistant/composer-state";
 
 import { AskAboutLink } from "./ask-about-link";

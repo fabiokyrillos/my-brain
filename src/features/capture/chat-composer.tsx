@@ -34,15 +34,60 @@ import {
   type MemoryProposalAction,
 } from "@/features/memories/memory-proposal-card";
 
-import { idleAssistantComposerState, type AssistantComposerState } from "./composer-state";
-import { getAssistantCopy } from "./copy";
+import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
+import { getAssistantCopy } from "@/features/assistant/copy";
 
-export type AssistantComposerAction = (
+import { VoiceComposer, type TranscribeAction } from "./voice-composer";
+
+export type ChatComposerAction = (
   state: AssistantComposerState,
   formData: FormData,
 ) => Promise<AssistantComposerState>;
 
-export function AssistantComposer({
+/** The name the chat pages and tests used before B.5; the same type. */
+export type AssistantComposerAction = ChatComposerAction;
+
+export type ChatComposerProps = {
+  action: ChatComposerAction;
+  /**
+   * Life Brain B.5 (LB-OD-8 option A): the same voice the capture composer
+   * has — `transcribeRecording`, bound by the page. The text comes back into
+   * the field for the owner to read before sending; nothing is sent by voice
+   * alone. Optional so a surface without a microphone path still renders.
+   */
+  transcribeAction?: TranscribeAction;
+  /**
+   * The confirmed-memory write (DEC-5), passed in for the same reason `action`
+   * is: this is a client component and may not import a `"use server"` module
+   * for a value. It is reachable only from the proposal card's confirm control.
+   */
+  memoryAction: MemoryProposalAction;
+  /**
+   * `2K-ACT-008`. The conversational undo, which **archives** (OD-2K-3). Passed
+   * in for the same reason the other two actions are, and kept separate from
+   * `memoryAction` so the write and its reversal never share a control.
+   */
+  memoryUndoAction: MemoryProposalAction;
+  locale: Locale;
+  /** The assistant’s configured name (UX-06). Passed in, never read here: this is a client component. */
+  agentName: string;
+  conversationId?: string;
+  /**
+   * `2P-CHAT-005`. A starting sentence, seeded on first mount only.
+   *
+   * Set when the owner arrived from a contextual page through "ask about this".
+   * It is **a seed, not a submission**: the field is still uncontrolled, the
+   * owner edits or clears it, and only an explicit send does anything — the same
+   * rule the capture composer follows for a transcript.
+   *
+   * Seeding stops the moment a turn resolves, which is what `state.route` gates
+   * below. Without that, a failed turn would restore the owner's own text from
+   * `echo` and then a re-render would put the seed back over it.
+   */
+  initialText?: string;
+};
+
+export function ChatComposer({
   action,
   memoryAction,
   memoryUndoAction,
@@ -50,8 +95,16 @@ export function AssistantComposer({
   agentName,
   conversationId,
   initialText,
+  transcribeAction,
 }: {
-  action: AssistantComposerAction;
+  action: ChatComposerAction;
+  /**
+   * Life Brain B.5 (LB-OD-8 option A): the same voice the capture composer
+   * has — `transcribeRecording`, bound by the page. The text comes back into
+   * the field for the owner to read before sending; nothing is sent by voice
+   * alone. Optional so a surface without a microphone path still renders.
+   */
+  transcribeAction?: TranscribeAction;
   /**
    * The confirmed-memory write (DEC-5), passed in for the same reason `action`
    * is: this is a client component and may not import a `"use server"` module
@@ -85,6 +138,16 @@ export function AssistantComposer({
   const [state, formAction, pending] = useActionState(action, idleAssistantComposerState);
   const copy = getAssistantCopy(locale);
   const form = useRef<HTMLFormElement | null>(null);
+  const field = useRef<HTMLTextAreaElement | null>(null);
+
+  /** A transcript lands in the field, after what is already typed; never sent by itself. */
+  function insertTranscript(text: string) {
+    const target = field.current;
+    if (!target) return;
+    const current = target.value.trimEnd();
+    target.value = current ? `${current} ${text}` : text;
+    target.focus();
+  }
   const notice = useRef<HTMLDivElement | null>(null);
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;
@@ -188,9 +251,13 @@ export function AssistantComposer({
             name="composerText"
             onKeyDown={onKeyDown}
             placeholder={copy.inputPlaceholder}
+            ref={field}
             required
             rows={2}
           />
+          {transcribeAction ? (
+            <VoiceComposer locale={locale} onTranscript={insertTranscript} transcribeAction={transcribeAction} />
+          ) : null}
           {/*
             Life Brain A.1: a 44px primary icon button in place of the
             full-width "Enviar" block. Its accessible name follows the state so
