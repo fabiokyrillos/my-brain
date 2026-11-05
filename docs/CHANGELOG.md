@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain: LB-M2 applied hosted, `process-jobs` v35
+
+- **Recorded:** LB-M2 applied to the hosted project on 2026-11-05 (16,066 bytes, md5 `d2c2a934…`, staged in three md5-checked chunks and applied in one block that re-checked them; parity **106 = 106**, head `202611040106`; RLS forced, SELECT-only for `authenticated`, no `anon`/`service_role`; a rolled-back owner-session check: foreign confirm and cancel → P0002, direct insert → 42501). `process-jobs` **v35** deployed from `5435e86` (prompt `2026-11-04.3`); every deployed file compared with git, the only difference being `entity-resolution.ts`'s accent range rendered as literal characters, as in v34.
+
 ## 2026-11-04 — Life Brain C.3: events with a period, confirmed by the owner, on the calendar's sixth lane (LB-M2)
 
 - **Migration `202611040106_life_brain_m2_events.sql`** (LB-M2, ADR-152, supersedes OD-2M-3 A): `public.events` (RLS forced, SELECT-only for the owner, owned composite FKs, no sensitivity column), `confirm_entry_event_candidates` (definer, owner + current-interpretation checks, candidate validation, idempotent, one event per candidate, area context, undo + audit), `private.undo_confirm_entry_event_candidates` registered with the router, `cancel_event`. pgTAP `life_brain_m2_events.sql` (30).
