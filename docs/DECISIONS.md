@@ -2414,3 +2414,18 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** A reminder only, unlinked (option 1 offered to the owner; rejected by them: the page could not show the date). A `birthday date` column (rejected: a date type needs a year, and most birthdays are kept without one). Extracting birthdays from records automatically (left for later: an AI→domain write the owner would still confirm).
 
 - **Consequences.** Migrations: **107** local. The person page shows the birthday and the reminder reaches the Agenda, Home and notifications like any yearly reminder.
+
+## ADR-157 — One composer with modes, voice in the chat, and a relato in the chat kept as a record (LB-OD-8 option A)
+
+- **Date:** 2026-11-05
+- **Status:** Accepted — Life Brain slice B.5 (LB-OD-8, decided by the owner: "B5 a"). **No migration.**
+
+- **Context.** Capture and chat had two composers: the capture one with text, attachment and voice; the assistant one with text only. Telling the chat "fui no cardiologista hoje" went to the task-command model, fell through, and was *answered* — so the owner had to know to type "registre que" for the product to keep it.
+
+- **Decision 1 — One entry point.** `Composer` (`src/features/capture/composer.tsx`) takes `mode`: `capture` (default; Hoje and the capture page are unchanged) or `chat`. The chat body is `ChatComposer` (`capture/chat-composer.tsx`, moved from `assistant/assistant-composer.tsx`, which no longer exists). The bodies stay separate components because their actions and states differ.
+- **Decision 2 — Voice in the chat, the same control.** The chat pages bind `transcribeRecording`; `ChatComposer` mounts the capture composer's `VoiceComposer`. A transcript is inserted into the field for the owner to read; nothing is sent by voice alone.
+- **Decision 3 — A relato is kept.** After the task-command model says a text is not a command, `looksLikeRelato` (declared pt-BR/en: no question mark, no request opener, a first-person narrative verb) sends it through the same capture path as "registre que" (`captureFromChat`), and the turn says "Guardei isso como registro", with the way back if it was a question. Every other non-command is still answered. The command model keeps the first look, so "terminei o relatório" can still complete a task.
+
+- **Alternatives considered.** Keeping two composers (LB-OD-8 option B, declined by the owner). Classifying relatos before the command model (rejected: "terminei a tarefa X" is a command). Asking a model to classify (rejected: an extra call per turn for a decision a small declared rule answers).
+
+- **Consequences.** The chat writes in one more case than before: a statement that reads as something that happened. The confirmation sentence and the record card make it visible, and the record can be deleted like any other.

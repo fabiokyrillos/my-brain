@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain B.5: one composer with modes, voice in the chat, relatos kept
+
+- **`Composer mode="capture" | "chat"`** is the one entry point; `ChatComposer` (moved from `assistant/assistant-composer.tsx`) mounts the shared `VoiceComposer` (chat pages bind `transcribeRecording`).
+- **Chat routing:** after the command model says "not a command", `looksLikeRelato` keeps a narrative statement as a record through `captureFromChat` (shared with "registre que") and answers "Guardei isso como registro". ADR-157.
+
 ## 2026-11-05 — Life Brain: LB-M4 applied hosted; LB-OD-8 decided
 
 - **Recorded:** LB-M4 applied to the hosted project on 2026-11-05 (11,823 bytes, md5 `d2150441…`, three md5-checked chunks; parity **107 = 107**, head `202611050107`; writer definer, authenticated-only; rolled-back check: foreign person → P0002, 30 February → 22023; regenerated types equal the hand-written ones).

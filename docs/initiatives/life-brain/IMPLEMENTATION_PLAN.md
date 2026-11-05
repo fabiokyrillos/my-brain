@@ -100,6 +100,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### B.5 — Composer único com voz e captura pela conversa (1,5 d)
 
 - `Composer` com `mode`; roteador (pergunta/comando/relato); `VoiceComposer` compartilhado; retirada de `assistant-composer.tsx`.
+- **Implementado 2026-11-05 (ADR-157, LB-OD-8 opção A):** `Composer mode="capture" | "chat"`; `ChatComposer` (movido de `assistant-composer.tsx`) com o mesmo `VoiceComposer`; um relato que não é comando vira registro com "Guardei isso como registro".
 
 ### B.6 — Progresso real e streaming (1 d, pode)
 
