@@ -3,7 +3,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getLibraryCopy } from "@/features/library/copy";
+import { loadAreaCounts, loadIdeas } from "@/features/areas/area-page";
 import { loadLifeAreas } from "@/features/library/life-areas";
+import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
+import { formatInstant } from "@/lib/time/instant-format";
 import { loadBrainOverview } from "@/features/library/overview";
 import { getNavigationHref } from "@/features/shell/capabilities";
 import { contextKindLabel } from "@/features/vocabulary/copy";
@@ -60,7 +63,7 @@ export default async function LibraryPage({
   params: Promise<{ locale: Locale }>;
 }) {
   const { locale } = await params;
-  const { supabase } = await requireUser(locale);
+  const { supabase, user } = await requireUser(locale);
   const text = getLibraryCopy(locale);
   const messages = getMessages(locale);
   // `NavigationKey` includes `jobs`, which is context-only and carries no nav
@@ -72,10 +75,20 @@ export default async function LibraryPage({
 
   // Two independent reads: an area read that fails says so in its own section
   // and never fails the overview (or the other way round).
-  const [domains, areas] = await Promise.all([loadBrainOverview(supabase, locale), loadLifeAreas(supabase)]);
+  const [domains, areas, ideas, timeZone] = await Promise.all([
+    loadBrainOverview(supabase, locale),
+    loadLifeAreas(supabase),
+    loadIdeas(supabase, user.id),
+    getOwnerTimeZone(),
+  ]);
+  // Life Brain C.4 (`LB-C-009`): real counts, by the timeline's own rule. A
+  // failed count read leaves the doors without a number rather than with a 0.
+  const counts = areas.status === "ok" ? await loadAreaCounts(supabase, user.id, areas.areas.map((area) => area.id)) : null;
+  const ideasArea = areas.status === "ok" ? areas.areas.find((area) => area.kind === "ideas") ?? null : null;
   // The area doors and "see all" hang off the registry's href for the
   // contexts lens, never a hand-written path (`2I-LIB-006`).
   const contextsHref = getNavigationHref(locale, "contexts");
+  const recordsHref = getNavigationHref(locale, "inbox");
 
   return (
     <div className="brain-page">
@@ -108,6 +121,7 @@ export default async function LibraryPage({
             <ul className="brain-area-list">
               {areas.areas.map((area) => {
                 const kindLabel = contextKindLabel(locale, area.kind);
+                const count = counts?.get(area.id);
                 return (
                   <li key={area.id}>
                     <Link className="brain-area" href={`${contextsHref}/${area.id}`}>
@@ -115,6 +129,7 @@ export default async function LibraryPage({
                       {kindLabel && kindLabel.localeCompare(area.name, locale, { sensitivity: "base" }) !== 0 ? (
                         <span className="brain-area-kind">{kindLabel}</span>
                       ) : null}
+                      {count ? <span className="brain-area-count">{text.areas.count(count.count, count.atLeast)}</span> : null}
                     </Link>
                   </li>
                 );
@@ -127,6 +142,40 @@ export default async function LibraryPage({
           </>
         ) : (
           <p className="brain-domain-quiet">{text.areas.empty}</p>
+        )}
+      </section>
+
+      {/*
+        Life Brain C.4 (`LB-C-011`): Ideias as a lens — the records whose current
+        reading carries the `idea` concept. A filter over records, not a table.
+      */}
+      <section aria-labelledby="brain-ideas-heading" className="brain-areas brain-ideas">
+        <h2 id="brain-ideas-heading">{text.ideas.heading}</h2>
+        {ideas.status === "failed" ? (
+          <p className="brain-domain-quiet" role="note">{text.ideas.failed}</p>
+        ) : ideas.records.length ? (
+          <>
+            <ul className="brain-ideas-list">
+              {ideas.records.map((idea) => {
+                const href = `${recordsHref}/${idea.id}`;
+                return (
+                  <li key={idea.id}>
+                    <ProtectedContent href={href} locale={locale} revealKey={`brain-idea-${idea.id}`} sensitivity={idea.sensitivity} surface="area">
+                      <Link href={href}>{idea.preview}</Link>
+                    </ProtectedContent>
+                    <span className="brain-idea-date">{formatInstant(idea.occurredAt, "day", locale, timeZone)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            {ideasArea ? (
+              <p className="brain-areas-foot">
+                <Link className="brain-areas-all" href={`${contextsHref}/${ideasArea.id}`}>{text.ideas.seeArea}</Link>
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="brain-domain-quiet">{text.ideas.empty}</p>
         )}
       </section>
 

@@ -53,6 +53,15 @@ export type LibraryCopy = {
     readonly seeAll: string;
     /** Said when the overview read its bound and there are more areas. */
     readonly more: string;
+    /** Life Brain C.4 (`LB-C-009`): the area's real record count. */
+    readonly count: (count: number, atLeast: boolean) => string;
+  };
+  /** Life Brain C.4 (`LB-C-011`): Ideias, a lens over the records, not a table. */
+  readonly ideas: {
+    readonly heading: string;
+    readonly empty: string;
+    readonly failed: string;
+    readonly seeArea: string;
   };
   readonly lists: {
     readonly people: ListPageCopy & { readonly rowMeta: string };
@@ -110,6 +119,13 @@ const copy: Record<Locale, LibraryCopy> = {
       failed: "Não foi possível ler as áreas agora. Isso não quer dizer que não existam.",
       seeAll: "Ver todas as áreas",
       more: "Há mais áreas do que cabem aqui.",
+      count: (count, atLeast) => `${count}${atLeast ? "+" : ""} ${count === 1 && !atLeast ? "registro" : "registros"}`,
+    },
+    ideas: {
+      heading: "Ideias",
+      empty: "Quando você registrar uma ideia, ela aparece aqui.",
+      failed: "Não foi possível ler as ideias agora. Isso não quer dizer que não existam.",
+      seeArea: "Ver a área Ideias",
     },
     lists: {
       people: {
@@ -156,6 +172,13 @@ const copy: Record<Locale, LibraryCopy> = {
       failed: "Could not read the areas right now. That does not mean there are none.",
       seeAll: "See all areas",
       more: "There are more areas than fit here.",
+      count: (count, atLeast) => `${count}${atLeast ? "+" : ""} ${count === 1 && !atLeast ? "record" : "records"}`,
+    },
+    ideas: {
+      heading: "Ideas",
+      empty: "When you record an idea, it shows up here.",
+      failed: "Could not read the ideas right now. That does not mean there are none.",
+      seeArea: "See the Ideas area",
     },
     lists: {
       people: {

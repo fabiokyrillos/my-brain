@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-05 — Life Brain C.4: area pages, real counts, Ideias, "Áreas da vida"
+
+- **Area page:** a context whose kind is a life area shows next events (each trip with the area's records inside its period), the timeline of records the current reading files under it (bounded, with a real count), open linked tasks and the people linked or named (`src/features/areas/`). Every owner text renders through `ProtectedContent surface="area"`; events and tasks derive sensitivity from their source, failing closed.
+- **`area` governed surface** added to `GOVERNED_SURFACES` (contextual posture), after the thirteen 2Q pinned.
+- **Memória:** each area door carries its real record count; **Ideias** lists the newest records whose current reading carries `idea`.
+- **"Contextos" → "Áreas da vida"** ("Contexts" → "Life areas"), "Nova área", "Criar área"; route and table unchanged. ADR-154.
+
 ## 2026-11-05 — Life Brain A.5: compact list headers, two-line notices, Memória's areas
 
 - **List routes** (Registros, Notificações, Memória, Pessoas, Projetos, Organizações, Áreas, Arquivos, Memórias, Buscar) open with `PageHeader size="compact"`: no eyebrow, the lead hidden on a phone, the route's link or create form as the header's action. Their empty states keep the universal vocabulary and lose the box (`ux-state-quiet`). Inline locale ternaries moved into the typed copy modules. Guard: `life-brain-a5-lists-guard.test.ts`.

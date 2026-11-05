@@ -129,6 +129,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### C.4 — Linha do tempo por área e Ideias (1,5 d)
 
 - `/app/memory/areas/[area]`: linha do tempo (fatos), pendências, pessoas, eventos; lente Ideias; Relações absorvida pela página da pessoa/projeto.
+- **Implementado 2026-11-05 (ADR-154):** a página do contexto **é** a página da área (mesma URL, LB-OD-2): próximos eventos (uma viagem lista os registros do período), linha do tempo dos registros que a leitura **atual** arquiva na área, pendências abertas e pessoas; superfície governada `area` (altamente sensível mascarado no lugar). Memória com **contagens reais** por área e a lente **Ideias** (filtro pelo conceito `idea`). O destino passa a se chamar **Áreas da vida**. Fica: Relações continua uma lente própria.
 
 ### C.5 — Aniversários e datas recorrentes (1 d, pode)
 

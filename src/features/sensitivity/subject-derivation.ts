@@ -159,6 +159,16 @@ export function resolveProjectContent(
   return resolveContent("project", sensitivity.level, key, state);
 }
 
+/** Life Brain C.4 — an area page's record, under the `area` surface. */
+export function resolveAreaContent(
+  sensitivity: SubjectSensitivity,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  if (!isDerivedLevel(sensitivity)) return { show: true, masked: false, revealable: false };
+  return resolveContent("area", sensitivity.level, key, state);
+}
+
 export function resolveMemoryContent(
   sensitivity: SubjectSensitivity,
   key: string,

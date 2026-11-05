@@ -309,9 +309,15 @@ describe("2Q-TRUST-007: the phase adds no second sensitivity derivation", () => 
      * passes on twelve surfaces silently disappearing. This phase must move none
      * of them, so it pins all of them.
      */
+    //
+    // Life Brain C.4 (ADR-154) appends `area`, AFTER every surface this phase
+    // pinned: the thirteen below are still byte-for-byte in place and in order,
+    // which is what 2Q-TRUST-007 protects. A later initiative adding a surface
+    // at the end is not this phase moving one.
     expect([...list.matchAll(/"([a-z_]+)"/g)].map((match) => match[1])).toEqual([
       "hoje", "attention", "capture_receipt", "review_summary", "notification",
       "chat", "work", "calendar", "person", "project", "memory", "file", "graph",
+      "area",
     ]);
   });
 

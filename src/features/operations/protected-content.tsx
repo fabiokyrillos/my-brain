@@ -40,6 +40,7 @@ import {
   resolveGraphContent,
   resolveMemoryContent,
   resolvePersonContent,
+  resolveAreaContent,
   resolveProjectContent,
 } from "@/features/sensitivity/subject-derivation";
 import {
@@ -89,7 +90,8 @@ export type ProtectedSurface =
   | "project"
   | "memory"
   | "file"
-  | "graph";
+  | "graph"
+  | "area";
 
 const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
   work: resolveTaskContent,
@@ -99,6 +101,7 @@ const RESOLVER: Record<ProtectedSurface, typeof resolveTaskContent> = {
   memory: resolveMemoryContent,
   file: resolveFileContent,
   graph: resolveGraphContent,
+  area: resolveAreaContent,
 };
 
 export function ProtectedContent({

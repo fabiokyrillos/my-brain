@@ -353,7 +353,7 @@ function brainSurface() {
     "Pessoas",
     "Projetos",
     "Organizações",
-    "Contextos",
+    "Áreas da vida",
     "Memórias",
     "Arquivos",
     "Relações",
@@ -376,7 +376,7 @@ function brainSurface() {
       + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
       + `</ul></article></li>`,
     `<li><article class="brain-domain"><div class="brain-domain-head">`
-      + `<h3><a href="#">Contextos</a></h3><span class="brain-domain-count">3</span></div>`
+      + `<h3><a href="#">Áreas da vida</a></h3><span class="brain-domain-count">3</span></div>`
       + `<p class="brain-domain-note">Áreas da sua vida.</p>`
       + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
     `<li><article class="brain-domain"><div class="brain-domain-head">`
@@ -393,10 +393,12 @@ function brainSurface() {
     + `<div class="ui-page-header__actions"><a class="brain-search-link" href="#">Buscar em tudo</a></div></header>`
     + strip
     + `<section aria-labelledby="brain-areas-heading" class="brain-areas"><h2 id="brain-areas-heading">Áreas da vida</h2>`
-    + `<ul class="brain-area-list"><li><a class="brain-area" href="#"><span class="brain-area-name">Saúde</span></a></li>`
+    + `<ul class="brain-area-list"><li><a class="brain-area" href="#"><span class="brain-area-name">Saúde</span><span class="brain-area-count">12 registros</span></a></li>`
     + `<li><a class="brain-area" href="#"><span class="brain-area-name">Terapia</span><span class="brain-area-kind">Saúde</span></a></li>`
     + `<li><a class="brain-area" href="#"><span class="brain-area-name">Viagens</span></a></li></ul>`
     + `<p class="brain-areas-foot"><a class="brain-areas-all" href="#">Ver todas as áreas</a></p></section>`
+    + `<section aria-labelledby="brain-ideas-heading" class="brain-areas brain-ideas"><h2 id="brain-ideas-heading">Ideias</h2>`
+    + `<ul class="brain-ideas-list"><li><a href="#">E se a horta fosse no telhado?</a><span class="brain-idea-date">3 de nov.</span></li></ul></section>`
     + `<section class="brain-holds"><h2>O que o Brain guarda</h2>`
     + `<ul class="brain-domains">${panels.join("")}</ul></section></div>`;
 }
