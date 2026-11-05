@@ -118,3 +118,17 @@ describe("revalidation names the route pattern, never the resolved path", () => 
     expect(SETTINGS_REVALIDATION_PATHS[1].endsWith("/[section]")).toBe(true);
   });
 });
+
+describe("Life Brain A.6 — Avançado names the destinations as the rail does", () => {
+  it("uses the navigation's own labels for Histórico and Custos de IA", async () => {
+    const { getSettingsCopy } = await import("./copy");
+    const { getMessages } = await import("@/i18n/messages");
+    for (const locale of ["pt-BR", "en"] as const) {
+      const advanced = getSettingsCopy(locale).advanced.links;
+      const nav = getMessages(locale).nav as Record<string, string>;
+      expect(advanced.history).toBe(nav.history);
+      expect(advanced.costs).toBe(nav.costs);
+      expect(advanced.jobs.length).toBeGreaterThan(0);
+    }
+  });
+});

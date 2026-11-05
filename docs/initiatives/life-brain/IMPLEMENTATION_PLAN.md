@@ -65,6 +65,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### A.6 — Ajustes, Avançado e regressão visual (1 d)
 
 - Ajustes com seções em `ListItem` no celular e "Avançado" agrupando Histórico, Uso de IA, Em andamento; lane `toHaveScreenshot` para Hoje, Conversar, Tarefas, Agenda nos dois temas; remoção dos seletores superados e consolidação de breakpoints.
+- **Parte 1 implementada 2026-11-05:** Ajustes com `PageHeader compact` (sem eyebrow nem ternário); no celular as seções viram linhas de lista entre divisórias (a ativa marcada por uma borda à esquerda, não só por cor); grupo **Avançado** com Histórico, Custos de IA e Em andamento (links, nunca seções; os nomes são os do menu). Ficam: os 28 usos de `button-primary/secondary` em seis formulários (cada um com largura e margem próprias no CSS — trocar sem revisão visual de cada um é arriscado), a lane `toHaveScreenshot` (baselines dependem do sistema; precisam de um runner fixo) e a consolidação de breakpoints.
 
 ## 2. Trilha B — Conversar com a memória
 
