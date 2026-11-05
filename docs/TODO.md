@@ -90,7 +90,7 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
   - ~~**Apply LB-M4 to the hosted project**~~ — **done 2026-11-05:** byte-identical to `main` (11,823 bytes, md5 `d2150441…`), parity **107 = 107**, posture read back (writer definer with empty `search_path`, authenticated-only, no `anon`; three triggers; four constraints; the one-active-series index); a rolled-back check refused a foreign person (P0002) and an impossible date (22023); the types regenerated from the hosted project equal the hand-written ones.
   - Run a live check: set a birthday on a person, see it on the page and the reminder on the Agenda; change it and see one series active.
   - ~~Birthdays are not read from records yet~~ — **implemented 2026-11-05 (ADR-158):** the reading carries `people[].birthday` (`entry-extraction-v5` / `2026-11-05.1`) and the record page offers "Guardar o aniversário de Ana: 5 de maio?" for a linked person with no date. Left open by it:
-    - **Deploy `process-jobs`** with prompt `2026-11-05.1`; until then no new reading carries a birthday.
+    - ~~**Deploy `process-jobs`** with prompt `2026-11-05.1`~~ — **done 2026-11-05:** v36 from `main` `8398f6f` (owner: "pode publicar o worker"); 20 files read back, 19 byte-identical, `entity-resolution.ts` differing only by the accent range rendered as literal characters, as in v34/v35.
     - Run a live check: capture "a Ana faz aniversário em 5 de maio", link Ana, accept the offer, see the date on her page and the reminder on the Agenda.
     - No "não, obrigado" that is remembered; the offer stays on that record while the person has no date.
   - The reminder title is fixed at creation; renaming the person does not rename it until the date is set again.

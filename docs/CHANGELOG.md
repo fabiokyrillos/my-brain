@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-05 — `process-jobs` v36 (prompt `2026-11-05.1`)
+
+- **Recorded:** `process-jobs` v36 deployed from `main` `8398f6f` on the owner's go ("pode publicar o worker"), carrying ADR-158's `people[].birthday` (`entry-extraction-v5`). The 20 deployed files were read back and compared with git: 19 byte-identical, `_shared/entity-resolution.ts` differing only by the accent range rendered as literal characters, as in v34 and v35.
+
 ## 2026-11-05 — Screenshot lane, part 2: baselines and the gate (ADR-159)
 
 - 16 baselines drawn by `visual-baselines.yml` on the runner (`e2e/visual-regression.spec.ts-snapshots/`), reviewed by eye.
