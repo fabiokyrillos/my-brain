@@ -49,6 +49,8 @@ import {
 } from "@/features/sensitivity/subject-derivation";
 import { deriveTaskSensitivity } from "@/features/sensitivity/task-derivation";
 import { attachmentStatusLabel, getVocabularyCopy, memoryKindLabel, taskStatusLabel } from "@/features/vocabulary/copy";
+import { setPersonBirthday } from "@/features/birthdays/actions";
+import { BirthdayPanel } from "@/features/birthdays/birthday-panel";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
@@ -122,7 +124,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     agentName,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
-    supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at").eq("id", personId).maybeSingle(),
+    supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at,birthday_month,birthday_day,birthday_year").eq("id", personId).maybeSingle(),
     // `2N-PERSON-003`: every list below asks for one row more than it will show,
     // so "there are more" is knowable rather than guessed. See
     // `features/bounds/contracts.ts` — receiving exactly `limit` rows cannot
@@ -429,6 +431,19 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           ) : (
             <p>{pt ? "Contexto construído a partir das interações registradas." : "Context built from recorded interactions."}</p>
           )}
+          {/*
+            Life Brain C.5 (ADR-156): the person's birthday and its yearly
+            reminder. A date about a person is a structural fact the owner
+            entered, not derived content, so it renders unmasked like the name.
+          */}
+          <BirthdayPanel
+            action={setPersonBirthday}
+            birthday={person.birthday_month !== null && person.birthday_day !== null
+              ? { day: person.birthday_day, month: person.birthday_month, year: person.birthday_year }
+              : null}
+            locale={locale}
+            personId={person.id}
+          />
           {aliases.length > 0 && (
             <p className="entity-aliases">
               {/* Gender-neutral in pt-BR on purpose: this line describes every
