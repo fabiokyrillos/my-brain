@@ -261,3 +261,44 @@ its reader. That refusal is now deliberate rather than merely unreviewed.
 - **The authenticated journeys still have not been run** (§5), and the three unloadable test files
   and the broken `npm run dev` are still exactly as §5 describes them — neither caused nor fixed by
   any of this.
+
+## 8. The screenshot baselines: what actually moved, and the hole it exposed
+
+`visual-baselines.yml` ran on this branch on 6 November and redrew **two** images:
+`hoje-light-mobile` and `hoje-dark-mobile`. Not four, not eight — two. §5 and ADR-160 both said the
+baselines "for Hoje and Conversar" no longer matched. That was half right, and the half that was
+wrong is the interesting half.
+
+**Hoje, mobile.** Redrawn, and the new image is the proof that the run built this branch: the
+"Perguntar ao Brain" door is gone from it, and so is the `Ctrl+K` hint — which also settles that
+Playwright's Pixel 7 emulation does report `(hover: none) and (pointer: coarse)`, something the B.7
+lane deliberately did not assume.
+
+**Hoje, desktop.** Unchanged, because `toHaveScreenshot` captures the **viewport**, not the page,
+and the removed block sits below the fold at 1280 × 720.
+
+**Conversar: unchanged on all four, and that is a defect in the baseline rather than in the page.**
+The same run rendered Conversar from the same build, compared it against a baseline drawn on `main`
+before B.7 — one that still shows the lens strip and the `Ctrl+K` hint — and **passed** it. The
+difference is real and it is below `maxDiffPixelRatio: 0.005`: at 412 × 839 that is 1,728 pixels,
+and what changed is thin anti-aliased glyph text (a four-item strip, a 2px underline, a separator
+rule, and a small `kbd`) with nothing reflowing underneath, because the space below the strip was
+already empty. So the gate tolerates it — and `--update-snapshots` runs in `changed` mode, so it
+never rewrites a baseline it considers matching. **A baseline that depicts a removed element can
+therefore survive indefinitely**, and the next person redrawing baselines for an unrelated change
+would inherit a phantom strip.
+
+The fix here is the blunt one that cannot be fooled: the four Conversar baselines are **deleted**, so
+the runner has to write them from scratch rather than compare and keep. That also makes it an
+experiment rather than a cleanup — if the redrawn image still shows the lens strip, the page is
+wrong rather than the baseline, and it will be visible in the pull request.
+
+**And the first `verify` run proved nothing about Conversar either.** The lane is
+`test.describe.configure({ mode: "serial" })`, so when `hoje (light)` failed on mobile the remaining
+seven mobile tests were **skipped** — the reporter's `·F°°°°°°°·······`. A serial lane reports the
+first failure per project and nothing after it, which is worth knowing before reading a green-looking
+dot sequence as coverage.
+
+**Not fixed here, and not mine to decide:** `maxDiffPixelRatio: 0.005` is ADR-159's number. This
+slice does not change it. But it is now written down that the threshold is large enough to hide the
+removal of a navigation strip, which is the kind of change the lane exists to catch.
