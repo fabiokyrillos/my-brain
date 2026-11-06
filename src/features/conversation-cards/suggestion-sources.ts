@@ -125,27 +125,43 @@ type EntryRow = { id: string; original_content: string; sensitivity: string };
  * because the year-boundary case is the one a reader will want proof of: a
  * birthday on 2 January, read on 28 December, is **next** year's.
  *
- * A 29 February birthday read in a non-leap year resolves through
- * `Date.UTC`'s own rollover to 1 March. Stated rather than special-cased: the
- * suggestion is a question about the week ahead, and being one day out on the
- * rarest date in the calendar is not worth a month-length table here.
+ * `addLocalDays(…, 0)` is a normalisation, not a no-op: it round-trips the date
+ * through `Date.UTC`, which is what turns a 29 February birthday into 1 March in
+ * a year that has no 29 February. Being one day out on the rarest date in the
+ * calendar is cheaper than a month-length table, and silently never suggesting
+ * that birthday would be worse than both.
  */
 export function nextBirthdayOccurrence(
   today: LocalDate,
   month: number,
   day: number,
 ): LocalDate {
-  const thisYear: LocalDate = { year: today.year, month, day };
+  const thisYear = addLocalDays({ year: today.year, month, day }, 0);
   return compareLocalDates(thisYear, today) >= 0
     ? thisYear
-    : { year: today.year + 1, month, day };
+    : addLocalDays({ year: today.year + 1, month, day }, 0);
 }
 
-/** Whole calendar days from `from` to `to`. Never a division of milliseconds. */
-function daysBetween(from: LocalDate, to: LocalDate): number {
-  const start = Date.UTC(from.year, from.month - 1, from.day);
-  const end = Date.UTC(to.year, to.month - 1, to.day);
-  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+/**
+ * How many days away the next occurrence is, or `null` past the horizon.
+ *
+ * Walked one calendar day at a time with `addLocalDays` rather than subtracted
+ * as milliseconds. That is not fussiness: `phase-2m-local-day-guard.test.ts`
+ * refuses any module that holds both a day-boundary name and a hard-coded
+ * `24 * 60 * 60 * 1000`, because deriving a day from a fixed 24 hours is how
+ * this repository got a wrong answer at 23:00 three times. A UTC subtraction
+ * would in fact have been correct here — both ends are wall-clock dates, not
+ * instants — but a reader cannot see that from the arithmetic, and the walk is
+ * bounded by the horizon (at most fifteen steps) so it costs nothing to make it
+ * obvious instead.
+ */
+function daysUntil(from: LocalDate, to: LocalDate, horizon: number): number | null {
+  let cursor = from;
+  for (let days = 0; days <= horizon; days += 1) {
+    if (compareLocalDates(cursor, to) === 0) return days;
+    cursor = addLocalDays(cursor, 1);
+  }
+  return null;
 }
 
 /**
@@ -289,8 +305,7 @@ export async function loadSuggestionInputs(
     birthdaysSoon: birthdays.flatMap((person) => {
       if (person.birthday_month === null || person.birthday_day === null) return [];
       const occurrence = nextBirthdayOccurrence(today, person.birthday_month, person.birthday_day);
-      const away = daysBetween(today, occurrence);
-      if (away < 0 || away > BIRTHDAY_HORIZON_DAYS) return [];
+      if (daysUntil(today, occurrence, BIRTHDAY_HORIZON_DAYS) === null) return [];
       /*
         `people` carries no classification column — the same evidenced negative
         `suggestions.ts` records for a person's name, and the reason a birthday
