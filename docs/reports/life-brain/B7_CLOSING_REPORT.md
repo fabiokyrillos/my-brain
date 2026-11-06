@@ -97,6 +97,19 @@ pushed the page 15 CSS px wide at 320. Fixed with a local override, not in the p
 locales; `accessibility`, `layout-contracts`, `daily-surfaces` and `calendar` 413 passing on both
 projects.
 
+**Two guards caught this slice from the other side of the repository, and both were right to.**
+Neither was weakened:
+
+- `phase-2m-local-day-guard` refuses any module holding both a day-boundary name and a hard-coded
+  `24 * 60 * 60 * 1000`, because deriving a day from a fixed 24 hours is how this product got a wrong
+  answer at 23:00 three times. The birthday distance was a UTC millisecond subtraction, which was
+  *correct* — both ends are wall-clock dates, not instants — but a reader cannot see that from the
+  arithmetic. It now walks calendar days with `addLocalDays`, bounded by the horizon.
+- `phase-2i-library-guard` asserted that every Brain lens surface mounts the lens strip. `/app/chat`
+  deliberately stopped. The guard now names `chat` as the one exemption and asserts the **absence**,
+  so a strip that comes back fails there — and additionally asserts `chat` is still in the lens
+  vocabulary, because what left is the self-mount and not the lens.
+
 **Not verified, and it matters:**
 
 - **The ADR-159 screenshot baselines for Hoje and Conversar no longer match.** Both surfaces changed
@@ -107,8 +120,24 @@ projects.
   manual. The fill was proved in jsdom and the chip's geometry in a real browser; *clicking a chip in
   the signed-in app and watching the composer fill* has not been run anywhere.
 - **No real device.** An emulated viewport is a viewport.
-- `npm run dev` does not start in this container (`Can't resolve './tokens.css'`). Pre-existing and
-  unrelated: `npm run build` and `npm run start` are both fine, and CI uses the latter.
+
+**Two pre-existing faults found while verifying, neither caused by this slice and neither fixed by
+it** — recorded because both cost time to diagnose and will cost it again:
+
+- **Three test files cannot be loaded at all**, and have nothing to do with B.7:
+  `src/features/auth/hosted-auth-parity.test.ts`,
+  `src/lib/closeout/signup-hardening-admin-boundary.test.ts` and
+  `src/lib/closeout/storage-orphan-scanner.test.ts` each import a `scripts/*.mjs` that begins with a
+  `#!/usr/bin/env node` shebang, and this Vitest's rolldown transform fails on it
+  (`Invalid Character '!'`). Neither those tests nor those scripts are in this branch's diff, so the
+  failure is byte-for-byte identical on `origin/main`. It reports as "3 failed" in any full run and
+  should not be read as a regression.
+- **`npm run dev` does not start in this checkout** (`Can't resolve './tokens.css'`, resolved from
+  the repo root instead of `src/app`). `npm run build` and `npm run start` are both fine, so it is a
+  dev-server-only fault. It matters for Playwright: `playwright.config.ts` runs `npm run dev` as its
+  `webServer` unless `CI` is set, so a plain `npx playwright test` dies after a 120 s timeout with a
+  wall of webpack resolver output. Build first, then run lanes as
+  `CI=1 npx playwright test <spec> --project=desktop --project=mobile`.
 
 ## 6. Left for the owner, not decided here
 
