@@ -489,9 +489,17 @@
 /*
  * `2K-SUGG-001/003` — the suggestion row.
  *
- * Text, not controls. A suggestion tells the user what they could type; making
- * it a button would put words in their mouth, and the composer is one field
- * away. So there is nothing here to size for a thumb — only to read.
+ * ## Life Brain B.7 changed what these are, and the CSS says so
+ *
+ * They used to be text: *"A suggestion tells the user what they could type;
+ * making it a button would put words in their mouth, and the composer is one
+ * field away. So there is nothing here to size for a thumb — only to read."*
+ *
+ * The owner read that surface on an iPhone and asked for the chip to **fill**
+ * the field, which is the half the sentence above was never about. So each row
+ * now holds a `ui-button` and the thumb matters after all: the row's own padding
+ * is gone, because the control carries its own `--control-sm` height, and
+ * stacking two paddings would make a 60px row out of a 44px target.
  */
 
 .conversation-suggestions {
@@ -521,6 +529,42 @@
 }
 
 .conversation-suggestions-list > li {
+  display: flex;
+  /* Owner content. A long name must not push the row off a narrow viewport. */
+  overflow-wrap: anywhere;
+}
+
+/*
+ * The chip fills the row, so a thumb landing anywhere on it lands on the
+ * control rather than beside it.
+ *
+ * `white-space: normal` is the load-bearing line. `.ui-button` is `nowrap`,
+ * which is right for "Enviar" and wrong for a sentence: the pt-BR chip "O prazo
+ * de Pagar a escola já passou. O que eu faço?" pushed the page 15 CSS px wide
+ * at 320, which `life-brain-b7-conversation.spec.ts` caught at both viewports.
+ * Overridden here rather than in the primitive — every other button in the
+ * product is a label and should keep refusing to wrap.
+ */
+.conversation-suggestions-list > li > .ui-button {
+  width: 100%;
+  height: auto;
+  padding: var(--space-2) var(--space-3);
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  /* Owner content inside the sentence: a long name must not widen the row. */
+  overflow-wrap: anywhere;
+  font-weight: 500;
+  border-color: var(--tone-suggestion-line);
+  background: var(--tone-suggestion-bg);
+  color: var(--tone-suggestion-fg);
+}
+
+/* The degraded row: no composer is listening, so there is no control to draw
+   and the suggestion is what it always was — a sentence to read. */
+.conversation-suggestion-text {
+  display: block;
+  width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--tone-suggestion-line);
   border-radius: var(--radius-md);
@@ -528,8 +572,6 @@
   color: var(--tone-suggestion-fg);
   font-size: 0.875rem;
   line-height: 1.4;
-  /* Owner content. A long name must not push the row off a narrow viewport. */
-  overflow-wrap: anywhere;
 }
 
 /*

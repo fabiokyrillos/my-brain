@@ -14,6 +14,7 @@
 import type { Locale } from "@/lib/preferences";
 
 import type { ConversationCardState, ConversationCardType } from "./contracts";
+import type { SuggestionCategory } from "./suggestions";
 
 export const conversationCardsLocales = ["pt-BR", "en"] as const;
 export type ConversationCardsLocale = (typeof conversationCardsLocales)[number];
@@ -55,11 +56,36 @@ export type ConversationCardsCopy = {
    * The sentence is built **here**, from a category and a name the derivation
    * kept apart. The module never produces a string, so there is no rendered
    * sentence anywhere that a telemetry event could log whole.
+   *
+   * ## One function per category, and why three of them ignore the name
+   *
+   * Life Brain B.7 turns two categories into eight. A `Record` keyed by the
+   * closed vocabulary makes a new category a **compile error here** until
+   * somebody writes both locales for it, which is the only way a derivation and
+   * its copy stay in step.
+   *
+   * `birthday_soon`, `open_question` and `unreviewed_entry` receive the name and
+   * do not use it. That is deliberate rather than lazy: the owner's own wording
+   * was *"tem algum aniversário próximo?"* — a question about the shape of the
+   * week, not about a person — and a record's first 240 characters make a poor
+   * chip. The derivation still consults their classification and still drops a
+   * withheld row, because the suggestion's **presence** would report that such a
+   * row exists even when its sentence names nobody (`2K-PRIVACY-002`).
+   *
+   * ## `fill`, which is the sentence that changed meaning
+   *
+   * These were text, on purpose: a control that submitted a question would put
+   * words in the owner's mouth. On 5 November 2026 the owner asked for the other
+   * half of that — *"para eu clicar, e já preencher isso embaixo. Mas lembre que
+   * é preencher, não enviar."* `fill` is what the control announces, and the
+   * principle is unchanged: filling is not sending, and the send button is still
+   * theirs to press.
    */
   readonly suggestions: {
     readonly label: string;
-    readonly person: (name: string) => string;
-    readonly project: (name: string) => string;
+    /** The accessible name of one chip: it fills the field, it does not ask. */
+    readonly fill: (question: string) => string;
+    readonly byCategory: Readonly<Record<SuggestionCategory, (name: string) => string>>;
   };
 };
 
@@ -105,8 +131,17 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
     returnToConversation: "Voltar para a conversa",
     suggestions: {
       label: "Você pode me perguntar",
-      person: (name) => `O que ficou pendente com ${name}?`,
-      project: (name) => `Como está ${name}?`,
+      fill: (question) => `Escrever no campo: ${question}`,
+      byCategory: {
+        overdue_task: (name) => `O prazo de ${name} já passou. O que eu faço?`,
+        due_today: (name) => `${name} é para hoje. Por onde eu começo?`,
+        reminder_soon: (name) => `O que eu preciso saber sobre ${name}?`,
+        birthday_soon: () => "Tem algum aniversário próximo?",
+        open_question: () => "Qual pergunta ficou em aberto?",
+        unreviewed_entry: () => "O que eu registrei e ainda não revisei?",
+        person: (name) => `O que ficou pendente com ${name}?`,
+        project: (name) => `Como está ${name}?`,
+      },
     },
   },
   en: {
@@ -150,8 +185,17 @@ const COPY: Record<ConversationCardsLocale, ConversationCardsCopy> = {
     returnToConversation: "Back to the conversation",
     suggestions: {
       label: "You can ask me",
-      person: (name) => `What is still open with ${name}?`,
-      project: (name) => `How is ${name} going?`,
+      fill: (question) => `Put in the field: ${question}`,
+      byCategory: {
+        overdue_task: (name) => `${name} is past its date. What do I do?`,
+        due_today: (name) => `${name} is due today. Where do I start?`,
+        reminder_soon: (name) => `What do I need to know about ${name}?`,
+        birthday_soon: () => "Is there a birthday coming up?",
+        open_question: () => "Which question is still open?",
+        unreviewed_entry: () => "What have I recorded and not reviewed yet?",
+        person: (name) => `What is still open with ${name}?`,
+        project: (name) => `How is ${name} going?`,
+      },
     },
   },
 };

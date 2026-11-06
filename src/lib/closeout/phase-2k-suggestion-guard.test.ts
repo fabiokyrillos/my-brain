@@ -1,6 +1,6 @@
 /**
  * `2K-SUGG-002` / `2K-SUGG-003` / `2K-SUGG-005`, T-2K-10 — the structural half
- * of slice 2K.6.
+ * of slice 2K.6, carried forward by Life Brain B.7.
  *
  * ## The threat, stated the way the model states it
  *
@@ -13,6 +13,37 @@
  * **incapable** of costing anything. That is what this guard asserts, and it is
  * the same reasoning ADR-094 applied when it refused to rank priorities with a
  * model call.
+ *
+ * ## What Life Brain B.7 changed here, and what it did not
+ *
+ * Two assertions in this file were rewritten, and both deserve to be read as
+ * deliberate rather than as a guard bent to fit new code.
+ *
+ * 1. **The vocabulary grew from two names to eight.** The property was never
+ *    "there are two categories" — it was "the category is a **closed** enum, so
+ *    telemetry cannot carry anything else". The list below is still exact and
+ *    still ordered, so adding a ninth category is still a visible edit here.
+ *
+ * 2. **The row may now hold a control.** The old assertion refused `<button`
+ *    and `onClick` outright, from a sentence in `suggestion-row.tsx` saying a
+ *    control "would put words in their mouth and turn a hint into an action".
+ *    The owner read that surface on 5 November 2026 and asked for the half the
+ *    sentence was not about: *"para eu clicar, e já preencher isso embaixo. Mas
+ *    lembre que é preencher, não enviar."*
+ *
+ *    So the refusal is now the sharper one it should always have been: **no path
+ *    from a suggestion to a submission.** No `<form>`, no `formAction`, no
+ *    `type="submit"`, no `requestSubmit`. A control that writes into a field and
+ *    stops is permitted, and is required to say so with `type="button"`.
+ *
+ *    The weaker form of this edit — leaving the regex alone and moving the
+ *    button into a file the regex does not read — would have kept this file
+ *    green while deleting the property. The chip's file is therefore **named
+ *    below** and held to the same rule.
+ *
+ * 3. **A file that can fetch now exists.** `suggestion-sources.ts` reads the
+ *    rows the derivation orders, which is exactly where somebody would later add
+ *    "and ask the model to rank them". It is held to the no-cost rule too.
  */
 
 import { readFileSync } from "node:fs";
@@ -25,16 +56,22 @@ const code = (path: string) =>
   read(path).replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
 const SUGGESTIONS = "src/features/conversation-cards/suggestions.ts";
+const SOURCES = "src/features/conversation-cards/suggestion-sources.ts";
 const ROW = "src/features/conversation-cards/suggestion-row.tsx";
+const CHIP = "src/features/conversation-cards/seed-chip.tsx";
+const SEED = "src/features/capture/composer-seed.tsx";
 const PAGE = "src/app/[locale]/app/chat/page.tsx";
 
 /** Anything that would make a suggestion cost money or a rate-limit slot. */
 const COSTS_SOMETHING =
   /(?<!["'`])\b(getAIProvider|recordAIUsage|admitRateLimitedOperation|openAiGate|answerFromKnowledge|embedText)\b/;
 
+/** Any path from a chip to a submitted turn. */
+const SUBMITS = /<form\b|formAction|type="submit"|requestSubmit/;
+
 describe("2K-SUGG-002: the suggestions module cannot cost anything", () => {
   it("constructs no provider, records no usage, requests no rate-limit slot", () => {
-    for (const file of [SUGGESTIONS, ROW]) {
+    for (const file of [SUGGESTIONS, SOURCES, ROW, CHIP, SEED]) {
       expect(COSTS_SOMETHING.test(code(file)), file).toBe(false);
     }
   });
@@ -61,6 +98,19 @@ describe("2K-SUGG-002: the suggestions module cannot cost anything", () => {
   it("has no confidence contract and no fail-closed path, because it needs none", () => {
     expect(code(SUGGESTIONS)).not.toMatch(/confidence|failClosed|fallback/i);
   });
+
+  it("keeps the reading in the file that is allowed to read, and only there", () => {
+    /*
+      Life Brain B.7. The derivation cannot fetch, so the rows arrive from
+      `suggestion-sources.ts`. That file is the one place a query may live, and
+      naming it here is what stops the next slice from "just adding a small
+      read" to the pure module instead.
+    */
+    expect(code(SOURCES)).toMatch(/import "server-only";/);
+    expect(code(SOURCES)).toMatch(/loadSuggestionInputs/);
+    // The page asks the reader, never the database, for a suggestion input.
+    expect(code(PAGE)).toMatch(/loadSuggestionInputs\(/);
+  });
 });
 
 describe("2K-SUGG-001: the cap is in the module, not at the call site", () => {
@@ -74,6 +124,7 @@ describe("2K-SUGG-001: the cap is in the module, not at the call site", () => {
     // A cap applied where the list is drawn holds until somebody draws it
     // somewhere else.
     expect(code(ROW)).not.toMatch(/slice\(0,\s*3\)|MAX_SUGGESTIONS/);
+    expect(code(CHIP)).not.toMatch(/slice\(0,\s*3\)|MAX_SUGGESTIONS/);
   });
 });
 
@@ -86,8 +137,29 @@ describe("2K-SUGG-005: a name can never reach telemetry", () => {
     expect(narrowed).not.toMatch(/\bname\b|\btext\b|\bid\b/);
   });
 
-  it("keeps the category a closed enum", () => {
-    expect(code(SUGGESTIONS)).toMatch(/export const SUGGESTION_CATEGORIES = \["person", "project"\] as const;/);
+  it("keeps the category a closed enum, in its declared precedence order", () => {
+    /*
+      Life Brain B.7: eight names where there were two. The pin is exact for the
+      same reason it always was — an open union is a union a name could join —
+      and it is *ordered* because the order IS the urgency rule the derivation
+      reads, so a reordering is a behaviour change and belongs in a diff here.
+    */
+    expect(code(SUGGESTIONS)).toMatch(
+      /export const SUGGESTION_CATEGORIES = \[\s*"overdue_task",\s*"due_today",\s*"reminder_soon",\s*"birthday_soon",\s*"open_question",\s*"unreviewed_entry",\s*"person",\s*"project",\s*\] as const;/,
+    );
+  });
+
+  it("reports only the categories the deployed vocabulary accepts", () => {
+    /*
+      `record_product_event` validates this property against
+      `array['person', 'project']`, and B.7 ships no migration. The writer is
+      fail-open, so sending a dated category would be swallowed and the surface
+      would look instrumented while reporting nothing. The filter is the honest
+      form of that gap, and this assertion is what keeps it from being deleted
+      as "dead code" before the migration that widens the enum.
+    */
+    expect(code(SUGGESTIONS)).toMatch(/export const REPORTABLE_SUGGESTION_CATEGORIES = \["person", "project"\] as const;/);
+    expect(code(ROW)).toMatch(/\.filter\(isReportableSuggestionCategory\)/);
   });
 
   it("produces no rendered sentence in the derivation module", () => {
@@ -118,10 +190,53 @@ describe("2K-SUGG-003: the hard-coded example and its ternary are gone", () => {
   it("renders nothing rather than a placeholder when there is nothing to say", () => {
     expect(code(ROW)).toMatch(/if \(suggestions\.length === 0\) return null;/);
   });
+});
 
-  it("offers no control that would ask on the user's behalf", () => {
-    // A suggestion says what the user *could* type. A control that submitted it
-    // would put words in their mouth, and the composer is one field away.
-    expect(code(ROW)).not.toMatch(/<form\b|<button\b|formAction|type="submit"|onClick/);
+describe("LB-SUGG-004: a chip fills the field and can never send it", () => {
+  /*
+    The distinction the owner drew, held structurally. Filling is the owner's
+    question arriving where they can read, edit or delete it with the send
+    button unpressed; sending is the product speaking for them.
+  */
+  it("offers no path from a suggestion to a submitted turn", () => {
+    for (const file of [ROW, CHIP, SEED]) {
+      expect(SUBMITS.test(code(file)), file).toBe(false);
+    }
+  });
+
+  it("is not vacuous: it detects every shape a send would arrive in", () => {
+    for (const planted of [
+      '<form action={formAction}>',
+      "form.current?.requestSubmit();",
+      '<button type="submit">Ask</button>',
+      "<Button formAction={ask} />",
+    ]) {
+      expect(SUBMITS.test(planted), planted).toBe(true);
+    }
+    expect(SUBMITS.test('<Button type="button" onClick={() => seed.fill(question)} />')).toBe(false);
+  });
+
+  it("says what the control is, so a submit cannot arrive by default", () => {
+    // A `<button>` with no `type` inside a form submits it. The chip declares
+    // `type="button"` rather than relying on never being placed in one.
+    expect(code(CHIP)).toMatch(/type="button"/);
+    expect(code(CHIP)).toMatch(/seed\.fill\(/);
+  });
+
+  it("keeps the filler out of the pure derivation", () => {
+    // The module that decides *what* to suggest must not know how a surface
+    // puts it anywhere.
+    expect(code(SUGGESTIONS)).not.toMatch(/fill|onClick|useState|useRef/);
+  });
+
+  it("bounds a filled question with the same constant the query string uses", () => {
+    /*
+      `MAX_SEED_LENGTH` moved out of `chat/page.tsx` so the client fill and the
+      `?q=` seed cannot bound the same text differently.
+    */
+    expect(code(SEED)).toMatch(/export const MAX_SEED_LENGTH = 240;/);
+    expect(code(SEED)).toMatch(/slice\(0, MAX_SEED_LENGTH\)/);
+    expect(code(PAGE)).toMatch(/MAX_SEED_LENGTH/);
+    expect(code(PAGE)).not.toMatch(/const MAX_SEED_LENGTH/);
   });
 });
