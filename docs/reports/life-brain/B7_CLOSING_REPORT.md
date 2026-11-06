@@ -299,6 +299,16 @@ seven mobile tests were **skipped** — the reporter's `·F°°°°°°°···�
 first failure per project and nothing after it, which is worth knowing before reading a green-looking
 dot sequence as coverage.
 
+**The experiment's answer: the page was right and the baseline was lying.** With the four files gone,
+the runner wrote them from scratch, and the new Conversar images have **no lens strip** and **no
+`Ctrl+K` hint**. So nothing is wrong with the route — the old baseline had simply survived a change
+it was supposed to catch.
+
+That redraw is also the first time either change has been proved **in the real signed-in
+application**. Until now the lens strip's removal was proved by a guard reading source, and the
+`Ctrl+K` hint by a fixture branching on `matchMedia`; both are now visible in a screenshot of the
+actual route, rendered against a real database.
+
 **Not fixed here, and not mine to decide:** `maxDiffPixelRatio: 0.005` is ADR-159's number. This
 slice does not change it. But it is now written down that the threshold is large enough to hide the
 removal of a navigation strip, which is the kind of change the lane exists to catch.
