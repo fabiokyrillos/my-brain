@@ -129,25 +129,32 @@ describe("LB-SUGG-004: the chip fills the field", () => {
   });
 });
 
-describe("2K-SUGG-005: only the deployed categories reach telemetry", () => {
+describe("2K-SUGG-005: every category reaches telemetry, and no name does", () => {
   it("reports person and project", () => {
     renderRow([suggestion("person", "p1", "Ana"), suggestion("project", "j1", "Aurora")]);
     expect(shown).toHaveBeenCalledWith(["person", "project"]);
   });
 
-  it("withholds the six categories `record_product_event` would refuse", () => {
+  it("reports the six dated categories too, in the order they were shown", () => {
     /*
-      The database validates this property against `array['person','project']`
-      and B.7 ships no migration. The writer is fail-open, so sending a dated
-      category would be swallowed and the surface would look instrumented while
-      reporting nothing.
+      This case was its own inverse until `202611060108` was spent. It read
+      "withholds the six categories `record_product_event` would refuse", and it
+      was true: the database validated this property against
+      `array['person','project']`, the writer is fail-open, so a dated category
+      would have been swallowed and the surface would have looked instrumented
+      while reporting nothing.
+
+      The owner authorized the migration (ADR-161) and it landed first, in the
+      same pull request. The assertion is the full list now, so a narrowing that
+      came back would red here rather than quietly stop reporting six
+      categories again.
     */
     renderRow([
       suggestion("overdue_task", "t1", "Pagar a escola"),
       suggestion("birthday_soon", "p9", "Ana"),
       suggestion("person", "p1", "Ana"),
     ]);
-    expect(shown).toHaveBeenCalledWith(["person"]);
+    expect(shown).toHaveBeenCalledWith(["overdue_task", "birthday_soon", "person"]);
   });
 
   it("carries no name, in any category", () => {

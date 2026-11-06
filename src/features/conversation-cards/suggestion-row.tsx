@@ -42,7 +42,7 @@ import type { Locale } from "@/lib/preferences";
 
 import { getConversationCardsCopy } from "./copy";
 import { SeedChip } from "./seed-chip";
-import { isReportableSuggestionCategory, type ConversationSuggestion } from "./suggestions";
+import type { ConversationSuggestion } from "./suggestions";
 
 export function SuggestionRow({
   locale,
@@ -71,17 +71,15 @@ export function SuggestionRow({
         `2K-SUGG-005`. Categories, never suggestions: there is no name in scope
         at the call site, so none can reach the event.
 
-        Filtered to the categories the **deployed** vocabulary accepts. The
-        database validates this property against `array['person', 'project']`
-        inside `record_product_event`, and B.7 ships no migration — so the six
-        dated categories are rendered and not reported. The writer is fail-open,
-        so sending them would look instrumented and report nothing;
-        `isReportableSuggestionCategory` makes the gap a visible list instead.
+        Unfiltered since `202611060108` widened both database gates to all eight
+        categories (ADR-161). The narrowing that used to stand here existed
+        because the writer is fail-open: a category the deployed chain refuses is
+        swallowed, so the surface would have looked instrumented while reporting
+        nothing. The migration landed first and in the same pull request, which
+        is the ordering `2M-METRICS-001` makes a rule.
       */}
       <ConversationSuggestionsShown
-        categories={suggestions
-          .map((suggestion) => suggestion.category)
-          .filter(isReportableSuggestionCategory)}
+        categories={suggestions.map((suggestion) => suggestion.category)}
         locale={locale === "en" ? "en" : "pt-BR"}
       />
     </div>

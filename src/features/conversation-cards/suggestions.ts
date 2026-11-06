@@ -118,33 +118,26 @@ export const SUGGESTION_CATEGORIES = [
 ] as const;
 export type SuggestionCategory = (typeof SUGGESTION_CATEGORIES)[number];
 
-/**
- * The categories the **deployed** telemetry vocabulary accepts, and why this
- * list is shorter than the one above.
+/*
+ * EVERY category is reportable, and it took a migration to say so.
  *
- * `202608110090_phase_2m_daily_cycle_telemetry.sql` validates
- * `conversation_suggestion_shown.category` against
- * `array['person', 'project']` inside `record_product_event`. Widening it is a
- * migration, and Life Brain B.7 was scoped with **no migration** — so the six
- * dated categories are derived and rendered, and simply not reported, until the
- * telemetry vocabulary is widened in a slice that is allowed to write SQL.
+ * This is where `REPORTABLE_SUGGESTION_CATEGORIES` used to be. B.7 shipped
+ * without a migration, so `conversation_suggestion_shown.category` was
+ * validated against `array['person', 'project']` and the six dated categories
+ * were rendered and **not reported**; that list existed to make the gap a
+ * visible declaration rather than six events a fail-open writer silently
+ * swallowed. The owner authorized the migration on 6 November 2026 (ADR-161),
+ * `202611060108` widened both database gates, and the list came out in the same
+ * pull request, **after** it.
  *
- * Declared here rather than filtered at the call site because the alternative is
- * worse in a specific way: the writer is fail-open, so a payload the database
- * refuses is swallowed, and the surface would look instrumented while reporting
- * nothing. A list the renderer must consult makes the gap visible in the type
- * instead of invisible at runtime, and makes the follow-up one edit in one
- * place.
+ * The ordering is the whole discipline and not a detail: a producer that names
+ * a category the deployed chain refuses is rejected `22023` at the last real
+ * write path, inside a `.catch(() => {})`, so the code reads as instrumented
+ * and the ledger stays empty. That is `202608080087` and `202608090089`, twice.
+ * `phase-2m-telemetry-guard.test.ts` now holds `SUGGESTION_CATEGORIES` itself to
+ * the migration chain, so a ninth category added here without SQL fails in CI
+ * rather than in production silence.
  */
-export const REPORTABLE_SUGGESTION_CATEGORIES = ["person", "project"] as const;
-export type ReportableSuggestionCategory = (typeof REPORTABLE_SUGGESTION_CATEGORIES)[number];
-
-/** Whether this category may reach `conversation_suggestion_shown` today. */
-export function isReportableSuggestionCategory(
-  category: SuggestionCategory,
-): category is ReportableSuggestionCategory {
-  return (REPORTABLE_SUGGESTION_CATEGORIES as readonly SuggestionCategory[]).includes(category);
-}
 
 /**
  * A suggestion, as a value.

@@ -149,17 +149,26 @@ describe("2K-SUGG-005: a name can never reach telemetry", () => {
     );
   });
 
-  it("reports only the categories the deployed vocabulary accepts", () => {
+  it("reports every category, and narrows nothing now that the chain admits them", () => {
     /*
-      `record_product_event` validates this property against
-      `array['person', 'project']`, and B.7 ships no migration. The writer is
-      fail-open, so sending a dated category would be swallowed and the surface
-      would look instrumented while reporting nothing. The filter is the honest
-      form of that gap, and this assertion is what keeps it from being deleted
-      as "dead code" before the migration that widens the enum.
+      This assertion was the inverse until `202611060108` was spent. It read
+      "reports only the categories the deployed vocabulary accepts", and it
+      existed to stop `REPORTABLE_SUGGESTION_CATEGORIES` being deleted as dead
+      code *before* the migration: `record_product_event` validated this
+      property against `array['person', 'project']`, the writer is fail-open, so
+      a dated category would have been swallowed and the surface would have
+      looked instrumented while reporting nothing.
+
+      The owner authorized the migration on 6 November 2026 (ADR-161) and it
+      landed first, in the same pull request. So the narrowing is gone, and its
+      absence is asserted rather than remembered — a filter that comes back
+      would silently stop reporting six categories again, which is precisely the
+      state this line used to describe. `phase-2m-telemetry-guard.test.ts` holds
+      the other end: the chain must admit every category the derivation declares.
     */
-    expect(code(SUGGESTIONS)).toMatch(/export const REPORTABLE_SUGGESTION_CATEGORIES = \["person", "project"\] as const;/);
-    expect(code(ROW)).toMatch(/\.filter\(isReportableSuggestionCategory\)/);
+    expect(code(SUGGESTIONS)).not.toMatch(/export const REPORTABLE_SUGGESTION_CATEGORIES/);
+    expect(code(ROW)).not.toMatch(/\.filter\(/);
+    expect(code(ROW)).toMatch(/categories=\{suggestions\.map\(\(suggestion\) => suggestion\.category\)\}/);
   });
 
   it("produces no rendered sentence in the derivation module", () => {

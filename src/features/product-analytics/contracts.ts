@@ -6,6 +6,7 @@ import type {
 } from "@/features/task-commands/analytics";
 import type { TaskMatchEvidence, TaskMatchScoreBand } from "@/features/task-commands/match-policy";
 import type { TaskCommandOutcome } from "@/features/task-commands/outcomes";
+import type { SuggestionCategory } from "@/features/conversation-cards/suggestions";
 
 /**
  * Phase 2E's vocabularies arrive as **types**, and their runtime literals are
@@ -122,6 +123,30 @@ export function toResolutionBucket(elapsedMs: number): ResolutionBucket {
 /** `2M-CAL-007`'s three orientations. Never the anchor date. */
 export const calendarOrientations = ["day", "week", "agenda"] as const;
 export type CalendarOrientation = (typeof calendarOrientations)[number];
+
+/**
+ * Life Brain B.7. The eight suggestion categories, restated.
+ *
+ * `SuggestionCategory` arrives as a **type** for the reason the Phase 2E
+ * vocabularies do: a type-only import is erased at build time, so the
+ * derivation does not follow this module into the client bundle
+ * `interaction-events.tsx` ships, while a value outside the union stays a
+ * compile error. What a type cannot catch is an *omission* — a ninth category
+ * added to the derivation and forgotten here would be refused by the database
+ * and swallowed by a fail-open writer — so `contracts.test.ts` holds this list
+ * to `SUGGESTION_CATEGORIES` by exact equality, and
+ * `phase-2m-telemetry-guard.test.ts` holds it to the migration chain.
+ */
+export const suggestionCategories: readonly SuggestionCategory[] = [
+  "overdue_task",
+  "due_today",
+  "reminder_soon",
+  "birthday_soon",
+  "open_question",
+  "unreviewed_entry",
+  "person",
+  "project",
+];
 
 /**
  * `2M-PLAN-002`. `cleared` exists because the phase closes the `clear_planned`
@@ -560,13 +585,23 @@ export type ProductEventPropertiesByName = {
    * `2K-SUGG-005` / `2K-METRICS-002`. That a suggestion was shown, and of
    * which kind.
    *
-   * **The category and nothing else.** OD-2K-4 permits a suggestion to name
-   * a person or project on screen and forbids that name from ever entering
-   * telemetry; `suggestionTelemetryCategory` narrows to exactly this shape,
-   * whose type has no field a name could occupy.
+   * **The category and nothing else.** OD-2K-4 permits a suggestion to name a
+   * person, a project, a task or a reminder on screen and forbids that name
+   * from ever entering telemetry; `suggestionTelemetryCategory` narrows to
+   * exactly this shape, whose type has no field a name could occupy.
+   *
+   * Life Brain B.7 widened this from the two entity kinds to all eight
+   * categories the derivation shows, and `202611060108` widened both database
+   * gates in the same pull request and **before** this line — a producer
+   * declaring a category the deployed chain refuses is silent, because the
+   * writer is fail-open, which is the defect `202608080087` and `202608090089`
+   * were written to correct. The six added categories report a STATE (something
+   * was overdue, due today, coming up, unanswered, unreviewed), never a
+   * subject: a `highly_sensitive` row is dropped from the derivation before it
+   * can be shown, so it is never counted either.
    */
   conversation_suggestion_shown: {
-    category: "person" | "project";
+    category: SuggestionCategory;
   };
   /**
    * Q1. `2M-CAL-007`'s three orientations, and nothing else.
@@ -877,7 +912,7 @@ function arePropertiesValid<Name extends ProductEventName>(
         && isOneOf(value.outcome, ["accepted", "no_change", "failed", "undone"]);
     case "conversation_suggestion_shown":
       return hasExactKeys(value, ["category"])
-        && isOneOf(value.category, ["person", "project"]);
+        && isOneOf(value.category, suggestionCategories);
     /*
      * Phase 2M slice 2M.1. `hasExactKeys` is what makes `2M-METRICS-004`
      * structural rather than aspirational: an extra key — a task title, a
