@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-06 — `202611060108` applied to the hosted project (parity 108 = 108)
+
+- **Applied** with `supabase db push --linked` after PR #370 merged with all three CI jobs green, so the `database` job had already applied the whole chain from an empty database and run the pgTAP suite before production saw the file. One migration pending, one applied; `migration list` reports `202611060108 | 202611060108 | 202611060108`.
+- **Verified against the live database, writing nothing.** `product_events` is an append-only ledger, so a test event would be a lie inside it; the checks call `private.validate_product_event_properties` directly instead. The eight suggestion categories are accepted, `'invented'` is refused with `22023` (`Invalid product event property`), and the deployed function keeps its posture — `security invoker`, empty `search_path`, `execute` for `postgres` alone, with neither `anon` nor `authenticated` able to call it.
+- **The before-reading, recorded because it is the point:** at the moment of the push the deployed database still held `array['person', 'project']`. The six dated categories really were being refused, and the fail-open writer really was swallowing it in silence.
+- **Supabase security advisors:** no finding attributable to this change. The standing ones (four RLS-enabled-without-policy tables, `pg_net` in `public`, `SECURITY DEFINER` functions reachable by `authenticated`, leaked-password protection off) predate it and are untouched here.
+
 ## 2026-11-06 — The suggestion telemetry enum widens to all eight categories (ADR-161)
 
 The owner's three answers to the questions B.7's closing report left open: *"pode fazer a migration"*, *"não, pode ficar o hoje e manter conversa como atalho embaixo"*, *"sem problemas, só usar um modelo barato pra isso"*.

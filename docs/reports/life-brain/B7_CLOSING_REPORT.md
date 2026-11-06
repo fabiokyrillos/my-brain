@@ -186,10 +186,20 @@ value the deployed chain refuses is rejected `22023` at the last real write path
 `202608080087` and `202608090089` both, and §6 of this report described B.7 deliberately carrying the
 same state.
 
-**Still to do for it, and it is not a formality: apply and deploy.** The migration is in the chain
-and in CI. It is **not** applied to the hosted project, so until it is, the deployed database still
-refuses a dated category and the fail-open writer still swallows the refusal. Hosted parity moves
-from `202611050107` to `202611060108` when it is applied.
+**Applied to the hosted project on 6 November**, after the pull request merged with all three CI jobs
+green — which means the `database` job had already applied the whole chain from an empty database and
+run the pgTAP suite, so the migration and its verification blocks executed for real before production
+saw them. Parity is 108 = 108.
+
+Verified against the **live** database afterwards, by calling the validator rather than writing a row,
+because `product_events` is an append-only ledger and a test event would be a lie in it: the eight
+categories are accepted, `'invented'` is refused with `22023` (`Invalid product event property`), and
+the deployed function keeps the posture it had — `security invoker`, empty `search_path`, `execute` for
+`postgres` alone, with neither `anon` nor `authenticated` able to call it directly.
+
+The before-reading is worth recording, because it is the thing this whole exercise was about: at the
+moment of the push the deployed database still held `array['person', 'project']`. The refusals really
+were happening and really were being swallowed.
 
 ### 7.2 A guard was missing, and this is what found it
 
@@ -251,11 +261,11 @@ its reader. That refusal is now deliberate rather than merely unreviewed.
 
 ### 7.5 What is still not verified
 
-- **The migration has not been applied anywhere.** Docker is not running in this checkout, so
-  `supabase db reset` could not be run locally; CI's `database` job applies the whole chain from an
-  empty database and runs the pgTAP suite, and that is the first real execution of this file. The
-  extraction logic in its verification blocks was simulated line-for-line before pushing, which is
-  why the nine-name defect above was found rather than deployed.
+- ~~The migration has not been applied anywhere.~~ **Since resolved** — CI's `database` job ran it
+  against the whole chain from an empty database, and it is now applied to the hosted project (§7.1).
+  It is recorded here because of how it was de-risked without Docker: the extraction logic in its
+  verification blocks was simulated line-for-line before pushing, which is why the nine-name defect
+  above was found rather than deployed.
 - **The ADR-159 screenshot baselines for Hoje and Conversar are still unredrawn**, and they are the
   one thing standing between this branch and a green pipeline. Both surfaces changed on purpose.
 - **The authenticated journeys still have not been run** (§5), and the three unloadable test files
