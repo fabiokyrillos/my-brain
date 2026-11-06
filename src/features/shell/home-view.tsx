@@ -1,7 +1,5 @@
-import { MessageCircle } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { ButtonLink } from "@/components/ui";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { BoundedNotice } from "@/features/bounds/bounded-notice";
@@ -320,18 +318,23 @@ export function HomeView({
       <div className="today-capture">{capture}</div>
 
       {/*
-        Life Brain A.1 (ADR-145 Decision 4). The conversation is the product's
-        main surface and Hoje had no door to it: Conversar sat behind "Mais".
-        One call to action under the composer, with three life questions as
-        the hint, so the first thing a new owner learns is that the brain
-        answers back.
+        Life Brain B.7 **removes** the door slice A.1 added here, and that is a
+        decision rather than a cleanup.
+
+        A.1 (ADR-145 Decision 4) reasoned that Conversar sat behind "Mais" and
+        Hoje had no door to it, so it put "Perguntar ao {agente}" directly under
+        the composer. A.2 then gave Conversar its own place in the mobile bar,
+        which answered the reachability half — and left two text entry points
+        stacked on the owner's first screen.
+
+        He read it back on 5 November 2026: *"ele me mostra o chat e embaixo ele
+        me mostra para perguntar ao Michael, que é a mesma coisa. Para mim não faz
+        sentido."* And: *"não faz muito sentido ter dois campos separados."* The
+        extra door was the symptom of the composer not being the place you speak;
+        B.5 made the one composer route a question, a command and a relato, so
+        the door now duplicates a field that is already right there. Conversar
+        stays reachable from the bar, which `mobile-reachability-guard` holds.
       */}
-      <div className="today-ask">
-        <ButtonLink href={`/${locale}/app/chat`} icon={<MessageCircle />} size="lg" variant="secondary">
-          {copy.ask.action}
-        </ButtonLink>
-        <p className="today-ask-hint">{copy.ask.hint}</p>
-      </div>
 
       {/*
         `2O-ONBOARD-001` — offered, never imposed. It sits *after* capture, and

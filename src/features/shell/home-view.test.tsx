@@ -96,17 +96,30 @@ function renderHome(view: HomeViewModel, locale: Locale = "pt-BR") {
 }
 
 describe("HomeView", () => {
-  it("offers a door to the conversation right under the composer (Life Brain A.1)", () => {
+  /**
+   * Life Brain B.7 replaces A.1's assertion with its inverse, deliberately.
+   *
+   * A.1 put "Perguntar ao {agente}" under the composer because Conversar sat
+   * behind "Mais". A.2 gave Conversar its own place in the mobile bar, and the
+   * owner then read the result back: *"ele me mostra o chat e embaixo ele me
+   * mostra para perguntar ao Michael, que é a mesma coisa… não faz muito sentido
+   * ter dois campos separados."*
+   *
+   * So the test does not just disappear — it keeps asserting the layout rule it
+   * was written for (capture is the first thing on the page, UX-07) and adds the
+   * absence, because a door that comes back should fail here rather than be
+   * noticed in a recording three weeks later.
+   */
+  it("opens with the composer and nothing between it and the day (Life Brain B.7)", () => {
     const { container } = renderHome(viewModel());
 
-    const door = screen.getByRole("link", { name: "Perguntar ao Brain" });
-    expect(door).toHaveAttribute("href", "/pt-BR/app/chat");
-    // Under the composer and above the first section: capture first (UX-07),
-    // then the question, then the day.
-    const order = [...container.querySelectorAll(".today-capture, .today-ask, .home-section")].map((node) => node.className);
+    expect(screen.queryByRole("link", { name: /Perguntar ao/ })).toBeNull();
+    expect(screen.queryByText(/Quando fui ao médico\?/)).toBeNull();
+    expect(container.querySelector(".today-ask")).toBeNull();
+
+    const order = [...container.querySelectorAll(".today-capture, .home-section")].map((node) => node.className);
     expect(order[0]).toBe("today-capture");
-    expect(order[1]).toBe("today-ask");
-    expect(screen.getByText(/Quando fui ao médico\?/)).toBeInTheDocument();
+    expect(order[1]).not.toContain("today-ask");
   });
 
   /**
