@@ -168,7 +168,11 @@ const REPO = resolve(__dirname, "../../..");
 // events with a period, the last of the three migrations ADR-145 allocated.
 // Chain head moved to 202611050107 by Life Brain LB-M4 (slice C.5, ADR-156):
 // a person's birthday, the fourth Life Brain migration, authorized by the owner.
-const AUTHORIZED_MIGRATION_HEAD = "202611050107";
+// Chain head moved to 202611060108 by Life Brain B.7 (ADR-161): the suggestion
+// telemetry enum widened from two categories to eight, authorized by the owner on
+// 2026-11-06 after B.7 shipped without it and reported the gap. Moved in the commit
+// that adds it; Entity Graph Completion still spends nothing.
+const AUTHORIZED_MIGRATION_HEAD = "202611060108";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.
