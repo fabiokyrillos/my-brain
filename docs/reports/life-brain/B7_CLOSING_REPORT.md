@@ -1,7 +1,10 @@
 # Life Brain B.7 — closing report
 
-**Date:** 5 November 2026. **Branch:** `life-brain/b5-one-composer`, cut from `origin/main` at `09709a9`.
-**Governing input:** `FEEDBACK_DONO_2026-11-05.md` (T1, T7, defects 1, 3 and 5). **Decision:** ADR-160. **Migrations:** none.
+**Date:** 5 November 2026; §7 added 6 November. **Branch:** `life-brain/b7-fill-and-suggest`, cut from `origin/main` at `09709a9`.
+**Pull request:** fabiokyrillos/my-brain#370.
+**Governing input:** `FEEDBACK_DONO_2026-11-05.md` (T1, T7, defects 1, 3 and 5). **Decisions:** ADR-160, and ADR-161 for the owner's three
+answers of 6 November. **Migrations:** one — `202611060108`, authorized by the owner after this report was first written. **Read §7 before §6:**
+§6 is the list of what was left for him, and §7 is what he decided.
 
 ---
 
@@ -156,3 +159,105 @@ it** — recorded because both cost time to diagnose and will cost it again:
 5. **Defects 2 and 4 of the analysis are not here.** Defect 2 ("Cérebro" in `relations/copy.ts`) is
    in another branch's scope and was not touched; defect 4 (the timeline stamping `created_at`) is
    C.4's.
+
+## 7. The owner answered, on 6 November
+
+Three questions, three answers, and the work they did or did not produce. ADR-161 records them.
+
+### 7.1 "pode fazer a migration" — done, and it landed before the code that needed it
+
+`202611060108_life_brain_b7_suggestion_telemetry.sql` re-declares
+`private.validate_product_event_properties` whole, with `conversation_suggestion_shown.category`
+validated against the eight names of `SUGGESTION_CATEGORIES` in the derivation's own precedence
+order. The diff against `202608110090` is exactly that one `case` arm; the other 346 lines were
+assembled from that migration's own text rather than retyped, because a hand-copy of 347 lines is
+how a pre-existing arm gets silently dropped — and the file's verification blocks assert that none
+was, that the arm admits exactly eight names, and that the event-name CHECK and the validator still
+name the same vocabulary.
+
+The event-name CHECK and the surface CHECK are **not** touched. Both already admitted this event and
+the `chat` surface, so re-running `drop constraint if exists` — the one fail-open operation in this
+chain — would have risked silently narrowing a vocabulary in exchange for nothing.
+
+`REPORTABLE_SUGGESTION_CATEGORIES` and the renderer's `.filter` came out in the same pull request and
+**after** the migration. That ordering is the rule rather than a preference: a producer naming a
+value the deployed chain refuses is rejected `22023` at the last real write path, inside a
+`.catch(() => {})`, so the code reads as instrumented and the ledger stays empty. That is
+`202608080087` and `202608090089` both, and §6 of this report described B.7 deliberately carrying the
+same state.
+
+**Still to do for it, and it is not a formality: apply and deploy.** The migration is in the chain
+and in CI. It is **not** applied to the hosted project, so until it is, the deployed database still
+refuses a dated category and the fail-open writer still swallows the refusal. Hosted parity moves
+from `202611050107` to `202611060108` when it is applied.
+
+### 7.2 A guard was missing, and this is what found it
+
+`phase-2m-telemetry-guard.test.ts` exists precisely so that no producer precedes its migration. It
+checked the event **name** against the chain and the **surface** against the chain, and it never
+looked at a property's enum — which is how B.7 could render six categories the deployed database
+refused while every guard in the repository stayed green. The gap was visible here only because the
+slice wrote the narrowing down instead of shipping the silence.
+
+It now reads the chain's latest validator with `enumValuesFor()` and holds `SUGGESTION_CATEGORIES`
+itself to it. The extraction is bounded at **both** ends, and the right bound is the interesting one:
+these enum calls sit directly before the next `when` arm and its comment, so a fixed-width window
+reads a literal out of the following arm and reports a vocabulary that is not there. A first draft of
+the migration's own verification block did exactly that — it would have counted nine names and
+aborted a correct migration in CI — and it was caught by simulating the extraction before pushing
+rather than by watching the `database` job fail.
+
+Three more places now assert the same thing from different directions: `contracts.test.ts` holds the
+analytics restatement to the derivation's list by exact equality and in order, and exercises every
+category through `parseProductEventPayload` while still refusing an invented value and a name
+travelling beside one; `post_2j_product_event_write_path.sql` writes all eight through the real
+writer (plan 39 → 42) with the same two refusals proved at the database; and
+`phase-2k-suggestion-guard.test.ts`'s assertion is now the inverse of what it was — the narrowing's
+**absence** is pinned, so a filter that comes back fails rather than quietly stopping six categories
+again.
+
+### 7.3 "não, pode ficar o hoje e manter conversa como atalho embaixo" — no code changed
+
+`mobileBarSlots` has been `["home", "chat", "capture", "calendar", "library"]` since A.2, so
+Conversar is already the second slot of the bottom bar: the shortcut he wants kept was never the
+thing B.7 removed. This also settles that removing Hoje's in-page *"Perguntar ao {agente}"* block was
+the right half to remove — what he objected to was a second text door stacked on the first screen,
+not the route being reachable.
+
+The open question §6 recorded — whether Conversar replaces Hoje as the app's front door — is
+**closed**. What remains is narrower and still unasked: whether the suggestions belong above the
+conversation list on every visit to Conversar, rather than only on the empty surface.
+
+### 7.4 "sem problemas, só usar um modelo barato pra isso" — approved, and not built here
+
+The objection §6 recorded was the price of a billed call on his own BYOK credential every time the
+main screen loads. A cheap model answers that objection; it does not waive it, and it does not supply
+the four decisions the slice needs:
+
+1. **Which `agent_preferences` operation routes it.** `background` is the existing cheap lane.
+2. **Cached per day, or recomputed per render.** A suggestion derived from today's state has a
+   natural cache key; a per-render call does not.
+3. **What happens with no key, or a rate limit.** The derived suggestions are free and never fail the
+   surface; a generated one must degrade to them rather than to nothing.
+4. **How a generated sentence stays inside `2K-SUGG-005`.** This is the real one. The whole reason a
+   name can never reach telemetry today is that the derivation keeps `{category, name}` apart and
+   the renderer builds the sentence from copy. **A model that writes the sentence can write a name
+   into it** — and into anything that logs it. Whatever that slice does, it cannot be "ask the model
+   for a sentence and show it".
+
+Until that slice exists, `phase-2k-suggestion-guard.test.ts` keeps refusing
+`getAIProvider`, `recordAIUsage`, `answerFromKnowledge` and `embedText` anywhere in the derivation or
+its reader. That refusal is now deliberate rather than merely unreviewed.
+
+### 7.5 What is still not verified
+
+- **The migration has not been applied anywhere.** Docker is not running in this checkout, so
+  `supabase db reset` could not be run locally; CI's `database` job applies the whole chain from an
+  empty database and runs the pgTAP suite, and that is the first real execution of this file. The
+  extraction logic in its verification blocks was simulated line-for-line before pushing, which is
+  why the nine-name defect above was found rather than deployed.
+- **The ADR-159 screenshot baselines for Hoje and Conversar are still unredrawn**, and they are the
+  one thing standing between this branch and a green pipeline. Both surfaces changed on purpose.
+- **The authenticated journeys still have not been run** (§5), and the three unloadable test files
+  and the broken `npm run dev` are still exactly as §5 describes them — neither caused nor fixed by
+  any of this.
