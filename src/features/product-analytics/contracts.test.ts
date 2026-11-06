@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
-import { parseProductEventPayload } from "./contracts";
+import { parseProductEventPayload, suggestionCategories } from "./contracts";
 
 type ProductAnalyticsContracts = {
   productEventContractVersion?: number;
@@ -186,6 +186,62 @@ describe("product analytics contracts", () => {
     expect(restated.previewedOutcomes).toEqual([...analytics.TASK_COMMAND_PREVIEWED_OUTCOMES]);
     expect(restated.scoreBands).toEqual([...matchPolicy.TASK_MATCH_SCORE_BANDS]);
     expect(restated.evidence).toEqual([...matchPolicy.TASK_MATCH_EVIDENCE]);
+  });
+
+  /**
+   * The same drift gate, for Life Brain B.7's suggestion categories.
+   *
+   * `SuggestionCategory` is imported as a type for the same bundle reason, with
+   * the same consequence: an omission is not a compile error. And an omission
+   * here is not cosmetic — `parseProductEventPayload` would refuse the missing
+   * category, the writer is fail-open, and the event would vanish without a
+   * trace. **In order**, because the order is the derivation's precedence rule,
+   * so a reordering is a behaviour change that should be read in a diff.
+   */
+  it("restates the suggestion categories exactly as the derivation holds them", async () => {
+    const [suggestions, actual] = await Promise.all([
+      import("@/features/conversation-cards/suggestions"),
+      import("./contracts"),
+    ]);
+    expect([...actual.suggestionCategories]).toEqual([...suggestions.SUGGESTION_CATEGORIES]);
+  });
+
+  /**
+   * The behavioural half, and the half that was actually broken.
+   *
+   * Before `202611060108` a dated category was refused here and at the
+   * database, so the event existed in the code and nowhere in the ledger. The
+   * invented value still has to be refused, or this test would pass by
+   * accepting anything.
+   *
+   * `suggestionCategories` is imported **statically**, not through this file's
+   * `importActual` shim: that shim falls back to `{}` to tolerate the module
+   * being absent, which is right for the vocabulary-census cases and wrong
+   * here — an `undefined` list would make the loop below iterate nothing and
+   * report success for a contract it never exercised.
+   */
+  it("accepts a dated suggestion category and still refuses an invented one", () => {
+    const shown = {
+      ...basePayload,
+      surface: "conversation",
+      name: "conversation_suggestion_shown",
+    };
+    expect(suggestionCategories).toHaveLength(8);
+    for (const category of suggestionCategories) {
+      expect(
+        parseProductEventPayload({ ...shown, properties: { category } }),
+        `${category} is a declared suggestion category`,
+      ).not.toBeNull();
+    }
+    expect(parseProductEventPayload({ ...shown, properties: { category: "invented" } })).toBeNull();
+    // And nothing may travel beside it: `hasExactKeys` is what stops a name
+    // arriving under another key, which is OD-2K-4's actual prohibition.
+    expect(
+      parseProductEventPayload({
+        ...shown,
+        properties: { category: "overdue_task", name: "Pagar a escola" },
+      }),
+    ).toBeNull();
   });
 
   /**

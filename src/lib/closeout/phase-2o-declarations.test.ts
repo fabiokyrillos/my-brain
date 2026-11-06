@@ -601,9 +601,21 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
       laterLifeBrain.length,
       `Life Brain is allocated at most four migrations: ${laterLifeBrain.join(", ")}`,
     ).toBeLessThanOrEqual(4);
+    // Life Brain B.7's telemetry migration (ADR-161) is attributed BY NAME rather
+    // than folded into the four above, which is this rule's whole point: the
+    // `m[1234]` ceiling was a stop condition the owner lifted once, for LB-M4 alone,
+    // and this is a FIFTH Life Brain migration authorized separately on 2026-11-06
+    // ("pode fazer a migration") to widen the suggestion telemetry enum from two
+    // categories to eight. Folding it in would make a four-ceiling read as a
+    // five-ceiling and quietly spend an authorization nobody gave.
+    const laterLifeBrainB7 = migrations.filter((name) => /life_brain_b7_/i.test(name));
+    expect(
+      laterLifeBrainB7.length,
+      `B.7 is authorized exactly one telemetry migration: ${laterLifeBrainB7.join(", ")}`,
+    ).toBeLessThanOrEqual(1);
     expect(migrations).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
-      + laterPhase2s.length + laterNotifyHeartbeat.length + laterLifeBrain.length,
+      + laterPhase2s.length + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length,
     );
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);

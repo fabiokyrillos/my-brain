@@ -1,14 +1,17 @@
 import { notFound } from "next/navigation";
-import { ButtonLink, EmptyState, List, ListItem, PageHeader } from "@/components/ui";
+import { EmptyState, List, ListItem, PageHeader } from "@/components/ui";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
-import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { Composer } from "@/features/capture/composer";
+import { ComposerSeedProvider, MAX_SEED_LENGTH } from "@/features/capture/composer-seed";
 import { transcribeRecording } from "@/features/capture/transcribe-action";
 import { getAssistantCopy } from "@/features/assistant/copy";
 import { askAboutCopy, parseAskAbout } from "@/features/conversation-cards/ask-about";
 import { AskingAboutBanner } from "@/features/conversation-cards/asking-about-banner";
+import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
 import { resolveAskAboutSubject } from "@/features/conversation-cards/resolve-ask-about";
+import { SeedChip } from "@/features/conversation-cards/seed-chip";
+import { loadSuggestionInputs } from "@/features/conversation-cards/suggestion-sources";
 import { deriveConversationSuggestions } from "@/features/conversation-cards/suggestions";
 import { SuggestionRow } from "@/features/conversation-cards/suggestion-row";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
@@ -20,9 +23,6 @@ import { formatInstant } from "@/lib/time/instant-format";
 import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
-
-/** The longest question a starter chip may seed; anything else is ignored. */
-const MAX_SEED_LENGTH = 240;
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -39,6 +39,7 @@ export default async function ChatPage({
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const copy = getAssistantCopy(locale);
+  const chipCopy = getConversationCardsCopy(locale).suggestions;
   const agentName = await getAgentName();
   const query = await searchParams;
   const page = parsePage(query.page);
@@ -48,16 +49,12 @@ export default async function ChatPage({
   // other contextual surface stamp instants from the same source.
   const timeZone = await getOwnerTimeZone();
 
-  const [result, peopleResult, projectsResult] = await Promise.all([
-    supabase.from("conversations").select("id,title,updated_at").order("updated_at", { ascending: false }).range(from, to),
-    supabase.from("people").select("id,name").order("updated_at", { ascending: false }).limit(3),
-    supabase.from("projects").select("id,name").order("updated_at", { ascending: false }).limit(3),
-  ]);
+  const result = await supabase
+    .from("conversations")
+    .select("id,title,updated_at")
+    .order("updated_at", { ascending: false })
+    .range(from, to);
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load conversations") ?? []);
-  const suggestions = deriveConversationSuggestions({
-    people: requireSupabaseData(peopleResult, "load suggestion people") ?? [],
-    projects: requireSupabaseData(projectsResult, "load suggestion projects") ?? [],
-  });
 
   /*
     `2P-CHAT-005` — arriving from a person's or project's page seeds the
@@ -70,6 +67,25 @@ export default async function ChatPage({
   const initialText = askingAbout === null
     ? seededQuestion
     : askAboutCopy(locale).seed(askingAbout.name);
+
+  /*
+    Life Brain B.7 (T7). The suggestions are read **only when they will be
+    drawn**, which is the empty conversation surface — the same condition
+    `2K-SUGG-003` shipped with. An owner who already has conversations pays for
+    none of these reads, which is why they can afford to be six.
+
+    A scoped conversation hands its subject down: the owner found "Perguntando
+    sobre Família" offering "Quando fui ao médico pela última vez?", and a
+    suggestion that ignores the scope the banner announces is worse than no
+    suggestion at all.
+  */
+  const suggestions = items.length === 0
+    ? deriveConversationSuggestions(await loadSuggestionInputs(supabase, {
+      now: new Date(),
+      scope: askingAbout === null ? null : askingAbout.subject,
+      timeZone,
+    }))
+    : [];
 
   return (
     <div className="content-page chat-page">
@@ -85,38 +101,66 @@ export default async function ChatPage({
         <AskingAboutBanner locale={locale} resolved={askingAbout} />
       )}
 
-      <Composer
-        mode="chat"
-        transcribeAction={transcribeRecording}
-        action={runAssistantTurn}
-        agentName={agentName}
-        initialText={initialText}
-        locale={locale}
-        memoryAction={createProposedMemory}
-        memoryUndoAction={undoProposedMemory}
-      />
-
-      {items.length === 0 ? (
-        <EmptyState
-          description={copy.emptyDescription}
-          size="compact"
-          title={copy.emptyTitle(agentName)}
-          action={
-            <div className="chat-starters" role="group" aria-label={copy.startersLabel}>
-              {copy.starters.map((question) => (
-                <ButtonLink
-                  href={`/${locale}/app/chat?q=${encodeURIComponent(question)}`}
-                  key={question}
-                  size="sm"
-                  variant="secondary"
-                >
-                  {question}
-                </ButtonLink>
-              ))}
-            </div>
-          }
+      {/*
+        Life Brain B.7. Everything that can put a question **in** the field is
+        inside this provider, which is the whole mechanism: the composer
+        registers its field, a chip calls the filler, and nothing between them
+        submits. The owner's rule, in his words: "é preencher, não enviar."
+      */}
+      <ComposerSeedProvider>
+        <Composer
+          mode="chat"
+          transcribeAction={transcribeRecording}
+          action={runAssistantTurn}
+          agentName={agentName}
+          initialText={initialText}
+          locale={locale}
+          memoryAction={createProposedMemory}
+          memoryUndoAction={undoProposedMemory}
         />
-      ) : null}
+
+        {items.length === 0 ? (
+          <EmptyState
+            description={copy.emptyDescription}
+            size="compact"
+            title={copy.emptyTitle(agentName)}
+            action={
+              /*
+                Defect 3 of 5 November: in a scoped conversation these four
+                generic life questions were exactly the chips the owner quoted
+                as having nothing to do with "Família". The banner above already
+                says what the conversation is about, and the field is already
+                seeded with it, so the generic starters stand down.
+              */
+              askingAbout !== null ? undefined : (
+                <div className="chat-starters" role="group" aria-label={copy.startersLabel}>
+                  {copy.starters.map((question) => (
+                    <SeedChip
+                      fillLabel={chipCopy.fill(question)}
+                      /*
+                        The path with no JavaScript, and the behaviour this
+                        replaced: a full navigation that re-rendered the page to
+                        put four words in a field. Kept only as the degraded
+                        route, never as the one a hydrated page takes.
+                      */
+                      href={`/${locale}/app/chat?q=${encodeURIComponent(question)}`}
+                      key={question}
+                      question={question}
+                    />
+                  ))}
+                </div>
+              )
+            }
+          />
+        ) : null}
+
+        {/*
+          `2K-SUGG-003`, extended by B.7. At most three suggestions derived from
+          the owner's own people, projects, dates and open loops — and nothing at
+          all when none is honestly appropriate.
+        */}
+        <SuggestionRow locale={locale} suggestions={suggestions} />
+      </ComposerSeedProvider>
 
       {/*
         Proactive questions stay — they are the agent's own open loops and
@@ -124,18 +168,6 @@ export default async function ChatPage({
         read as secondary so their answer fields do not compete with it.
       */}
       <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="proactive" />
-
-      {/*
-        `2K-SUGG-003`. At most three suggestions derived from the user's own
-        people and projects — and nothing at all when they have neither.
-      */}
-      {items.length === 0 ? <SuggestionRow locale={locale} suggestions={suggestions} /> : null}
-
-      {/*
-        Conversar is Brain's Conversas lens, and the strip says so — below the
-        composer, so the first focus stop stays on the field (UX-07).
-      */}
-      <BrainLensTabs active="chat" locale={locale} />
 
       {items.length ? (
         <section className="conversation-list" aria-labelledby="chat-recent-title">

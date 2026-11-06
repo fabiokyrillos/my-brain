@@ -16,7 +16,7 @@
 
 begin;
 
-select plan(39);
+select plan(42);
 
 -- ---------------------------------------------------------------------------
 -- Fixtures.
@@ -428,6 +428,57 @@ select is(
       )),
   3,
   'all three Phase 2K conversation events are written through the real public writer'
+);
+
+-- ---------------------------------------------------------------------------
+-- Life Brain B.7 / ADR-161. The eight suggestion categories, through the real
+-- writer, because the two-name version of this enum is exactly the state the
+-- slice's own closing report had to report as a gap: six categories rendered on
+-- screen and refused `22023` at this call, inside a producer that swallows the
+-- refusal. A unit test cannot see that -- only this file can.
+-- ---------------------------------------------------------------------------
+
+select is_empty(
+  $$ select category || ' -> no row'
+       from (
+         select c.category,
+           (select w.event_id from public.record_product_event_for_user(
+              'b7000001-0000-4000-8000-000000000001', 'conversation_suggestion_shown',
+              'conversation', 'pt-BR', 'desktop', '0.0.0-pgtap',
+              jsonb_build_object('category', c.category),
+              null, null, null, gen_random_uuid(), true) w) as id
+         from (values
+           ('overdue_task'), ('due_today'), ('reminder_soon'), ('birthday_soon'),
+           ('open_question'), ('unreviewed_entry'), ('person'), ('project')
+         ) as c(category)
+       ) written
+      where written.id is null $$,
+  'LIFE BRAIN B.7: all eight suggestion categories are writable through the real writer'
+);
+
+-- NON-VACUITY. The assertion above would pass just as well against an enum that
+-- admitted anything, which is the one way a widening can be wrong.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'conversation_suggestion_shown', 'conversation',
+       'pt-BR', 'desktop', '0.0.0-pgtap', '{"category":"invented"}'::jsonb,
+       null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Invalid product event property',
+  'B.7: a category outside the eight is still refused -- the enum widened, it did not open'
+);
+
+-- OD-2K-4's actual prohibition: the name may be on screen and may never be in
+-- the ledger. The widened enum does not give it a key to travel under.
+select throws_ok(
+  $$ select public.record_product_event_for_user(
+       'b7000001-0000-4000-8000-000000000001', 'conversation_suggestion_shown', 'conversation',
+       'pt-BR', 'desktop', '0.0.0-pgtap',
+       '{"category":"overdue_task","name":"Pagar a escola"}'::jsonb,
+       null, null, null, gen_random_uuid(), true) $$,
+  '22023',
+  'Unsupported product event property',
+  'B.7: a task title beside the category is still refused: the payload has nowhere to put one'
 );
 
 -- ---------------------------------------------------------------------------

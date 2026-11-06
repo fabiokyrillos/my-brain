@@ -2,7 +2,12 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { productEventNames, productSurfaces } from "@/features/product-analytics/contracts";
+import {
+  productEventNames,
+  productSurfaces,
+  suggestionCategories,
+} from "@/features/product-analytics/contracts";
+import { SUGGESTION_CATEGORIES } from "@/features/conversation-cards/suggestions";
 
 /**
  * `2M-METRICS-001` / `2M-AUDIT-002` — **no producer may precede its migration**,
@@ -103,6 +108,42 @@ function validatedEventNames(): readonly string[] {
   return latest;
 }
 
+/**
+ * The values a `require_product_event_enum(p_properties, '<key>', array[...])`
+ * call admits, from the **last** migration that re-declares the validator.
+ *
+ * Life Brain B.7 added this, and it closes the half of this guard that was open.
+ * The rules above check the event NAME and the SURFACE; neither looks at a
+ * property's enum, and a property value the chain refuses fails in exactly the
+ * way a name does — `22023` at the last real write path, inside a producer that
+ * wraps emission in `.catch(() => {})`, so the code reads as instrumented and
+ * the ledger stays empty. That is `202608080087` and `202608090089` both. B.7
+ * reached its own closing report carrying that state deliberately: six
+ * suggestion categories rendered and not reported, because the validator
+ * admitted `array['person', 'project']`.
+ *
+ * Bounded at both ends, and the right bound is not optional: these calls sit
+ * directly before the next `when` arm and its comment, so a fixed-width window
+ * reads a literal out of the following arm and reports a vocabulary that is not
+ * there. A first draft of `202611060108`'s own verification block did that.
+ */
+function enumValuesFor(key: string): readonly string[] {
+  let latest: string[] = [];
+  for (const file of migrationFiles()) {
+    const sql = readFileSync(join(MIGRATIONS, file), "utf8");
+    const start = sql.indexOf("function private.validate_product_event_properties");
+    if (start < 0) continue;
+    const at = sql.indexOf(`require_product_event_enum(p_properties, '${key}', array[`, start);
+    if (at < 0) continue;
+    const open = sql.indexOf("array[", at);
+    const close = sql.indexOf("]", open);
+    if (close < 0) continue;
+    const values = [...sql.slice(open, close).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    if (values.length > 0) latest = values;
+  }
+  return latest;
+}
+
 describe("2M-METRICS-001: no producer precedes its migration", () => {
   it("admits every event name the application declares", () => {
     const admitted = new Set(admittedValues("event_name"));
@@ -132,6 +173,40 @@ describe("2M-METRICS-001: no producer precedes its migration", () => {
       missing,
       `these event names have no property branch and would raise 22023: ${missing.join(", ")}`,
     ).toEqual([]);
+  });
+
+  it("admits every suggestion category the derivation declares", () => {
+    /*
+     * Life Brain B.7 / ADR-161. The property-enum half of the same rule.
+     *
+     * Asserted against the DERIVATION's own vocabulary rather than against the
+     * analytics restatement alone, because the derivation is what decides which
+     * category reaches the producer. A seventh dated category added to
+     * `SUGGESTION_CATEGORIES` without SQL reds here, in the `app` job, instead
+     * of being refused `22023` in production by a writer that swallows it.
+     */
+    const admitted = new Set(enumValuesFor("category"));
+    const undeclared = SUGGESTION_CATEGORIES.filter((category) => !admitted.has(category));
+    expect(
+      undeclared,
+      `the derivation shows categories the migration chain does not admit: ${undeclared.join(", ")}`,
+    ).toEqual([]);
+
+    // And the restatement the producer's type is built from must be the same
+    // list, so the two ends cannot drift apart between these two assertions.
+    expect([...suggestionCategories]).toEqual([...SUGGESTION_CATEGORIES]);
+  });
+
+  it("detects the category defect it exists for, on a value the chain does not admit", () => {
+    // The mutation. Without it, an extraction that silently returned everything
+    // — or that read a literal out of the next `when` arm — would pass and prove
+    // nothing. Eight exactly: `202611060108` widened two to eight and a ninth
+    // value here means the window overshot into `calendar_viewed`.
+    const admitted = enumValuesFor("category");
+    expect(admitted).toHaveLength(8);
+    expect(admitted).not.toContain("calendar_viewed");
+    expect(admitted).toContain("overdue_task");
+    expect(admitted).toContain("project");
   });
 
   it("detects the defect it exists for, on a name the chain does not admit", () => {

@@ -185,9 +185,10 @@ describe("2N-FILES-012: the slice ships no migration and no RPC", () => {
     // Chain head moved to 105 by Life Brain LB-M3, the ONE migration slice B.3 was allocated (ADR-145 Decision 7): the chat's retrieval gains a date window (ADR-150). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 106 by Life Brain LB-M2, the ONE migration slice C.3 was allocated (ADR-145 Decision 7) and the third and last of Life Brain's three: events with a period (ADR-152). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 107 by Life Brain LB-M4, a FOURTH Life Brain migration: ADR-145 Decision 7 made it a stop condition and the owner lifted it explicitly on 2026-11-05 ("Sim, autorizo LB-M4") for slice C.5, a person's birthday and its yearly reminder (ADR-156). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
-    expect(migrations.length).toBe(107);
+    // Chain head moved to 108 by Life Brain B.7's telemetry migration (ADR-161): the suggestion category enum widened from two names to eight, authorized by the owner on 2026-11-06 ("pode fazer a migration") after B.7 shipped without it and recorded the gap in its closing report. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
+    expect(migrations.length).toBe(108);
     expect(migrations.sort().at(-1)).toBe(
-      "202611050107_life_brain_m4_birthdays.sql",
+      "202611060108_life_brain_b7_suggestion_telemetry.sql",
     );
   });
 

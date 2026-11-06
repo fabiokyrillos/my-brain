@@ -152,6 +152,48 @@ describe("2K-METRICS-001: the vocabulary is declared once and derived everywhere
   });
 });
 
+/**
+ * The members of a NAMED type, if and only if it is a closed list of string
+ * literals — `export type X = (typeof Y)[number]` over an `export const Y =
+ * [...] as const` of string literals, in the module `contracts.ts` imports it
+ * from. Anything else returns `null`.
+ *
+ * Added by Life Brain B.7 (ADR-161), when `conversation_suggestion_shown`'s
+ * `category` became `SuggestionCategory` instead of a literal union written in
+ * place. The rule below must not be relaxed to "a named type is fine": the
+ * property `2K-METRICS-002` asserts is that **no field can hold free text**, and
+ * `category: string` is a named type too. So the name is RESOLVED and its
+ * closure proved, here, from the source — a name that resolved to nothing, to a
+ * `string`, or to a list with a non-literal member fails exactly as an inline
+ * `string` would.
+ */
+function closedVocabularyBehind(typeName: string): readonly string[] | null {
+  if (!/^[A-Z]\w*$/.test(typeName)) return null;
+  const contracts = read(CONTRACTS);
+  const spec = new RegExp(
+    `import type \\{[^}]*\\b${typeName}\\b[^}]*\\} from "([^"]+)"`,
+  ).exec(contracts)?.[1];
+  if (spec === undefined) return null;
+  const declaring = spec.startsWith("@/") ? `src/${spec.slice(2)}.ts` : null;
+  if (declaring === null) return null;
+
+  const source = read(declaring);
+  const alias = new RegExp(
+    `export type ${typeName} = \\(typeof (\\w+)\\)\\[number\\];`,
+  ).exec(source)?.[1];
+  if (alias === undefined) return null;
+
+  const literal = new RegExp(`export const ${alias} = \\[([^\\]]*)\\] as const;`).exec(source)?.[1];
+  if (literal === undefined) return null;
+
+  const members = [...literal.matchAll(/"([^"]+)"/g)].map((match) => match[1]);
+  // Every entry must be a quoted string literal: a trailing identifier, a
+  // spread or a computed member would make the list open.
+  const residue = literal.replace(/"[^"]+"|,|\s/g, "");
+  if (members.length === 0 || residue !== "") return null;
+  return members;
+}
+
 describe("2K-METRICS-002: no property can hold free text", () => {
   it("declares only closed enums and booleans for the three events", () => {
     const contracts = read(CONTRACTS);
@@ -159,16 +201,44 @@ describe("2K-METRICS-002: no property can hold free text", () => {
       const start = contracts.indexOf(`  ${name}: {`);
       expect(start, `${name} property shape not found`).toBeGreaterThan(0);
       const shape = contracts.slice(start, contracts.indexOf("};", start));
-      // Every declared field is either a union of string literals or a boolean.
+      // Every declared field is either a union of string literals, a boolean,
+      // or a named type this file can prove closed.
       const fields = [...shape.matchAll(/^\s{4}(\w+):\s*(.+);$/gm)];
       expect(fields.length, `${name} declares no fields`).toBeGreaterThan(0);
       for (const [, field, type] of fields) {
         const bounded = /^boolean$/.test(type.trim())
-          || /^"[^"]+"(\s*\|\s*"[^"]+")*$/.test(type.trim());
+          || /^"[^"]+"(\s*\|\s*"[^"]+")*$/.test(type.trim())
+          || closedVocabularyBehind(type.trim()) !== null;
         expect(bounded, `${name}.${field} is "${type.trim()}", which is not a closed enum or a boolean`)
           .toBe(true);
       }
     }
+  });
+
+  it("resolves a named type to its members, and refuses one it cannot prove closed", () => {
+    /*
+      The non-vacuity of the rule above. `closedVocabularyBehind` returning a
+      list for anything would turn "no field can hold free text" into "no field
+      is written inline", which is not a property at all.
+    */
+    expect(closedVocabularyBehind("SuggestionCategory")).toEqual([
+      "overdue_task",
+      "due_today",
+      "reminder_soon",
+      "birthday_soon",
+      "open_question",
+      "unreviewed_entry",
+      "person",
+      "project",
+    ]);
+    // It is a general rule, not a carve-out for one name: any type `contracts.ts`
+    // imports that aliases an `as const` list of string literals resolves.
+    expect(closedVocabularyBehind("TaskCommandOrigin")).toEqual(["chat", "work"]);
+    // And it refuses what it cannot prove: a name `contracts.ts` does not
+    // import, and anything that is not a type name at all.
+    expect(closedVocabularyBehind("FreeTextWhateverItIsCalled")).toBeNull();
+    expect(closedVocabularyBehind("string")).toBeNull();
+    expect(closedVocabularyBehind("boolean")).toBeNull();
   });
 
   it("names no content-shaped KEY on any Phase 2K event", () => {

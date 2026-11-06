@@ -124,7 +124,12 @@ describe("2L-AUDIT-004: the Work view vocabulary is one vocabulary", () => {
     // validator whole to add six arms. The pin moves in the same commit as the
     // migration; the equality this describe block asserts is what proves the
     // re-declaration lost nothing.
-    expect(validator.name).toBe("202608110090_phase_2m_daily_cycle_telemetry.sql");
+    // Moved again by Life Brain B.7's `202611060108` (ADR-161), which
+    // re-declares it whole to widen one arm — the suggestion category enum, from
+    // two names to eight. This block is exactly the check such a re-declaration
+    // needs: the `workView` vocabulary belongs to another phase entirely, and it
+    // has to survive a 347-line copy untouched.
+    expect(validator.name).toBe("202611060108_life_brain_b7_suggestion_telemetry.sql");
   });
 
   it("the database validator allows exactly the three signed views", () => {

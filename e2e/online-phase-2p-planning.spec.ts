@@ -342,7 +342,7 @@ test.describe("a reminder is created through a dialog", () => {
      * Asserted positively and negatively, because a row that rendered nothing at
      * all would pass a check for the absence of a link.
      */
-    await expect(row.locator(".reminder-subject-none")).toHaveText("Lembrete avulso");
+    await expect(row.locator(".reminder-subject-none")).toHaveText("Sem vínculo");
     await expect(row.locator(".reminder-subject-link")).toHaveCount(0);
   });
 

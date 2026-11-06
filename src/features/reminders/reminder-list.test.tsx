@@ -174,9 +174,37 @@ describe("the linked subject and the audit trail", () => {
     expect(link).toHaveAttribute("href", "/pt-BR/app/work/task-1");
   });
 
-  it("says a reminder is standalone rather than showing an empty link", () => {
+  it("says which absence it means rather than showing an empty link", () => {
     renderList([reminder()]);
-    expect(screen.getByText("Lembrete avulso")).toBeInTheDocument();
+    expect(screen.getByText("Sem vínculo")).toBeInTheDocument();
+  });
+
+  /**
+   * Life Brain B.7, defect 5 of 5 November 2026.
+   *
+   * The owner's card said "Lembrete avulso" and, two lines down, "REPETE — Todo
+   * dia 5 de junho". The label is chosen by `link === null`, so it was reporting
+   * the absence of a **subject**; *avulso* reads in Portuguese as the absence of
+   * **recurrence**, which the next line then contradicted. The data was right
+   * and the word was wrong, so this asserts the one case that exposed it.
+   */
+  it("does not call a recurring reminder standalone (defect 5)", () => {
+    renderList([reminder({
+      link: null,
+      series: {
+        id: "77777777-7777-4777-8777-777777777777",
+        active: true,
+        detached: false,
+        sequence: 4,
+        description: "Todo dia 5 de junho",
+      },
+    })]);
+
+    expect(screen.getByText("Sem vínculo")).toBeInTheDocument();
+    expect(screen.getByText("Todo dia 5 de junho")).toBeInTheDocument();
+    // The two sentences are on the same card, so the one that reports "no
+    // subject" may not read as "no repetition".
+    expect(screen.queryByText(/avulso/i)).toBeNull();
   });
 
   it("links every reminder to its own history", () => {

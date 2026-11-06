@@ -106,6 +106,40 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 
 - Estado persistido de "pensando" (job de chat) e streaming quando o ledger permitir.
 
+### B.7 — Sugestões que preenchem e que sabem que dia é hoje (2 d)
+
+Acrescentada em 2026-11-05, depois das duas gravações do dono e do pedido T7. **A ordem da §0 não
+mudou** — a B.7 entra como slice nova no fim da trilha B, e a numeração pula a B.6 porque aquela
+(streaming) continua não iniciada e opcional: uma renumeração seria mexer no plano sem o dono pedir.
+
+- **O que sobrou da T1 depois da B.5.** A B.5 já tinha entregado o composer único, o roteador e a
+  voz; o que o dono ainda via era: os chips de partida **navegando** para `?q=` em vez de preencher,
+  a faixa `BrainLensTabs` embaixo do composer em `/app/chat`, e a porta "Perguntar ao {agente}" na
+  Hoje ao lado do próprio campo.
+- **T7 — sugestões contextuais.** Seis categorias novas (`overdue_task`, `due_today`,
+  `reminder_soon`, `birthday_soon`, `open_question`, `unreviewed_entry`), derivadas de forma
+  determinística; nenhuma chamada ao modelo por render (T-2K-10, ADR-094). Nasceu com **zero
+  migration**, como briefada; **uma** entrou em 2026-11-06, autorizada pelo dono (ADR-161).
+- **Defeitos 1, 3 e 5** do relatório de feedback.
+- **Implementado 2026-11-05 (ADR-160):** `composer-seed.tsx` (canal de preenchimento — "é preencher,
+  não enviar", com o guard recusando `<form>`, `formAction`, `type="submit"` e `requestSubmit` na
+  linha, no chip **e** no canal); `suggestion-sources.ts` (seis leituras limitadas + **uma** leitura
+  dependente de `entries` para toda a classificação); `resolveConversationContent` **descarta** —
+  não mascara — uma tarefa, lembrete, pergunta ou registro `highly_sensitive`; conversa com escopo
+  recebe sugestão do escopo ou nenhuma. Relatório: `docs/reports/life-brain/B7_CLOSING_REPORT.md`.
+- **Decidido pelo dono em 2026-11-06 (ADR-161):** a migration de telemetria foi autorizada e entrou
+  no mesmo pull request (`202611060108` — o enum admite as oito categorias, e o estreitamento do
+  renderizador saiu **depois** dela); a **Hoje continua a porta de entrada**, com Conversar como
+  atalho na barra de baixo, onde a A.2 já a tinha posto (nada mudou em código, e a pergunta aberta
+  da ADR-160 fecha aqui); e sugestões geradas por modelo estão aprovadas **em princípio**, com
+  modelo barato, como **slice própria** — a ADR-161 Decisão 4 escreve as quatro perguntas que ela
+  precisa responder antes de qualquer código, inclusive como uma frase gerada fica dentro do
+  `2K-SUGG-005`, já que um modelo que escreve a frase pode escrever um nome dentro dela.
+- **Aberto:** redesenhar as baselines de screenshot (ADR-159) de Hoje e Conversar neste branch — é o
+  único item que impede o pipeline verde; aplicar e publicar a migration no projeto hospedado (a
+  paridade só anda quando isso acontecer); as jornadas autenticadas com um chip tocado não foram
+  rodadas; e `Ctrl+K` ainda aparece como `Ctrl+K` num Mac.
+
 ## 3. Trilha C — Vida inteira
 
 ### C.0 — Copy e exemplos de vida (0,5 d)
@@ -164,4 +198,5 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 | A.6 | A | 1 | — | Ajustes/Avançado, regressão visual |
 | B.5 | B | 1,5 | — | um composer, voz no chat |
 | B.6 | B | 1 | — | streaming |
-| **Total** | | **≈ 25 d** | 3 (+1 condicional) | |
+| B.7 | B | 2 | 1 (telemetria) | chips que preenchem, sugestões por data e estado |
+| **Total** | | **≈ 25 d** | 3 (+1 condicional) alocadas · **5 gastas** | M1, M2, M3, M4 e a de telemetria da B.7 (ADR-161) |

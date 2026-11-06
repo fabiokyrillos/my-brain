@@ -37,6 +37,7 @@ import {
 import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
 import { getAssistantCopy } from "@/features/assistant/copy";
 
+import { fillField, useRegisterComposerSeed } from "./composer-seed";
 import { VoiceComposer, type TranscribeAction } from "./voice-composer";
 
 export type ChatComposerAction = (
@@ -140,6 +141,14 @@ export function ChatComposer({
   const form = useRef<HTMLFormElement | null>(null);
   const field = useRef<HTMLTextAreaElement | null>(null);
 
+  /**
+   * The last text a chip put in the field, so a second chip replaces it.
+   *
+   * Only a *fill* writes here. A transcript does not, because a transcript is
+   * the owner speaking and the next chip must join it rather than erase it.
+   */
+  const lastFill = useRef<string | null>(null);
+
   /** A transcript lands in the field, after what is already typed; never sent by itself. */
   function insertTranscript(text: string) {
     const target = field.current;
@@ -148,6 +157,22 @@ export function ChatComposer({
     target.value = current ? `${current} ${text}` : text;
     target.focus();
   }
+
+  /**
+   * Life Brain B.7. A suggestion or starter chip, landing in this field.
+   *
+   * **Fills, never sends** — the owner's rule, stated in his own words in
+   * `composer-seed.tsx`. There is no `requestSubmit` on this path, which is the
+   * whole distinction: `suggestion-row.tsx` could not make its chips controls
+   * while a control meant asking on the owner's behalf, and a control that only
+   * writes into a field does not.
+   */
+  useRegisterComposerSeed((text) => {
+    const target = field.current;
+    if (!target) return;
+    lastFill.current = fillField(target, text, lastFill.current);
+  });
+
   const notice = useRef<HTMLDivElement | null>(null);
   const fieldId = useId();
   const hintId = `${fieldId}-hint`;

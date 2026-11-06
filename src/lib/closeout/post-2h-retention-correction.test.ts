@@ -248,6 +248,7 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // sweep: the yearly reminder is materialised by the existing series
       // trigger, and the date lives as long as the person.
       "202611050107_life_brain_m4_birthdays.sql",
+      "202611060108_life_brain_b7_suggestion_telemetry.sql",
     ]);
   });
 });

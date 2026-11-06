@@ -245,3 +245,45 @@ export function resolveCalendarContent(
   }
   return resolveContent("calendar", sensitivity.level, key, state);
 }
+
+/**
+ * Life Brain B.7 — the same question, asked for the **conversation** surface.
+ *
+ * A third function for the same reason the second one exists: the surface
+ * literals live in this module, so a guard can keep asking which file names a
+ * surface. The surface is `chat`, because a contextual suggestion is drawn on
+ * the conversation surface and must take that surface's posture rather than
+ * invent one of its own.
+ *
+ * ## Why a suggestion asks this at all
+ *
+ * `suggestions.ts` names the owner's own rows on the opening screen. Its header
+ * could once state that there was nothing to mask, because people and projects
+ * carry no classification. The dated categories broke that: a task, a reminder,
+ * a pending question and a record all derive a level from their source entry,
+ * and the Home already withholds a `highly_sensitive` one. A suggestion naming
+ * the same row would be that mask, walked around — so the derivation asks here
+ * and declines to name what comes back withheld.
+ *
+ * **It drops the row rather than rendering it masked**, which is the one place a
+ * suggestion departs from every other surface in this file. The reason the
+ * others mask in position does not apply: a masked list row keeps a count
+ * honest and a masked calendar row keeps a day from looking empty, whereas a
+ * suggestion whose subject is hidden says nothing at all, and its presence would
+ * still report that such a row exists (`2K-PRIVACY-002`). Zero suggestions is
+ * already a legitimate answer here (OD-2K-4); zero rows never was anywhere else.
+ *
+ * The `undetermined` arm is identical to the two above and deliberately does not
+ * consult a rule: a hand-made task or reminder has no source, and OD-2L-1 B says
+ * that absence is never *inferred* to mean `normal`.
+ */
+export function resolveConversationContent(
+  sensitivity: TaskSensitivity,
+  key: string,
+  state: RevealState = NO_REVEALS,
+): { readonly show: boolean; readonly masked: boolean; readonly revealable: boolean } {
+  if (!isDerivedLevel(sensitivity)) {
+    return { show: true, masked: false, revealable: false };
+  }
+  return resolveContent("chat", sensitivity.level, key, state);
+}

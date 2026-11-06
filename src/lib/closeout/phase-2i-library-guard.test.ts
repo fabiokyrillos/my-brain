@@ -180,15 +180,32 @@ describe("Brain's lenses reach every context destination, and none twice", () =>
   });
 
   /**
-   * The strip is mounted by hand on nine surfaces and told which one it is on.
+   * The strip is mounted by hand on each surface and told which one it is on.
    * A page passing another lens's key would light the wrong tab, and nothing
    * about the page would look wrong while it did.
    *
    * So the expected key is re-derived from each route file's own directory and
    * compared with what the file actually passes. `library` maps to `overview`
    * because Brain's own route is the overview lens rather than a member.
+   *
+   * ## Conversar is the one lens that does not mount it, since Life Brain B.7
+   *
+   * `/app/chat` carried `<BrainLensTabs active="chat">` below its composer. The
+   * owner read it on his own iPhone and called it *"uma lista com várias coisas
+   * aqui embaixo que não deveriam fazer parte da conversa… para mim isso aqui
+   * está perdido"* — a page of lenses to everything else, under the field he
+   * had just been told to type in.
+   *
+   * What the strip is **for** is unaffected and still asserted below:
+   * `chat` stays in `BRAIN_DOMAIN_LENSES`, so Conversas is still a lens of
+   * Memória and is still reachable from the strip on all eight other surfaces.
+   * Only the self-mount is gone, and `EXEMPT` asserts its absence rather than
+   * skipping the route — a strip that came back would fail here.
    */
   it("passes each surface its own lens key", () => {
+    /** Lenses reachable from the strip that deliberately do not mount it. */
+    const EXEMPT = new Set(["chat"]);
+
     const mounts = new Map<string, string>([
       ["library", "overview"],
       ...BRAIN_DOMAIN_LENSES.map((key) => [key, key] as [string, string]),
@@ -197,6 +214,15 @@ describe("Brain's lenses reach every context destination, and none twice", () =>
     for (const [route, expectedLens] of mounts) {
       const source = readFileSync(join(REPO, `src/app/[locale]/app/${route}/page.tsx`), "utf8");
       const mount = source.match(/<BrainLensTabs\s+active="([a-z]+)"/);
+
+      if (EXEMPT.has(route)) {
+        expect(mount, `/app/${route} mounts BrainLensTabs again (Life Brain B.7 removed it)`).toBeNull();
+        // Removed from the page, never from the strip: the lens is still a
+        // destination, which is what keeps the conversation inside Memória.
+        expect(BRAIN_DOMAIN_LENSES, `${route} left the lens vocabulary`).toContain(route);
+        continue;
+      }
+
       expect(mount, `/app/${route} does not mount BrainLensTabs`).not.toBeNull();
       expect(mount![1], `/app/${route} marks the ${mount![1]} lens as current`).toBe(expectedLens);
     }
