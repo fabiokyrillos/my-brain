@@ -20,6 +20,16 @@
   border-radius: var(--radius-sm);
   background: var(--background-subtle); color: var(--text-muted);
 }
+/* Life Brain B.7, defect 1 of 5 November 2026: the owner read "Ctrl+K" on an
+   iPhone, which has no Ctrl. The shortcut is real where a keyboard is, so the
+   hint is withheld rather than the control -- and the test is the device query
+   rather than a user-agent string, because "has a keyboard" is what the hint
+   claims and `pointer: coarse` with `hover: none` is the closest thing a
+   browser will tell us. The `<kbd>` is already `aria-hidden`, so nothing is
+   taken from a screen reader here. */
+@media (hover: none) and (pointer: coarse) {
+  .palette-trigger kbd { display: none; }
+}
 
 .palette-backdrop {
   position: fixed; inset: 0; z-index: 60;

@@ -624,7 +624,7 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
 
     await expect(row(page, title).getByText("Scheduled")).toBeVisible();
     await expect(row(page, title).getByText(/Next reminder/)).toBeVisible();
-    await expect(row(page, title).getByText("Standalone reminder")).toBeVisible();
+    await expect(row(page, title).getByText("Not linked")).toBeVisible();
 
     await row(page, title).getByRole("button", { name: "Cancel reminder" }).click();
     await expect(page.getByText("Cancel this reminder?")).toBeVisible();

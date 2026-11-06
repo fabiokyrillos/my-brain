@@ -79,6 +79,19 @@ type ReminderCopy = {
   readonly importantBadge: string;
   readonly linkedTask: string;
   readonly linkedEntry: string;
+  /**
+   * Life Brain B.7, defect 5 of 5 November 2026.
+   *
+   * This label is chosen by `reminder.link === null` -- it reports the absence
+   * of a linked **subject** (a task or a record). It read "Lembrete avulso",
+   * and in Portuguese *avulso* reads as the absence of **recurrence**, which
+   * the very next line of the same card then contradicted with "REPETE -- Todo
+   * dia 5 de junho". Nothing was wrong with the data; the word named the wrong
+   * absence.
+   *
+   * So it now says which absence it means, in the same vocabulary as the two
+   * labels above it: "Tarefa vinculada", "Registro vinculado", "Sem vinculo".
+   */
   readonly independent: string;
   readonly historyLink: string;
 
@@ -363,7 +376,7 @@ const COPY = {
     importantBadge: "importante",
     linkedTask: "Tarefa vinculada",
     linkedEntry: "Registro vinculado",
-    independent: "Lembrete avulso",
+    independent: "Sem vínculo",
     historyLink: "Ver no histórico",
 
     creation: {
@@ -603,7 +616,7 @@ const COPY = {
     importantBadge: "important",
     linkedTask: "Linked task",
     linkedEntry: "Linked record",
-    independent: "Standalone reminder",
+    independent: "Not linked",
 
     creation: {
       open: "New reminder",
