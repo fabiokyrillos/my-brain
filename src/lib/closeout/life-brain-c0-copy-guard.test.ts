@@ -151,6 +151,16 @@ describe("Life Brain C.0 — destinations named for a whole life", () => {
     expect(offending).toEqual([]);
   });
 
+  it("no product file hardcodes the assistant as \"Cérebro\"", () => {
+    // Defect 2 of `FEEDBACK_DONO_2026-11-05.md`: Relações said "o Cérebro" while
+    // the rest of the product said the configured name (UX-06). Copy carries
+    // `{agent}` and the getter substitutes it; this holds every product file.
+    const offending = PRODUCT_FILES.filter((path) => withoutComments(readFileSync(path, "utf8")).includes("Cérebro")).map((path) =>
+      relative(REPO, path),
+    );
+    expect(offending).toEqual([]);
+  });
+
   it("left the extraction prompt to C.1, which extended it rather than replacing it", () => {
     // C.0 pinned the version at "2026-08-22.1" and said C.1 would move it on
     // purpose. C.1 did (ADR-148): the life-area section was added and the

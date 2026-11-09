@@ -409,7 +409,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         {relationships.length || projectLinks.length || contextLinks.length ? (
           <Link className="relations-open-link" href={relationViewHref(locale, "diagram", person.id)}>
             <Network aria-hidden="true" size={16} />
-            {getRelationsCopy(locale).openForPerson}
+            {getRelationsCopy(locale, agentName).openForPerson}
           </Link>
         ) : null}
       </div>

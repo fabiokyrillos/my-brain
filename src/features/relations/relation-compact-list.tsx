@@ -47,14 +47,16 @@ import { COMPACT_RELATION_LIMIT, relationRowHref } from "./view";
 
 export function RelationCompactList({
   focusId,
+  agentName,
   locale,
   projection,
 }: {
   readonly focusId: string | null;
+  readonly agentName: string;
   readonly locale: Locale;
   readonly projection: RelationProjection;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const byId = nodesById(projection);
   const drawn = drawableEdges(projection);
   if (drawn.length === 0) return null;
@@ -76,7 +78,7 @@ export function RelationCompactList({
       <p className="relations-intro">{copy.compactIntro}</p>
       <ul className="relations-compact-rows">
         {shown.map((edge) => (
-          <CompactRow byId={byId} edge={edge} focusId={focusId} key={edge.key} locale={locale} position={positionOf.get(edge.key) ?? 0} />
+          <CompactRow agentName={agentName} byId={byId} edge={edge} focusId={focusId} key={edge.key} locale={locale} position={positionOf.get(edge.key) ?? 0} />
         ))}
       </ul>
       {drawn.length > shown.length ? (
@@ -92,16 +94,18 @@ function CompactRow({
   byId,
   edge,
   focusId,
+  agentName,
   locale,
   position,
 }: {
   readonly byId: ReadonlyMap<string, RelationNode>;
   readonly edge: RelationEdge;
   readonly focusId: string | null;
+  readonly agentName: string;
   readonly locale: Locale;
   readonly position: number;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   // A row missing an endpoint cannot be rendered truthfully, and half of one
