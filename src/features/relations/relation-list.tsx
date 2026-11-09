@@ -73,13 +73,14 @@ const RELATION_TABLE_OF = {
 } as const satisfies Partial<Record<RelationEdge["kind"], "person_relationships" | "person_projects" | "person_contexts">>;
 
 export type RelationListProps = {
+  readonly agentName: string;
   readonly locale: Locale;
   readonly projection: RelationProjection;
   readonly timeZone: string;
 };
 
-export function RelationList({ locale, projection, timeZone }: RelationListProps) {
-  const copy = getRelationsCopy(locale);
+export function RelationList({ agentName, locale, projection, timeZone }: RelationListProps) {
+  const copy = getRelationsCopy(locale, agentName);
   const byId = nodesById(projection);
   const drawn = drawableEdges(projection);
   const undrawn = unattributableEdges(projection);
@@ -131,6 +132,7 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
         <ul className="relations-rows" data-relation-group="drawn">
           {drawn.map((edge) => (
             <RelationRow
+              agentName={agentName}
               anchor={relationAnchorId(positionOf.get(edge.key) ?? 0)}
               byId={byId}
               edge={edge}
@@ -151,6 +153,7 @@ export function RelationList({ locale, projection, timeZone }: RelationListProps
           <ul className="relations-rows" data-relation-group="undrawn">
             {undrawn.map((edge) => (
               <RelationRow
+                agentName={agentName}
                 anchor={relationAnchorId(positionOf.get(edge.key) ?? 0)}
                 byId={byId}
                 edge={edge}
@@ -191,6 +194,7 @@ export function RelationRow({
   anchor,
   byId,
   edge,
+  agentName,
   locale,
   timeZone,
 }: {
@@ -204,10 +208,11 @@ export function RelationRow({
   readonly anchor?: string;
   readonly byId: ReadonlyMap<string, RelationNode>;
   readonly edge: RelationEdge;
+  readonly agentName: string;
   readonly locale: Locale;
   readonly timeZone: string;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const from = byId.get(edge.from);
   const to = byId.get(edge.to);
   // A row missing an endpoint cannot be rendered truthfully, and rendering it
@@ -262,7 +267,7 @@ export function RelationRow({
         ) : null}
       </p>
 
-      <RelationOriginNote edge={edge} locale={locale} />
+      <RelationOriginNote agentName={agentName} edge={edge} locale={locale} />
 
       {edge.description ? (
         <p className="relations-row-note">
@@ -297,8 +302,16 @@ export function RelationRow({
  * organization kinds are owner-authored at the **column** level and say so
  * without naming a table they could not honestly claim.
  */
-export function RelationOriginNote({ edge, locale }: { readonly edge: RelationEdge; readonly locale: Locale }) {
-  const copy = getRelationsCopy(locale);
+export function RelationOriginNote({
+  agentName,
+  edge,
+  locale,
+}: {
+  readonly agentName: string;
+  readonly edge: RelationEdge;
+  readonly locale: Locale;
+}) {
+  const copy = getRelationsCopy(locale, agentName);
   const provenance = getProvenanceCopy(locale);
   const attributed = edge.origin.kind === "owner-authored";
   const table = RELATION_TABLE_OF[edge.kind as keyof typeof RELATION_TABLE_OF] ?? null;

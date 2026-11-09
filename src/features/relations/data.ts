@@ -54,7 +54,7 @@ import type { Locale } from "@/lib/preferences";
 import type { createClient } from "@/lib/supabase/server";
 
 import { OWNER_ASSOCIATION_ACTIONS } from "./contracts";
-import { getRelationsCopy } from "./copy";
+import { relationsOwnerLabel } from "./copy";
 import { projectRelations, type RelationProjection } from "./projection";
 
 type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
@@ -183,7 +183,7 @@ export async function loadRelations(
       sourceBounded: relationships.bounded || personProjects.bounded || personContexts.bounded,
       limit: RELATION_LIMIT,
       locale,
-      ownerLabel: getRelationsCopy(locale).ownerLabel,
+      ownerLabel: relationsOwnerLabel(locale),
     }),
   };
 }

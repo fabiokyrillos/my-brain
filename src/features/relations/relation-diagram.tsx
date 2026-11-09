@@ -50,13 +50,15 @@ import { drawableEdges, drawableNodes, type RelationProjection } from "./project
 const DIAGRAM_DESCRIPTION_ID = "relations-diagram-description";
 
 export function RelationDiagram({
+  agentName,
   locale,
   projection,
 }: {
+  readonly agentName: string;
   readonly locale: Locale;
   readonly projection: RelationProjection;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const nodes = drawableNodes(projection);
   const edges = drawableEdges(projection);
   const layout = layOutRelations(nodes, edges, locale);

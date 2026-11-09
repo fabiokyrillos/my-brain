@@ -28,6 +28,6 @@ describe("the relations map, from a person's and a project's page", () => {
 
   it("builds the focused address the map resolves, and names the link in both locales", () => {
     expect(relationViewHref("pt-BR", "diagram", "p1")).toBe("/pt-BR/app/relations?view=diagram&focus=p1");
-    expect(getRelationsCopy("pt-BR").openForPerson).not.toBe(getRelationsCopy("en").openForPerson);
+    expect(getRelationsCopy("pt-BR", "Brain").openForPerson).not.toBe(getRelationsCopy("en", "Brain").openForPerson);
   });
 });
