@@ -5,6 +5,7 @@
 - **`e2e/visual-regression.spec.ts`:** `maxDiffPixelRatio: 0.005` → `maxDiffPixels: 25`. The old ratio allowed 1,728 pixels on Pixel 7 and 4,608 on Desktop Chrome.
 - **Measured before choosing:** a temporary workflow (run `42345549312`, branch deleted afterwards) drew all sixteen images three times in each of three jobs. All 144 draws were 0 pixels apart at the lane's per-pixel threshold. Across days the only drift is 1–4 pixels where the Hoje day name brushes its mask.
 - **Six stale baselines redrawn**, all of which had passed under the old ratio while depicting removed UI: `hoje-{light,dark}-desktop` ("Perguntar ao Brain", 2,840–2,963 px), plus `tarefas-{light,dark}-mobile` and `agenda-{light,dark}-mobile` (`Ctrl+K`, 512–525 px).
+- **A race removed from the lane:** Tarefas was visited at `/pt-BR/app/tasks`, which redirects client-side (under `app/loading.tsx`) to `/pt-BR/app/work?view=all&page=1`. The URL assertion passed only when it sampled before the redirect, and the first `verify` run here lost that race. The lane now visits the final address.
 - **Corrected:** §8 of `docs/reports/life-brain/B7_CLOSING_REPORT.md` said Hoje desktop's removed block was below the fold. It is visible in the viewport; the threshold hid it.
 
 ## 2026-11-06 — `202611060108` applied to the hosted project (parity 108 = 108)

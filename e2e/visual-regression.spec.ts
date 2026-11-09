@@ -68,7 +68,9 @@ type Surface = {
 const SURFACES: readonly Surface[] = [
   { name: "hoje", path: "/pt-BR/app", mask: [".today-hero .eyebrow"] },
   { name: "conversar", path: "/pt-BR/app/chat", mask: [] },
-  { name: "tarefas", path: "/pt-BR/app/tasks", mask: [] },
+  // `/app/tasks` redirects here. Under `app/loading.tsx` that redirect lands
+  // client-side after the shell streams, so asserting the old path raced it.
+  { name: "tarefas", path: "/pt-BR/app/work?view=all&page=1", mask: [] },
   { name: "agenda", path: "/pt-BR/app/calendar?date=2026-01-15&orientation=month", mask: [] },
 ];
 
