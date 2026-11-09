@@ -83,7 +83,7 @@ const ptBR: AiConfigCopy = {
   dispositions: {
     controlled: "Você escolhe o modelo nas preferências acima.",
     uncontrolled:
-      "Este modelo é usado de verdade e não tem controle. É uma decisão registrada, não um esquecimento: mudar o modelo de embedding invalidaria as buscas já indexadas.",
+      "Este modelo é usado de verdade e não tem controle. É uma decisão registrada, não um esquecimento.",
     unconsumed:
       "Nada no produto lê esta preferência hoje, então ela não recebe controle — um controle que não muda nada seria uma promessa falsa.",
   },
@@ -107,15 +107,15 @@ const ptBR: AiConfigCopy = {
     },
     embedding_model: {
       name: "Busca semântica",
-      effect: "Transforma registros e memórias em vetores para que o chat encontre o que é relevante.",
+      effect: "Transforma registros e memórias em vetores para que o chat encontre o que é relevante. Mudar este modelo invalidaria as buscas já indexadas.",
     },
     reasoning_model: {
       name: "Raciocínio avançado",
       effect: "Reservado no banco de dados e nunca chamado.",
     },
     background_model: {
-      name: "Rotinas internas",
-      effect: "Reservado no banco de dados e nunca chamado.",
+      name: "Sugestões de conversa",
+      effect: "Escolhe, no máximo uma vez por dia, quais das suas coisas Conversar sugere. Não escreve nenhuma frase, e usa o modelo econômico do seu perfil.",
     },
   },
   profileTitle: "O que o perfil escolhido roteia",
@@ -142,7 +142,7 @@ const en: AiConfigCopy = {
   dispositions: {
     controlled: "You choose the model in the preferences above.",
     uncontrolled:
-      "This model is genuinely used and has no control. That is a recorded decision rather than an oversight: changing the embedding model would invalidate everything already indexed.",
+      "This model is genuinely used and has no control. That is a recorded decision rather than an oversight.",
     unconsumed:
       "Nothing in the product reads this preference today, so it gets no control — a control that changes nothing would be a false promise.",
   },
@@ -166,15 +166,15 @@ const en: AiConfigCopy = {
     },
     embedding_model: {
       name: "Semantic search",
-      effect: "Turns records and memories into vectors so chat can find what is relevant.",
+      effect: "Turns records and memories into vectors so chat can find what is relevant. Changing this model would invalidate everything already indexed.",
     },
     reasoning_model: {
       name: "Advanced reasoning",
       effect: "Reserved in the database and never called.",
     },
     background_model: {
-      name: "Background routines",
-      effect: "Reserved in the database and never called.",
+      name: "Conversation suggestions",
+      effect: "Picks, at most once a day, which of your own things Conversar suggests. It writes no sentence, and uses your profile's economical model.",
     },
   },
   profileTitle: "What the chosen profile routes",

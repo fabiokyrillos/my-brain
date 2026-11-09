@@ -15,9 +15,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ComposerSeedProvider, useRegisterComposerSeed } from "@/features/capture/composer-seed";
 
 const shown = vi.fn();
+const shownSource = vi.fn();
 vi.mock("@/features/product-analytics/interaction-events", () => ({
-  ConversationSuggestionsShown: (props: { categories: readonly string[] }) => {
+  ConversationSuggestionsShown: (props: { categories: readonly string[]; source?: string }) => {
     shown(props.categories);
+    shownSource(props.source);
     return null;
   },
 }));
@@ -29,6 +31,7 @@ const { SUGGESTION_CATEGORIES } = await import("./suggestions");
 afterEach(() => {
   cleanup();
   shown.mockClear();
+  shownSource.mockClear();
 });
 
 function suggestion(category: string, id: string, name: string) {
@@ -155,6 +158,18 @@ describe("2K-SUGG-005: every category reaches telemetry, and no name does", () =
       suggestion("person", "p1", "Ana"),
     ]);
     expect(shown).toHaveBeenCalledWith(["overdue_task", "birthday_soon", "person"]);
+  });
+
+  it("reports who chose them — the date rules by default, the model when it did (B.8)", () => {
+    renderRow([suggestion("person", "p1", "Ana")]);
+    expect(shownSource).toHaveBeenLastCalledWith("derived");
+    cleanup();
+    render(
+      <ComposerSeedProvider>
+        <SuggestionRow locale="pt-BR" source="model" suggestions={[suggestion("person", "p1", "Ana")]} />
+      </ComposerSeedProvider>,
+    );
+    expect(shownSource).toHaveBeenLastCalledWith("model");
   });
 
   it("carries no name, in any category", () => {

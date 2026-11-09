@@ -249,9 +249,11 @@ export function ConversationMemoryResolved({ outcome, locale }: {
  * same kind are one fact about the surface, and keying by id would put an
  * identifier into the dedupe key for no gain.
  */
-export function ConversationSuggestionsShown({ categories, locale }: {
+export function ConversationSuggestionsShown({ categories, locale, source = "derived" }: {
   categories: readonly ProductEventPropertiesByName["conversation_suggestion_shown"]["category"][];
   locale: ProductEventLocale;
+  /** Life Brain B.8 (ADR-163): admitted by `202611090109`, which lands first. */
+  source?: NonNullable<ProductEventPropertiesByName["conversation_suggestion_shown"]["source"]>;
 }) {
   const distinct = [...new Set(categories)];
   return (
@@ -264,7 +266,11 @@ export function ConversationSuggestionsShown({ categories, locale }: {
             name: "conversation_suggestion_shown",
             surface: "conversation",
             locale,
-            properties: { category },
+            // `source` only when the model chose: an absent key reads as
+            // `derived`, and the pre-B.8 payload stays valid on a database that
+            // has not applied `202611090109` yet. A model pick cannot exist
+            // before that migration, because its cache table does not.
+            properties: source === "model" ? { category, source } : { category },
           })}
         />
       ))}

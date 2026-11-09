@@ -208,7 +208,7 @@ export const capabilityRegistry = [
   { key: "follow_up_intensity", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["follow_up_intensity"], controls: [] },
   { key: "privacy_default", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["privacy_default"], controls: [] },
   { key: "reasoning_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["reasoning_model"], controls: [] },
-  { key: "background_route", state: "future", surface: "settings", consumerEvidence: [], visible: false, columns: ["background_model"], controls: [] },
+  { key: "background_route", state: "uncontrolled", surface: "settings", consumerEvidence: ["conversation-cards/model-picks"], visible: false, columns: ["background_model"], controls: [] },
   /*
    * `2O-ACTIVATION-007`'s remaining four, which had no row at all.
    *

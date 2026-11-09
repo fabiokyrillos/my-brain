@@ -602,6 +602,13 @@ export type ProductEventPropertiesByName = {
    */
   conversation_suggestion_shown: {
     category: SuggestionCategory;
+    /**
+     * Life Brain B.8 (ADR-163): whether the date rules or the model chose the
+     * suggestion. Optional in the database, because the application deployed
+     * before `202611090109` sends `{category}` alone. The producer sends it only
+     * as `model`; an absent key means `derived`. Two words, naming nothing.
+     */
+    source?: "derived" | "model";
   };
   /**
    * Q1. `2M-CAL-007`'s three orientations, and nothing else.

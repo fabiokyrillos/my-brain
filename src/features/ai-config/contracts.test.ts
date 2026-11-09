@@ -202,16 +202,19 @@ describe("2O-AICONFIG-004 and -005: the dispositions say the true thing", () => 
     }
   });
 
-  it("keeps `uncontrolled` for `embedding_model` alone — ADR-117 Decision 1", () => {
+  it("keeps `uncontrolled` for `embedding_model` (ADR-117 Decision 1) and `background_model` (ADR-163)", () => {
+    // Life Brain B.8 gave `background_model` its first reader, the model's pick
+    // of today's suggestions, and the owner decided it gets no control
+    // (ADR-163). Named by decision, so a third row still fails here.
     expect(
       AI_ROUTE_CONTRACTS.filter((route) => route.disposition === "uncontrolled").map((r) => r.column),
-    ).toEqual(["embedding_model"]);
+    ).toEqual(["embedding_model", "background_model"]);
   });
 
-  it("keeps `unconsumed` for exactly the two columns `2O-AICONFIG-005` names", () => {
+  it("keeps `unconsumed` for `reasoning_model` alone, since B.8 consumed `background_model`", () => {
     expect(
       AI_ROUTE_CONTRACTS.filter((route) => route.disposition === "unconsumed").map((r) => r.column),
-    ).toEqual(["reasoning_model", "background_model"]);
+    ).toEqual(["reasoning_model"]);
   });
 
   it("agrees with the capability registry, which is the other half of the claim", () => {
@@ -233,18 +236,20 @@ describe("2O-AICONFIG-004 and -005: the dispositions say the true thing", () => 
     const registryUncontrolled = new Set(
       capabilityRegistry.filter((row) => row.state === "uncontrolled").flatMap((row) => row.columns),
     );
-    expect([...registryUncontrolled]).toEqual(["embedding_model"]);
+    expect([...registryUncontrolled]).toEqual(["embedding_model", "background_model"]);
   });
 });
 
 describe("2O-AICONFIG-001: the use sites are the routes with a real reader", () => {
-  it("names five, and derives rather than lists them", () => {
+  it("names six since B.8, and derives rather than lists them", () => {
     expect(AI_USE_SITES.map((route) => route.column)).toEqual([
       "chat_model",
       "extraction_model",
       "review_model",
       "file_model",
       "embedding_model",
+      // Life Brain B.8 (ADR-163): today's suggestion pick.
+      "background_model",
     ]);
     expect(AI_USE_SITES.every((route) => route.callSites.length > 0)).toBe(true);
   });

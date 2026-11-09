@@ -881,11 +881,13 @@ describe("2O-ACTIVATION-006 → 2O-PREF-004: `scheduled_reviews` reaches its fin
 /* -------------------------------------------------------------------------- */
 
 describe("2O-ACTIVATION-007: the nine consumer-less columns are recorded and uncontrolled", () => {
+  // Nine when `2O-ACTIVATION-007` was written; eight since Life Brain B.8
+  // (ADR-163) gave `background_model` its first reader. It still has no control
+  // and stays invisible: it moved to `uncontrolled`, not to the preferences form.
   const NINE = [
     "ai_provider",
     "autonomy_level",
     "avatar_path",
-    "background_model",
     "follow_up_intensity",
     "privacy_default",
     "privacy_preferences",

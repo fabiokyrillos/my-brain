@@ -320,6 +320,68 @@ export function deriveConversationSuggestions(
 }
 
 /**
+ * Life Brain B.8 (ADR-163) — one choice the model made: a category and the id of
+ * a row this derivation offered. It carries no text, so nothing a model writes
+ * can reach the surface: the sentence is still `copy.byCategory` applied to the
+ * row's own current name.
+ */
+export type SuggestionPick = {
+  readonly category: SuggestionCategory;
+  readonly id: string;
+};
+
+/**
+ * Every suggestion the model may choose from — the same rows, under the same
+ * `readable` rule, that the derivation itself chooses from.
+ *
+ * Unlike `deriveConversationSuggestions`, a dated bucket offers **all** its
+ * readable rows rather than its earliest one, because choosing between them is
+ * the model's whole job. A scoped conversation offers its one subject and
+ * nothing else, so a scope leaves the model nothing to choose.
+ */
+export function suggestionCandidates(inputs: SuggestionInputs): readonly ConversationSuggestion[] {
+  if (inputs.scope) return scopedSuggestions(inputs, inputs.scope);
+
+  const dated: ConversationSuggestion[] = [];
+  for (const category of SUGGESTION_CATEGORIES) {
+    if (!isDated(category)) continue;
+    for (const item of [...DATED_BUCKETS[category](inputs)].filter(readable).sort(byInstantThenId)) {
+      dated.push({ category, id: item.id, name: item.name });
+    }
+  }
+  const subjects = [
+    ...subjectSuggestions("person", inputs.people),
+    ...subjectSuggestions("project", inputs.projects),
+  ];
+  return [...dated, ...subjects].filter((suggestion) => suggestion.name.trim() !== "");
+}
+
+/**
+ * The model's picks, resolved against today's candidates.
+ *
+ * A pick that names a row no longer offered — completed since the model chose
+ * it, now withheld, or never offered at all — is dropped, as is a repeat. The
+ * cap holds here too. An empty result means the caller shows the derivation.
+ */
+export function suggestionsFromPicks(
+  picks: readonly SuggestionPick[],
+  candidates: readonly ConversationSuggestion[],
+): readonly ConversationSuggestion[] {
+  const chosen: ConversationSuggestion[] = [];
+  const seen = new Set<string>();
+  for (const pick of picks) {
+    const key = `${pick.category}:${pick.id}`;
+    if (seen.has(key)) continue;
+    const match = candidates.find((candidate) => candidate.category === pick.category && candidate.id === pick.id);
+    if (match === undefined) continue;
+    seen.add(key);
+    chosen.push(match);
+    if (chosen.length === MAX_SUGGESTIONS) break;
+  }
+  return chosen;
+}
+
+/**
  * The scoped answer: this subject, or nothing.
  *
  * An organization and an area have no suggestion sentence of their own, so they
