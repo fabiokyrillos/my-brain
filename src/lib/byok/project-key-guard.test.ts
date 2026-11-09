@@ -442,10 +442,11 @@ describe("BYOK-GUARD-002: the provider cannot be constructed without a credentia
 
   it("every operation carries an output ceiling (BYOK-QUOTA-003)", async () => {
     const source = code(read("src/lib/ai/openai-provider.ts"));
-    // Three provider calls that generate tokens; the embedding call generates
-    // none and takes no ceiling, which is why the count is three and not four.
+    // Four provider calls that generate tokens since Life Brain B.8 added
+    // `pickSuggestions` (ADR-163); the embedding call generates none and takes
+    // no ceiling, which is why the count is four and not five.
     const ceilings = source.match(/max_output_tokens:/g) ?? [];
-    expect(ceilings).toHaveLength(3);
+    expect(ceilings).toHaveLength(4);
   });
 });
 

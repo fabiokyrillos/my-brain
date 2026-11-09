@@ -140,6 +140,39 @@ mudou** — a B.7 entra como slice nova no fim da trilha B, e a numeração pula
   paridade só anda quando isso acontecer); as jornadas autenticadas com um chip tocado não foram
   rodadas; e `Ctrl+K` ainda aparece como `Ctrl+K` num Mac.
 
+### B.8 — O modelo escolhe as sugestões do dia; a frase continua nossa (2 d, **uma migration**)
+
+Acrescentada em 2026-11-09. É a slice própria que a ADR-161 Decisão 4 pediu. O dono aceitou as
+quatro respostas recomendadas e autorizou **uma** migration (cache e telemetria juntos).
+
+- **O modelo escolhe, não escreve.** A derivação da B.7 continua produzindo os candidatos: as linhas
+  já lidas por `loadSuggestionInputs`, com o mesmo filtro de sensibilidade. O modelo recebe esses
+  candidatos como **dado não confiável** e devolve, por Structured Outputs, no máximo três pares
+  `{category, id}`. Um par que não estiver entre os candidatos é descartado de forma determinística.
+  A frase continua saindo de `copy.byCategory`. Nenhum texto do modelo chega à tela nem à
+  telemetria, então `2K-SUGG-005` continua garantido pela estrutura, e não por um filtro.
+- **Rota:** a operação `background` de `agent_preferences` (`gpt-5-mini` por padrão), que até aqui
+  não tinha nenhum consumidor. Cada chamada bem-sucedida registra `background` em
+  `ai_usage_events` antes de gravar o cache, como em todo o resto do produto. Essa operação já é
+  admitida pelo ledger, então isso não exige migration.
+- **Cache por dia (a migration):** uma linha por pessoa em `conversation_suggestion_picks`
+  (`user_id` PK, `local_day`, `picks` jsonb validado por CHECK, modelo, versão do prompt). Ela é
+  sobrescrita quando o dia muda, então a tabela não cresce. O RLS é forçado e só o dono lê e
+  escreve, e a linha é apagada em cascata com a conta.
+- **Sem latência e sem erro visível:** a página nunca espera o modelo. Na primeira visita do dia,
+  Conversar mostra as sugestões derivadas, e a escolha roda num `after()`. As visitas seguintes
+  do mesmo dia leem o cache. Se não houver chave BYOK, se o provedor recusar ou estourar o limite,
+  se a resposta vier inválida ou se o cache apontar para algo que sumiu, a tela usa as derivadas,
+  sem nenhuma mensagem.
+- **Telemetria:** `conversation_suggestion_shown` ganha `source` (`derived` ou `model`), na mesma
+  migration, que entra **antes** do produtor (ADR-161 Decisão 1).
+- **Guards:** a derivação, a linha e o chip continuam proibidos de chamar o modelo, pelo guard da
+  2K, que não muda. A chamada mora num módulo próprio, `model-picks.ts`, com um guard novo que
+  prende três regras: a saída só pode ser `{category, id}` de um candidato; nada do modelo vira
+  texto; e a página nunca espera a chamada.
+- **Aberto até o fim da slice:** aplicar a migration no projeto hospedado depende de outro pedido
+  explícito ao dono, como nas anteriores.
+
 ## 3. Trilha C — Vida inteira
 
 ### C.0 — Copy e exemplos de vida (0,5 d)

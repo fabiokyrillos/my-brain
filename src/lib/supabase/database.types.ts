@@ -758,6 +758,33 @@ export type Database = {
           },
         ]
       }
+      conversation_suggestion_picks: {
+        Row: {
+          created_at: string
+          local_day: string
+          model: string
+          picks: Json
+          prompt_version: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          local_day: string
+          model: string
+          picks: Json
+          prompt_version: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          local_day?: string
+          model?: string
+          picks?: Json
+          prompt_version?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string
@@ -3957,6 +3984,15 @@ export type Database = {
           p_user_id?: string
         }
         Returns: string
+      }
+      record_conversation_suggestion_picks: {
+        Args: {
+          p_local_day: string
+          p_model: string
+          p_picks: Json
+          p_prompt_version: string
+        }
+        Returns: undefined
       }
       record_error_event: {
         Args: {

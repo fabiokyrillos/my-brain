@@ -83,6 +83,24 @@ export type ChatResult = AIUsageDetails & {
 };
 
 /**
+ * Life Brain B.8 (ADR-163). The candidates for today's conversation
+ * suggestions, in the caller's order. `kind` is the caller's category name and
+ * `label` the row's own name; both are data for the model, never instructions.
+ */
+export type SuggestionPickInput = {
+  readonly locale: "pt-BR" | "en";
+  /** The owner's local date, `YYYY-MM-DD`. */
+  readonly localDay: string;
+  readonly candidates: readonly { readonly kind: string; readonly label: string }[];
+};
+
+/** Positions in `candidates`, in range and without repeats, at most three. */
+export type SuggestionPickResult = AIUsageDetails & {
+  readonly indexes: readonly number[];
+  readonly model: string;
+};
+
+/**
  * Everything the command parser is given. Notably absent: any task, any task
  * id, any candidate list, and the operation key. The model receives the user's
  * own sentence and nothing else about their data (PRD §12.7, 2E-OWNERSHIP-005).

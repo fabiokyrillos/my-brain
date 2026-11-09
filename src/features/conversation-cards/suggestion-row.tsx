@@ -46,9 +46,12 @@ import type { ConversationSuggestion } from "./suggestions";
 
 export function SuggestionRow({
   locale,
+  source = "derived",
   suggestions,
 }: {
   locale: Locale;
+  /** Life Brain B.8: who chose these — the date rules or the model. Reported, never shown. */
+  source?: "derived" | "model";
   suggestions: readonly ConversationSuggestion[];
 }) {
   if (suggestions.length === 0) return null;
@@ -81,6 +84,7 @@ export function SuggestionRow({
       <ConversationSuggestionsShown
         categories={suggestions.map((suggestion) => suggestion.category)}
         locale={locale === "en" ? "en" : "pt-BR"}
+        source={source}
       />
     </div>
   );

@@ -1,5 +1,27 @@
 # Technical Changelog
 
+## 2026-11-09 — Life Brain B.8: the model picks today's suggestions (ADR-163)
+
+- **Migration `202611090109`** (the sixth Life Brain migration, authorized by the owner; **not yet applied to the hosted project**):
+  - `public.conversation_suggestion_picks` holds one row per person (`user_id` PK, `local_day`, `picks`, `model`, `prompt_version`). RLS is forced, the owner may only read, and the row cascades with the account.
+  - Its only writer, `public.record_conversation_suggestion_picks`, is `security definer` with an empty `search_path`, takes the owner from `auth.uid()`, and refuses with `22023` anything but `{category, id}` pairs.
+  - `private.validate_product_event_properties` is re-declared whole, assembled from `202611060108`'s text, to admit an optional `source` (`derived` | `model`) on `conversation_suggestion_shown`. Verification blocks check the new arm, the table's posture and every pre-existing arm.
+  - New pgTAP file `supabase/tests/life_brain_b8_model_suggestions.sql` (19 assertions).
+- **The model selects and never writes:**
+  - `suggestionCandidates` and `suggestionsFromPicks` in `suggestions.ts` are pure.
+  - `AIProvider.pickSuggestions` uses `suggestionPickSchema = { picks: integer[] }`, with no string anywhere. The provider keeps in-range, unrepeated positions, three at most.
+  - `model-picks.ts` routes through `background_model` (`gpt-5-mini`) with the owner's BYOK key. It records `background` in `ai_usage_events` before writing the cache.
+  - A failed call caches an empty pick, a missing key makes no call, an unreadable cache makes no call, and three or fewer candidates make no call.
+- **Conversar:**
+  - It renders the derived suggestions and replaces them with today's cached pick when one resolves.
+  - `SuggestionPickTrigger` fires `refreshTodaysSuggestionPicks` (a Server Action taking only a locale) once after render when today has no pick.
+  - Telemetry sends `source` only as `model`.
+- **Registry:** `background_model` is `uncontrolled` with one call site. The AI section of Ajustes lists "Sugestões de conversa", and the disposition sentence is now generic, with each route's reason in its own effect line.
+- **Guards:**
+  - New `life-brain-b8-model-picks-guard.test.ts`.
+  - The migration-budget guards attribute `202611090109` by name.
+  - The privacy census counts the table under `chat`, and the Phase 2F verifier excuses it with its reason.
+  - `DATABASE.md` and `SECURITY.md` record the migration.
 ## 2026-11-09 — Maintenance: `.mjs` line endings, the assistant's name on Relações
 
 - **`.gitattributes`:** `*.mjs text eol=lf`. With `core.autocrlf=true`, Windows checkouts put a carriage return after `#!/usr/bin/env node`, and Vitest's transform rejected it (`Invalid Character '!'`). Three test files that import `scripts/*.mjs` could not load: `hosted-auth-parity`, `signup-hardening-admin-boundary` and `storage-orphan-scanner`. All three load and pass now. CI on Linux was never affected.

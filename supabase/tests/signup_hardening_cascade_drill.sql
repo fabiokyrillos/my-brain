@@ -324,6 +324,13 @@ begin
     values (p_user, 'Drill event ' || p_tag, now() + interval '1 day', v_ctx, v_entry);
   exception when others then failures := failures || ('events: ' || sqlerrm); end;
 
+  -- Life Brain B.8 (`202611090109`). Inserted directly for the populator's
+  -- reason (no session for `record_conversation_suggestion_picks`).
+  begin
+    insert into public.conversation_suggestion_picks (user_id, local_day, picks, model, prompt_version)
+    values (p_user, current_date, '[]'::jsonb, 'drill-model', 'drill');
+  exception when others then failures := failures || ('conversation_suggestion_picks: ' || sqlerrm); end;
+
   begin
     insert into public.notifications (user_id, type, title, body)
     values (p_user, 'heartbeat', 'Drill notification ' || p_tag, 'Drill body');

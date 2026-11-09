@@ -397,8 +397,11 @@ describe("2S-TRUST-003: the central grant census knows about the fourteenth tabl
    * the set still cannot grow silently. Life Brain C.3 (`202611040106`,
    * ADR-152): `events` is written only by `confirm_entry_event_candidates` and
    * `cancel_event`, both definers, and no service_role path touches it.
+   * Life Brain B.8 (`202611090109`, ADR-163): `conversation_suggestion_picks`
+   * is written only by `record_conversation_suggestion_picks`, a definer
+   * taking the owner from auth.uid(), and no service_role path touches it.
    */
-  const ADDED_AFTER_2S = ["events"];
+  const ADDED_AFTER_2S = ["events", "conversation_suggestion_picks"];
 
   it("admits nothing beyond those thirteen, this slice's one addition and the named later ones", () => {
     const unexpected = rpcClosedTables().filter(

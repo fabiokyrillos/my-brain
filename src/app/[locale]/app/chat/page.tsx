@@ -11,9 +11,17 @@ import { AskingAboutBanner } from "@/features/conversation-cards/asking-about-ba
 import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
 import { resolveAskAboutSubject } from "@/features/conversation-cards/resolve-ask-about";
 import { SeedChip } from "@/features/conversation-cards/seed-chip";
+import { readTodaysPicks } from "@/features/conversation-cards/model-picks";
+import { SuggestionPickTrigger } from "@/features/conversation-cards/suggestion-pick-trigger";
 import { loadSuggestionInputs } from "@/features/conversation-cards/suggestion-sources";
-import { deriveConversationSuggestions } from "@/features/conversation-cards/suggestions";
+import {
+  deriveConversationSuggestions,
+  suggestionCandidates,
+  suggestionsFromPicks,
+  type ConversationSuggestion,
+} from "@/features/conversation-cards/suggestions";
 import { SuggestionRow } from "@/features/conversation-cards/suggestion-row";
+import { formatLocalDate, isSupportedTimeZone, localDateOf } from "@/lib/time/local-day";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -79,13 +87,36 @@ export default async function ChatPage({
     suggestion that ignores the scope the banner announces is worse than no
     suggestion at all.
   */
-  const suggestions = items.length === 0
-    ? deriveConversationSuggestions(await loadSuggestionInputs(supabase, {
-      now: new Date(),
+  let suggestions: readonly ConversationSuggestion[] = [];
+  let suggestionSource: "derived" | "model" = "derived";
+  let pickPending = false;
+  if (items.length === 0) {
+    const now = new Date();
+    const inputs = await loadSuggestionInputs(supabase, {
+      now,
       scope: askingAbout === null ? null : askingAbout.subject,
       timeZone,
-    }))
-    : [];
+    });
+    suggestions = deriveConversationSuggestions(inputs);
+    /*
+      Life Brain B.8 (ADR-163). Today's model pick, when there is one, replaces
+      the derived three; it is only ever `{category, id}` pairs resolved against
+      today's own candidates, so the sentences are still ours. A scoped
+      conversation keeps the derivation: its one subject leaves nothing to pick.
+      When today has no pick yet, the trigger below asks for one after render,
+      and this visit shows the derivation.
+    */
+    if (askingAbout === null && isSupportedTimeZone(timeZone)) {
+      const picks = await readTodaysPicks(supabase, formatLocalDate(localDateOf(now, timeZone)));
+      const chosen = picks ? suggestionsFromPicks(picks, suggestionCandidates(inputs)) : [];
+      if (chosen.length > 0) {
+        suggestions = chosen;
+        suggestionSource = "model";
+      }
+      // `undefined` is an unreadable cache: no trigger, because nothing could be stored.
+      pickPending = picks === null;
+    }
+  }
 
   return (
     <div className="content-page chat-page">
@@ -159,7 +190,8 @@ export default async function ChatPage({
           the owner's own people, projects, dates and open loops — and nothing at
           all when none is honestly appropriate.
         */}
-        <SuggestionRow locale={locale} suggestions={suggestions} />
+        <SuggestionRow locale={locale} source={suggestionSource} suggestions={suggestions} />
+        {pickPending ? <SuggestionPickTrigger locale={locale} /> : null}
       </ComposerSeedProvider>
 
       {/*

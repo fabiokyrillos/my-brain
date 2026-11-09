@@ -249,6 +249,11 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // trigger, and the date lives as long as the person.
       "202611050107_life_brain_m4_birthdays.sql",
       "202611060108_life_brain_b7_suggestion_telemetry.sql",
+      // Life Brain B.8 (ADR-163): one row per person in
+      // `conversation_suggestion_picks`, overwritten when the day changes, so it
+      // holds nothing that needs a retention window; the row goes with the
+      // account by cascade.
+      "202611090109_life_brain_b8_model_suggestions.sql",
     ]);
   });
 });

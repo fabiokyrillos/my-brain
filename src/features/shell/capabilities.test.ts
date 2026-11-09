@@ -210,7 +210,7 @@ describe("navigation capabilities", () => {
       { key: "follow_up_intensity", state: "future", visible: false },
       { key: "privacy_default", state: "future", visible: false },
       { key: "reasoning_route", state: "future", visible: false },
-      { key: "background_route", state: "future", visible: false },
+      { key: "background_route", state: "uncontrolled", visible: false },
       // `2O-ACTIVATION-007`'s four that had no row at all.
       { key: "privacy_preferences", state: "future", visible: false },
       { key: "quiet_periods", state: "future", visible: false },
@@ -328,8 +328,10 @@ describe("navigation capabilities", () => {
     const uncontrolled = capabilityRegistry.filter(
       (item) => (item.state as ProductCapabilityState) === "uncontrolled",
     );
-    expect(uncontrolled.map((item) => item.key)).toEqual(["embedding_route"]);
-    expect(uncontrolled.flatMap((item) => item.columns)).toEqual(["embedding_model"]);
+    // Life Brain B.8 adds the second, by the owner's decision (ADR-163): the
+    // background route now has a reader and, deliberately, no control.
+    expect(uncontrolled.map((item) => item.key)).toEqual(["embedding_route", "background_route"]);
+    expect(uncontrolled.flatMap((item) => item.columns)).toEqual(["embedding_model", "background_model"]);
     // The row says the true thing rather than either false one: it names real
     // consumers (not `future`'s "none") and offers no control (not
     // `operational`'s "yours to change").
@@ -362,12 +364,13 @@ describe("navigation capabilities", () => {
     expect(stateInvariantFailures({ ...real[0]!, visible: true })).toHaveLength(1);
   });
 
-  it("derives the nine consumer-less columns `2O-ACTIVATION-007` names", () => {
+  it("derives the consumer-less columns `2O-ACTIVATION-007` names, less the one B.8 consumed", () => {
+    // `background_model` left this list in Life Brain B.8 (ADR-163), which gave
+    // it its first reader. Eight remain.
     expect([...consumerlessPreferenceColumns].sort()).toEqual([
       "ai_provider",
       "autonomy_level",
       "avatar_path",
-      "background_model",
       "follow_up_intensity",
       "privacy_default",
       "privacy_preferences",

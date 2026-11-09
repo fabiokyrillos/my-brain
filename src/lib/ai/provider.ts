@@ -4,6 +4,8 @@ import type {
   EmbeddingResult,
   ExtractionInput,
   ExtractionResult,
+  SuggestionPickInput,
+  SuggestionPickResult,
   TaskCommandParseInput,
   TaskCommandParseResult,
   TranscriptionInput,
@@ -32,4 +34,10 @@ export interface AIProvider {
    * one implementation.
    */
   transcribeAudio(input: TranscriptionInput): Promise<TranscriptionResult>;
+  /**
+   * Life Brain B.8 (ADR-163). Chooses up to three of the given candidates by
+   * position. It writes no text: the caller builds every sentence from its own
+   * copy, so a provider cannot put a word on the owner's screen.
+   */
+  pickSuggestions(input: SuggestionPickInput): Promise<SuggestionPickResult>;
 }

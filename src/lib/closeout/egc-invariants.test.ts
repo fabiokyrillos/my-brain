@@ -172,7 +172,11 @@ const REPO = resolve(__dirname, "../../..");
 // telemetry enum widened from two categories to eight, authorized by the owner on
 // 2026-11-06 after B.7 shipped without it and reported the gap. Moved in the commit
 // that adds it; Entity Graph Completion still spends nothing.
-const AUTHORIZED_MIGRATION_HEAD = "202611060108";
+// Chain head moved to 202611090109 by Life Brain B.8 (ADR-163): the per-day
+// suggestion pick cache and the `source` telemetry property, one migration the
+// owner authorized on 2026-11-09. Moved in the commit that adds it; Entity Graph
+// Completion still spends nothing.
+const AUTHORIZED_MIGRATION_HEAD = "202611090109";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

@@ -2516,3 +2516,56 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Alternatives considered.** `maxDiffPixelRatio: 0.001` (rejected: still 921 pixels on desktop, close to twice the smallest removal measured). `maxDiffPixels: 0` (rejected: the Hoje day name would fail the lane on some days). Widening the Hoje mask so a strict zero could hold (deferred: it is a separate change, and 25 already absorbs it).
 
 - **Consequences.** A change that moves more than 25 pixels on purpose has to redraw its baselines through `visual-baselines.yml`, which is what ADR-159 Decision 2 already asks for; it no longer passes by accident. Only three weekday names have been observed. A longer one could brush its mask more, and the lane would then fail on that day; widening the mask is the fix if that happens. A runner image or Chromium upgrade that changes rasterization fails the lane under any limit and is answered by a redraw, as before. The measurement drew every image from scratch rather than through the comparison path, which retries until the page settles, so the lane can only be equally or more tolerant than what was measured.
+
+## ADR-163 — The model picks today's suggestions; the sentence stays ours
+
+- **Date:** 2026-11-09
+- **Status:** Accepted. This is Life Brain B.8, the slice ADR-161 Decision 4 asked for. **One migration** (`202611090109`), the sixth Life Brain migration, which the owner authorized explicitly on 2026-11-09. It is not yet applied to the hosted project.
+
+- **Context.** ADR-161 approved model-generated suggestions in principle, on a cheap model, and left four questions. On 2026-11-09 the owner accepted the recommended answer to each: route through `background`; cache per person per day; fall back silently to the derived suggestions without a key or under a limit; and let the model choose among fixed templates rather than write. Mapping the code changed two premises. First, `2K-SUGG-005` is enforced on **telemetry**: names already appear in sentences, through `copy.byCategory`. Second, no existing table could hold a per-day cache without contradicting standing ADRs, so the owner authorized a migration for it, together with a `source` telemetry property.
+
+- **Decision 1 — The model selects; it never writes.**
+  - `suggestionCandidates` offers every readable row the derivation reads, under the same sensitivity rule, plus people and projects. A scoped conversation offers its one subject, which leaves nothing to pick.
+  - The provider sends each row as `[kind] "label"`, numbered, and states that labels are untrusted data.
+  - `suggestionPickSchema` is `{ picks: integer[] }`. It has no string anywhere, so no model text can leave the provider.
+  - The provider keeps only in-range, unrepeated positions, three at most. The caller maps them to `{category, id}`, and `suggestionsFromPicks` resolves them against **today's** candidates, dropping anything no longer offered.
+  - The chip's sentence is still `copy.byCategory` applied to the row's own current name.
+- **Decision 2 — `background`, and the spend is recorded.**
+  - `background_model` gains its first reader, `src/features/conversation-cards/model-picks.ts`, with `gpt-5-mini` in every preset.
+  - Every successful call records `background` in `ai_usage_events` before the cache is written, with `source_type` null: the column admits five values and none fits, and the operation alone attributes the spend.
+  - The route is `uncontrolled` (consumed, no settings control). `AI_ROUTE_CONTRACTS`, the capability registry and the AI section of Ajustes now say so. The disposition sentence became generic, and each route's own reason moved into its effect line.
+  - `AIProvider` gains `pickSuggestions`.
+- **Decision 3 — One row per person, overwritten daily (`202611090109`).**
+  - `public.conversation_suggestion_picks` has `user_id` as its primary key, plus `local_day`, `picks`, `model` and `prompt_version`.
+  - A CHECK limits `picks` to an array of at most three. RLS is forced, the owner may only read, and nothing may be written directly.
+  - The writer `record_conversation_suggestion_picks` is `security definer` with an empty `search_path` and takes the owner from `auth.uid()`. It refuses with `22023` any item that is not exactly `{category, id}`: one of the eight categories, and an id that is a uuid.
+  - The row cascades with the account. It is counted in the privacy census under `chat` and excused from the Phase 2F verifier with its reason.
+- **Decision 4 — The page never waits, and every failure looks like the date rules.**
+  - Conversar renders the derived suggestions, then reads today's cached pick. If a pick resolves to at least one suggestion, it replaces them.
+  - When today has no pick, a client component (`SuggestionPickTrigger`) fires `refreshTodaysSuggestionPicks` once after render. That Server Action takes only a locale and re-reads the owner, the day and the candidates under RLS.
+  - It is a Server Action and not `after()` in the page because Next 16 forbids request APIs inside `after()` in a Server Component, and the Supabase client reads cookies.
+  - Without a key: no call and no write. With a key, a failed or unparseable call caches an empty pick, so a provider that is down is asked once a day rather than once a visit. Three or fewer candidates leave nothing to choose, so no call is made.
+  - A cache that cannot be read (`readTodaysPicks` returns `undefined`) means no trigger and no call. That covers a deployment ahead of this migration: the table is missing, nothing could be stored, and without this rule the model would be asked on every visit.
+- **Decision 5 — Telemetry says who chose.** `conversation_suggestion_shown` gains an optional `source` (`derived` | `model`). The producer sends it **only as `model`**, and an absent key means `derived`. A model pick cannot exist before this migration, because its table does not, so the producer can never send a value the deployed database refuses. The validator was re-declared whole from `202611060108`'s own text, and the diff is exactly that arm. The key is optional because the application deployed before this file sends `{category}` alone, and the migration lands before the producer (ADR-161 Decision 1).
+- **Decision 6 — Guards.**
+  - The 2K suggestion guard is unchanged and still forbids any model call in the derivation, the row, the chip and the chat page.
+  - `life-brain-b8-model-picks-guard.test.ts` adds five rules:
+    - the cache writer receives only `{category, id}`;
+    - the page reads the cache and imports neither the action nor `after`;
+    - exactly one client component imports the action;
+    - the action takes a locale and re-reads the rest;
+    - the ledger is written before the cache.
+  - The migration-budget guards attribute `202611090109` by name.
+
+- **Alternatives considered.**
+  - Generating the sentence (rejected: a model that writes the sentence can write a name or anything else into it, and nothing structural would stop it).
+  - Ids instead of positions in the answer (rejected: an id can be invented, while a position outside the list is simply dropped).
+  - Next's `"use cache"` (rejected by the owner: user data outside Postgres and RLS).
+  - The unused jsonb columns of `agent_preferences` (rejected: `202608190099` refuses overloading them).
+  - `after()` in the page (impossible: Next 16 forbids request APIs inside it in a Server Component).
+  - A rate-limit admission through `admitRateLimitedOperation` (deferred: its `operation` enum is CHECK-bound, so it would be a second migration; the daily cache already bounds calls to one per person per day).
+
+- **Consequences.**
+  - The first visit of each day shows the derived suggestions, and the model's pick appears from the second visit on. This is deliberate: the alternative is a page that waits on a provider.
+  - Not verified: a live call against OpenAI (every test mocks the provider), and the signed-in journey that would show a cached pick replacing the derived row.
+  - Applying `202611090109` to the hosted project is the owner's separate decision, as for every migration before it. Deploying the application before it is safe by construction. With the table missing, the cache is unreadable, so there is no call and no trigger. Conversar shows the derived suggestions, and telemetry keeps sending `{category}` alone. The model pick starts working when the migration is applied.

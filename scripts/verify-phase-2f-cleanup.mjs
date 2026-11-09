@@ -171,6 +171,7 @@ export const DELIBERATELY_NOT_SCANNED = Object.freeze({
   entry_embeddings: "no Phase 2F proof writes it; cascades at 202607160006:28",
   conversations: "no Phase 2F proof writes it; cascades at 202607160006:42",
   conversation_messages: "chat-only, no Phase 2F proof writes it; cascades at 202607160006:54",
+  conversation_suggestion_picks: "Life Brain B.8: written only by record_conversation_suggestion_picks, which no Phase 2F proof calls; cascades from auth.users at 202611090109:46",
   profiles: "identity row created by handle_new_user, not an independent fixture; cascades at 202607160001:8",
   agent_preferences: "same; cascades at 202607160001:18",
   organizations: "no Phase 2F proof writes it; cascades at 202607160003:14",

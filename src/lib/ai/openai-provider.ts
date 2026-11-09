@@ -5,6 +5,11 @@ import { zodTextFormat } from "openai/helpers/zod";
 import { chatAnswerSchema } from "./chat-schema";
 import { knowledgePrompt } from "./knowledge-prompt";
 import { entryExtractionSchema } from "./extraction-schema";
+import {
+  SUGGESTION_PICK_MAX_OUTPUT_TOKENS,
+  SUGGESTION_PICK_SYSTEM_PROMPT,
+  suggestionPickSchema,
+} from "./suggestion-pick-schema";
 import type { AIProvider } from "./provider";
 import {
   TASK_COMMAND_MAX_OUTPUT_TOKENS,
@@ -22,6 +27,8 @@ import type {
   EmbeddingResult,
   ExtractionInput,
   ExtractionResult,
+  SuggestionPickInput,
+  SuggestionPickResult,
   TaskCommandParseInput,
   TaskCommandParseResult,
   TranscriptionInput,
@@ -367,5 +374,34 @@ export class OpenAIProvider implements AIProvider {
       citedSourceIds: parsed.citedSourceIds.filter((id) => availableIds.has(id)),
       model: response.model ?? this.model,
     };
+  }
+
+  async pickSuggestions(input: SuggestionPickInput): Promise<SuggestionPickResult> {
+    const list = input.candidates
+      .map((candidate, index) => `${index}. [${candidate.kind}] ${JSON.stringify(candidate.label)}`)
+      .join("\n");
+    const response = await this.client.responses.parse({
+      model: this.model,
+      reasoning: { effort: "low" },
+      max_output_tokens: SUGGESTION_PICK_MAX_OUTPUT_TOKENS,
+      input: [
+        { role: "system", content: SUGGESTION_PICK_SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Locale: ${input.locale}. Today (owner's local date): ${input.localDay}.\nCandidates:\n${list}`,
+        },
+      ],
+      text: { format: zodTextFormat(suggestionPickSchema, "suggestion_picks") },
+    });
+    if (!response.output_parsed) throw new Error("OpenAI returned no structured suggestion picks");
+    const parsed = suggestionPickSchema.parse(response.output_parsed);
+    // Deterministic, whatever the model returned: in range, no repeats, three at most.
+    const indexes: number[] = [];
+    for (const index of parsed.picks) {
+      if (index < 0 || index >= input.candidates.length || indexes.includes(index)) continue;
+      indexes.push(index);
+      if (indexes.length === 3) break;
+    }
+    return { ...normalizeResponseUsage(response), indexes, model: response.model ?? this.model };
   }
 }

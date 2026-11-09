@@ -93,9 +93,10 @@ describe("2O-PRIVACY-010: a refused read is not a zero", () => {
       "owner",
     );
 
-    // Two tables in `chat`, both dropped from the total when one refuses — and
-    // the count differs from the all-readable run, so the exclusion is visible.
-    expect(withRefusal.countedRows).toBe(readable.countedRows - 2);
+    // Three tables in `chat` since Life Brain B.8 added the suggestion pick
+    // cache, all dropped from the total when one refuses — and the count
+    // differs from the all-readable run, so the exclusion is visible.
+    expect(withRefusal.countedRows).toBe(readable.countedRows - 3);
     expect(withRefusal.countedRows).not.toBe(readable.countedRows);
   });
 

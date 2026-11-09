@@ -171,13 +171,19 @@ export const AI_ROUTE_CONTRACTS = [
     callSites: [],
     fallbackModel: null,
   },
+  /*
+   * Life Brain B.8 (ADR-163) gave this column its first reader: the model's pick
+   * of today's conversation suggestions, once a day at most. `uncontrolled`
+   * rather than `controlled` because no settings control was added for it; the
+   * owner's profile preset decides it, and `gpt-5-mini` is every preset's value.
+   */
   {
     column: "background_model",
     routeKey: "backgroundModel",
-    operation: null,
-    disposition: "unconsumed",
-    callSites: [],
-    fallbackModel: null,
+    operation: "background",
+    disposition: "uncontrolled",
+    callSites: ["src/features/conversation-cards/model-picks.ts"],
+    fallbackModel: "gpt-5-mini",
   },
 ] as const satisfies readonly AiRouteContract[];
 

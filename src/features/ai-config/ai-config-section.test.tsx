@@ -27,13 +27,13 @@ describe("2O-AICONFIG-001: the section states every place AI is used", () => {
     }
   });
 
-  it("renders the five with a real consumer and the two without, distinguishably", () => {
+  it("renders the six with a real consumer and the one without, distinguishably (B.8, ADR-163)", () => {
     const { container } = render(
       <AiConfigSection locale="pt-BR" credentialStatus="active" saved={SAVED} />,
     );
     expect(container.querySelectorAll(".ai-config-route.controlled")).toHaveLength(4);
-    expect(container.querySelectorAll(".ai-config-route.uncontrolled")).toHaveLength(1);
-    expect(container.querySelectorAll(".ai-config-route.unconsumed")).toHaveLength(2);
+    expect(container.querySelectorAll(".ai-config-route.uncontrolled")).toHaveLength(2);
+    expect(container.querySelectorAll(".ai-config-route.unconsumed")).toHaveLength(1);
   });
 });
 
