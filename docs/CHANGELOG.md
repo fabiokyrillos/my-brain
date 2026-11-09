@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-08 — The screenshot lane tolerates 25 pixels (ADR-162)
+
+- **`e2e/visual-regression.spec.ts`:** `maxDiffPixelRatio: 0.005` → `maxDiffPixels: 25`. The old ratio allowed 1,728 pixels on Pixel 7 and 4,608 on Desktop Chrome.
+- **Measured before choosing:** a temporary workflow (run `42345549312`, branch deleted afterwards) drew all sixteen images three times in each of three jobs. All 144 draws were 0 pixels apart at the lane's per-pixel threshold. Across days the only drift is 1–4 pixels where the Hoje day name brushes its mask.
+- **Six stale baselines redrawn**, all of which had passed under the old ratio while depicting removed UI: `hoje-{light,dark}-desktop` ("Perguntar ao Brain", 2,840–2,963 px), plus `tarefas-{light,dark}-mobile` and `agenda-{light,dark}-mobile` (`Ctrl+K`, 512–525 px).
+- **Corrected:** §8 of `docs/reports/life-brain/B7_CLOSING_REPORT.md` said Hoje desktop's removed block was below the fold. It is visible in the viewport; the threshold hid it.
+
 ## 2026-11-06 — `202611060108` applied to the hosted project (parity 108 = 108)
 
 - **Applied** with `supabase db push --linked` after PR #370 merged with all three CI jobs green, so the `database` job had already applied the whole chain from an empty database and run the pgTAP suite before production saw the file. One migration pending, one applied; `migration list` reports `202611060108 | 202611060108 | 202611060108`.

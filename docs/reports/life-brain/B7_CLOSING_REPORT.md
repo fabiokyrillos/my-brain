@@ -287,6 +287,13 @@ lane deliberately did not assume.
 **Hoje, desktop.** Unchanged, because `toHaveScreenshot` captures the **viewport**, not the page,
 and the removed block sits below the fold at 1280 × 720.
 
+> **Correction, 2026-11-08 (ADR-162): the sentence above is wrong.** The "Perguntar ao Brain" door
+> is inside the viewport in the old Hoje desktop baseline, at y ≈ 600–680 of 720. Hoje desktop was
+> not redrawn for the same reason Conversar was not: the difference (2,840–2,963 pixels, 0.0031 of
+> the image) landed under `maxDiffPixelRatio: 0.005`. The same run also left four more stale
+> baselines in place: Tarefas and Agenda mobile, light and dark, still showed the `Ctrl+K` hint
+> (512–525 pixels, 0.0015). ADR-162 replaces the threshold and redraws all six.
+
 **Conversar: unchanged on all four, and that is a defect in the baseline rather than in the page.**
 The same run rendered Conversar from the same build, compared it against a baseline drawn on `main`
 before B.7 — one that still shows the lens strip and the `Ctrl+K` hint — and **passed** it. The
@@ -322,3 +329,6 @@ actual route, rendered against a real database.
 **Not fixed here, and not mine to decide:** `maxDiffPixelRatio: 0.005` is ADR-159's number. This
 slice does not change it. But it is now written down that the threshold is large enough to hide the
 removal of a navigation strip, which is the kind of change the lane exists to catch.
+
+> **Decided 2026-11-08 (ADR-162):** the owner replaced it with `maxDiffPixels: 25`, after a
+> measurement on the runner found zero noise between same-day draws.
