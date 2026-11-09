@@ -129,7 +129,10 @@ describe("2L-AUDIT-004: the Work view vocabulary is one vocabulary", () => {
     // two names to eight. This block is exactly the check such a re-declaration
     // needs: the `workView` vocabulary belongs to another phase entirely, and it
     // has to survive a 347-line copy untouched.
-    expect(validator.name).toBe("202611060108_life_brain_b7_suggestion_telemetry.sql");
+    // Moved again by Life Brain B.8's `202611090109` (ADR-163), which re-declares
+    // it whole to add the optional `source` key to the suggestion arm; the
+    // `workView` vocabulary has to survive that copy untouched too.
+    expect(validator.name).toBe("202611090109_life_brain_b8_model_suggestions.sql");
   });
 
   it("the database validator allows exactly the three signed views", () => {

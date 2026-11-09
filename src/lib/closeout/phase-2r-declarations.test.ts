@@ -409,7 +409,8 @@ describe("Phase 2R: every signature and every authorization is earned by an ADR"
     // Chain head moved to 106 by Life Brain LB-M2, the ONE migration slice C.3 was allocated (ADR-145 Decision 7) and the third and last of Life Brain's three: events with a period (ADR-152). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 107 by Life Brain LB-M4, a FOURTH Life Brain migration: ADR-145 Decision 7 made it a stop condition and the owner lifted it explicitly on 2026-11-05 ("Sim, autorizo LB-M4") for slice C.5, a person's birthday and its yearly reminder (ADR-156). Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
     // Chain head moved to 108 by Life Brain B.7's telemetry migration (ADR-161): the suggestion category enum widened from two names to eight, authorized by the owner on 2026-11-06 ("pode fazer a migration") after B.7 shipped without it and recorded the gap in its closing report. Same reasoning as every move before it: this pin moves in the commit that adds the migration, visibly, and this guard's own claim is untouched.
-    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(108);
+    // Chain head moved to 109 by Life Brain B.8 (ADR-163): the per-day suggestion pick cache and the `source` telemetry property, one migration the owner authorized on 2026-11-09.
+    expect(migrations.length, "an unattributed migration arrived beside the allocated one").toBe(109);
   });
 
   it("covers every requirement with a slice, and classifies none for delivery", () => {

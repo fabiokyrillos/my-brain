@@ -613,9 +613,17 @@ describe("Phase 2O budget: nothing is spent and nothing may be created", () => {
       laterLifeBrainB7.length,
       `B.7 is authorized exactly one telemetry migration: ${laterLifeBrainB7.join(", ")}`,
     ).toBeLessThanOrEqual(1);
+    // Life Brain B.8 (ADR-163), attributed by name for the same reason: a SIXTH
+    // Life Brain migration, authorized separately on 2026-11-09 for the per-day
+    // suggestion pick cache and the `source` telemetry property, together.
+    const laterLifeBrainB8 = migrations.filter((name) => /life_brain_b8_/i.test(name));
+    expect(
+      laterLifeBrainB8.length,
+      `B.8 is authorized exactly one migration: ${laterLifeBrainB8.join(", ")}`,
+    ).toBeLessThanOrEqual(1);
     expect(migrations).toHaveLength(
       MIGRATIONS_BEFORE_PHASE_2O + 3 + laterPhase2p.length + laterPhase2q.length + laterPhase2r.length
-      + laterPhase2s.length + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length,
+      + laterPhase2s.length + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length + laterLifeBrainB8.length,
     );
     const attributable = migrations.filter((name) => /phase[_-]?2o/i.test(name));
     expect(attributable, "a migration is attributable to Phase 2O during planning").toEqual([]);

@@ -246,9 +246,17 @@ describe("Phase 2P declarations", () => {
       laterLifeBrainB7.length,
       `B.7 is authorized exactly one telemetry migration: ${laterLifeBrainB7.join(", ")}`,
     ).toBeLessThanOrEqual(1);
+    // Life Brain B.8 (ADR-163), attributed by name for the same reason: a SIXTH
+    // Life Brain migration, authorized separately on 2026-11-09 for the per-day
+    // suggestion pick cache and the `source` telemetry property, together.
+    const laterLifeBrainB8 = migrations.filter((name) => /life_brain_b8_/i.test(name));
+    expect(
+      laterLifeBrainB8.length,
+      `B.8 is authorized exactly one migration: ${laterLifeBrainB8.join(", ")}`,
+    ).toBeLessThanOrEqual(1);
     expect(migrations).toHaveLength(
       99 + laterPhase2q.length + laterPhase2r.length + laterPhase2s.length
-      + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length,
+      + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length + laterLifeBrainB8.length,
     );
   });
 

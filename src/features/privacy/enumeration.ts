@@ -175,7 +175,12 @@ export const PRIVACY_CATEGORIES: readonly PrivacyCategory[] = [
   {
     key: "chat",
     surface: "chat",
-    tables: [{ table: "conversations" }, { table: "conversation_messages" }],
+    tables: [
+      { table: "conversations" },
+      { table: "conversation_messages" },
+      // Life Brain B.8 (ADR-163): the model's pick of today's suggestions, one row.
+      { table: "conversation_suggestion_picks" },
+    ],
   },
   {
     key: "files",
