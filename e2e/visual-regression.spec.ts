@@ -32,6 +32,13 @@ import { signInWithoutTheLoginForm } from "./support/online-session";
  *    anything a real device adds. The day name on Hoje is masked, because it is
  *    the one thing on these pages that changes by itself; the Agenda is pinned
  *    to January 2026 for the same reason.
+ *
+ * ## How much difference it tolerates
+ *
+ * 25 pixels per image, whatever the viewport (ADR-162). The smallest removal
+ * measured, one `Ctrl+K` hint, was 512 pixels; the runner's own noise is zero
+ * on one day and at most a few pixels across days. A change that needs more than 25 pixels to be "the
+ * same" is a change, so redraw the baselines rather than raise the number.
  */
 
 const supabaseUrl = process.env.SUPABASE_URL ?? "";
@@ -61,7 +68,9 @@ type Surface = {
 const SURFACES: readonly Surface[] = [
   { name: "hoje", path: "/pt-BR/app", mask: [".today-hero .eyebrow"] },
   { name: "conversar", path: "/pt-BR/app/chat", mask: [] },
-  { name: "tarefas", path: "/pt-BR/app/tasks", mask: [] },
+  // `/app/tasks` redirects here. Under `app/loading.tsx` that redirect lands
+  // client-side after the shell streams, so asserting the old path raced it.
+  { name: "tarefas", path: "/pt-BR/app/work?view=all&page=1", mask: [] },
   { name: "agenda", path: "/pt-BR/app/calendar?date=2026-01-15&orientation=month", mask: [] },
 ];
 
@@ -122,7 +131,13 @@ test.describe("visual regression — signed-in surfaces", () => {
           animations: "disabled",
           caret: "hide",
           mask: surface.mask.map((selector) => page.locator(selector)),
-          maxDiffPixelRatio: 0.005,
+          // ADR-162. A fixed pixel count, not a ratio: the runner redraws the
+          // same page identically (144 draws, 0 pixels apart), and the only
+          // drift between days is the Hoje day name brushing its mask, 1-4
+          // pixels. The smallest real removal measured was 512 pixels. The old
+          // `maxDiffPixelRatio: 0.005` let 1,728 pixels through on mobile and
+          // 4,608 on desktop, which hid every removal it was there to catch.
+          maxDiffPixels: 25,
         });
       });
     }
