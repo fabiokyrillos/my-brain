@@ -288,6 +288,10 @@ with rpc_closed (table_name) as (
   ('account_deletion_attempts'),
   ('account_deletion_log'),
   ('auth_event_attempts'),
+  -- Life Brain B.8 (`202611090109`). The one writer is
+  -- `record_conversation_suggestion_picks`, a definer taking the owner from
+  -- auth.uid(); no service_role path reads or writes the cache.
+  ('conversation_suggestion_picks'),
   ('credential_validation_attempts'),
   ('entity_deletion_confirmations'),
   ('entry_person_candidate_resolutions'),
@@ -524,6 +528,9 @@ select is(
   || E'automation_calibration_observations -> SELECT\n'
   || E'automation_category_policies -> SELECT\n'
   || E'conversation_messages -> INSERT,SELECT\n'
+  -- Life Brain B.8 (`202611090109`). SELECT-only: the owner reads today's pick,
+  -- and the definer writer is the only door in, refusing any text.
+  || E'conversation_suggestion_picks -> SELECT\n'
   || E'credential_validation_attempts -> INSERT,SELECT\n'
   || E'entity_attachments -> SELECT\n'
   -- Phase 2N M3 (`202608140094`). SELECT-only, and that is the whole posture:
