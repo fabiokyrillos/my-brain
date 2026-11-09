@@ -28,7 +28,7 @@ function diagram(overrides: Partial<RelationSource> = {}, locale: Locale = "pt-B
   const projection = projectRelations(
     source({ ...overrides, locale, ownerLabel: locale === "pt-BR" ? "Você" : "You" }),
   );
-  return render(<RelationDiagram locale={locale} projection={projection} />);
+  return render(<RelationDiagram agentName="Brain" locale={locale} projection={projection} />);
 }
 
 const MARINA = { id: "person-1", name: "Marina", organization_id: null };

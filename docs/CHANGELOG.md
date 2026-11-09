@@ -22,6 +22,12 @@
   - The migration-budget guards attribute `202611090109` by name.
   - The privacy census counts the table under `chat`, and the Phase 2F verifier excuses it with its reason.
   - `DATABASE.md` and `SECURITY.md` record the migration.
+## 2026-11-09 — Maintenance: `.mjs` line endings, the assistant's name on Relações
+
+- **`.gitattributes`:** `*.mjs text eol=lf`. With `core.autocrlf=true`, Windows checkouts put a carriage return after `#!/usr/bin/env node`, and Vitest's transform rejected it (`Invalid Character '!'`). Three test files that import `scripts/*.mjs` could not load: `hosted-auth-parity`, `signup-hardening-admin-boundary` and `storage-orphan-scanner`. All three load and pass now. CI on Linux was never affected.
+- **Relações (defect 2 of `FEEDBACK_DONO_2026-11-05.md`):** four strings in each locale hardcoded the assistant ("o Cérebro", "the Brain"). They now carry `{agent}`. `getRelationsCopy(locale, agentName)` makes the name required, as `getHistoryCopy` does. The relations page loads the name with `getAgentName` and passes it down to the list, drawing, compact list and view controls, and the loader's owner label has its own accessor, `relationsOwnerLabel`.
+- **Guards:** `agent-name.test.ts` checks relations copy, in both locales, for a surviving token and for the substitution actually happening. `life-brain-c0-copy-guard.test.ts` fails on "Cérebro" in any product file.
+- **`docs/TODO.md`:** the Life Brain heading no longer says A.5 is in progress or that LB-OD-8 is open.
 
 ## 2026-11-08 — The screenshot lane tolerates 25 pixels (ADR-162)
 

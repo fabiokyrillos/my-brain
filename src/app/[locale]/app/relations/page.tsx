@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 
 import { BrainLensTabs } from "@/features/library/brain-lenses";
+import { getAgentName } from "@/features/profile/agent-identity";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { getRelationsCopy } from "@/features/relations/copy";
 import { loadRelations } from "@/features/relations/data";
@@ -71,9 +72,8 @@ export default async function RelationsPage({
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const copy = getRelationsCopy(locale);
-
-  const { supabase } = await requireUser(locale);
+  const [{ supabase }, agentName] = await Promise.all([requireUser(locale), getAgentName()]);
+  const copy = getRelationsCopy(locale, agentName);
   // `LDC-CONTEXT-001`. One accessor, cached per request, exactly as every other
   // contextual surface stamps its instants.
   const timeZone = await getOwnerTimeZone();
@@ -131,15 +131,16 @@ export default async function RelationsPage({
           return (
             <>
               <RelationFocusControl
+                agentName={agentName}
                 focusId={focusId}
                 locale={locale}
                 options={focusableNodes(outcome.projection)}
                 view={view}
               />
-              <RelationViewTabs focusId={focusId} locale={locale} view={view} />
+              <RelationViewTabs agentName={agentName} focusId={focusId} locale={locale} view={view} />
               {view === "diagram" ? (
                 <>
-                  <RelationDiagram locale={locale} projection={projection} />
+                  <RelationDiagram agentName={agentName} locale={locale} projection={projection} />
                   {/*
                     `2P-RELATION-004`. Inside the drawing tab, because the case it
                     answers is "the figure does not fit this screen" — and
@@ -147,10 +148,10 @@ export default async function RelationsPage({
                     explanation in the text tab. It is a strict subset of the
                     drawing, so it can neither add nor hide anything.
                   */}
-                  <RelationCompactList focusId={focusId} locale={locale} projection={projection} />
+                  <RelationCompactList agentName={agentName} focusId={focusId} locale={locale} projection={projection} />
                 </>
               ) : (
-                <RelationList locale={locale} projection={projection} timeZone={timeZone} />
+                <RelationList agentName={agentName} locale={locale} projection={projection} timeZone={timeZone} />
               )}
             </>
           );

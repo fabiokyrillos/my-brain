@@ -29,7 +29,7 @@ function source(overrides: Partial<RelationSource> = {}): RelationSource {
 
 function list(overrides: Partial<RelationSource> = {}, locale: Locale = "pt-BR") {
   const projection = projectRelations(source({ ...overrides, locale, ownerLabel: locale === "pt-BR" ? "Você" : "You" }));
-  return render(<RelationList locale={locale} projection={projection} timeZone={ZONE} />);
+  return render(<RelationList agentName="Brain" locale={locale} projection={projection} timeZone={ZONE} />);
 }
 
 const MARINA = { id: "person-1", name: "Marina", organization_id: null };
@@ -176,7 +176,7 @@ describe("2N-ACCESS-005: both locales, through the typed module", () => {
     expect(screen.getByRole("heading", { name: "All links" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Links with no confirmed origin" })).toBeVisible();
     expect(screen.getByText("Informed by you")).toBeVisible();
-    expect(screen.getByText(/The Brain cannot tell whether you recorded this link/)).toBeVisible();
+    expect(screen.getByText(/Brain cannot tell whether you recorded this link/)).toBeVisible();
     // One link per row, and Marina is in both groups — two controls with the
     // same name that go to the same place, which is correct rather than the
     // duplicate-name defect `provenance-note.tsx` guards against.

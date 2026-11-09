@@ -59,7 +59,7 @@ describe("RelationCompactList", () => {
     // is the picture's text, so it takes the same subset — the full text tab is
     // where the other rows live, and it says why.
     render(
-      <RelationCompactList
+      <RelationCompactList agentName="Brain"
         focusId={null}
         locale="pt-BR"
         projection={projection([
@@ -75,7 +75,7 @@ describe("RelationCompactList", () => {
 
   it("renders nothing at all when there is nothing drawn", () => {
     const { container } = render(
-      <RelationCompactList
+      <RelationCompactList agentName="Brain"
         focusId={null}
         locale="pt-BR"
         projection={projection([edge("person_project", "p2", "j1", UNATTRIBUTABLE)])}
@@ -95,7 +95,7 @@ describe("RelationCompactList", () => {
      */
     const undrawn = edge("person_project", "p2", "j1", UNATTRIBUTABLE);
     const drawn = edge("person_project", "p1", "j1", OWNED);
-    render(<RelationCompactList focusId={null} locale="pt-BR" projection={projection([undrawn, drawn])} />);
+    render(<RelationCompactList agentName="Brain" focusId={null} locale="pt-BR" projection={projection([undrawn, drawn])} />);
 
     const link = screen.getByRole("link", { name: /Ver a explicação do vínculo/ });
     expect(link).toHaveAttribute("href", "/pt-BR/app/relations?view=links#relation-2");
@@ -103,7 +103,7 @@ describe("RelationCompactList", () => {
 
   it("keeps the focus in the link, so the destination shows the same rows", () => {
     render(
-      <RelationCompactList
+      <RelationCompactList agentName="Brain"
         focusId="p1"
         locale="pt-BR"
         projection={projection([edge("person_project", "p1", "j1", OWNED)])}
@@ -120,7 +120,7 @@ describe("RelationCompactList", () => {
     // and it stays in the text tab behind `ProtectedContent`. An `aria-label`
     // carrying it would hand the masked text straight to assistive technology.
     render(
-      <RelationCompactList
+      <RelationCompactList agentName="Brain"
         focusId={null}
         locale="pt-BR"
         projection={projection([edge("person_owner", "p1", "owner", OWNED, "Chefe")])}
@@ -148,7 +148,7 @@ describe("RelationCompactList", () => {
       })),
     ];
     render(
-      <RelationCompactList
+      <RelationCompactList agentName="Brain"
         focusId={null}
         locale="pt-BR"
         projection={{ nodes, edges: { items: many, bounded: false, limit: 50 } }}
@@ -165,7 +165,7 @@ describe("the text tab's anchors", () => {
     const undrawn = edge("person_project", "p2", "j1", UNATTRIBUTABLE);
     const drawn = edge("person_project", "p1", "j1", OWNED);
     const { container } = render(
-      <RelationList locale="pt-BR" projection={projection([undrawn, drawn])} timeZone="America/Sao_Paulo" />,
+      <RelationList agentName="Brain" locale="pt-BR" projection={projection([undrawn, drawn])} timeZone="America/Sao_Paulo" />,
     );
 
     // Position 1 is the undrawn row and position 2 is the drawn one, in the

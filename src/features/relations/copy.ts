@@ -29,6 +29,7 @@
  *   the row does not carry.
  */
 
+import { withAgentName } from "@/lib/agent-name";
 import type { Locale } from "@/lib/preferences";
 
 import type { RelationEdgeKind, RelationNodeType } from "./contracts";
@@ -151,7 +152,7 @@ const PT: RelationsCopy = {
   openForProject: "Ver o mapa de relações",
   pageEyebrow: "Contexto",
   pageIntro:
-    "As ligações que o Cérebro guarda entre pessoas, projetos, contextos e organizações. A lista abaixo é a versão completa; o desenho mostra a parte que pode ser explicada.",
+    "As ligações que o {agent} guarda entre pessoas, projetos, contextos e organizações. A lista abaixo é a versão completa; o desenho mostra a parte que pode ser explicada.",
 
   listHeading: "Todos os vínculos",
   listIntro: "Cada linha diz o que o vínculo afirma e de onde ele veio.",
@@ -171,7 +172,7 @@ const PT: RelationsCopy = {
     "Não é possível dizer se você registrou este vínculo ou se ele veio de uma leitura.",
   notDrawnHeading: "Vínculos sem origem confirmada",
   notDrawnExplainer:
-    "Estes vínculos existem e continuam nas páginas de pessoa e de projeto. Eles não entram no desenho porque o Cérebro não consegue dizer de onde vieram.",
+    "Estes vínculos existem e continuam nas páginas de pessoa e de projeto. Eles não entram no desenho porque o {agent} não consegue dizer de onde vieram.",
 
   roleLabel: "Papel",
   sinceLabel: "Desde",
@@ -212,7 +213,7 @@ const PT: RelationsCopy = {
   openNode: (label, type) => `Abrir ${type.toLowerCase()}: ${label}`,
   edgeSummary: (from, relation, to) => `${from} — ${relation} — ${to}`,
   confidenceNeverShown:
-    "O Cérebro guarda um número de confiança para cada vínculo e não o mostra: ele mede a consistência de uma leitura, não a verdade de um fato.",
+    "O {agent} guarda um número de confiança para cada vínculo e não o mostra: ele mede a consistência de uma leitura, não a verdade de um fato.",
 };
 
 const EN: RelationsCopy = {
@@ -221,7 +222,7 @@ const EN: RelationsCopy = {
   openForProject: "See the relations map",
   pageEyebrow: "Context",
   pageIntro:
-    "The links the Brain holds between people, projects, contexts and organizations. The list below is the complete version; the drawing shows the part that can be explained.",
+    "The links {agent} holds between people, projects, contexts and organizations. The list below is the complete version; the drawing shows the part that can be explained.",
 
   listHeading: "All links",
   listIntro: "Each row says what the link asserts and where it came from.",
@@ -238,10 +239,10 @@ const EN: RelationsCopy = {
   originLabel: "Origin",
   ownerAuthoredOrigin: "Informed by you",
   unattributableOrigin:
-    "The Brain cannot tell whether you recorded this link or it came from a reading.",
+    "{agent} cannot tell whether you recorded this link or it came from a reading.",
   notDrawnHeading: "Links with no confirmed origin",
   notDrawnExplainer:
-    "These links exist and stay on the person and project pages. They are left out of the drawing because the Brain cannot say where they came from.",
+    "These links exist and stay on the person and project pages. They are left out of the drawing because {agent} cannot say where they came from.",
 
   roleLabel: "Role",
   sinceLabel: "Since",
@@ -282,9 +283,19 @@ const EN: RelationsCopy = {
   openNode: (label, type) => `Open ${type.toLowerCase()}: ${label}`,
   edgeSummary: (from, relation, to) => `${from} — ${relation} — ${to}`,
   confidenceNeverShown:
-    "The Brain stores a confidence number for each link and does not show it: it measures how consistent a reading was, not whether a fact is true.",
+    "{agent} stores a confidence number for each link and does not show it: it measures how consistent a reading was, not whether a fact is true.",
 };
 
-export function getRelationsCopy(locale: Locale): RelationsCopy {
-  return locale === "pt-BR" ? PT : EN;
+/**
+ * @param agentName the assistant's configured name (UX-06). Required, so a
+ * surface cannot keep rendering a hardcoded one, which is how "o Cérebro"
+ * reached this page while the rest of the product said the configured name.
+ */
+export function getRelationsCopy(locale: Locale, agentName: string): RelationsCopy {
+  return withAgentName(locale === "pt-BR" ? PT : EN, agentName);
+}
+
+/** The owner's own node label, which names no assistant; for the loader. */
+export function relationsOwnerLabel(locale: Locale): string {
+  return (locale === "pt-BR" ? PT : EN).ownerLabel;
 }

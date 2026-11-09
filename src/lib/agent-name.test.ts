@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { getDailyCycleCopy } from "@/features/daily-cycle/copy";
 import { getTaskDetailCopy } from "@/features/daily-cycle/task-detail-copy";
+import { getRelationsCopy } from "@/features/relations/copy";
 import { getHomeCopy } from "@/features/shell/home-copy";
 import { locales } from "@/lib/preferences";
 
@@ -84,6 +85,10 @@ describe("no copy module leaks the token to a user", () => {
     it(`home copy — ${locale}`, () => {
       assertNoToken(getHomeCopy(locale, "Ada"), `home[${locale}]`);
     });
+
+    it(`relations copy — ${locale}`, () => {
+      assertNoToken(getRelationsCopy(locale, "Ada"), `relations[${locale}]`);
+    });
   }
 
   for (const locale of locales) {
@@ -93,6 +98,7 @@ describe("no copy module leaks the token to a user", () => {
       expect(JSON.stringify(getDailyCycleCopy(locale, "Ada"))).toContain("Ada");
       expect(JSON.stringify(getTaskDetailCopy(locale, "Ada"))).toContain("Ada");
       expect(JSON.stringify(getHomeCopy(locale, "Ada"))).toContain("Ada");
+      expect(JSON.stringify(getRelationsCopy(locale, "Ada"))).toContain("Ada");
     });
   }
 });

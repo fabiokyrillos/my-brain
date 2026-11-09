@@ -35,14 +35,16 @@ import { relationViewHref, RELATION_VIEWS, type RelationView } from "./view";
 
 export function RelationViewTabs({
   focusId,
+  agentName,
   locale,
   view,
 }: {
   readonly focusId: string | null;
+  readonly agentName: string;
   readonly locale: Locale;
   readonly view: RelationView;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const label = { diagram: copy.diagramTab, links: copy.linksTab } as const;
 
   return (
@@ -74,17 +76,19 @@ export function RelationViewTabs({
 
 export function RelationFocusControl({
   focusId,
+  agentName,
   locale,
   options,
   view,
 }: {
   readonly focusId: string | null;
+  readonly agentName: string;
   readonly locale: Locale;
   /** People the projection already contains — never a fresh read of `people`. */
   readonly options: readonly RelationNode[];
   readonly view: RelationView;
 }) {
-  const copy = getRelationsCopy(locale);
+  const copy = getRelationsCopy(locale, agentName);
   const focused = options.find((node) => node.id === focusId) ?? null;
 
   if (options.length === 0) {
