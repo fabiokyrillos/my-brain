@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-11-09 — `202611090109` applied to the hosted project (parity 109 = 109)
+
+- **Applied** with `supabase db push --linked` after PR #374 merged with all three CI jobs passing. One migration was pending and is now applied, and `migration list` reports `202611090109 | 202611090109 | 202611090109`. The migration's own verification blocks ran on the hosted database without aborting.
+- **Verified against the live database, writing no rows:**
+  - `conversation_suggestion_picks` has forced RLS and is empty.
+  - `authenticated` holds SELECT only; `anon` and `service_role` hold nothing.
+  - The writer is `security definer` with an empty `search_path`, executable by `authenticated` and not by `anon`.
+  - The validator accepts `{category}` and `{category, source: "model"}` and refuses `source: "llm"` with `22023`. It was called inside a `do` block, so no event was written.
+- **Supabase security advisors:** the only new entry is the writer itself, under "definer executable by `authenticated`", which is the posture of every RPC writer in the project. The standing findings predate this change and are untouched.
+
 ## 2026-11-09 — Life Brain B.8: the model picks today's suggestions (ADR-163)
 
 - **Migration `202611090109`** (the sixth Life Brain migration, authorized by the owner; **not yet applied to the hosted project**):
