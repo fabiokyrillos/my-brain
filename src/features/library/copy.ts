@@ -64,7 +64,11 @@ export type LibraryCopy = {
     readonly seeArea: string;
   };
   readonly lists: {
-    readonly people: ListPageCopy & { readonly rowMeta: string };
+    /**
+     * Life Brain D.2: the fixed "Aparece no seu contexto" under every person is
+     * gone; people are grouped by area, and the last group is the ones with none.
+     */
+    readonly people: ListPageCopy & { readonly ungrouped: string; readonly groupsLabel: string };
     readonly projects: ListPageCopy & { readonly rowFallback: string };
   };
 };
@@ -133,7 +137,8 @@ const copy: Record<Locale, LibraryCopy> = {
         description: "Quem aparece nas suas conversas, decisões e acompanhamentos.",
         emptyTitle: "Nenhuma pessoa ainda",
         emptyBody: "Pessoas citadas nas capturas aparecem aqui automaticamente.",
-        rowMeta: "Aparece no seu contexto",
+        ungrouped: "Sem área definida",
+        groupsLabel: "Pessoas por área da vida",
       },
       projects: {
         title: "Projetos",
@@ -186,7 +191,8 @@ const copy: Record<Locale, LibraryCopy> = {
         description: "People who appear in your conversations, decisions, and follow-ups.",
         emptyTitle: "No people yet",
         emptyBody: "People mentioned in captures appear here automatically.",
-        rowMeta: "Appears in your context",
+        ungrouped: "No area yet",
+        groupsLabel: "People by area of life",
       },
       projects: {
         title: "Projects",

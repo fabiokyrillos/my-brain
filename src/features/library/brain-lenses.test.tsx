@@ -1,5 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/entities/actions", () => ({ createOrganization: vi.fn() }));
 
 import { BrainLensTabs } from "./brain-lenses";
 import { BRAIN_LENSES } from "./lenses";
@@ -8,6 +10,22 @@ import { BRAIN_LENSES } from "./lenses";
  * The lens strip — the one component that makes Brain a place rather than a
  * menu, and the one that could quietly strand a destination.
  */
+/*
+ * Life Brain D.2 (T3, V2 1:17: "deveria ter uma forma mais fácil de criar uma
+ * organização, não tendo que vir até aqui"). Every Memória lens offers it.
+ */
+describe("Life Brain D.2: an organization is created from any Memória lens", () => {
+  it("offers 'Nova organização' beside the strip on another lens", () => {
+    render(<BrainLensTabs active="people" locale="pt-BR" />);
+    expect(screen.getByRole("button", { name: /nova organização/i })).toBeInTheDocument();
+  });
+
+  it("does not repeat it on Organizações, whose header already has it", () => {
+    render(<BrainLensTabs active="organizations" locale="pt-BR" />);
+    expect(screen.queryByRole("button", { name: /nova organização/i })).toBeNull();
+  });
+});
+
 describe("BrainLensTabs", () => {
   it("offers every lens, in reading order, with the overview first", () => {
     render(<BrainLensTabs active="overview" locale="pt-BR" />);

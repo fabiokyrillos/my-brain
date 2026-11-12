@@ -35,6 +35,8 @@ const read = (relative: string) => readFileSync(join(REPO, relative), "utf8");
 
 const SURFACE = "src/app/[locale]/app/notifications/page.tsx";
 const AGENT_ACTIONS = "src/features/agent/actions.ts";
+// Life Brain D.2 (ADR-166): the bulk disposition writer.
+const BULK_NOTICE_WRITER = "src/features/notifications/bulk-data.ts";
 /** The one bundle of authorities both surfaces dispatch through (slice 2S.2). */
 const HANDLERS = "src/features/notifications/verb-handlers.ts";
 /** The migration that defines the deployed `run_user_heartbeat`. */
@@ -162,9 +164,16 @@ describe("2S-FOUNDATION-004 → 2S-ANSWER-001: `dismissed` WAS unreachable, and 
      * SURFACE, not an authority — which is why this slice adds no write path
      * for it at all.
      */
+    /*
+     * Life Brain D.2 (ADR-166) adds ONE more, by name and for one purpose: the
+     * bulk verbs ("marcar todos como lidos", "limpar os lidos") and their undo.
+     * It writes the same two dispositions, owner-scoped and state-guarded, and
+     * every write is audited. Any third writer still fails here.
+     */
     const newWriters = sourceFiles().filter((file) => {
       const body = read(file);
       return file !== AGENT_ACTIONS
+        && file !== BULK_NOTICE_WRITER
         && /from\("notifications"\)/.test(body)
         && /\.update\(/.test(body);
     });
@@ -304,8 +313,9 @@ describe("2S-FOUNDATION-007: this slice changes no product behaviour", () => {
     // and a requirement resting on a false sentence is a requirement nobody can
     // check.
     const writers = sourceFiles().filter((file) => /\.from\("notifications"\)[\s\S]{0,120}\.(update|insert|upsert|delete)/.test(read(file)));
-    expect(writers, "exactly one application-layer writer, and it is the disposition writer")
-      .toEqual([AGENT_ACTIONS]);
+    // Life Brain D.2 (ADR-166): the bulk disposition writer joins it, by name.
+    expect(writers, "the disposition writer and the bulk disposition writer, and no other")
+      .toEqual([AGENT_ACTIONS, BULK_NOTICE_WRITER].sort());
   });
 
   it("ships the record it is accountable to", () => {

@@ -765,6 +765,35 @@ describe("2S-ACCESS-006: the compact menu opens, MOVES, activates and closes by 
   });
 });
 
+/*
+ * Life Brain D.2 (T5, V2 3:06: "abre esse menu gigante"). Six items each with
+ * a paragraph. The meanings stay — as each item's description, for a screen
+ * reader — and what the eye reads is three short group labels that keep
+ * `2S-ACT-006`'s visible difference between "changes the task" and "changes
+ * only this alert".
+ */
+describe("Life Brain D.2: the menu is short", () => {
+  it("groups the items under at most three short labels, task changes first", async () => {
+    setup();
+    await userEvent.click(control(copy.menuLabel("Pagar o aluguel")));
+    const labels = Array.from(document.querySelectorAll(".notification-verb-group-label")).map((node) => node.textContent);
+    expect(labels.length).toBeLessThanOrEqual(3);
+    expect(labels[0]).toBe(copy.groupLabel.task);
+    expect(labels).toContain(copy.groupLabel.message);
+    for (const label of labels) expect((label ?? "").length).toBeLessThanOrEqual(20);
+  });
+
+  it("prints no paragraph under an item; the meaning is its description", async () => {
+    setup();
+    await userEvent.click(control(copy.menuLabel("Pagar o aluguel")));
+    for (const item of screen.getAllByRole("menuitem")) {
+      const description = document.getElementById(item.getAttribute("aria-describedby") as string)!;
+      expect(description).toHaveClass("sr-only");
+      expect(description.textContent).not.toBe("");
+    }
+  });
+});
+
 describe("accessibility contract: the compact menu closes and gives focus back", () => {
   /*
    * The panel's focus contract is asserted below, and the MENU's was not —

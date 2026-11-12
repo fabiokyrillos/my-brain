@@ -255,6 +255,11 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      * "Abrir" and a "⋯" that opens on a press — no swipe.
      */
     "src/features/notifications/notification-history-row.tsx",
+    /*
+     * Life Brain D.2: "Marcar todos como lidos", "Limpar os lidos" and their
+     * "Desfazer" — three buttons in forms, pressed, never swiped.
+     */
+    "src/features/notifications/notification-bulk-bar.tsx",
   ] as const;
 
   it("finds no gesture on any calendar surface either (2M-MOBILE-003)", () => {

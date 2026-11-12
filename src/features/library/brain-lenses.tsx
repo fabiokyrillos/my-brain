@@ -1,9 +1,12 @@
 import Link from "next/link";
 
+import { createOrganization } from "@/features/entities/actions";
+import { EntityCreateForm } from "@/features/entities/entity-create-form";
 import { getNavigationHref } from "@/features/shell/capabilities";
 import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
 
+import { BrainLensScroller } from "./brain-lens-scroller";
 import { getLibraryCopy } from "./copy";
 import { BRAIN_LENSES, type BrainLensKey } from "./lenses";
 
@@ -38,7 +41,9 @@ export function BrainLensTabs({ active, locale }: { active: BrainLensKey; locale
   const navLabels = messages.nav as Record<string, string>;
 
   return (
-    <nav aria-label={copy.lensesLabel} className="brain-lenses">
+    // Life Brain D.2: the strip says when it hides tabs (`BrainLensScroller`).
+    <>
+    <BrainLensScroller label={copy.lensesLabel}>
       {BRAIN_LENSES.map((lens) => {
         const href = lens === "overview" ? getNavigationHref(locale, "library") : getNavigationHref(locale, lens);
         const label = lens === "overview" ? copy.overviewLens : navLabels[lens];
@@ -53,6 +58,18 @@ export function BrainLensTabs({ active, locale }: { active: BrainLensKey; locale
           </Link>
         );
       })}
-    </nav>
+    </BrainLensScroller>
+    {/*
+      Life Brain D.2 (T3): an organization is created from wherever the owner is
+      in Memória — the same form and the same Server Action as the Organizações
+      header, which stays on the page it was used on. Not repeated on
+      Organizações itself, whose header already offers it.
+    */}
+    {active === "organizations" ? null : (
+      <div className="brain-quick-create">
+        <EntityCreateForm action={createOrganization} kind="organization" locale={locale} />
+      </div>
+    )}
+    </>
   );
 }

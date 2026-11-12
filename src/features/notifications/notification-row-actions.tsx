@@ -38,7 +38,10 @@ import { getNotificationActionCopy } from "./action-copy";
 import { refusalMessage, type ActionRefusal } from "./refusal-copy";
 import type { NotificationRowView } from "./row-projection";
 import type { NotificationSubject } from "./subject";
-import { getVerbCopy, type VerbDefinition, type VerbId } from "./verbs";
+import { getVerbCopy, type VerbDefinition, type VerbId, type VerbScope } from "./verbs";
+
+/** Life Brain D.2: the menu reads task changes first, then this alert, then future alerts. */
+const MENU_SCOPE_ORDER: readonly VerbScope[] = ["task", "message", "cadence"];
 
 export type MarkHandler = (formData: FormData) => Promise<void>;
 export type WorkHandler = (state: WorkItemActionState, formData: FormData) => Promise<WorkItemActionState>;
@@ -613,18 +616,33 @@ export function NotificationRowActions({
               ref={menu}
               role="menu"
             >
-              {listedVerbs.map((verb) => (
-                <li key={verb.id} role="none">
-                  <div>
-                    {renderVerbButton(verb, "notification-verb-menu-item", {
-                      describedBy: `${menuId}-${verb.id}`,
-                    })}
-                    <span className="notification-verb-meaning" id={`${menuId}-${verb.id}`}>
-                      {verbCopy[verb.id].meaning}
-                    </span>
-                  </div>
-                </li>
-              ))}
+              {/*
+                Life Brain D.2: grouped by scope, task changes first. The group
+                label is what the eye reads (and what keeps `2S-ACT-006`'s
+                visible difference); each item's meaning is its description,
+                read by a screen reader and no longer printed as a paragraph.
+                The label is `aria-hidden` because the description already says
+                the same thing to that reader.
+              */}
+              {MENU_SCOPE_ORDER.flatMap((scope) => {
+                const inScope = listedVerbs.filter((verb) => verb.scope === scope);
+                if (inScope.length === 0) return [];
+                return [
+                  <li aria-hidden="true" className="notification-verb-group-label" key={`group-${scope}`} role="none">
+                    {copy.groupLabel[scope]}
+                  </li>,
+                  ...inScope.map((verb) => (
+                    <li key={verb.id} role="none">
+                      {renderVerbButton(verb, "notification-verb-menu-item", {
+                        describedBy: `${menuId}-${verb.id}`,
+                      })}
+                      <span className="notification-verb-meaning sr-only" id={`${menuId}-${verb.id}`}>
+                        {verbCopy[verb.id].meaning}
+                      </span>
+                    </li>
+                  )),
+                ];
+              })}
             </ul>
           ) : null}
         </div>

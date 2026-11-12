@@ -29,13 +29,59 @@
   border-bottom: 1px solid var(--border-divider);
   max-width: 100%;
   overflow-x: auto;
-  /* Firefox and WebKit each need their own word for "no visible scrollbar".
-     The strip is still scrollable by wheel, trackpad, touch and keyboard. */
-  scrollbar-width: none;
+  /* Life Brain D.2 (T3): the scrollbar is visible again, thin. Hiding it was
+     half of why nothing on an iPhone said there were more lenses; the fades on
+     `.brain-lenses-frame` are the other half. */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+  scroll-padding-inline: 32px;
 }
 
-.brain-lenses::-webkit-scrollbar {
-  display: none;
+.brain-lenses::-webkit-scrollbar { height: 3px; }
+.brain-lenses::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+/*
+ * The edge that hides tabs fades into the page, the platform's own "there is
+ * more" (`data-overflow-*` comes from `BrainLensScroller`). Pointer-transparent,
+ * so the tab under the fade stays tappable.
+ */
+.brain-lenses-frame {
+  position: relative;
+  margin-bottom: var(--space-6);
+}
+
+.brain-lenses-frame > .brain-lenses { margin-bottom: 0; }
+
+.brain-lenses-frame::before,
+.brain-lenses-frame::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 1px;
+  width: 40px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.brain-lenses-frame::before {
+  left: 0;
+  background: linear-gradient(to right, var(--background-canvas), transparent);
+}
+
+.brain-lenses-frame::after {
+  right: 0;
+  background: linear-gradient(to left, var(--background-canvas), transparent);
+}
+
+.brain-lenses-frame[data-overflow-start="true"]::before,
+.brain-lenses-frame[data-overflow-end="true"]::after {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brain-lenses-frame::before,
+  .brain-lenses-frame::after { transition: none; }
 }
 
 .brain-lens {
@@ -333,3 +379,32 @@
 .brain-ideas-list > li a { display: inline-flex; align-items: center; min-height: var(--touch-target); color: var(--text-primary); text-decoration: none; overflow-wrap: anywhere; }
 .brain-ideas-list > li a:hover { text-decoration: underline; }
 .brain-idea-date { flex: none; font: var(--type-caption); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+/*
+ * Life Brain D.2 — Pessoas, grouped by area of life. A small heading with the
+ * group's size, then the same rows as before, minus the fixed sentence.
+ */
+.people-groups { display: flex; flex-direction: column; gap: var(--space-6); }
+
+.people-group-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  font: var(--type-label);
+  color: var(--text-secondary);
+}
+
+.people-group-count {
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+/* Life Brain D.2 — "Nova organização" under the strip on every other lens. */
+.brain-quick-create {
+  display: flex;
+  justify-content: flex-end;
+  margin: calc(-1 * var(--space-4)) 0 var(--space-4);
+}
+
+.people-group { margin: 0; }
