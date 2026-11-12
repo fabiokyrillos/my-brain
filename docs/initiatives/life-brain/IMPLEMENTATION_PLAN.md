@@ -263,6 +263,7 @@ Regras comuns às três: um PR por slice, branch `life-brain/<slice>`, teste ant
 - **Pessoas sem a frase fixa** "Aparece no seu contexto" (`src/features/library/copy.ts`) e agrupadas de forma útil, com um critério proposto a partir do que o banco já sabe — não inventado.
 - **Criar uma Organização sem ir até a página dela.**
 - **O menu "⋯" de cada aviso enxuto** (hoje seis opções, cada uma com um parágrafo).
+- **Implementado 2026-11-12 (ADR-166), sem migration:** "Marcar todos como lidos" e "Limpar os lidos" com registro em `audit_logs` (só ids e estados) e desfazer por 24 h, a partir desse registro (`undo_operations` exigiria migration); a faixa de lentes esmaece a borda que esconde abas e traz a lente atual para a vista; Pessoas agrupada por área da vida a partir dos registros do dono (alternativas na ADR); "Nova organização" em toda lente da Memória; o menu do aviso em três grupos curtos, com o significado de cada item como descrição para leitor de tela. Evidência: `evidence/slice-d2/`.
 
 ### D.3 — Pequenos restos (1,5 d)
 
