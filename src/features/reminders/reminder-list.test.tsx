@@ -222,15 +222,15 @@ describe("Life Brain D.1: a reminder card shows at most three controls", () => {
     expect(within(card).queryByText(getReminderCopy("pt-BR").statusHint.scheduled)).toBeNull();
   });
 
-  it("snoozes for an hour in one tap", async () => {
-    const user = userEvent.setup();
-    const { container } = renderList([reminder()]);
+  it("snoozes for an hour in one tap", () => {
+    // Asserted on the form it submits, not by pressing it: pressing would run
+    // the real Server Action against a mocked session.
+    renderList([reminder()]);
     const quick = screen.getByRole("button", { name: "Adiar 1 hora" });
     const form = quick.closest("form") as HTMLFormElement;
+    expect(quick).toHaveAttribute("type", "submit");
     expect(new FormData(form).get("snoozeMinutes")).toBe("60");
     expect(new FormData(form).get("action")).toBe("snooze");
-    await user.click(quick);
-    expect(container).toBeTruthy();
   });
 
   it("a cancelled reminder shows its one verb and the menu", () => {
