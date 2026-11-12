@@ -155,6 +155,9 @@ export const HISTORY_ACTION_TYPES = [
   "entry_reprocessing_failed",
   // Phase 2S slice 2S.1. The owner telling the agent to stop speaking about
   // one subject, either until an instant or permanently.
+  // Life Brain D.3 (ADR-167): the owner's "não, obrigado" to a birthday a
+  // record stated. TypeScript writer: `birthdays/actions.ts`.
+  "birthday_offer_declined",
   "notification_suppressed",
   // Life Brain D.2 (ADR-166): TypeScript writers in `notifications/bulk-actions.ts`.
   "notifications_bulk_undone",
@@ -291,6 +294,8 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // the stream of notices about a subject, and nothing about the subject
   // itself is created, changed or undone.
   notification_suppressed: "lifecycle",
+  // An answer the owner gave to an offer, like resolving a question.
+  birthday_offer_declined: "answered",
   // Marking read changes an attribute of notices that stay; clearing ends their
   // place in the list, like a dismissal; the undo is an undo.
   notifications_marked_read: "changed",

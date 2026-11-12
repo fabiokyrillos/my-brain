@@ -300,6 +300,23 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
       expect(document.querySelector(".visually-hidden")).toBeNull();
     });
 
+    /* Life Brain D.3 (ADR-167): a trip is one bar, not three lines. */
+    it("draws a multi-day event once, as a bar across its days", () => {
+      const trip = (date: string) => item({
+        id: `event:trip:${date}`, lane: "event", title: "Viagem a Recife", date,
+        span: { allDay: true, startsAt: "2026-08-11T03:00:00.000Z", endsAt: "2026-08-14T03:00:00.000Z" },
+      });
+      const days = Array.from({ length: 7 }, (_unused, index) => {
+        const date = `2026-08-${String(10 + index).padStart(2, "0")}`;
+        return { date, isToday: false, items: index >= 1 && index <= 3 ? [trip(date)] : ([] as CalendarItemView[]) };
+      });
+      view({ projection: projection({ days, itemCount: 3 }), query: query({ orientation: "week" }) });
+      const bars = document.querySelectorAll("table.calendar-week tr.calendar-span-row td.calendar-span-cell");
+      expect(bars).toHaveLength(1);
+      expect(bars[0].getAttribute("colspan")).toBe("3");
+      expect(screen.getAllByText("Viagem a Recife")).toHaveLength(1);
+    });
+
     it("says an empty week is empty once, not seven times", () => {
       view({ projection: projection({ days: weekDays() }), query: query({ orientation: "week" }) });
       expect(document.querySelectorAll(".calendar-empty")).toHaveLength(1);

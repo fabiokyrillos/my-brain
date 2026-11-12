@@ -19,14 +19,17 @@ import type { Locale } from "@/lib/preferences";
 
 import { getBirthdayCopy } from "./copy";
 import type { BirthdayProposal } from "./entry-birthdays";
-import { idleBirthdayState, type BirthdayAction } from "./state";
+import { idleBirthdayState, type BirthdayAction, type BirthdayActionState } from "./state";
 
 export function BirthdayProposals({
   action,
+  declineAction,
   locale,
   proposals,
 }: {
   action: BirthdayAction;
+  /** Life Brain D.3: the remembered "não, obrigado". */
+  declineAction: BirthdayAction;
   locale: Locale;
   proposals: readonly BirthdayProposal[];
 }) {
@@ -36,15 +39,20 @@ export function BirthdayProposals({
     <section aria-label={copy.proposalHeading} className="birthday-proposals">
       <h3>{copy.proposalHeading}</h3>
       {proposals.map((proposal) => (
-        <BirthdayProposalRow action={action} key={proposal.personId} locale={locale} proposal={proposal} />
+        <BirthdayProposalRow action={action} declineAction={declineAction} key={proposal.personId} locale={locale} proposal={proposal} />
       ))}
     </section>
   );
 }
 
-function BirthdayProposalRow({ action, locale, proposal }: { action: BirthdayAction; locale: Locale; proposal: BirthdayProposal }) {
+function BirthdayProposalRow({ action, declineAction, locale, proposal }: { action: BirthdayAction; declineAction: BirthdayAction; locale: Locale; proposal: BirthdayProposal }) {
   const copy = getBirthdayCopy(locale);
-  const [state, formAction, pending] = useActionState(action, idleBirthdayState);
+  // One state for both answers, routed by the button the owner pressed.
+  const [state, formAction, pending] = useActionState(
+    (previous: BirthdayActionState, formData: FormData) =>
+      formData.get("answer") === "decline" ? declineAction(previous, formData) : action(previous, formData),
+    idleBirthdayState,
+  );
   const done = state.status === "success";
   return (
     <div className="birthday-proposal">
@@ -60,7 +68,8 @@ function BirthdayProposalRow({ action, locale, proposal }: { action: BirthdayAct
           <input name="day" type="hidden" value={proposal.day} />
           <input name="month" type="hidden" value={proposal.month} />
           <input name="year" type="hidden" value={proposal.year ?? ""} />
-          <Button loading={pending} size="sm" type="submit" variant="primary">{pending ? copy.saving : copy.accept}</Button>
+          <Button loading={pending} name="answer" size="sm" type="submit" value="accept" variant="primary">{pending ? copy.saving : copy.accept}</Button>
+          <Button disabled={pending} name="answer" size="sm" type="submit" value="decline" variant="ghost">{copy.decline}</Button>
           <Link href={`/${locale}/app/people/${proposal.personId}`}>{copy.adjust(proposal.name)}</Link>
         </form>
       )}

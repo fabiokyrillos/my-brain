@@ -566,6 +566,47 @@ test.describe("Life Brain D.1: the period label opens a date picker", () => {
  * belongs in a browser: the defect it guards against is a table that stopped
  * being a table, and jsdom has no table layout algorithm to be wrong about.
  */
+/**
+ * Life Brain D.3 (ADR-167) — a trip from Tuesday to Thursday is one bar across
+ * three columns, mirroring `calendar-view.tsx`'s `SpanLane` above the week's
+ * cells.
+ */
+function weekWithBar(): string {
+  const days = ["seg., 10 ago.", "ter., 11 ago.", "qua., 12 ago.", "qui., 13 ago.", "sex., 14 ago.", "sáb., 15 ago.", "dom., 16 ago."];
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>${FONT_STUB}${css}</style></head><body><main>
+  <div class="content-page calendar-page"><section class="calendar">
+    <div class="calendar-week-scroll"><table class="calendar-week">
+      <caption class="sr-only">semana</caption>
+      <thead><tr>${days.map((day, index) => `<th scope="col"><a class="calendar-week-head" href="#"><span class="calendar-week-weekday">${day.split(",")[0]}</span><span class="calendar-week-day">${10 + index}</span></a></th>`).join("")}</tr></thead>
+      <tbody>
+        <tr class="calendar-span-row"><td class="calendar-span-gap" colspan="1"></td><td class="calendar-span-cell" colspan="3" data-continues-after="true"><ul class="calendar-day-items">${compact("Viagem a Recife")}</ul></td><td class="calendar-span-gap" colspan="3"></td></tr>
+        <tr>${days.map(() => "<td></td>").join("")}</tr>
+      </tbody>
+    </table></div>
+  </section></div></main></body></html>`;
+}
+
+test.describe("Life Brain D.3: a multi-day event is one bar", () => {
+  for (const width of [375, 1440]) {
+    test(`spans three columns and stays one line tall at ${width}px`, async ({ page: target }) => {
+      await target.setViewportSize({ width, height: 900 });
+      await target.setContent(weekWithBar(), { waitUntil: "load" });
+      const [bar, heads] = await Promise.all([
+        target.locator(".calendar-span-cell").boundingBox(),
+        target.locator(".calendar-week thead th").evaluateAll((cells) => cells.map((cell) => cell.getBoundingClientRect())),
+      ]);
+      expect(Math.abs(bar!.x - heads[1].x)).toBeLessThanOrEqual(1);
+      expect(Math.abs((bar!.x + bar!.width) - (heads[3].x + heads[3].width))).toBeLessThanOrEqual(1);
+      // The bar's row is the line's height, not a day cell's 8–10rem.
+      expect(bar!.height).toBeLessThan(120);
+      const radius = await target.locator(".calendar-span-cell .calendar-item").evaluate((node) => getComputedStyle(node).borderTopRightRadius);
+      expect(parseFloat(radius), "a bar that continues keeps a rounded end").toBe(0);
+    });
+  }
+});
+
 test.describe("the week is a grid, not seven columns sized by their contents", () => {
   test("seven equal columns, whichever day is busy", async ({ page: target }) => {
     await target.setViewportSize({ width: 1440, height: 900 });

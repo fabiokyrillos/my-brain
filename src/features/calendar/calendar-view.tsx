@@ -47,6 +47,7 @@ import { AGENDA_DATE_TOKEN } from "./agenda-date-picker";
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
+import { spanRows, type SpanCell } from "./calendar-spans";
 import {
   CALENDAR_LANES,
   CALENDAR_ORIENTATIONS,
@@ -117,6 +118,34 @@ function formatMonthLabel(anchor: LocalDate, locale: Locale): string {
  * test that asserts the overflow appears has to name the same number.
  */
 export const MONTH_CELL_ITEM_LIMIT = 3;
+
+/**
+ * Life Brain D.3 (ADR-167) — one lane of multi-day bars above a row of days.
+ * A gap is an empty cell; a bar is one cell `columns` wide holding the event's
+ * compact line, still rendered by `CalendarItem`.
+ */
+function SpanLane({ cells, locale, timezone }: { cells: readonly SpanCell[]; locale: Locale; timezone: string }) {
+  return (
+    <tr className="calendar-span-row">
+      {cells.map((cell, index) =>
+        cell.kind === "gap" ? (
+          <td className="calendar-span-gap" colSpan={cell.columns} key={`gap-${index}`} />
+        ) : (
+          <td
+            className="calendar-span-cell"
+            colSpan={cell.columns}
+            data-continues-after={cell.continuesAfter ? "true" : undefined}
+            data-continues-before={cell.continuesBefore ? "true" : undefined}
+            key={cell.item.id}
+          >
+            <ul className="calendar-day-items">
+              <CalendarItem density="compact" item={cell.item} locale={locale} timezone={timezone} />
+            </ul>
+          </td>
+        ))}
+    </tr>
+  );
+}
 
 export function CalendarView({
   dateBounds,
@@ -209,9 +238,33 @@ export function CalendarView({
     )
     : [];
 
-  /** The month's own days that have something in them — the phone's list. */
+  /*
+   * Life Brain D.3: every item the projection holds, so a bar knows whether its
+   * event continues outside the row it is drawn in.
+   */
+  const everything = projection.days.flatMap((day) => day.items);
+  const weekSpans = query.orientation === "week" ? spanRows(projection.days, everything) : null;
+  const monthSpans = weeks.map((week) => spanRows(week, everything));
+
+  /*
+   * The month's own days that have something in them — the phone's list. A
+   * multi-day event is listed on the first of its days in the month only.
+   */
+  const listedEvents = new Set<string>();
   const monthDaysWithItems = query.orientation === "month"
-    ? projection.days.filter((day) => day.inPeriod && day.items.length > 0)
+    ? projection.days
+      .filter((day) => day.inPeriod)
+      .map((day) => ({
+        ...day,
+        items: day.items.filter((item) => {
+          const row = /^event:([^:]+):/.exec(item.id)?.[1];
+          if (!row) return true;
+          if (listedEvents.has(row)) return false;
+          listedEvents.add(row);
+          return true;
+        }),
+      }))
+      .filter((day) => day.items.length > 0)
     : [];
 
   const failed = projection.failedLanes.map((failure) => copy.lanes.names[failure.lane]).join(", ");
@@ -392,7 +445,12 @@ export function CalendarView({
                 </tr>
               </thead>
               <tbody>
-                {weeks.map((week) => (
+                {weeks.map((rawWeek, weekIndex) => {
+                  const week = monthSpans[weekIndex].days;
+                  return [
+                  ...monthSpans[weekIndex].lanes.map((lane, laneIndex) => (
+                    <SpanLane cells={lane} key={`${rawWeek[0].date}-span-${laneIndex}`} locale={locale} timezone={projection.timezone} />
+                  )),
                   <tr key={week[0].date}>
                     {week.map((day) => {
                       const parsed = parseLocalDate(day.date);
@@ -463,8 +521,9 @@ export function CalendarView({
                         </td>
                       );
                     })}
-                  </tr>
-                ))}
+                  </tr>,
+                  ];
+                })}
               </tbody>
             </table>
           </div>
@@ -544,8 +603,11 @@ export function CalendarView({
                 </tr>
               </thead>
               <tbody>
+                {weekSpans?.lanes.map((lane, laneIndex) => (
+                  <SpanLane cells={lane} key={`span-${laneIndex}`} locale={locale} timezone={projection.timezone} />
+                ))}
                 <tr>
-                  {projection.days.map((day) => (
+                  {(weekSpans?.days ?? projection.days).map((day) => (
                     <td key={day.date} data-today={day.isToday ? "true" : undefined}>
                       {day.items.length === 0 ? null : (
                         <ul className="calendar-day-items">

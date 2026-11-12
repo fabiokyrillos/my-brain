@@ -730,7 +730,7 @@
 /* The timeline: the fact date in its own column on a wide screen, above the
    words on a phone. */
 .area-record { grid-template-columns: 7.5rem minmax(0, 1fr); column-gap: var(--space-4); align-items: baseline; }
-@media (max-width: 599px) { .area-record { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) { .area-record { grid-template-columns: minmax(0, 1fr); } }
 
 .area-in-period { margin-top: var(--space-2); }
 .area-in-period > summary {
