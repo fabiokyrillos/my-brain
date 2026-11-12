@@ -65,7 +65,7 @@ Migrations: **3 alocadas** (LB-M1 em C.1, LB-M3 em B.3, LB-M2 em C.3). Uma quart
 ### A.6 — Ajustes, Avançado e regressão visual (1 d)
 
 - Ajustes com seções em `ListItem` no celular e "Avançado" agrupando Histórico, Uso de IA, Em andamento; lane `toHaveScreenshot` para Hoje, Conversar, Tarefas, Agenda nos dois temas; remoção dos seletores superados e consolidação de breakpoints.
-- **Parte 1 implementada 2026-11-05:** Ajustes com `PageHeader compact` (sem eyebrow nem ternário); no celular as seções viram linhas de lista entre divisórias (a ativa marcada por uma borda à esquerda, não só por cor); grupo **Avançado** com Histórico, Custos de IA e Em andamento (links, nunca seções; os nomes são os do menu). **Parte 2 implementada 2026-11-05:** os 28 usos de `button-primary/secondary` migrados para o `Button`, um formulário por commit, e as classes removidas. Ficavam: os 28 usos de `button-primary/secondary` em seis formulários (cada um com largura e margem próprias no CSS — trocar sem revisão visual de cada um é arriscado), a lane `toHaveScreenshot` (baselines dependem do sistema; precisam de um runner fixo) e a consolidação de breakpoints.
+- **Parte 1 implementada 2026-11-05:** Ajustes com `PageHeader compact` (sem eyebrow nem ternário); no celular as seções viram linhas de lista entre divisórias (a ativa marcada por uma borda à esquerda, não só por cor); grupo **Avançado** com Histórico, Custos de IA e Em andamento (links, nunca seções; os nomes são os do menu). **Parte 2 implementada 2026-11-05:** os 28 usos de `button-primary/secondary` migrados para o `Button`, um formulário por commit, e as classes removidas. **Depois da parte 2 ficaram** a lane `toHaveScreenshot` — entregue em seguida, num runner fixo de CI (ADR-159; limite de 25 pixels pela ADR-162) — e a consolidação de breakpoints, que passa para a D.3 (§5). *(Correção de 2026-11-12: este parágrafo dizia que os 28 usos tinham sido migrados e, na frase seguinte, que eles "ficavam". A segunda frase era a lista de pendências de **antes** da parte 2 e não tinha sido apagada.)*
 
 ## 2. Trilha B — Conversar com a memória
 
@@ -232,4 +232,45 @@ quatro respostas recomendadas e autorizou **uma** migration (cache e telemetria 
 | B.5 | B | 1,5 | — | um composer, voz no chat |
 | B.6 | B | 1 | — | streaming |
 | B.7 | B | 2 | 1 (telemetria) | chips que preenchem, sugestões por data e estado |
-| **Total** | | **≈ 25 d** | 3 (+1 condicional) alocadas · **5 gastas** | M1, M2, M3, M4 e a de telemetria da B.7 (ADR-161) |
+| B.8 | B | 2 | 1 (cache + telemetria) | o modelo escolhe as sugestões do dia |
+| **Total da ordem** | | **≈ 27 d** | 3 (+1 condicional) alocadas · **6 gastas** | M1 `202611040104`, M3 `202611040105`, M2 `202611040106`, M4 `202611050107`, a de telemetria da B.7 `202611060108` (ADR-161) e a de cache da B.8 `202611090109` (ADR-163) — todas aplicadas no hospedado |
+| D.1 | D | 3 | — | Agenda com seletor de data, semana em grade, Planejar explicado, lembrete enxuto |
+| D.2 | D | 3 | — (uma só com autorização escrita) | Notificações que esvaziam, abas que mostram que há mais, Pessoas agrupadas, Organização criada de onde se está |
+| D.3 | D | 1,5 | — | ⌘K no Mac, sem "nan", "não, obrigado" lembrado, evento de vários dias como barra, breakpoints consolidados |
+| **Total com §5** | | **≈ 34,5 d** | 6 gastas · **nenhuma alocada para a §5** | uma sétima é condição de parada, como as anteriores |
+
+*(Correção de 2026-11-12: a tabela não listava a B.8 e dizia "5 gastas" quando já eram seis, contando a `202611090109`.)*
+
+## 5. Depois da ordem
+
+Acrescentada em 2026-11-12 (ADR-164). **Origem:** `docs/reports/life-brain/FEEDBACK_DONO_2026-11-05.md`, os temas T2, T3 e T5 e o que sobrou dos defeitos pequenos, mais três itens abertos do `TODO.md`. As slices A.4 e A.5 entregaram a estrutura dessas telas, mas o texto delas não nomeava nenhuma das reclamações abaixo, e o código confirma que nenhuma foi atendida. A ordem da §0 não muda: a trilha D vem depois dela.
+
+Regras comuns às três: um PR por slice, branch `life-brain/<slice>`, teste antes do código, lint, typecheck, testes e build zerados, Playwright em desktop e mobile, `STATE`/`CHANGELOG`/`TODO` no mesmo PR e uma ADR por decisão. **Nenhuma migration está alocada para a trilha D**; se uma slice precisar de uma, ela para e pede autorização escrita do dono. Nada é aplicado no hospedado e nada é mesclado sem pedido explícito.
+
+### D.1 — Agenda (tema T2, 3 d)
+
+- **Seletor de data.** O rótulo do período no cabeçalho (`src/features/calendar/agenda-header.tsx`, hoje um `<p>`) passa a abrir um seletor; as setas deixam de ser a única forma de navegar.
+- **A semana parece uma semana.** Grade de sete colunas, tipo agenda, em vez da lista por dia.
+- **Planejar diz o que "planejado" significa** e é redesenhada: checkbox alinhado ao rótulo, nada em monoespaçada, sem o cartão aninhado com um "Aplicar" por tarefa (`src/app/[locale]/app/calendar/plan/page.tsx`).
+- **Cartão de lembrete com no máximo 3 controles visíveis**, o resto atrás de um "mais" (`src/features/reminders/reminder-actions.tsx`, `series-controls.tsx`).
+- **Aceite:** screenshots antes/depois em `docs/reports/life-brain/evidence/slice-d1/`, iPhone e desktop, claro e escuro; as baselines da ADR-159 de Agenda redesenhadas no runner.
+
+### D.2 — Listas e Notificações (temas T3 e T5, 3 d)
+
+- **Notificações esvaziam:** "marcar todas como lidas" e "limpar lidas", com auditoria e desfazer (regra de ação automática reversível do `ENGINEERING_STANDARDS.md`).
+- **As abas da Memória mostram que há mais** (`src/app/brain.css`, `.brain-lenses` com a barra de rolagem escondida).
+- **Pessoas sem a frase fixa** "Aparece no seu contexto" (`src/features/library/copy.ts`) e agrupadas de forma útil, com um critério proposto a partir do que o banco já sabe — não inventado.
+- **Criar uma Organização sem ir até a página dela.**
+- **O menu "⋯" de cada aviso enxuto** (hoje seis opções, cada uma com um parágrafo).
+
+### D.3 — Pequenos restos (1,5 d)
+
+- `Ctrl+K` aparece como `⌘K` num Mac (`src/features/palette/copy.ts`).
+- O `nan` que aparece em Ajustes.
+- A oferta de aniversário ganha um "não, obrigado" que fica lembrado.
+- Um evento de vários dias vira uma barra na semana e no mês, em vez de repetir em cada dia.
+- Consolidação de breakpoints (599, 600, 899 e 900 px convivem hoje).
+
+### Fora de escopo até o dono decidir
+
+O redesenho de Ajustes (T4), a relação tipada entre pessoas (T6, exige schema), "organizar memórias como o Claude faz" (exige uma referência do dono), a B.6 (streaming), as decisões LB-OD-3, LB-OD-4 e LB-OD-7, a regra do `LB-B-008` e se a lente Relações sai da Memória.
