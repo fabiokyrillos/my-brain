@@ -1,5 +1,15 @@
 # Technical Changelog
 
+## 2026-11-12 — Life Brain D.3: small remainders (ADR-167)
+
+- **No migration.**
+- **⌘K:** `palette/shortcut-hint.ts` (`isApplePlatform`, `useApplePlatform` via `useSyncExternalStore`); `triggerHint` is `{ apple, other }`.
+- **"nan" in Ajustes:** a false positive of the evidence instrument — "Fernando de Noronha" in the time-zone select. `online-life-brain-baseline.spec.ts` now matches whole words and records `technicalContexts`; re-measured, none.
+- **Birthday offer:** `declineBirthdayOffer` records `birthday_offer_declined` in `audit_logs` (person, day, month); `loadEntryBirthdayProposals` drops a declined date (`withoutDeclined`); "Não, obrigado" beside "Guardar aniversário". History vocabulary: `birthday_offer_declined` → answered; `birthdays/actions.ts` joins the declared `audit_logs` writers.
+- **Multi-day events:** `calendar/calendar-spans.ts` (`spanRows`) — one bar per event per row in the week and the month, stacked lanes, continuation marked; the month list shows the event on its first day.
+- **Breakpoints:** `max-width: 599px` → 600px (2), `max-width: 900px` → 899px (5); `breakpoint-guard.test.ts`.
+- **Tests:** `shortcut-hint.test.tsx`, `calendar-spans.test.ts`, `breakpoint-guard.test.ts`, decline cases in the birthday tests, the bar case in `calendar-view.test.tsx` and `e2e/calendar.spec.ts`.
+
 ## 2026-11-12 — Life Brain D.2: lists and notices (ADR-166)
 
 - **No migration.**
