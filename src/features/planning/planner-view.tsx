@@ -58,6 +58,7 @@ import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
 import { AgendaHeader, AgendaStepper } from "@/features/calendar/agenda-header";
+import { AGENDA_DATE_TOKEN } from "@/features/calendar/agenda-date-picker";
 import { BulkBar, type BulkCommandHandler } from "@/features/operations/bulk-bar";
 import { getWorkCopy } from "@/features/operations/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -104,6 +105,7 @@ export function PlannerView({
   dayHrefBase,
   locale,
   projection,
+  today,
   undoAction,
 }: {
   action: TaskDetailCommandHandler;
@@ -113,6 +115,8 @@ export function PlannerView({
   dayHrefBase: string;
   locale: Locale;
   projection: PlannerProjection;
+  /** `YYYY-MM-DD` in the owner's zone, so the date picker can mark today. */
+  today?: string;
   undoAction?: TaskUndoHandler;
 }) {
   const copy = getPlannerCopy(locale);
@@ -174,18 +178,28 @@ export function PlannerView({
    * never derived for.
    */
   function Row({ item, operation }: { item: PlannerItem; operation: "set" | "cleared" }) {
-    const controls = plannedControlsFor(item.status);
+    /*
+     * Life Brain D.1. One verb per row, and the one the list is about: an
+     * available task is planned for **this** day, a planned one leaves it.
+     * Moving a task to another day is the task's own page (or the bulk bar),
+     * not a date field under every row.
+     */
+    const verb = operation === "set" ? "set_planned" : "clear_planned";
+    const controls = plannedControlsFor(item.status).filter((control) => control.action === verb);
     return (
       <li className="planner-item" data-operation={operation} key={item.taskId}>
         <div className="planner-item-head">
           {operation === "set" ? (
-            <input
-              aria-label={item.title}
-              checked={isSelected(selection, item.taskId)}
-              className="planner-select"
-              onChange={() => changeSelection(toggleSelected(selection, item.taskId))}
-              type="checkbox"
-            />
+            // The label is the 44px target and sits on the title's first line.
+            <label className="planner-select-label">
+              <input
+                aria-label={item.title}
+                checked={isSelected(selection, item.taskId)}
+                className="planner-select"
+                onChange={() => changeSelection(toggleSelected(selection, item.taskId))}
+                type="checkbox"
+              />
+            </label>
           ) : null}
           {/*
             The title is never rendered directly. `surface="calendar"` because
@@ -193,33 +207,40 @@ export function PlannerView({
             surface — a second surface name would be a vocabulary entry nothing
             declared.
           */}
-          <ProtectedContent
-            href={item.href}
-            locale={locale}
-            revealKey={item.taskId}
-            sensitivity={item.sensitivity}
-            surface="calendar"
-          >
-            {item.title}
-          </ProtectedContent>
+          {/* One flex item, whatever `ProtectedContent` renders (a bare text node
+              when nothing is withheld), so the title never wraps under the box. */}
+          <span className="planner-item-title">
+            <ProtectedContent
+              href={item.href}
+              locale={locale}
+              revealKey={item.taskId}
+              sensitivity={item.sensitivity}
+              surface="calendar"
+            >
+              {item.title}
+            </ProtectedContent>
+          </span>
         </div>
-        <p className="planner-item-meta">
-          {item.plannedAt
-            ? `${plannedCopy.prefix} ${formatPlannedDay(item.plannedAt, locale, projection.timezone)}`
-            : plannedCopy.none}
-        </p>
+        {/* The pool is the tasks with no day: saying so on every row said nothing. */}
+        {item.plannedAt ? (
+          <p className="planner-item-meta">
+            {`${plannedCopy.prefix} ${formatPlannedDay(item.plannedAt, locale, projection.timezone)}`}
+          </p>
+        ) : null}
         {controls.length > 0 ? (
           <div className="planner-item-controls">
           <TaskDetailControls
             action={reporting(action, operation)}
             controls={controls}
             dateBounds={dateBounds}
+            defaultValues={{ set_planned: projection.day }}
             locale={locale}
             relationOptions={NO_RELATIONS}
             renderResult={false}
+            submitLabels={{ set_planned: copy.planHere, clear_planned: copy.removeHere }}
             taskId={item.taskId}
             title={item.title}
-            variant="inline"
+            variant="preset"
           />
           </div>
         ) : null}
@@ -244,12 +265,21 @@ export function PlannerView({
             className="planner-day-nav"
             locale={locale}
             next={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, 1)}`, label: copy.nextDay }}
+            picker={{
+              hrefTemplate: `${dayHrefBase}?date=${AGENDA_DATE_TOKEN}`,
+              min: dateBounds.min,
+              max: dateBounds.max,
+              selected: projection.day,
+              today: today ?? (projection.isToday ? projection.day : ""),
+            }}
             previous={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, -1)}`, label: copy.previousDay }}
             rangeLabel={`${dayLabel(projection.day, locale)}${projection.isToday ? ` · ${copy.today}` : ""}`}
             today={{ href: dayHrefBase, label: copy.today }}
           />
         )}
       />
+      {/* Life Brain D.1: what "planned" means, before any number about it. */}
+      <p className="planner-meaning">{copy.meaning}</p>
       <p className="quiet-state planner-guarantee">{copy.createsNothing}</p>
 
       {/*
@@ -328,6 +358,7 @@ export function PlannerView({
 
       <section aria-label={copy.available} className="planner-list">
         <h2>{copy.available}</h2>
+        <p className="quiet-state planner-list-hint">{copy.availableHint}</p>
         {projection.available.length === 0 ? (
           <UniversalStateLine description={copy.availableEmpty} locale={locale} state="empty" />
         ) : (

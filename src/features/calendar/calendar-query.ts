@@ -290,6 +290,23 @@ export function calendarHref(locale: string, query: CalendarQuery): string {
 }
 
 /**
+ * Life Brain D.1 — this position's href with `token` where the date goes, for
+ * the date picker to fill in client-side. Same parameters, same order.
+ */
+export function calendarHrefTemplate(locale: string, query: CalendarQuery, token: string): string {
+  const search = new URLSearchParams({ ...toCalendarQueryParams(query), date: token }).toString();
+  return `/${locale}/app/calendar?${search}`;
+}
+
+/** The declared bound (`2M-CAL-006`) as the picker's `min` and `max`. */
+export function calendarBound(today: LocalDate): { readonly min: string; readonly max: string } {
+  return {
+    min: formatLocalDate(addLocalDays(today, -CALENDAR_BOUND_DAYS)),
+    max: formatLocalDate(addLocalDays(today, CALENDAR_BOUND_DAYS)),
+  };
+}
+
+/**
  * The anchor one step earlier or later, **clamped to the bound**.
  *
  * Clamped rather than refused, so the control still moves the user to the last

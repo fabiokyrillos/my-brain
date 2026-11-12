@@ -94,6 +94,18 @@ type ReminderCopy = {
    */
   readonly independent: string;
   readonly historyLink: string;
+  /**
+   * Life Brain D.1 — the card's three visible controls and the menu behind them.
+   * `snoozeQuick` is the one-tap snooze (an hour); every other duration waits in
+   * the menu under `snoozeFor`.
+   */
+  readonly card: {
+    readonly snoozeQuick: string;
+    readonly snoozeFor: string;
+    readonly more: string;
+    readonly moreLabel: string;
+    readonly openSubject: (label: string) => string;
+  };
 
   /**
    * `2P-REMINDER-001`/`-002` — the creation dialog's words.
@@ -378,6 +390,13 @@ const COPY = {
     linkedEntry: "Registro vinculado",
     independent: "Sem vínculo",
     historyLink: "Ver no histórico",
+    card: {
+      snoozeQuick: "Adiar 1 hora",
+      snoozeFor: "Adiar por",
+      more: "Mais",
+      moreLabel: "Mais ações deste lembrete",
+      openSubject: (label) => `Abrir: ${label}`,
+    },
 
     creation: {
       open: "Novo lembrete",
@@ -744,6 +763,13 @@ const COPY = {
       failed: "Could not change it right now. Try again.",
     },
     historyLink: "See in history",
+    card: {
+      snoozeQuick: "Snooze 1 hour",
+      snoozeFor: "Snooze for",
+      more: "More",
+      moreLabel: "More actions for this reminder",
+      openSubject: (label) => `Open: ${label}`,
+    },
 
     cancelConfirmTitle: "Cancel this reminder?",
     cancelConfirmBody:

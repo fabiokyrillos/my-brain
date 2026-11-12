@@ -220,6 +220,77 @@
   color: var(--tone-risk-fg);
 }
 
+/*
+ * Life Brain D.1 — "Mais": everything past the card's three visible controls.
+ *
+ * A `<details>` whose panel floats under the trigger, right-aligned; its items
+ * are full-width rows, 44px tall, so the menu reads as a list rather than as a
+ * second row of buttons.
+ */
+.reminder-snooze-quick { display: flex; }
+.reminder-action-row .reminder-button { white-space: nowrap; }
+
+.reminder-more {
+  position: relative;
+  flex: none;
+}
+
+.reminder-more-trigger { list-style: none; }
+/* The panel's own `display` would otherwise lay it out while the menu is closed. */
+.reminder-more:not([open]) > .reminder-more-panel { display: none; }
+.reminder-more-trigger::-webkit-details-marker { display: none; }
+.reminder-more[open] > .reminder-more-trigger { background: var(--background-subtle-strong); }
+
+.reminder-more-panel {
+  position: absolute;
+  z-index: var(--z-sheet);
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: min(20rem, calc(100vw - 2 * var(--gutter, 16px)));
+  padding: 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
+}
+
+.reminder-more-panel .reminder-snooze {
+  padding: 4px 4px 8px;
+  border-bottom: 1px solid var(--border-divider);
+  margin-bottom: 4px;
+}
+
+.reminder-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-primary);
+  font: var(--type-body);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.reminder-menu-item:hover { background: var(--background-subtle); }
+.reminder-menu-item.danger { color: var(--tone-risk-fg); }
+
+/* The rule's controls inside the menu: rows, not a second button bar. */
+.reminder-more-panel .reminder-series { margin: 0; padding: 4px 0; border-top: 1px solid var(--border-divider); }
+.reminder-more-panel .reminder-series .reminder-action-row { flex-direction: column; align-items: stretch; gap: 2px; }
+.reminder-more-panel .reminder-series .reminder-button { justify-content: flex-start; border: 0; background: none; font: var(--type-body); }
+.reminder-more-panel .reminder-series-hint { margin: 4px 10px; font: var(--type-caption); color: var(--text-muted); }
+
+.reminder-subject-text { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+
 .reminder-panel {
   display: grid;
   gap: 10px;
@@ -675,10 +746,18 @@
 }
 
 @media (max-width: 480px) {
+  /* Life Brain D.1: three controls on one row — the two verbs share the width,
+     "Mais" keeps its own. Stacking each at full width was most of the card's
+     height. */
+  .reminder-action-row { flex-wrap: nowrap; }
   .reminder-action-row > form,
   .reminder-action-row > button {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-width: 0;
   }
+  .reminder-action-row .reminder-button { padding: 0 10px; }
+  .reminder-action-row > form > .reminder-button { width: 100%; }
+  .reminder-more-panel { inset-inline-end: 0; }
 
   .reminder-snooze {
     width: 100%;

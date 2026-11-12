@@ -159,7 +159,84 @@ describe("only the actions the state accepts are rendered", () => {
 
   it("labels the snooze select so it has an accessible name", () => {
     renderList([reminder()]);
-    expect(screen.getByLabelText("Adiar")).toBeInTheDocument();
+    expect(screen.getByLabelText("Adiar por")).toBeInTheDocument();
+  });
+});
+
+/*
+ * Life Brain D.1 (T2, V1 3:30: "está tão grande esse cartão. Deveria ser bem
+ * melhor … bem mais minimalista"). A card counted up to ~18 controls between
+ * `reminder-actions.tsx` and `series-controls.tsx`. At most three are visible;
+ * the rest wait behind "Mais".
+ */
+describe("Life Brain D.1: a reminder card shows at most three controls", () => {
+  /** Interactive elements a sighted owner sees without opening anything. */
+  function visibleControls(card: HTMLElement): HTMLElement[] {
+    const all = Array.from(card.querySelectorAll<HTMLElement>(
+      "a[href], button, select, textarea, input:not([type='hidden']), summary",
+    ));
+    return all.filter((node) => {
+      const closed = node.closest("details:not([open])");
+      // A closed `<details>` shows its summary and nothing else.
+      return closed === null || node.tagName === "SUMMARY" && node.parentElement === closed;
+    });
+  }
+
+  const busiest = () => reminder({
+    link: { kind: "task", href: "/pt-BR/app/work/task-1", label: "Fechar o balanço" },
+    series: {
+      id: "77777777-7777-4777-8777-777777777777",
+      active: true,
+      detached: false,
+      sequence: 4,
+      description: "Todo dia 5 de junho",
+    },
+  });
+
+  it("the busiest card — scheduled, linked, repeating, every action — shows three", () => {
+    const { container } = renderList([busiest()]);
+    const card = container.querySelector("article") as HTMLElement;
+    const shown = visibleControls(card);
+    expect(shown.length).toBeLessThanOrEqual(3);
+    expect(shown.map((node) => node.textContent?.trim())).toEqual(["Adiar 1 hora", "Reagendar", "Mais"]);
+  });
+
+  it("keeps everything else one tap away, behind 'Mais'", () => {
+    const { container } = renderList([busiest()]);
+    const more = container.querySelector("details.reminder-more") as HTMLElement;
+    expect(within(more).getByRole("button", { name: /Editar$/ })).toBeInTheDocument();
+    expect(within(more).getByRole("button", { name: "Cancelar lembrete" })).toBeInTheDocument();
+    expect(within(more).getByLabelText("Adiar por")).toBeInTheDocument();
+    expect(within(more).getByRole("link", { name: /Fechar o balanço/ })).toBeInTheDocument();
+    expect(within(more).getByRole("link", { name: /Ver no histórico/ })).toBeInTheDocument();
+    expect(within(more).getByRole("button", { name: /Alterar repetição/ })).toBeInTheDocument();
+  });
+
+  it("still says, without opening anything, when it fires, that it repeats and what it is tied to", () => {
+    const { container } = renderList([busiest()]);
+    const card = container.querySelector("article") as HTMLElement;
+    const visibleText = (node: HTMLElement) => node.closest("details:not([open])") === null;
+    expect(visibleText(within(card).getByText("Todo dia 5 de junho"))).toBe(true);
+    expect(visibleText(within(card).getAllByText(/Fechar o balanço/)[0])).toBe(true);
+    // And it does not repeat itself: "vai disparar no horário" is the line above.
+    expect(within(card).queryByText(getReminderCopy("pt-BR").statusHint.scheduled)).toBeNull();
+  });
+
+  it("snoozes for an hour in one tap", async () => {
+    const user = userEvent.setup();
+    const { container } = renderList([reminder()]);
+    const quick = screen.getByRole("button", { name: "Adiar 1 hora" });
+    const form = quick.closest("form") as HTMLFormElement;
+    expect(new FormData(form).get("snoozeMinutes")).toBe("60");
+    expect(new FormData(form).get("action")).toBe("snooze");
+    await user.click(quick);
+    expect(container).toBeTruthy();
+  });
+
+  it("a cancelled reminder shows its one verb and the menu", () => {
+    const { container } = renderList([reminder({ status: "cancelled", hasPendingDelivery: false, actions: ["restore"] })]);
+    const shown = visibleControls(container.querySelector("article") as HTMLElement);
+    expect(shown.map((node) => node.textContent?.trim())).toEqual(["Reativar", "Mais"]);
   });
 });
 

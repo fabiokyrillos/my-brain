@@ -77,7 +77,21 @@ const MAX_LENGTH_BY_FIELD: Partial<Record<TaskCommandPatchField, number>> = {
  * add or remove a verb would be the second copy this prop exists to avoid, so
  * everything below the frame is shared verbatim.
  */
-export type TaskDetailControlsVariant = "section" | "inline";
+export type TaskDetailControlsVariant = "section" | "inline" | "preset";
+
+/*
+ * Life Brain D.1 — `preset` is a row whose value the surface already knows.
+ *
+ * Planejar is anchored on a day, so "plan this task" has exactly one answer:
+ * this day. Rendering a date field (empty, unlabelled on a phone) and an
+ * "Aplicar" under every task asked the owner to type what the page already
+ * said. Under `preset`, a control whose action has a `defaultValues` entry
+ * submits that value as a hidden field, and every control is one button with
+ * the surface's own label (`submitLabels`). The same bar as `inline`: it changes
+ * no control, no eligibility and no intent — the caller chooses the controls,
+ * and every gate below (`buildDetailPatch`, `validateTaskCommand`,
+ * `apply_task_command`) runs unchanged on the value it sends.
+ */
 
 /**
  * A value the *surface* proposes for a control, per action.
@@ -105,6 +119,7 @@ export function TaskDetailControls({
   relationOptions,
   dateBounds,
   variant = "section",
+  submitLabels,
   undoAction,
   renderResult = true,
 }: {
@@ -119,6 +134,8 @@ export function TaskDetailControls({
   relationOptions: TaskDetailRelationOptions;
   dateBounds: TaskDetailDateBounds;
   variant?: TaskDetailControlsVariant;
+  /** Life Brain D.1. Under `preset`, the button's words per action. */
+  submitLabels?: Partial<Record<TaskCommandAction, string>>;
   /** `2L-EDIT-008`. Injected like every other action this component calls. */
   undoAction?: TaskUndoHandler;
   /**
@@ -275,12 +292,17 @@ export function TaskDetailControls({
   }
 
   const framed = variant === "section";
+  const preset = variant === "preset";
   const Frame = framed ? "section" : "div";
 
   return (
     <Frame
       aria-label={copy.sectionTitle}
-      className={framed ? "task-detail-section task-detail-controls" : "task-detail-controls task-detail-controls-inline"}
+      className={framed
+        ? "task-detail-section task-detail-controls"
+        : preset
+          ? "task-detail-controls task-detail-controls-inline task-detail-controls-preset"
+          : "task-detail-controls task-detail-controls-inline"}
     >
       {framed ? <h2>{copy.sectionTitle}</h2> : null}
       {framed ? <p className="quiet-state">{copy.sectionHint}</p> : null}
@@ -310,11 +332,24 @@ export function TaskDetailControls({
               <form action={formAction}>
                 {hiddenFields(control.action, intent)}
 
-                {control.field === null ? null : (
+                {preset ? (
+                  <>
+                    {proposed === undefined ? null : <input type="hidden" name="value" value={proposed} />}
+                    <button
+                      className={control.destructive ? "row-action row-action-destructive" : "row-action"}
+                      disabled={pending}
+                      type="submit"
+                    >
+                      {submitLabels?.[control.action] ?? label}
+                    </button>
+                  </>
+                ) : null}
+
+                {preset || control.field === null ? null : (
                   <label htmlFor={inputId}>{copy.fields[control.field]}</label>
                 )}
 
-                {control.kind === "text" && control.field !== null ? (
+                {!preset && control.kind === "text" && control.field !== null ? (
                   LONG_FIELDS.includes(control.field) ? (
                     <textarea
                       defaultValue={proposed}
@@ -336,7 +371,7 @@ export function TaskDetailControls({
                   )
                 ) : null}
 
-                {control.kind === "date" ? (
+                {!preset && control.kind === "date" ? (
                   // `type="date"` emits `YYYY-MM-DD`, which is exactly the one
                   // temporal shape `explicit_date` resolves — and it resolves it
                   // in the caller's own zone, so the control never sends an
@@ -352,7 +387,7 @@ export function TaskDetailControls({
                   />
                 ) : null}
 
-                {control.kind === "choice" && control.choices !== null ? (
+                {!preset && control.kind === "choice" && control.choices !== null ? (
                   <select
                     defaultValue={proposed !== undefined && control.choices.includes(proposed) ? proposed : ""}
                     id={inputId}
@@ -367,7 +402,7 @@ export function TaskDetailControls({
                   </select>
                 ) : null}
 
-                {control.kind === "relation" && options !== null && control.relation !== null ? (
+                {!preset && control.kind === "relation" && options !== null && control.relation !== null ? (
                   empty ? (
                     <UniversalStateLine description={copy.relationEmpty[control.relation]} locale={locale} state="empty" />
                   ) : (
@@ -385,15 +420,17 @@ export function TaskDetailControls({
                   )
                 ) : null}
 
-                <button
-                  className={control.destructive ? "row-action row-action-destructive" : "row-action"}
-                  disabled={pending || empty}
-                  type="submit"
-                >
-                  {control.field === null || control.destructive ? label : copy.submit}
-                </button>
+                {preset ? null : (
+                  <button
+                    className={control.destructive ? "row-action row-action-destructive" : "row-action"}
+                    disabled={pending || empty}
+                    type="submit"
+                  >
+                    {control.field === null || control.destructive ? label : copy.submit}
+                  </button>
+                )}
 
-                {control.field === null || control.destructive ? null : (
+                {preset || control.field === null || control.destructive ? null : (
                   <span className="task-control-name">{label}</span>
                 )}
               </form>

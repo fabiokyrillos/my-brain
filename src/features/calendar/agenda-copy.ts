@@ -17,6 +17,16 @@ export type AgendaHeaderCopy = {
   readonly lensesLabel: string;
   readonly lenses: Record<AgendaLens, string>;
   readonly stepperLabel: string;
+  /** Life Brain D.1 — the period label opens a date picker. */
+  readonly datePicker: {
+    readonly open: (period: string) => string;
+    readonly label: string;
+    readonly previousMonth: string;
+    readonly nextMonth: string;
+    /** Monday first, as every grid in the Agenda. */
+    readonly weekdays: readonly string[];
+    readonly outsideBound: string;
+  };
 };
 
 const AGENDA_HEADER_COPY = {
@@ -25,12 +35,28 @@ const AGENDA_HEADER_COPY = {
     lensesLabel: "Lentes da agenda",
     lenses: { calendar: "Calendário", plan: "Planejar", reminders: "Lembretes" },
     stepperLabel: "Navegar pelas datas",
+    datePicker: {
+      open: (period) => `${period}. Escolher uma data`,
+      label: "Escolher uma data",
+      previousMonth: "Mês anterior",
+      nextMonth: "Próximo mês",
+      weekdays: ["S", "T", "Q", "Q", "S", "S", "D"],
+      outsideBound: "fora do período que a agenda cobre",
+    },
   },
   en: {
     title: "Agenda",
     lensesLabel: "Agenda lenses",
     lenses: { calendar: "Calendar", plan: "Plan", reminders: "Reminders" },
     stepperLabel: "Move through dates",
+    datePicker: {
+      open: (period) => `${period}. Choose a date`,
+      label: "Choose a date",
+      previousMonth: "Previous month",
+      nextMonth: "Next month",
+      weekdays: ["M", "T", "W", "T", "F", "S", "S"],
+      outsideBound: "outside the range the agenda covers",
+    },
   },
 } as const satisfies Record<Locale, AgendaHeaderCopy>;
 

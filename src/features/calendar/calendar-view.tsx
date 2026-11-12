@@ -43,6 +43,7 @@ import { Badge, SegmentedControl, buttonVariants } from "@/components/ui";
 import { SlidersHorizontal } from "lucide-react";
 
 import { AgendaHeader, AgendaStepper } from "./agenda-header";
+import { AGENDA_DATE_TOKEN } from "./agenda-date-picker";
 import type { CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
@@ -50,7 +51,9 @@ import {
   CALENDAR_LANES,
   CALENDAR_ORIENTATIONS,
   boundState,
+  calendarBound,
   calendarHref,
+  calendarHrefTemplate,
   isNarrowed,
   rangeDayCount,
   rangeStart,
@@ -82,6 +85,14 @@ function formatDayLabel(date: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, {
     weekday: "short", day: "2-digit", month: "short", timeZone: "UTC",
   }).format(instant);
+}
+
+/** Life Brain D.1 — the week column's short weekday ("seg."), from the date's own parts. */
+function formatWeekdayLabel(date: string, locale: Locale): string {
+  const parsed = parseLocalDate(date);
+  if (!parsed) return date;
+  const instant = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, 12));
+  return new Intl.DateTimeFormat(locale, { weekday: "short", timeZone: "UTC" }).format(instant);
 }
 
 /**
@@ -248,6 +259,12 @@ export function CalendarView({
             className="calendar-navigation"
             locale={locale}
             next={{ href: calendarHref(locale, step(query, 1, today)), label: copy.navigation.next, disabled: bound.atLatest }}
+            picker={{
+              hrefTemplate: calendarHrefTemplate(locale, query, AGENDA_DATE_TOKEN),
+              ...calendarBound(today),
+              selected: formatLocalDate(query.anchor),
+              today: formatLocalDate(today),
+            }}
             previous={{ href: calendarHref(locale, step(query, -1, today)), label: copy.navigation.previous, disabled: bound.atEarliest }}
             rangeClassName="calendar-range"
             rangeLabel={rangeLabel}
@@ -366,7 +383,7 @@ export function CalendarView({
         <>
           <div className="calendar-month-scroll">
             <table className="calendar-month">
-              <caption className="visually-hidden">{copy.month.gridLabel(rangeLabel)}</caption>
+              <caption className="sr-only">{copy.month.gridLabel(rangeLabel)}</caption>
               <thead>
                 <tr>
                   {copy.month.weekdays.map((weekday) => (
@@ -489,61 +506,67 @@ export function CalendarView({
         </>
       ) : query.orientation === "week" ? (
         /*
-          The scroll container is the **table's parent**, not the table.
+          Life Brain D.1 — the week at a glance (T2: "como se fosse no Google
+          Calendar, que você realmente vê a semana").
 
-          `overflow-x` needs a block box, and the previous rule got one by
-          putting `display:block` on the `<table>` itself. That replaces the
-          table box with a block box and hands the rows to an anonymous table
-          wrapper, so `table-layout: fixed` was inert and the seven columns were
-          sized by their contents: a week with one busy Tuesday rendered as one
-          wide column and six narrow ones, on every viewport, and `min-width`
-          was the only thing keeping them legible.
-
-          With the overflow on a wrapper the table is a table again — seven
-          equal columns that line up with their headers, and a container that
-          scrolls only when the viewport is narrower than the grid's own floor.
-          The `<table>`, `<thead>`, `<th scope="col">` and `<caption>` are
-          untouched, so `2M-ACCESS-002` is unchanged.
+          Still a `<table>` (`2M-ACCESS-002`): seven equal columns that fit the
+          viewport at every width, with no horizontal scroll and no floor that
+          forces one. Each column holds **compact** lines — time, title, lane —
+          and its heading is a link into that day, where the full cards and their
+          controls live. An empty week says so once, above the grid; an empty
+          column is an empty column.
         */
-        <div className="calendar-week-scroll">
-          <table className="calendar-week">
-            <caption className="visually-hidden">{rangeLabel}</caption>
-            <thead>
-              <tr>
-                {projection.days.map((day) => (
-                  <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
-                    <span className="calendar-week-day">{formatDayLabel(day.date, locale)}</span>
-                    {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                {projection.days.map((day) => (
-                  <td key={day.date} data-today={day.isToday ? "true" : undefined}>
-                    {day.items.length === 0 ? (
-                      <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
-                    ) : (
-                      <ul className="calendar-day-items">
-                        {day.items.map((item) => (
-                          <CalendarItem
-                            dateBounds={dateBounds}
-                            item={item}
-                            key={item.id}
-                            locale={locale}
-                            rescheduleAction={recordingAction}
-                            timezone={projection.timezone}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <>
+          {projection.itemCount === 0 ? (
+            <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
+          ) : null}
+          <div className="calendar-week-scroll">
+            <table className="calendar-week">
+              <caption className="sr-only">{rangeLabel}</caption>
+              <thead>
+                <tr>
+                  {projection.days.map((day) => {
+                    const parsed = parseLocalDate(day.date);
+                    return (
+                      <th key={day.date} scope="col" data-today={day.isToday ? "true" : undefined}>
+                        <Link
+                          aria-label={formatDayLabel(day.date, locale)}
+                          className="calendar-week-head"
+                          href={calendarHref(locale, { ...withOrientation(query, "day"), anchor: parsed ?? query.anchor })}
+                        >
+                          <span className="calendar-week-weekday">{formatWeekdayLabel(day.date, locale)}</span>
+                          <span className="calendar-week-day">{parsed ? parsed.day : day.date}</span>
+                        </Link>
+                        {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  {projection.days.map((day) => (
+                    <td key={day.date} data-today={day.isToday ? "true" : undefined}>
+                      {day.items.length === 0 ? null : (
+                        <ul className="calendar-day-items">
+                          {day.items.map((item) => (
+                            <CalendarItem
+                              density="compact"
+                              item={item}
+                              key={item.id}
+                              locale={locale}
+                              timezone={projection.timezone}
+                            />
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : (
         <ol className="calendar-days">
           {projection.days.map((day) => (

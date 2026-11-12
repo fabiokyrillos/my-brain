@@ -10,7 +10,7 @@ import { applyTaskDetailCommand } from "@/features/task-commands/detail-actions"
 import { dateBounds } from "@/features/task-commands/detail-controls";
 import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
-import { localDateOf, parseLocalDate } from "@/lib/time/local-day";
+import { formatLocalDate, localDateOf, parseLocalDate } from "@/lib/time/local-day";
 
 /**
  * `2M-PLAN-004` — the daily planner, under `/app/calendar`.
@@ -88,6 +88,7 @@ export default async function PlannerPage({
       dayHrefBase={`/${locale}/app/calendar/plan`}
       locale={locale}
       projection={projection}
+      today={formatLocalDate(today)}
       undoAction={undoWorkOperation}
     />
   );

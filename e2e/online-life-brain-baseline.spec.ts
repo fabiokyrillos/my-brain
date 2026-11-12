@@ -43,6 +43,8 @@ type Route = {
   /** Section whose first detail link should also be captured. */
   readonly detail?: RegExp;
   readonly en?: boolean;
+  /** A control to press before the capture, for a state only a tap shows (Life Brain D.1). */
+  readonly open?: string;
 };
 
 const ROUTES: readonly Route[] = [
@@ -60,6 +62,11 @@ const ROUTES: readonly Route[] = [
   { name: "contexts", path: "/app/contexts", detail: /\/app\/contexts\/[0-9a-f-]{36}/ },
   { name: "relations", path: "/app/relations" },
   { name: "calendar", path: "/app/calendar", en: true },
+  // Life Brain D.1: the week and the month are their own captures, because the
+  // default orientation is the day and the owner's complaint was the week.
+  { name: "calendar-week", path: "/app/calendar?orientation=week" },
+  { name: "calendar-month", path: "/app/calendar?orientation=month" },
+  { name: "calendar-picker", path: "/app/calendar?orientation=week", open: ".agenda-date-trigger" },
   { name: "calendar-plan", path: "/app/calendar/plan" },
   { name: "reminders", path: "/app/reminders", detail: /\/app\/reminders\/[0-9a-f-]{36}/ },
   { name: "reviews", path: "/app/reviews", detail: /\/app\/reviews\/[0-9a-f-]{36}/ },
@@ -166,6 +173,10 @@ async function capture(page: Page, route: Route, path: string, locale: string, v
   await page.waitForLoadState("networkidle").catch(() => undefined);
   await page.waitForTimeout(400);
   const status = response?.status() ?? 0;
+  if (route.open) {
+    await page.locator(route.open).first().click();
+    await page.waitForTimeout(200);
+  }
   const file = `${EVIDENCE}/${route.name}${suffix}-${locale}-${viewport.name}${THEME_SUFFIX}.png`;
   await page.screenshot({ path: file, fullPage: true });
   measurements.push(await measure(page, `${route.name}${suffix}${THEME_SUFFIX}`, locale, viewport.name, status));

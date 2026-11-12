@@ -175,7 +175,7 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
    rule of its own is exactly the condition under which borrowing goes unnoticed.
    A debt counter records that something is owed; it still does not decide what
    is worth paying first. */
-const RECORDED_UNSTYLED = 40;
+const RECORDED_UNSTYLED = 37;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

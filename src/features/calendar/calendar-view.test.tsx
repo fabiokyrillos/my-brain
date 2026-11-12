@@ -238,6 +238,75 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
     expect(within(table as HTMLElement).getAllByRole("columnheader")).toHaveLength(7);
   });
 
+  /*
+    Life Brain D.1 (T2: "deveria ficar como se fosse no Google Calendar, que você
+    realmente vê a semana"). The week is read at a glance: each column holds
+    compact lines (time and title), the day's name opens that day, and the
+    controls live in the day view where there is room for them.
+  */
+  describe("Life Brain D.1: the week reads as a week", () => {
+    const weekDays = (items: readonly CalendarItemView[] = []) =>
+      Array.from({ length: 7 }, (_unused, index) => ({
+        date: `2026-08-${String(10 + index).padStart(2, "0")}`,
+        isToday: index === 5,
+        items: index === 2 ? items : ([] as CalendarItemView[]),
+      }));
+
+    it("draws compact lines in the grid, with no reschedule form in a cell", () => {
+      render(
+        <CalendarView
+          dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+          locale="pt-BR"
+          projection={projection({ days: weekDays([item({ reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } })]) })}
+          query={query({ orientation: "week" })}
+          rescheduleAction={vi.fn(async () => idleTaskDetailCommandState)}
+          today={TODAY}
+        />,
+      );
+      const grid = document.querySelector("table.calendar-week") as HTMLElement;
+      const line = grid.querySelector(".calendar-item") as HTMLElement;
+      expect(line).toHaveAttribute("data-density", "compact");
+      expect(within(line).getByText("Entregar o relatório")).toBeTruthy();
+      // The lane is still said in text (2M-ACCESS-005), not only drawn.
+      expect(within(line).getByText("Prazos")).toBeTruthy();
+      expect(grid.querySelector("form, details, input")).toBeNull();
+    });
+
+    it("still masks a highly sensitive title in a compact line", () => {
+      view({
+        projection: projection({ days: weekDays([item({ sensitivity: { kind: "derived", level: "highly_sensitive" } })]) }),
+        query: query({ orientation: "week" }),
+      });
+      expect(screen.queryByText("Entregar o relatório")).toBeNull();
+      expect(document.querySelectorAll("table.calendar-week .calendar-item")).toHaveLength(1);
+    });
+
+    it("lets a column's day open that day", () => {
+      view({ projection: projection({ days: weekDays() }), query: query({ orientation: "week" }) });
+      const heads = Array.from(document.querySelectorAll("table.calendar-week thead th a"));
+      expect(heads).toHaveLength(7);
+      expect(heads[2].getAttribute("href")).toBe("/pt-BR/app/calendar?date=2026-08-12");
+    });
+
+    /*
+      Found while capturing D.1's "before" evidence: the captions used
+      `visually-hidden`, a class no stylesheet in the product defines, so
+      "Grade do mês de novembro de 2026" was printed above the month. `sr-only`
+      is the class `globals.css` defines.
+    */
+    it("hides the grid captions with the class the product actually defines", () => {
+      view({ projection: projection({ days: weekDays() }), query: query({ orientation: "week" }) });
+      expect(document.querySelector("table.calendar-week caption")).toHaveClass("sr-only");
+      expect(document.querySelector(".visually-hidden")).toBeNull();
+    });
+
+    it("says an empty week is empty once, not seven times", () => {
+      view({ projection: projection({ days: weekDays() }), query: query({ orientation: "week" }) });
+      expect(document.querySelectorAll(".calendar-empty")).toHaveLength(1);
+      expect(document.querySelector("table.calendar-week .calendar-empty")).toBeNull();
+    });
+  });
+
   it("renders a day and an agenda as lists, because that is the shape they are", () => {
     view();
     expect(document.querySelector("table.calendar-week")).toBeNull();
@@ -340,7 +409,12 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
   it("announces the range and the count", () => {
     view();
     const live = Array.from(document.querySelectorAll("[aria-live='polite']"));
-    expect(live.some((node) => node.classList.contains("calendar-range"))).toBe(true);
+    // Life Brain D.1: the range is the picker's trigger now, and its
+    // announcement is a polite region beside it in the stepper.
+    const range = document.querySelector(".calendar-navigation summary.calendar-range, .calendar-navigation .calendar-range summary")
+      ?? document.querySelector(".calendar-navigation summary");
+    expect(range).toBeTruthy();
+    expect(live.some((node) => node.closest(".calendar-navigation") !== null && node.textContent === range!.textContent)).toBe(true);
     expect(live.some((node) => node.classList.contains("calendar-summary"))).toBe(true);
   });
 
@@ -410,7 +484,8 @@ describe("2M-CAL-010: the outcome survives the task leaving the day", () => {
     ]);
 
     await user.click(screen.getByText(getCalendarCopy("pt-BR").reschedule.summary));
-    await user.click(screen.getAllByRole("button")[0]);
+    // Scoped: the header's date picker has buttons of its own (Life Brain D.1).
+    await user.click(within(document.querySelector(".calendar-days") as HTMLElement).getAllByRole("button")[0]);
     await waitFor(() => expect(action).toHaveBeenCalled());
 
     // The revalidated projection: the task is on another day now, so this day
@@ -623,7 +698,8 @@ describe("2P-CALENDAR-001: the month is a grid, not a renamed list", () => {
 
   it("names the period as its month, not as the grid's two edges", () => {
     monthView();
-    expect(screen.getByText("agosto de 2026")).toBeTruthy();
+    // The period label is now the date picker's trigger (Life Brain D.1).
+    expect(document.querySelector(".calendar-navigation summary")).toHaveTextContent("agosto de 2026");
   });
 
   it("offers the month as a fourth orientation control", () => {

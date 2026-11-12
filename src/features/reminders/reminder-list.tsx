@@ -103,13 +103,20 @@ export function ReminderList({
               <p className="reminder-overdue">{copy.overdueNote}</p>
             ) : null}
 
-            <p className="reminder-status-hint">{copy.statusHint[reminder.status]}</p>
+            {/* Life Brain D.1: a scheduled reminder's hint ("vai disparar no
+                horário") repeats the line above it; the other states need theirs. */}
+            {reminder.status === "scheduled" ? null : (
+              <p className="reminder-status-hint">{copy.statusHint[reminder.status]}</p>
+            )}
 
+            {/* Life Brain D.1: what it is tied to and that it repeats are facts,
+                read without opening anything; the links and the rule's
+                controls wait in "Mais". */}
             <p className="reminder-subject">
               {reminder.link === null ? (
                 <span className="reminder-subject-none">{copy.independent}</span>
               ) : (
-                <Link className="reminder-subject-link" href={reminder.link.href}>
+                <span className="reminder-subject-text">
                   {reminder.link.kind === "task" ? (
                     <ListTodo aria-hidden="true" size={14} />
                   ) : (
@@ -119,34 +126,56 @@ export function ReminderList({
                     {reminder.link.kind === "task" ? copy.linkedTask : copy.linkedEntry}
                   </span>
                   <span>{reminder.link.label}</span>
-                </Link>
+                </span>
               )}
-              <Link className="reminder-history-link" href={reminder.historyHref}>
-                <History aria-hidden="true" size={14} />
-                {copy.historyLink}
-              </Link>
             </p>
+
+            {reminder.series === null ? null : (
+              <ReminderSeriesControls
+                anchorTimeValue={formatLocalTime(reminder.remindAt)}
+                locale={locale}
+                part="facts"
+                reminder={reminder}
+              />
+            )}
 
             {/* The formatted string, never the formatter: this file is a Server
                 Component and a function cannot be serialized into a Client one. */}
             <ReminderActions
               currentScheduleLabel={formatInstant(reminder.remindAt)}
               locale={locale}
+              more={(
+                <>
+                  {/* Slice 2R.2. Absent — not disabled — for a reminder that
+                      carries no rule; the component returns null on a null
+                      series, so the two agree. */}
+                  {reminder.series === null ? null : (
+                    <ReminderSeriesControls
+                      anchorTimeValue={formatLocalTime(reminder.remindAt)}
+                      locale={locale}
+                      part="controls"
+                      reminder={reminder}
+                    />
+                  )}
+                  {reminder.link === null ? null : (
+                    <Link className="reminder-menu-item reminder-subject-link" href={reminder.link.href}>
+                      {reminder.link.kind === "task" ? (
+                        <ListTodo aria-hidden="true" size={14} />
+                      ) : (
+                        <FileText aria-hidden="true" size={14} />
+                      )}
+                      <span>{copy.card.openSubject(reminder.link.label)}</span>
+                    </Link>
+                  )}
+                  <Link className="reminder-menu-item reminder-history-link" href={reminder.historyHref}>
+                    <History aria-hidden="true" size={14} />
+                    {copy.historyLink}
+                  </Link>
+                </>
+              )}
               reminder={reminder}
               remindAtLocalValue={formatLocalInput(reminder.remindAt)}
             />
-
-            {/* Slice 2R.2. Absent — not disabled — for a reminder that carries no
-                rule, which is every reminder in an account that has created
-                none. The component itself returns null on a null series, so the
-                two agree rather than one guarding the other. */}
-            {reminder.series === null ? null : (
-              <ReminderSeriesControls
-                anchorTimeValue={formatLocalTime(reminder.remindAt)}
-                locale={locale}
-                reminder={reminder}
-              />
-            )}
           </div>
 
           <div className="list-meta">

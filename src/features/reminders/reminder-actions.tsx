@@ -1,7 +1,7 @@
 "use client";
 
-import { CalendarClock, Clock, LoaderCircle, Pencil, RotateCcw, X } from "lucide-react";
-import { useId, useState } from "react";
+import { CalendarClock, Clock, LoaderCircle, MoreHorizontal, Pencil, RotateCcw, X } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import type { Locale } from "@/lib/preferences";
 
@@ -44,15 +44,32 @@ import type { ReminderViewModel } from "./projection";
  * the reasoning `entity-edit-form.tsx` records in full and `memory-edit-form.tsx`
  * reuses. An `open` boolean plus a `useEffect` that clears it is the version
  * that flickers.
+ *
+ * ## Three visible controls, the rest behind "Mais" (Life Brain D.1)
+ *
+ * The owner's card had up to ~18 controls (T2: "está tão grande esse cartão").
+ * Now at most three are visible: the state's main verb (an hour's snooze in one
+ * tap, or Reactivate), Reschedule, and "Mais". The menu holds every other
+ * duration, Edit, Cancel, the rule's controls and the two links (`more`). It is
+ * a `<details>`: no script needed to open it, keyboard-operable, no gesture.
+ * Which actions exist is still `reminder.actions` alone — the menu moves
+ * controls, it never adds or removes one.
  */
 export function ReminderActions({
   reminder,
   locale,
   currentScheduleLabel,
+  more,
   remindAtLocalValue,
 }: {
   reminder: ReminderViewModel;
   locale: Locale;
+  /**
+   * What else goes in the "Mais" menu, rendered by the server: the rule's
+   * controls and the subject and history links. Elements cross the RSC
+   * boundary; functions do not.
+   */
+  more?: ReactNode;
   /**
    * The current schedule, **already formatted by the server**.
    *
@@ -89,6 +106,14 @@ export function ReminderActions({
   const { state, formAction, pending } = useReminderCommand();
   const copy = getReminderCopy(locale);
   const fieldId = useId();
+  const menu = useRef<HTMLDetailsElement | null>(null);
+
+  /** Opening a panel from the menu closes the menu, so the panel is what is read. */
+  function openFromMenu(next: "reschedule" | "edit" | "cancel") {
+    setDismissed(state);
+    setPanel(openPanel === next ? null : next);
+    if (menu.current) menu.current.open = false;
+  }
 
   const [panel, setPanel] = useState<"reschedule" | "edit" | "cancel" | null>(null);
   const [dismissed, setDismissed] = useState<ReminderActionState | null>(null);
@@ -131,63 +156,18 @@ export function ReminderActions({
       */}
       <div className="reminder-action-row">
         {has("snooze") ? (
-          <form action={formAction} className="reminder-snooze">
+          <form action={formAction} className="reminder-snooze-quick">
             {hidden("snooze")}
-            <label className="reminder-inline-label" htmlFor={`${fieldId}-snooze`}>
-              {copy.actionLabel.snooze}
-            </label>
-            <select
-              className="reminder-select"
-              defaultValue={60}
-              disabled={pending}
-              id={`${fieldId}-snooze`}
-              name="snoozeMinutes"
-            >
-              {SNOOZE_PRESET_MINUTES.map((minutes) => (
-                <option key={minutes} value={minutes}>
-                  {copy.snoozePreset[minutes]}
-                </option>
-              ))}
-            </select>
+            <input name="snoozeMinutes" type="hidden" value={60} />
             <button className="reminder-button" disabled={pending} type="submit">
               {pending ? (
                 <LoaderCircle aria-hidden="true" className="spin" size={14} />
               ) : (
                 <Clock aria-hidden="true" size={14} />
               )}
-              {copy.actionLabel.snooze}
+              {copy.card.snoozeQuick}
             </button>
           </form>
-        ) : null}
-
-        {has("reschedule") ? (
-          <button
-            aria-expanded={openPanel === "reschedule"}
-            className="reminder-button"
-            onClick={() => {
-              setDismissed(state);
-              setPanel(openPanel === "reschedule" ? null : "reschedule");
-            }}
-            type="button"
-          >
-            <CalendarClock aria-hidden="true" size={14} />
-            {copy.actionLabel.reschedule}
-          </button>
-        ) : null}
-
-        {has("edit") ? (
-          <button
-            aria-expanded={openPanel === "edit"}
-            className="reminder-button"
-            onClick={() => {
-              setDismissed(state);
-              setPanel(openPanel === "edit" ? null : "edit");
-            }}
-            type="button"
-          >
-            <Pencil aria-hidden="true" size={14} />
-            {copy.actionLabel.edit}
-          </button>
         ) : null}
 
         {has("restore") ? (
@@ -204,19 +184,77 @@ export function ReminderActions({
           </form>
         ) : null}
 
-        {has("cancel") ? (
+        {has("reschedule") ? (
           <button
-            aria-expanded={openPanel === "cancel"}
-            className="reminder-button danger"
-            onClick={() => {
-              setDismissed(state);
-              setPanel(openPanel === "cancel" ? null : "cancel");
-            }}
+            aria-expanded={openPanel === "reschedule"}
+            className="reminder-button"
+            onClick={() => openFromMenu("reschedule")}
             type="button"
           >
-            <X aria-hidden="true" size={14} />
-            {copy.actionLabel.cancel}
+            <CalendarClock aria-hidden="true" size={14} />
+            {copy.actionLabel.reschedule}
           </button>
+        ) : null}
+
+        {has("snooze") || has("edit") || has("cancel") || more ? (
+          <details className="reminder-more" ref={menu}>
+            <summary aria-label={copy.card.moreLabel} className="reminder-button reminder-more-trigger">
+              <MoreHorizontal aria-hidden="true" size={14} />
+              <span aria-hidden="true">{copy.card.more}</span>
+            </summary>
+            <div className="reminder-more-panel">
+              {has("snooze") ? (
+                <form action={formAction} className="reminder-snooze">
+                  {hidden("snooze")}
+                  <label className="reminder-inline-label" htmlFor={`${fieldId}-snooze`}>
+                    {copy.card.snoozeFor}
+                  </label>
+                  <select
+                    className="reminder-select"
+                    defaultValue={180}
+                    disabled={pending}
+                    id={`${fieldId}-snooze`}
+                    name="snoozeMinutes"
+                  >
+                    {SNOOZE_PRESET_MINUTES.map((minutes) => (
+                      <option key={minutes} value={minutes}>
+                        {copy.snoozePreset[minutes]}
+                      </option>
+                    ))}
+                  </select>
+                  <button className="reminder-button" disabled={pending} type="submit">
+                    {copy.actionLabel.snooze}
+                  </button>
+                </form>
+              ) : null}
+
+              {has("edit") ? (
+                <button
+                  aria-expanded={openPanel === "edit"}
+                  className="reminder-menu-item"
+                  onClick={() => openFromMenu("edit")}
+                  type="button"
+                >
+                  <Pencil aria-hidden="true" size={14} />
+                  {copy.actionLabel.edit}
+                </button>
+              ) : null}
+
+              {has("cancel") ? (
+                <button
+                  aria-expanded={openPanel === "cancel"}
+                  className="reminder-menu-item danger"
+                  onClick={() => openFromMenu("cancel")}
+                  type="button"
+                >
+                  <X aria-hidden="true" size={14} />
+                  {copy.actionLabel.cancel}
+                </button>
+              ) : null}
+
+              {more}
+            </div>
+          </details>
         ) : null}
       </div>
 

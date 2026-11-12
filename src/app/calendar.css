@@ -58,6 +58,102 @@
   white-space: nowrap;
 }
 
+/*
+ * Life Brain D.1 — the period label opens a month of days.
+ *
+ * A `<details>` whose `<summary>` is the label, with a chevron that says it
+ * opens; the panel floats under it on desktop and takes the width on a phone.
+ * Every day is a link (OD-2M-6 A), 40px square at least.
+ */
+.agenda-date-picker {
+  position: relative;
+  min-width: 0;
+}
+
+.agenda-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  list-style: none;
+}
+
+.agenda-date-trigger::-webkit-details-marker { display: none; }
+.agenda-date-trigger:hover { background: var(--background-subtle); }
+.agenda-date-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.agenda-date-chevron { flex: none; color: var(--text-secondary); transition: transform 120ms ease; }
+.agenda-date-picker[open] .agenda-date-chevron { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .agenda-date-chevron { transition: none; }
+}
+
+.agenda-date-picker:not([open]) > .agenda-date-panel { display: none; }
+
+.agenda-date-panel {
+  position: absolute;
+  z-index: var(--z-sheet);
+  top: calc(100% + var(--space-1));
+  inset-inline-end: 0;
+  width: 18.5rem;
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-2);
+}
+
+.agenda-date-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.agenda-date-month {
+  display: inline-block;
+  font: var(--type-label);
+  color: var(--text-primary);
+}
+/* "novembro de 2026" → "Novembro de 2026": `capitalize` would also raise "De". */
+.agenda-date-month::first-letter { text-transform: uppercase; }
+
+.agenda-date-grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.agenda-date-grid th {
+  padding-bottom: var(--space-1);
+  font: var(--type-caption);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.agenda-date-grid td { padding: 1px; text-align: center; }
+
+.agenda-date-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 40px;
+  border-radius: var(--radius-full);
+  font: var(--type-body);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+a.agenda-date-day:hover { background: var(--background-subtle-strong); }
+.agenda-date-grid td[data-today="true"] .agenda-date-day { font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+.agenda-date-day[aria-current="date"] { background: var(--text-primary); color: var(--background-surface); }
+.agenda-date-day[aria-disabled="true"] { color: var(--text-muted); opacity: 0.45; }
+
 /* At the edge of the range the calendar covers: still a link, visibly spent. */
 .agenda-stepper a[aria-disabled="true"] {
   opacity: 0.5;
@@ -165,6 +261,18 @@
     text-align: center;
     white-space: normal;
   }
+
+  .agenda-date-picker { flex: 1; }
+  .agenda-date-trigger { width: 100%; }
+
+  /* On a phone the panel is the width of the page, under the stepper. */
+  .agenda-date-panel {
+    position: fixed;
+    top: auto;
+    inset-inline: var(--gutter, 16px);
+    width: auto;
+    margin-top: var(--space-1);
+  }
 }
 
 .calendar-summary {
@@ -231,9 +339,11 @@
 .calendar-week-scroll {
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  /* The floor below which the grid stops being readable and starts scrolling:
-     seven columns at the 8.5rem the cells used to carry as `min-width`. */
-  --calendar-week-floor: 59.5rem;
+  /* Life Brain D.1: no floor. The week fits the viewport at every width, as a
+     week on a phone calendar does; its cells hold compact lines, not cards, so
+     a narrow column is a narrow column of short lines rather than a column of
+     single words. The wrapper stays, for 200% zoom (`2M-ACCESS` reflow). */
+  --calendar-week-floor: 0;
 }
 
 .calendar-week {
@@ -272,12 +382,91 @@
   padding-block: var(--space-2);
 }
 
-.calendar-week-day {
-  display: block;
-  font: var(--type-label);
+/*
+ * Life Brain D.1 — a column's heading is the weekday and its number, and it is
+ * a link into that day: the full cards and their controls live there.
+ */
+.calendar-week-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+}
+
+.calendar-week-head:hover .calendar-week-day { text-decoration: underline; text-underline-offset: 2px; }
+
+.calendar-week-weekday {
+  font: var(--type-caption);
   color: var(--text-secondary);
   text-transform: capitalize;
 }
+
+.calendar-week-day {
+  display: block;
+  font: var(--type-title-2);
+  color: var(--text-secondary);
+}
+
+.calendar-week thead th { text-align: center; }
+.calendar-week thead .calendar-today { display: block; margin-top: 2px; font: var(--type-caption); }
+
+/*
+ * The compact line: time, title, lane word, in a column that may be 48px wide
+ * on a phone. The title gets three lines and an ellipsis; the whole of it is
+ * one tap away in the day view.
+ */
+.calendar-item[data-density="compact"] {
+  gap: 0;
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-sm);
+  font: var(--type-caption);
+}
+
+.calendar-item[data-density="compact"] .calendar-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font: var(--type-caption);
+}
+
+.calendar-item[data-density="compact"] .calendar-item-lane {
+  display: block;
+  max-width: 100%;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calendar-item[data-density="compact"] .calendar-item-body {
+  font: var(--type-caption);
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  /* Break between syllables where the language allows it, and anywhere only as
+     a last resort for a word wider than the column. */
+  hyphens: auto;
+  overflow-wrap: anywhere;
+}
+
+.calendar-item[data-density="compact"] { min-width: 0; overflow: hidden; }
+
+@media (max-width: 30rem) {
+  .calendar-item[data-density="compact"] { padding: 2px 3px; }
+  .calendar-item[data-density="compact"] .calendar-item-body,
+  .calendar-item[data-density="compact"] .calendar-item-meta { font-size: 0.6875rem; line-height: 1.3; }
+  .calendar-item[data-density="compact"] .calendar-item-lane { font-size: 0.625rem; }
+}
+
+.calendar-week .calendar-day-items { gap: 2px; }
 
 .calendar-week tbody td {
   /* Enough height that an empty day reads as a day rather than as a seam. */
@@ -296,6 +485,9 @@
 .calendar-week th[data-today="true"] .calendar-week-day {
   color: var(--text-primary);
   font-weight: 650;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
 
 .calendar-week td[data-today="true"] {
@@ -584,9 +776,9 @@
  * defect `layout-contracts.spec.ts` exists to catch elsewhere on this product.
  */
 @media (max-width: 30rem) {
-  .calendar-week-scroll { --calendar-week-floor: 77rem; }
-  .calendar-week tbody td { height: 6rem; }
-
+  .calendar-week tbody td { height: 10rem; }
+  .calendar-week th,
+  .calendar-week td { padding: var(--space-1) 2px; }
 }
 
 /*
@@ -769,13 +961,16 @@
 @media (min-width: 720px) {
   .planner-list .planner-item {
     display: grid;
-    grid-template-columns: minmax(0, 1.6fr) minmax(120px, .6fr) minmax(220px, auto);
-    align-items: start;
+    /* Life Brain D.1: the controls are one button now, so the third track is
+       `auto`; each part names its own column, so a row with no meta line (the
+       pool) keeps its button on the right rather than sliding into the middle. */
+    grid-template-columns: minmax(0, 1fr) minmax(0, auto) auto;
+    align-items: center;
     column-gap: var(--space-4);
     row-gap: var(--space-2);
   }
-  .planner-list .planner-item-meta { justify-self: start; }
-  .planner-list .planner-item-controls { justify-self: end; min-width: 0; }
+  .planner-list .planner-item-meta { grid-column: 2; justify-self: start; }
+  .planner-list .planner-item-controls { grid-column: 3; justify-self: end; min-width: 0; }
 }
 
 /* `> ul >`, not a descendant selector. `TaskDetailControls` renders its own
@@ -786,7 +981,59 @@
    per row, which is exactly why no browser lane could see it. */
 .planner-list > ul > li + li { border-top: 1px solid var(--border-default); padding-top: var(--space-3); }
 .planner-item-head { font: var(--type-reading-sm); color: var(--text-primary); }
-.planner-item-meta { font: var(--type-mono); color: var(--text-muted); }
+/* Life Brain D.1: the meta line is a sentence ("Planejado para qui., 12 nov."),
+   not a machine label — the body face, not monospace. */
+.planner-item-meta { font: var(--type-caption); color: var(--text-muted); }
+
+/* What "planned" means, first, at reading size (Life Brain D.1, T2). */
+.planner-meaning {
+  margin: var(--space-3) 0 var(--space-1);
+  font: var(--type-body);
+  color: var(--text-primary);
+  max-width: 62ch;
+}
+
+.planner-list-hint { margin: calc(-1 * var(--space-2)) 0 var(--space-3); font: var(--type-caption); }
+
+/*
+ * The checkbox and the title on one line: the label is the 44px target, the
+ * box sits centred in it, and the title starts where the box ends.
+ */
+/* `.planner-list` for specificity: the shared `.planner-item-head,
+   .day-review-item-head` rule below would otherwise wrap the box onto a line of
+   its own — which is what the signed-in iPhone capture showed. */
+.planner-list .planner-item-head { flex-wrap: nowrap; align-items: flex-start; }
+.planner-item-title { flex: 1; min-width: 0; }
+.planner-select-label {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: -10px 0 -10px -12px;
+  cursor: pointer;
+}
+.planner-select { width: 18px; height: 18px; margin: 0; accent-color: var(--text-primary); }
+
+/*
+ * `preset` controls: one button per row, no nested card. The inline frame's
+ * border, padding and canvas background were the "cartão aninhado".
+ */
+.task-detail-controls-preset {
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.task-detail-controls-preset .task-control-list { flex-direction: row; flex-wrap: wrap; gap: var(--space-2); }
+.task-detail-controls-preset .task-control form {
+  display: block;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+}
 
 .planner-item-head,
 .day-review-item-head {
