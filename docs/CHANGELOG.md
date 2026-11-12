@@ -1,5 +1,16 @@
 # Technical Changelog
 
+## 2026-11-12 — Life Brain D.1: the Agenda (ADR-165)
+
+- **No migration.**
+- **Date picker:** `src/features/calendar/agenda-date-picker.tsx` — the stepper's period label opens a Monday-first month whose days are links (`AGENDA_DATE_TOKEN` in an href template); months page inside the picker without navigating; out-of-bound days are `aria-disabled`. `AgendaStepper` requires `picker`; `calendarHrefTemplate` and `calendarBound` in `calendar-query.ts`; Planejar passes its `today`.
+- **Week:** no width floor; seven equal columns at every width; `CalendarItem density="compact"` (time, lane word, three-line title, no controls); the column heading is a 44px link into the day; an empty week says so once.
+- **Planejar:** `meaning` and `availableHint` copy; one button per row through `TaskDetailControls variant="preset"` (`submitLabels`, hidden preset value); checkbox in `.planner-select-label`; title in `.planner-item-title`; meta in the body face and absent on pool rows.
+- **Reminder card:** "Adiar 1 hora", Reagendar or Reativar, and "Mais" (`details.reminder-more`) holding the other durations, Editar, Cancelar, the rule's controls (`ReminderSeriesControls part="controls"`) and the two links; the rule's facts stay visible (`part="facts"`); no "Vai disparar no horário abaixo" on a scheduled reminder.
+- **Defect:** grid captions used `visually-hidden`, defined nowhere, so the month printed "Grade do mês de …" above itself; now `sr-only`.
+- **Tests:** `agenda-date-picker.test.tsx`; week, planner and reminder-card cases in their component tests; `e2e/calendar.spec.ts` and `e2e/daily-surfaces.spec.ts` fixtures mirror the new markup (the week test that *required* a sideways scroll on a phone now forbids it); new lane `e2e/life-brain-d1-agenda.spec.ts`; the no-gesture guard names the picker; `RECORDED_UNSTYLED` 40 → 37; the baseline instrument gains `calendar-week`, `calendar-month` and `calendar-picker` (with an `open` step).
+- **Evidence:** `docs/reports/life-brain/evidence/slice-d1/` (before/after, iPhone and desktop, light and dark).
+
 ## 2026-11-12 — Life Brain plan: track D after the order (ADR-164)
 
 - **Documentation only.** Zero migrations, zero product code.

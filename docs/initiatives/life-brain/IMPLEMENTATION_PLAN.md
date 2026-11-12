@@ -254,6 +254,7 @@ Regras comuns às três: um PR por slice, branch `life-brain/<slice>`, teste ant
 - **Planejar diz o que "planejado" significa** e é redesenhada: checkbox alinhado ao rótulo, nada em monoespaçada, sem o cartão aninhado com um "Aplicar" por tarefa (`src/app/[locale]/app/calendar/plan/page.tsx`).
 - **Cartão de lembrete com no máximo 3 controles visíveis**, o resto atrás de um "mais" (`src/features/reminders/reminder-actions.tsx`, `series-controls.tsx`).
 - **Aceite:** screenshots antes/depois em `docs/reports/life-brain/evidence/slice-d1/`, iPhone e desktop, claro e escuro; as baselines da ADR-159 de Agenda redesenhadas no runner.
+- **Implementado 2026-11-12 (ADR-165), sem migration:** `AgendaDatePicker` (o rótulo é o `<summary>` de um mês de dias, cada dia um link; o limite de `2M-CAL-006` no Calendário e ±730 dias em Planejar); a semana cabe na tela em qualquer largura, com linhas compactas (`CalendarItem density="compact"`) e o dia como link; Planejar abre com a frase do que "planejado" significa, um botão por linha (variante `preset` de `TaskDetailControls`), o checkbox num rótulo de 44px na primeira linha do título, sem monoespaçada; o cartão de lembrete com três controles visíveis e o resto em "Mais" (`ReminderSeriesControls part`). Achado de passagem: as legendas das grades usavam `visually-hidden`, que nenhum CSS define. Evidência: `evidence/slice-d1/` (o README diz o que a conta de teste não consegue mostrar).
 
 ### D.2 — Listas e Notificações (temas T3 e T5, 3 d)
 
