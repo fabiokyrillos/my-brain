@@ -2658,3 +2658,19 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 6 — What the slice did not do.** The page title stays "Configurações", the product-wide name (the mockups said "Ajustes"). The push sender's quiet period and cap stay beside the profile's in "Seu dia e avisos": two columns with two consumers, and merging them is its own decision. The credential panel keeps its 2O shape. The list does not show the month's AI spend the mockup showed (that needs a cost read on every arrival). Ajustes was never in the ADR-159 screenshot lane, so there were no baselines to redraw (the plan's §6 said otherwise; corrected).
 
 - **Consequences.** Stylesheet debt falls from 37 to 34 elements (the census, its no-surface cell and the consent list are drawn). The online Playwright specs that drove the old sections are updated; the remote journeys stay manual.
+
+## ADR-170 — Life Brain E.2: links between two people, one row read from both ends, and no migration
+
+- **Date:** 2026-11-14
+- **Status:** Accepted. Implements ADR-168 Decision 2. **The migration ADR-168 authorized is not used.**
+
+- **Context.** The owner's T6 feedback: "eu e Camila, nós somos casados… Pode melhorar bastante." `person_relationships` already held a typed relationship to the owner (EGC.2, a 14-term vocabulary) — shown on the person page but not near the name, and drawn on the Relações lens as "VOCÊ → PESSOA Camila". A relation between two of the owner's people had a column (`related_person_id`) and no writer: EGC-REL-001 recorded it as "a separate contract nobody has asked for yet".
+
+- **Decision 1 — One row, read from both ends.** A row reads "`person_id` is `relationship_type` of `related_person_id`", the direction a null row already had ("Camila is your spouse"). On the page of X, a row whose `related_person_id` is X names `person_id` with the stored type; a row whose `person_id` is X names the other end with the reciprocal (`inversePersonLinkType`: parent ↔ child, the rest symmetric). Nothing is stored twice, so the two pages cannot disagree.
+- **Decision 2 — No migration.** Forced RLS, the composite owner foreign keys on both people (`202607170016`) and the entity-deletion snapshot of both ends (`202608140094`) already cover a non-null `related_person_id`. Uniqueness is checked by the action in both directions (`repeatsLiveLink`), the same posture as `liveDuplicate` for relationships to the owner; a unique index would need the reciprocal in SQL and is not worth a migration for a single-writer table.
+- **Decision 3 — A subset of types.** Family, friend, colleague and other. The work terms do not read both ways (`report` is worded "Reporta a você"; `client`, `vendor` and `mentor` have no settled reverse), so they stay relationships to the owner.
+- **Decision 4 — The one writer stays one.** `createPersonLink` and `endPersonLink` live in `relationships.ts`, the only application writer of `person_relationships` (EGC-ASSOC-003) and a declared `audit_logs` writer (ADR-081). They audit under `create_person_relationship` and `end_person_relationship`, with both ends in the state. Ending sets `valid_until` (EGC-REL-007).
+- **Decision 5 — Every "relationship to you" read filters `related_person_id is null`.** The person page, the three owner actions and `relations/data.ts`: a link between two people is not an edge from "você", and the Relações projection draws every row it reads as one.
+- **Decision 6 — What this slice does not do.** The extraction does not propose a link from a capture yet ("minha mãe Camila"); that is a worker change with parity guards and gets its own slice, on the birthday offer's model (ADR-158). The Relações lens leaving Memória is E.3.
+
+- **Consequences.** The person page says "Esposa/Esposo" under the name and lists "Pessoas ligadas". Life Brain migrations stay at six.

@@ -792,3 +792,10 @@
 .birthday-proposal { display: grid; gap: var(--space-2); }
 .birthday-proposal-form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font: var(--type-caption); }
 .birthday-status[data-status="error"] { color: var(--tone-risk-fg); }
+
+/* Life Brain E.2 (ADR-170): what this person is to you, under the name. */
+.entity-hero-relation {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}

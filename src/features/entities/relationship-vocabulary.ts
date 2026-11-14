@@ -14,6 +14,12 @@ import type { Locale } from "@/lib/preferences";
  * slice writes a non-null `related_person_id`; person-to-person relationships are
  * a separate contract nobody has asked for yet.
  *
+ * *(Life Brain E.2, ADR-170: the owner asked for it. A row with a non-null
+ * `related_person_id` reads "`person_id` is `relationship_type` of
+ * `related_person_id`", the same direction as a null row — "Camila is your
+ * spouse". `PERSON_LINK_TYPES` and `inversePersonLinkType` below are that
+ * contract; a null still means the owner and still needs no backfill.)*
+ *
  * ## Why the column has no CHECK, and must not gain one
  *
  * `relationship_type` is bare `text`. The extraction pipeline can write it, and a
@@ -156,4 +162,50 @@ export function canonicalRelationshipTerms(): readonly (readonly [string, string
   return RELATIONSHIP_TYPES.map(
     (member) => [member, RELATIONSHIP_TERMS["pt-BR"][member], RELATIONSHIP_TERMS.en[member]] as const,
   );
+}
+
+/**
+ * Life Brain E.2 (ADR-170) — the types one of your people can be to another.
+ *
+ * A subset, on purpose: the family and friendship terms read correctly in both
+ * directions between two people ("Laura · Filho/Filha" on Camila's page,
+ * "Camila · Pai/Mãe" on Laura's). The work terms do not — `report` is worded
+ * "Reporta a você", and `client`/`vendor`/`mentor` have no settled reverse —
+ * so they stay relationships to the owner only.
+ */
+export const PERSON_LINK_TYPES = [
+  "spouse",
+  "partner",
+  "parent",
+  "child",
+  "sibling",
+  "other_family",
+  "friend",
+  "colleague",
+  "other",
+] as const satisfies readonly RelationshipType[];
+
+export type PersonLinkType = (typeof PERSON_LINK_TYPES)[number];
+
+export function asPersonLinkType(value: unknown): PersonLinkType | null {
+  return typeof value === "string" && (PERSON_LINK_TYPES as readonly string[]).includes(value)
+    ? (value as PersonLinkType)
+    : null;
+}
+
+/**
+ * What the other person is, seen from the far end of a link. If A is `parent`
+ * of B, B is `child` of A; every other link type reads the same both ways.
+ */
+export function inversePersonLinkType(type: PersonLinkType): PersonLinkType {
+  if (type === "parent") return "child";
+  if (type === "child") return "parent";
+  return type;
+}
+
+/** The link selector's options, in declared order. */
+export function personLinkOptions(
+  locale: Locale,
+): readonly { readonly value: PersonLinkType; readonly label: string }[] {
+  return PERSON_LINK_TYPES.map((value) => ({ value, label: RELATIONSHIP_TERMS[locale][value] }));
 }

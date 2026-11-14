@@ -307,6 +307,7 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 - **Relação entre duas pessoas suas** ("Camila é mãe da Laura") com `related_person_id`, mostrada nas duas páginas com o termo recíproco (mãe ↔ filha, casados ↔ casados).
 - **A extração propõe, não afirma**: uma relação dita num registro vira proposta para confirmar, como o aniversário (ADR-158); a categoria `relation` da automação continua "só sugere".
 - **Migration só se necessária** (unicidade da relação recíproca, restrição do vocabulário no banco). Se for criada, aplicar no hospedado é um passo separado, com pedido explícito.
+- **Implementado 2026-11-14 (ADR-170), sem migration:** a relação com você embaixo do nome; o painel "Pessoas ligadas" com o termo recíproco nas duas páginas, numa linha só de `person_relationships`; toda leitura de "relação com você" filtra `related_person_id is null`. Tipos de trabalho ficam só para a relação com você. **Fica para depois:** a extração propor a ligação a partir de um registro.
 
 ### E.3 — Relações sai da Memória (1 d)
 

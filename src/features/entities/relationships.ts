@@ -50,8 +50,12 @@ import { resolveLocale } from "@/lib/preferences";
 
 import { getEntityCopy } from "./copy";
 import type { EntityEditState } from "./edit-state";
+import { getPersonLinksCopy } from "./person-links-copy";
+import { repeatsLiveLink } from "./person-links-projection";
 import { failedRelation, submittedRelationFields } from "./relation-state";
 import {
+  personLinkCreateSchema,
+  personLinkEndSchema,
   relationshipCreateSchema,
   relationshipEndSchema,
   relationshipUpdateSchema,
@@ -87,6 +91,7 @@ async function liveDuplicate(
     .select("id")
     .eq("user_id", userId)
     .eq("person_id", personId)
+    .is("related_person_id", null)
     .eq("relationship_type", relationshipType)
     .is("valid_until", null)
     .limit(5);
@@ -190,6 +195,7 @@ export async function updateOwnerRelationship(
     .eq("id", relationshipId)
     .eq("user_id", user.id)
     .eq("person_id", personId)
+    .is("related_person_id", null)
     .is("valid_until", null)
     .maybeSingle();
   if (before.error) return failedRelation(locale, "saveFailed");
@@ -267,6 +273,7 @@ export async function endOwnerRelationship(
     .eq("id", relationshipId)
     .eq("user_id", user.id)
     .eq("person_id", personId)
+    .is("related_person_id", null)
     .is("valid_until", null)
     .select("id,relationship_type")
     .maybeSingle();
@@ -288,4 +295,129 @@ export async function endOwnerRelationship(
 
   revalidatePerson(parsed.data.locale, personId);
   return { status: "success", message: getEntityCopy(locale).relationshipEnded };
+}
+
+/**
+ * Life Brain E.2 (ADR-170) — link two of the owner's people, and end a link.
+ *
+ * Here rather than in a module of their own because this file is the one
+ * application writer of `person_relationships` (EGC-ASSOC-003) and a declared
+ * `audit_logs` writer (ADR-081).
+ *
+ * The write is `person_relationships` with a non-null `related_person_id`,
+ * which the schema has allowed since `202607160009` and which forced RLS, the
+ * composite owner foreign keys (`202607170016`) and the entity-deletion RPC
+ * (both ends, `202608140094`) already cover — so no migration. Each write is
+ * audited under the action types `relationships.ts` already declares, with the
+ * other end in the state; ending sets `valid_until`, it never deletes.
+ */
+
+function failedLink(message: string, submitted: EntityEditState["submitted"] = null): EntityEditState {
+  return { status: "error", message, submitted };
+}
+
+function revalidatePeople(locale: "pt-BR" | "en", ...personIds: string[]) {
+  for (const id of personIds) revalidatePath(`/${locale}/app/people/${id}`);
+  revalidatePath(`/${locale}/app/people`);
+}
+
+export async function createPersonLink(_previous: EntityEditState, formData: FormData): Promise<EntityEditState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getPersonLinksCopy(locale);
+  const fields = submittedRelationFields(formData);
+  const parsed = personLinkCreateSchema.safeParse(fields);
+  if (!parsed.success) {
+    const self = fields.personId !== undefined && fields.personId === fields.otherPersonId;
+    return failedLink(self ? copy.self : copy.invalid, fields);
+  }
+  const { personId, otherPersonId, relationshipType } = parsed.data;
+  const { supabase, user } = await requireUser(parsed.data.locale);
+
+  // Both ends must be the owner's. RLS would refuse a foreign id anyway; this
+  // says so in words instead of as a failed insert.
+  const people = await supabase.from("people").select("id").eq("user_id", user.id).in("id", [personId, otherPersonId]);
+  if (people.error) return failedLink(copy.failed, fields);
+  if ((people.data ?? []).length !== 2) return failedLink(copy.notFound, fields);
+
+  const live = await supabase
+    .from("person_relationships")
+    .select("id,person_id,related_person_id,relationship_type")
+    .eq("user_id", user.id)
+    .is("valid_until", null)
+    .or(
+      `and(person_id.eq.${otherPersonId},related_person_id.eq.${personId}),and(person_id.eq.${personId},related_person_id.eq.${otherPersonId})`,
+    );
+  if (live.error) return failedLink(copy.failed, fields);
+  if (repeatsLiveLink(personId, otherPersonId, relationshipType, live.data ?? [])) return failedLink(copy.duplicate, fields);
+
+  const { data: created, error } = await supabase
+    .from("person_relationships")
+    .insert({
+      user_id: user.id,
+      person_id: otherPersonId,
+      related_person_id: personId,
+      relationship_type: relationshipType,
+      description: null,
+      confidence: 1,
+    })
+    .select("id")
+    .maybeSingle();
+  if (error || !created) return failedLink(copy.failed, fields);
+
+  const audit = await supabase.from("audit_logs").insert({
+    user_id: user.id,
+    action_type: "create_person_relationship",
+    entity_type: "person_relationship",
+    entity_id: created.id,
+    actor: "user",
+    after_state: { person_id: otherPersonId, related_person_id: personId, relationship_type: relationshipType },
+    reason: "Owner linked two of their people",
+  });
+  if (audit.error) console.error("Person link create audit failed", audit.error.message);
+
+  revalidatePeople(parsed.data.locale, personId, otherPersonId);
+  return { status: "success", message: copy.added };
+}
+
+export async function endPersonLink(_previous: EntityEditState, formData: FormData): Promise<EntityEditState> {
+  const locale = resolveLocale(formData.get("locale"));
+  const copy = getPersonLinksCopy(locale);
+  const fields = submittedRelationFields(formData);
+  const parsed = personLinkEndSchema.safeParse(fields);
+  if (!parsed.success) return failedLink(copy.invalid);
+  const { personId, linkId } = parsed.data;
+  const { supabase, user } = await requireUser(parsed.data.locale);
+
+  const { data: ended, error } = await supabase
+    .from("person_relationships")
+    .update({ valid_until: new Date().toISOString() })
+    .eq("id", linkId)
+    .eq("user_id", user.id)
+    .not("related_person_id", "is", null)
+    .or(`person_id.eq.${personId},related_person_id.eq.${personId}`)
+    .is("valid_until", null)
+    .select("id,person_id,related_person_id,relationship_type")
+    .maybeSingle();
+  if (error) return failedLink(copy.failed);
+  if (!ended || ended.related_person_id === null) return failedLink(copy.linkNotFound);
+
+  const audit = await supabase.from("audit_logs").insert({
+    user_id: user.id,
+    action_type: "end_person_relationship",
+    entity_type: "person_relationship",
+    entity_id: linkId,
+    actor: "user",
+    before_state: { valid_until: null },
+    after_state: {
+      person_id: ended.person_id,
+      related_person_id: ended.related_person_id,
+      relationship_type: ended.relationship_type,
+      ended: true,
+    },
+    reason: "Owner ended a link between two of their people",
+  });
+  if (audit.error) console.error("Person link end audit failed", audit.error.message);
+
+  revalidatePeople(parsed.data.locale, ended.person_id, ended.related_person_id);
+  return { status: "success", message: copy.ended };
 }

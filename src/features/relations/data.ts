@@ -90,6 +90,10 @@ export async function loadRelations(
     supabase
       .from("person_relationships")
       .select("person_id,relationship_type,description,valid_from")
+      // Life Brain E.2: relationships to the owner only. A link between two
+      // of the owner's people (non-null `related_person_id`) is not an edge
+      // from "você", and this projection draws every row as one.
+      .is("related_person_id", null)
       .is("valid_until", null)
       .order("valid_from", { ascending: false })
       .limit(probe),
