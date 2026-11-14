@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain track E planned; track D merged (ADR-168)
+
+- **Documentation only, no migration.** Track D merged: #377, #378, #379.
+- `IMPLEMENTATION_PLAN.md` §6: E.1 Ajustes (T4), E.2 relation between people (T6, one migration authorized if needed), E.3 Relações leaves Memória, E.4 memories by segment, E.5 B.6 streaming.
+- `evidence/proposal-ajustes/`: the approved Ajustes mockups (three desktop, four iPhone).
+
 ## 2026-11-12 — Life Brain D.3: small remainders (ADR-167)
 
 - **No migration.**
