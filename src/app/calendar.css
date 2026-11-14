@@ -1283,3 +1283,34 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   .calendar-month-scroll { display: none; }
   .calendar-month-list { display: block; }
 }
+
+/*
+ * Life Brain D.3 (ADR-167) — a multi-day event is one bar above the days it
+ * covers. Its row is as tall as its line, not the 8–10rem a day cell gets; a
+ * bar that runs past the row on either side loses its rounded end there, so a
+ * trip that began last week reads as continuing.
+ */
+.calendar-week tbody tr.calendar-span-row td,
+.calendar-month tbody tr.calendar-span-row td {
+  height: auto;
+  padding-block: 2px;
+  vertical-align: middle;
+}
+
+.calendar-span-gap { border-bottom-color: transparent; }
+
+.calendar-span-cell .calendar-item[data-density="compact"] {
+  background: var(--background-subtle-strong);
+}
+
+.calendar-span-cell[data-continues-before="true"] .calendar-item {
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+  border-inline-start-style: dashed;
+}
+
+.calendar-span-cell[data-continues-after="true"] .calendar-item {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+  border-inline-end-style: dashed;
+}

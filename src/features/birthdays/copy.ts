@@ -27,6 +27,9 @@ export type BirthdayCopy = {
   readonly proposal: (name: string, date: string) => string;
   readonly accept: string;
   readonly adjust: (name: string) => string;
+  /** Life Brain D.3: the remembered refusal, and what it answers. */
+  readonly decline: string;
+  readonly declined: string;
 };
 
 const PT_MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -58,6 +61,8 @@ const copy: Record<Locale, BirthdayCopy> = {
     proposal: (name, date) => `Guardar o aniversário de ${name}: ${date}?`,
     accept: "Guardar aniversário",
     adjust: (name) => `Outra data? Ajuste na página de ${name}.`,
+    decline: "Não, obrigado",
+    declined: "Tudo bem. Não vou sugerir essa data de novo.",
   },
   en: {
     label: "Birthday",
@@ -84,6 +89,8 @@ const copy: Record<Locale, BirthdayCopy> = {
     proposal: (name, date) => `Keep ${name}'s birthday: ${date}?`,
     accept: "Keep birthday",
     adjust: (name) => `A different date? Adjust it on ${name}'s page.`,
+    decline: "No, thanks",
+    declined: "All right. I won't suggest that date again.",
   },
 };
 

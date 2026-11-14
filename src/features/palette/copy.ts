@@ -11,7 +11,8 @@ import type { Locale } from "@/lib/preferences";
 
 export type PaletteCopy = {
   readonly trigger: string;
-  readonly triggerHint: string;
+  /** Life Brain D.3: ⌘K on an Apple platform, Ctrl+K elsewhere. */
+  readonly triggerHint: { readonly apple: string; readonly other: string };
   readonly title: string;
   readonly inputLabel: string;
   readonly placeholder: string;
@@ -30,7 +31,7 @@ export type PaletteCopy = {
 const copy: Record<Locale, PaletteCopy> = {
   "pt-BR": {
     trigger: "Buscar e agir",
-    triggerHint: "Ctrl+K",
+    triggerHint: { apple: "⌘K", other: "Ctrl+K" },
     title: "O que você quer fazer?",
     inputLabel: "Buscar destinos e ações",
     placeholder: "Digite para ir a algum lugar…",
@@ -69,7 +70,7 @@ const copy: Record<Locale, PaletteCopy> = {
   },
   en: {
     trigger: "Search and act",
-    triggerHint: "Ctrl+K",
+    triggerHint: { apple: "⌘K", other: "Ctrl+K" },
     title: "What do you want to do?",
     inputLabel: "Search destinations and actions",
     placeholder: "Type to go somewhere…",

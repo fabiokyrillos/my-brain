@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
+const inserted: unknown[] = [];
 const person = { data: { id: "11111111-1111-4111-8111-111111111111", name: "Ana" }, error: null as unknown };
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/auth/require-user", () => ({
@@ -9,14 +10,19 @@ vi.mock("@/lib/auth/require-user", () => ({
     supabase: {
       rpc,
       from: () => {
-        const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => person };
+        const chain = {
+          select: () => chain,
+          eq: () => chain,
+          maybeSingle: async () => person,
+          insert: async (row: unknown) => { inserted.push(row); return { error: null }; },
+        };
         return chain;
       },
     },
   })),
 }));
 
-const { setPersonBirthday } = await import("./actions");
+const { declineBirthdayOffer, setPersonBirthday } = await import("./actions");
 const { getBirthdayCopy } = await import("./copy");
 const copy = getBirthdayCopy("pt-BR");
 const idle = { status: "idle" as const, message: "" };
@@ -30,6 +36,31 @@ function form(fields: Record<string, string>) {
 }
 
 beforeEach(() => rpc.mockReset());
+
+describe("declineBirthdayOffer — Life Brain D.3", () => {
+  it("records the owner's 'não, obrigado' for that person and date, and writes nothing else", async () => {
+    inserted.length = 0;
+    const state = await declineBirthdayOffer(idle, form({ day: "5", month: "5", year: "" }));
+    expect(state.status).toBe("success");
+    expect(state.message).toBe(copy.declined);
+    expect(rpc).not.toHaveBeenCalled();
+    expect(inserted).toEqual([expect.objectContaining({
+      user_id: "u1",
+      action_type: "birthday_offer_declined",
+      entity_type: "person",
+      entity_id: person.data.id,
+      actor: "user",
+      after_state: { day: 5, month: 5 },
+    })]);
+  });
+
+  it("refuses an impossible date before any write", async () => {
+    inserted.length = 0;
+    const state = await declineBirthdayOffer(idle, form({ day: "31", month: "2", year: "" }));
+    expect(state.status).toBe("error");
+    expect(inserted).toEqual([]);
+  });
+});
 
 describe("setPersonBirthday", () => {
   it("sends the date and a title built from the person's stored name", async () => {

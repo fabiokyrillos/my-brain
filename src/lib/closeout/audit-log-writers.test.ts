@@ -95,6 +95,12 @@ const DECLARED_WRITERS = [
    * title, body or url (`2M-NOTIFY-009`).
    */
   "src/features/notifications/bulk-data.ts",
+  /*
+   * Life Brain D.3 (ADR-167): "não, obrigado" to a birthday offer, remembered
+   * on every device. The row names the person and the date; it changes nothing
+   * else, and the offer's loader reads it back.
+   */
+  "src/features/birthdays/actions.ts",
 ].sort();
 
 function directWriters(): string[] {

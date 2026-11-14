@@ -39,6 +39,7 @@ import {
   type PaletteAction,
 } from "./actions-registry";
 import { getPaletteCopy } from "./copy";
+import { useApplePlatform } from "./shortcut-hint";
 
 export type CommandPaletteProps = {
   readonly locale: Locale;
@@ -55,6 +56,7 @@ export type CommandPaletteProps = {
 export function CommandPalette({ locale, canCreate = true, onActionChosen }: CommandPaletteProps) {
   const router = useRouter();
   const text = getPaletteCopy(locale);
+  const apple = useApplePlatform();
   const messages = getMessages(locale);
 
   const [open, setOpen] = useState(false);
@@ -192,7 +194,7 @@ export function CommandPalette({ locale, canCreate = true, onActionChosen }: Com
         data-palette-trigger="true"
       >
         <span>{text.trigger}</span>
-        <kbd aria-hidden="true">{text.triggerHint}</kbd>
+        <kbd aria-hidden="true">{apple ? text.triggerHint.apple : text.triggerHint.other}</kbd>
       </button>
 
       {open ? (

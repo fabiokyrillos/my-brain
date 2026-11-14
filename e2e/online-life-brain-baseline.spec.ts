@@ -119,6 +119,8 @@ type Measurement = {
   smallTargets: number;
   smallTargetSamples: string[];
   technicalWords: string[];
+  /** Life Brain D.3: where each technical word was found, so a report can be checked. */
+  technicalContexts: string[];
   textLength: number;
   navItems: string[];
 };
@@ -130,6 +132,9 @@ async function measure(page: Page, route: string, locale: string, viewport: stri
     const doc = document.documentElement;
     const visible = document.body.innerText ?? "";
     const lower = visible.toLowerCase();
+    // A word bounded by non-letters and non-digits, in any script.
+    const bounded = (word: string) =>
+      new RegExp(`(?<![\\p{L}\\p{N}])${word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u");
     const buttons = [...document.querySelectorAll("button, [role='button'], input[type='submit']")];
     const signatures = new Set(
       buttons.map((b) => (b.getAttribute("class") ?? "").split(/\s+/).filter(Boolean).sort().join(" ")),
@@ -162,7 +167,13 @@ async function measure(page: Page, route: string, locale: string, viewport: stri
       underlinedLinks: underlined.length,
       smallTargets: small.length,
       smallTargetSamples: small.slice(0, 6).map(sampleOf),
-      technicalWords: technicalWords.filter((w) => lower.includes(w)),
+      // Life Brain D.3: whole words only. A substring match reported "nan" on
+      // Ajustes for "fi-nan-ças" / "fi-nan-ce"; a word is bounded by non-letters.
+      technicalWords: technicalWords.filter((w) => lower.search(bounded(w)) >= 0),
+      technicalContexts: technicalWords
+        .map((w) => ({ w, at: lower.search(bounded(w)) }))
+        .filter(({ at }) => at >= 0)
+        .map(({ w, at }) => `${w}: …${visible.slice(Math.max(0, at - 30), at + w.length + 30).replace(/\s+/g, " ")}…`),
       textLength: visible.length,
       navItems: [...new Set(nav)],
     };
@@ -236,7 +247,7 @@ test.describe("Life Brain — baseline route audit", () => {
               measurements.push({
                 route: `${route.name}-detail`, locale, viewport: viewport.name, status: 0, finalUrl: "(no detail link found)",
                 overflowPx: 0, h1Count: 0, h1Text: "", buttons: 0, buttonClassSignatures: 0, links: 0, underlinedLinks: 0,
-                smallTargets: 0, smallTargetSamples: [], technicalWords: [], textLength: 0, navItems: [],
+                smallTargets: 0, smallTargetSamples: [], technicalWords: [], technicalContexts: [], textLength: 0, navItems: [],
               });
             }
           }

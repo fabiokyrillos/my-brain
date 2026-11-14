@@ -124,6 +124,28 @@ describe("loadEntryBirthdayProposals", () => {
     expect(calls.map((call) => call.table)).toEqual(["entry_interpretations"]);
   });
 
+  /*
+   * Life Brain D.3 (ADR-167): "não, obrigado" is remembered. A decline is an
+   * audit row naming the person and the date; the same date is not offered
+   * again, on any device. A different date (a later record) still is.
+   */
+  it("does not offer a date the owner declined for that person", async () => {
+    const { client, calls } = fakeClient({
+      entry_interpretations: { data: { raw_output: { people: [person("Ana", { month: 5, day: 5, year: null }), person("Bia", { month: 6, day: 1, year: null })] } }, error: null },
+      entry_person_candidate_resolutions: { data: [{ candidate_index: 0, disposition: "confirmed", person_id: "p-ana" }, { candidate_index: 1, disposition: "confirmed", person_id: "p-bia" }], error: null },
+      entry_entities: { data: [], error: null },
+      people: { data: [{ id: "p-ana", name: "Ana", birthday_month: null }, { id: "p-bia", name: "Bia", birthday_month: null }], error: null },
+      audit_logs: { data: [
+        { entity_id: "p-ana", after_state: { day: 5, month: 5 } },
+        { entity_id: "p-bia", after_state: { day: 2, month: 6 } },
+      ], error: null },
+    });
+    const proposals = await loadEntryBirthdayProposals(client as never, input);
+    expect(proposals.map((proposal) => proposal.name)).toEqual(["Bia"]);
+    const audit = calls.find((call) => call.table === "audit_logs")!;
+    expect(audit.filters).toEqual(expect.arrayContaining([["user_id", "u1"], ["action_type", "birthday_offer_declined"], ["entity_type", "person"]]));
+  });
+
   it("offers nothing when a read fails", async () => {
     const { client } = fakeClient({
       entry_interpretations: { data: { raw_output: { people: [person("Ana", { month: 5, day: 5, year: null })] } }, error: null },

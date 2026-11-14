@@ -272,6 +272,7 @@ Regras comuns às três: um PR por slice, branch `life-brain/<slice>`, teste ant
 - A oferta de aniversário ganha um "não, obrigado" que fica lembrado.
 - Um evento de vários dias vira uma barra na semana e no mês, em vez de repetir em cada dia.
 - Consolidação de breakpoints (599, 600, 899 e 900 px convivem hoje).
+- **Implementado 2026-11-12 (ADR-167), sem migration:** ⌘K numa plataforma Apple; o "nan" era o instrumento casando "Fernando de Noronha" como substring (agora casa palavras inteiras); a recusa do aniversário é um registro em `audit_logs` que a oferta lê; o evento de vários dias é uma barra na semana e no mês; telefone `max-width: 600px`, abaixo do desktop `max-width: 899px`, desktop `min-width: 900px`, com guard.
 
 ### Fora de escopo até o dono decidir
 

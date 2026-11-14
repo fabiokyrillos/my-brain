@@ -71,6 +71,18 @@ export function birthdayProposals(input: {
   return out;
 }
 
+/** Drops a proposal whose person and day/month the owner already declined. */
+export function withoutDeclined(
+  proposals: readonly BirthdayProposal[],
+  declines: readonly { readonly entity_id: string; readonly after_state: unknown }[],
+): BirthdayProposal[] {
+  const declined = new Set(declines.flatMap((row) => {
+    const state = row.after_state as { day?: unknown; month?: unknown } | null;
+    return typeof state?.day === "number" && typeof state.month === "number" ? [`${row.entity_id}:${state.month}-${state.day}`] : [];
+  }));
+  return proposals.filter((proposal) => !declined.has(`${proposal.personId}:${proposal.month}-${proposal.day}`));
+}
+
 export async function loadEntryBirthdayProposals(
   supabase: SupabaseClient,
   input: { readonly userId: string; readonly entryId: string; readonly interpretationId: string },
@@ -113,10 +125,26 @@ export async function loadEntryBirthdayProposals(
     .in("id", personIds);
   if (people.error) return [];
 
-  return birthdayProposals({
+  const proposals = birthdayProposals({
     rawPeople,
     resolutions: resolutions.data ?? [],
     links: links.data ?? [],
     people: people.data ?? [],
   });
+  if (proposals.length === 0) return [];
+
+  /*
+   * Life Brain D.3 (ADR-167): a date the owner declined for that person is not
+   * offered again. An unreadable decline list offers as before — asking again
+   * is the harmless failure, hiding an offer nobody declined is not.
+   */
+  const declines = await supabase
+    .from("audit_logs")
+    .select("entity_id,after_state")
+    .eq("user_id", input.userId)
+    .eq("action_type", "birthday_offer_declined")
+    .eq("entity_type", "person")
+    .in("entity_id", proposals.map((proposal) => proposal.personId));
+  if (declines.error) return proposals;
+  return withoutDeclined(proposals, (declines.data ?? []) as readonly { entity_id: string; after_state: unknown }[]);
 }

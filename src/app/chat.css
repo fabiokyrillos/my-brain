@@ -52,7 +52,7 @@ body .side-rail { overflow-y: auto }
 .chat-empty strong { color: var(--text-primary); font: var(--type-reading-lg); letter-spacing: -.01em }
 .chat-empty p { margin: 0; font: var(--type-body); max-width: var(--width-reading); line-height: 1.6 }
 
-.chat-thread { max-width: 900px }
+.chat-thread { max-width: 899px }
 .chat-thread > header { margin-bottom: var(--space-8) }
 
 /* One column. No `justify-self`, no percentage width, no fill. */
