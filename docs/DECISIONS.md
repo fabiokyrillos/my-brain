@@ -2687,3 +2687,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 3 — The phone's path is the entity pages.** Relações was reached on a phone through the strip; it is now reached through the "Ver ligações" link on every person and project page, and `mobile-reachability-guard.test.ts` asserts that link exists on both.
 
 - **Consequences.** Memória has seven lenses. No URL dies. Renaming the page to "Ligações", and whether the desktop rail should still list it, are left open in `TODO.md`.
+
+## ADR-172 — Life Brain E.4: Memórias by segment, derived, one segment per memory
+
+- **Date:** 2026-11-14
+- **Status:** Accepted. Implements ADR-168 Decision 3. No migration.
+
+- **Context.** The owner's reference: Claude's memory, organised by segment — health, work, personality. `memories` has a `kind` (preference, habit, rule, goal, professional context…), an optional `person_id` and `project_id`, and a `source_entry_id`; the record it came from may be linked to a life area through `entry_entities` (LB-M1's `link_entry_life_area`). There is no segment column, and adding one was not authorized.
+
+- **Decision 1 — Twelve segments.** "Sobre você" (the personality segment), the nine areas the product already names (Saúde, Família, Casa, Finanças, Trabalho, Estudos, Viagens, Lazer, Ideias), "Pessoas" and "Outras".
+- **Decision 2 — One segment per memory, by precedence.** The life area of the source record first (the most specific fact the product holds), then `professional_context` as Trabalho, then a memory about a person (`person_id` or kind `relationship`) as Pessoas, then preferences, habits, rules, restrictions and goals as Sobre você, and the rest as Outras. A record linked to several areas takes the first in segment order, so the result never depends on row order.
+- **Decision 3 — Derived on read, no column.** Two owner-scoped reads bounded by the page's source ids. If they fail, every memory is segmented by kind alone; none disappears.
+- **Decision 4 — Grouped within the page.** The list stays paginated as before, and each page is grouped. Grouping or filtering across the whole list needs the segment in SQL, which is a migration and the owner's call.
+
+- **Consequences.** Memórias reads as segments with counts. A memory saved from chat has no source record, so its segment comes from its kind.

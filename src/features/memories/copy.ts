@@ -1,3 +1,4 @@
+import type { MemorySegment } from "./segments";
 import type { Locale } from "@/lib/preferences";
 
 import type { MemoryLifecycleState } from "./lifecycle";
@@ -133,6 +134,9 @@ type MemoryCopy = {
   /** Classification. */
   readonly kindLabel: string;
   readonly kinds: Readonly<Record<MemoryKind, string>>;
+  /** Life Brain E.4 (ADR-172): the segment headings on Memórias. */
+  readonly segments: Readonly<Record<MemorySegment, string>>;
+  readonly segmentsLabel: string;
   readonly sensitivityLabel: string;
   readonly sensitivities: Readonly<Record<MemorySensitivity, string>>;
   readonly importantLabel: string;
@@ -262,6 +266,21 @@ const copy = {
       goal: "Objetivo",
       fact: "Fato",
     },
+    segments: {
+      self: "Sobre você",
+      health: "Saúde",
+      family: "Família",
+      home: "Casa",
+      finance: "Finanças",
+      work: "Trabalho",
+      study: "Estudos",
+      travel: "Viagens",
+      leisure: "Lazer",
+      ideas: "Ideias",
+      people: "Pessoas",
+      other: "Outras",
+    },
+    segmentsLabel: "Memórias por segmento",
     sensitivityLabel: "Sensibilidade",
     sensitivities: { normal: "Normal", private: "Privada", highly_sensitive: "Muito sensível" },
     importantLabel: "Marcar como importante",
@@ -374,6 +393,21 @@ const copy = {
       goal: "Goal",
       fact: "Fact",
     },
+    segments: {
+      self: "About you",
+      health: "Health",
+      family: "Family",
+      home: "Home",
+      finance: "Finances",
+      work: "Work",
+      study: "Studies",
+      travel: "Travel",
+      leisure: "Leisure",
+      ideas: "Ideas",
+      people: "People",
+      other: "Other",
+    },
+    segmentsLabel: "Memories by segment",
     sensitivityLabel: "Sensitivity",
     sensitivities: { normal: "Normal", private: "Private", highly_sensitive: "Highly sensitive" },
     importantLabel: "Mark as important",

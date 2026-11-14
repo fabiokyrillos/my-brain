@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
+import { areaByEntry, groupBySegment, memorySegment } from "@/features/memories/segments";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { memoryLifecycleState } from "@/features/memories/lifecycle";
 import { asMemoryKind } from "@/features/memories/read";
@@ -100,6 +101,26 @@ export default async function MemoriesPage({
    * memories.
    */
   const resolvableEntryIds = resolvableEntryIdsOf(sourceResult.data);
+
+  /*
+    Life Brain E.4 (ADR-172): the segment of each memory, derived from the life
+    area of the record it came from (`entry_entities` → `contexts.kind`) and its
+    own kind. Two owner-scoped reads, both bounded by this page's source ids;
+    a failure leaves every memory segmented by kind alone, never unlisted.
+  */
+  const areaLinks = sourceIds.length
+    ? await supabase.from("entry_entities").select("entry_id,entity_id").eq("entity_type", "context").in("entry_id", sourceIds)
+    : { data: [], error: null };
+  const areaContextIds = [...new Set((areaLinks.data ?? []).map((link) => link.entity_id))];
+  const areaContexts = areaContextIds.length
+    ? await supabase.from("contexts").select("id,kind").in("id", areaContextIds)
+    : { data: [], error: null };
+  const kindByContext = new Map((areaContexts.data ?? []).map((context) => [context.id, context.kind]));
+  const areas = areaByEntry(
+    (areaLinks.data ?? []).map((link) => ({ entryId: link.entry_id, kind: kindByContext.get(link.entity_id) ?? "" })),
+  );
+  const groups = groupBySegment(items, (memory) => memorySegment(memory, areas));
+  const positionOf = new Map(items.map((memory, index) => [memory.id, index]));
   const provenanceCopy = getProvenanceCopy(locale);
 
   return (
@@ -143,8 +164,16 @@ export default async function MemoriesPage({
       </section>
 
       {items.length ? (
+        <div aria-label={copy.segmentsLabel} className="memory-segments" role="group">
+        {groups.map((group) => (
+        <section aria-labelledby={`memory-segment-${group.segment}`} className="memory-segment" key={group.segment}>
+        <h2 className="memory-segment-title" id={`memory-segment-${group.segment}`}>
+          {copy.segments[group.segment]}
+          <span className="memory-segment-count">{group.items.length}</span>
+        </h2>
         <div className="list-stack">
-          {items.map((memory, index) => {
+          {group.items.map((memory) => {
+            const index = positionOf.get(memory.id) ?? 0;
             const state = memoryLifecycleState(memory, now);
             const related = memory.person_id !== null || memory.project_id !== null;
             const href = `/${locale}/app/memories/${memory.id}`;
@@ -206,6 +235,9 @@ export default async function MemoriesPage({
               </div>
             );
           })}
+        </div>
+        </section>
+        ))}
         </div>
       ) : (
         <UniversalStateView

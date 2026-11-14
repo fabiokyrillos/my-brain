@@ -320,6 +320,7 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 - **Referência do dono:** as memórias do Claude, organizadas por segmento (saúde, trabalho, personalidade…).
 - A lente **Memórias** agrupa por segmento: **Sobre você** (personalidade, preferências, hábitos, regras) e as áreas da vida já existentes (Saúde, Trabalho, Família, Finanças, Casa, Estudos, Lazer, Viagens, Ideias). **Cada memória fica em um segmento só.**
 - Primeiro tenta derivar o segmento do que o banco já sabe (o `kind` da memória e a área do registro de origem). Se for preciso guardar o segmento numa coluna, isso é uma migration **não autorizada**: a slice para e pede.
+- **Implementado 2026-11-14 (ADR-172), sem migration:** o segmento sai da área do registro de origem, depois da pessoa, depois do tipo; agrupado dentro da página da lista paginada. **Fica para depois:** agrupar ou filtrar a lista inteira (exige o segmento no SQL).
 
 ### E.5 — B.6: streaming e progresso real no Conversar (2 d)
 
