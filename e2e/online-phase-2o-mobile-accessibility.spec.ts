@@ -63,6 +63,15 @@ const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey
 const SURFACES = [
   { name: "settings — the whole centre (pt-BR)", path: "/pt-BR/app/settings" },
   { name: "settings — the whole centre (en)", path: "/en/app/settings" },
+  // Life Brain E.1: the centre is six groups at their own URLs (on a phone
+  // `/app/settings` is only the list), so each group is measured once, the
+  // locale alternating as for the narrower routes below.
+  { name: "settings — you and the assistant (pt-BR)", path: "/pt-BR/app/settings/general" },
+  { name: "settings — your day and alerts (en)", path: "/en/app/settings/day" },
+  { name: "settings — what it does alone (pt-BR)", path: "/pt-BR/app/settings/autonomy" },
+  { name: "settings — AI and costs (en)", path: "/en/app/settings/ai" },
+  { name: "settings — appearance (pt-BR)", path: "/pt-BR/app/settings/appearance" },
+  { name: "settings — privacy and account (en)", path: "/en/app/settings/privacy" },
   { name: "cockpit (pt-BR)", path: "/pt-BR/app" },
   { name: "cockpit (en)", path: "/en/app" },
   { name: "notifications (pt-BR)", path: "/pt-BR/app/notifications" },
@@ -410,9 +419,12 @@ test.describe("the chrome exceptions still need their exception", () => {
     */
     await page.setViewportSize({ width: 375, height: 812 });
     await begin(page);
-    await visit(page, "/pt-BR/app/settings");
+    // Life Brain E.1: those controls are the planning form in "Seu dia e avisos",
+    // and on a phone `/app/settings` shows only the list of groups.
+    await visit(page, "/pt-BR/app/settings/day");
+    const planning = page.locator('form[data-settings-form="planning"]');
 
-    const times = page.locator('input[type="time"]');
+    const times = planning.locator('input[type="time"]');
     const timeCount = await times.count();
     expect(timeCount, "no time field rendered, so this assertion measured nothing").toBeGreaterThan(0);
     for (let index = 0; index < timeCount; index += 1) {
@@ -424,14 +436,15 @@ test.describe("the chrome exceptions still need their exception", () => {
       expect(fontSize, "a font below 16px makes iOS zoom the page on focus").toBeGreaterThanOrEqual(16);
     }
 
-    const boxes = page.locator('input[type="checkbox"]');
+    const boxes = planning.locator('input[type="checkbox"]');
     const boxCount = await boxes.count();
     expect(boxCount, "no checkbox rendered, so this assertion measured nothing").toBeGreaterThan(0);
     for (let index = 0; index < boxCount; index += 1) {
+      // Life Brain E.1: the checkbox is a `role="switch"` beside its label, so
+      // the larger of the two is the target a thumb aims at.
       const reachable = await boxes.nth(index).evaluate((element) => {
         const label = element.closest("label") ?? document.querySelector(`label[for="${element.id}"]`);
-        const target = label ?? element;
-        return target.getBoundingClientRect().height;
+        return Math.max(element.getBoundingClientRect().height, label?.getBoundingClientRect().height ?? 0);
       });
       expect(reachable, "a checkbox has no 44px target, label included").toBeGreaterThanOrEqual(44);
     }
@@ -699,7 +712,10 @@ test.describe("the chrome exceptions still need their exception", () => {
     // where a three-column layout silently becomes one unreadable column.
     await page.setViewportSize({ width: 320, height: 720 });
     await begin(page);
-    await visit(page, "/pt-BR/app/notifications");
+    // Life Brain E.1: the facts render in "Seu dia e avisos" (since 2P.5 they are
+    // not on /app/notifications), behind the closed "Como os avisos funcionam".
+    await visit(page, "/pt-BR/app/settings/day");
+    await page.locator(".notification-settings details.settings-how > summary").click();
 
     const facts = page.locator(".notification-facts");
     await expect(facts).toBeVisible();
@@ -723,7 +739,8 @@ test.describe("the chrome exceptions still need their exception", () => {
   test("the credential panel keeps its three facts on three lines at 320px", async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await begin(page);
-    await visit(page, "/pt-BR/app/settings");
+    // Life Brain E.1: the credential panel is in "IA e custos".
+    await visit(page, "/pt-BR/app/settings/ai");
 
     const badge = page.locator(".byok-badge");
     await expect(badge).toBeVisible();
@@ -754,7 +771,8 @@ test.describe("the chrome exceptions still need their exception", () => {
     // renders in production.
     await page.setViewportSize({ width: 375, height: 812 });
     await begin(page);
-    await visit(page, "/pt-BR/app/settings");
+    // Life Brain E.1: the install guide is in "Aparência".
+    await visit(page, "/pt-BR/app/settings/appearance");
 
     const section = page.locator(".install-section");
     await expect(section).toBeVisible();

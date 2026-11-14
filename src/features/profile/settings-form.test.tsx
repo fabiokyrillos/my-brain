@@ -26,6 +26,21 @@ const values = {
 
 afterEach(cleanup);
 
+type Section = "general" | "assistant" | "planning" | "ai";
+
+/**
+ * Life Brain E.1 removed the save button: a select, checkbox or radio saves
+ * when it changes. Each test that used to press "Salvar preferências" now
+ * changes the one control the section is certain to have.
+ */
+async function changeSomething(user: ReturnType<typeof userEvent.setup>, section: Section, locale: "pt-BR" | "en" = "en") {
+  const pt = locale === "pt-BR";
+  if (section === "general") await user.selectOptions(screen.getByLabelText(pt ? "Fuso horário" : "Time zone"), "America/Manaus");
+  if (section === "assistant") await user.selectOptions(screen.getByLabelText(pt ? "Tom" : "Tone"), "professional");
+  if (section === "planning") await user.selectOptions(screen.getByLabelText(pt ? "Dia do fechamento da semana" : "Day the week closes"), "1");
+  if (section === "ai") await user.click(screen.getByRole("radio", { name: pt ? "Econômico" : "Economy" }));
+}
+
 /**
  * Slice 2P.5 gave this form a `section`, so each test names the section whose
  * controls it is about. The assertions themselves are unchanged wherever the
@@ -39,7 +54,8 @@ describe("SettingsForm — Geral", () => {
     render(<SettingsForm action={action} locale="pt-BR" section="general" values={values} />);
 
     expect(screen.getByLabelText("Fuso horário")).toHaveValue("America/Sao_Paulo");
-    expect(screen.getByRole("button", { name: "Salvar preferências" })).toHaveAttribute("type", "submit");
+    // Life Brain E.1: no save button; a change saves (see "saves on change").
+    expect(screen.queryByRole("button", { name: "Salvar preferências" })).not.toBeInTheDocument();
 
     /*
      * `2O-PREF-004` removed two names from this list, and the removal is the
@@ -57,7 +73,6 @@ describe("SettingsForm — Geral", () => {
     for (const hiddenControl of [
       "Seu nome",
       "Nome do agente",
-      "Idioma",
       "Nível de autonomia",
       "Intensidade das cobranças",
       "Planejamento semanal",
@@ -112,7 +127,7 @@ describe("SettingsForm — Assistente", () => {
 
     const describedBy = field.getAttribute("aria-describedby");
     expect(describedBy).toBeTruthy();
-    expect(document.getElementById(describedBy!)?.textContent).toContain("Como o assistente se chama");
+    expect(document.getElementById(describedBy!)?.textContent).toContain("Como ele se chama");
   });
 
   /**
@@ -172,7 +187,7 @@ describe("SettingsForm — Planejamento", () => {
     const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
     render(<SettingsForm action={action} locale="pt-BR" section="planning" values={values} />);
 
-    const override = screen.getByRole("checkbox");
+    const override = screen.getByRole("switch");
     const initial = (override as HTMLInputElement).checked;
     await user.click(override);
     expect((override as HTMLInputElement).checked).toBe(!initial);
@@ -182,23 +197,17 @@ describe("SettingsForm — Planejamento", () => {
 });
 
 describe("SettingsForm — IA", () => {
-  it("keeps real model routing behind an accessible Advanced disclosure", async () => {
+  it("shows the profile and the routes as rows, and a preset rewrites the routes", async () => {
     const user = userEvent.setup();
     const action = vi.fn(async () => ({ status: "success" as const, message: "Preferências salvas." })) as ProfileFormAction;
     render(<SettingsForm action={action} locale="pt-BR" section="ai" values={values} />);
 
-    const summary = screen.getByText("IA avançada").closest("summary");
-    const disclosure = summary?.closest("details");
-    expect(summary).not.toBeNull();
-    expect(disclosure).not.toHaveAttribute("open");
-    expect(screen.getByRole("link", { name: "Ver custos de IA" })).toHaveAttribute("href", "/pt-BR/app/costs");
-
-    await user.click(summary!);
-    expect(disclosure).toHaveAttribute("open");
-    expect(screen.getByRole("radio", { name: /Qualidade máxima.*Recomendado/ })).toBeChecked();
+    expect(screen.getByRole("link", { name: /Custos de IA/ })).toHaveAttribute("href", "/pt-BR/app/costs");
+    expect(screen.getByRole("radio", { name: "Qualidade máxima" })).toBeChecked();
+    expect(screen.getByText(/Recomendado\. Terra no chat/)).toBeInTheDocument();
     expect(screen.getByLabelText("Chat principal")).toHaveValue("gpt-5.6-terra");
 
-    await user.click(screen.getByRole("radio", { name: /Econômico/ }));
+    await user.click(screen.getByRole("radio", { name: "Econômico" }));
     expect(screen.getByLabelText("Chat principal")).toHaveValue("gpt-5-mini");
     expect(screen.getByLabelText("Revisões e resumos")).toHaveValue("gpt-5-mini");
   });
@@ -206,24 +215,24 @@ describe("SettingsForm — IA", () => {
   /**
    * `2O-PREF-009` — advanced preferences are **disclosed**, not hidden.
    *
-   * The distinction the requirement draws: a reader can reach every one of them,
-   * and none is the default view. A `<details>` with no `open` satisfies both —
-   * closed on arrival, one activation away, and present in the DOM the whole
-   * time, so find-in-page and a screen reader's element list both reach it.
-   * Rendering it conditionally would have been hiding.
+   * Life Brain E.1 (ADR-169): the owner approved the AI group with the four
+   * routes visible, on a page a reader only reaches by choosing "IA e custos".
+   * What stays disclosed is the list of routes the profile writes with no
+   * control — present in the DOM while closed, so find-in-page and a screen
+   * reader's element list still reach it.
    */
-  it("discloses the advanced preferences without hiding them", async () => {
+  it("discloses the routes without a control, without hiding them", async () => {
     const user = userEvent.setup();
     const action = vi.fn(async () => ({ status: "success" as const, message: "ok" })) as ProfileFormAction;
     render(<SettingsForm action={action} locale="pt-BR" section="ai" values={values} />);
 
-    const disclosure = screen.getByText("IA avançada").closest("details");
-    expect(disclosure, "the advanced section is not a disclosure").not.toBeNull();
-    expect(disclosure, "advanced is the default view").not.toHaveAttribute("open");
-    // In the DOM while closed: reachable, not conditional.
-    expect(screen.getByLabelText("Chat principal")).toBeInTheDocument();
+    const summary = screen.getByText("Outras funções que o perfil escolhe").closest("summary");
+    const disclosure = summary?.closest("details");
+    expect(disclosure, "the fixed routes are not a disclosure").not.toBeNull();
+    expect(disclosure, "the fixed routes are the default view").not.toHaveAttribute("open");
+    expect(disclosure!.querySelectorAll(".ai-route-fixed").length).toBeGreaterThan(0);
 
-    await user.click(screen.getByText("IA avançada").closest("summary")!);
+    await user.click(summary!);
     expect(disclosure).toHaveAttribute("open");
   });
 
@@ -255,7 +264,7 @@ describe("a section submits its own fields, `section`, and `locale` — nothing 
       const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
       render(<SettingsForm action={action} locale="en" section={section} values={values} />);
 
-      await user.click(screen.getByRole("button", { name: "Save preferences" }));
+      await changeSomething(user, section);
       await waitFor(() => expect(action).toHaveBeenCalled());
 
       const formData = action.mock.calls[0][1] as FormData;
@@ -269,7 +278,7 @@ describe("a section submits its own fields, `section`, and `locale` — nothing 
     const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
     render(<SettingsForm action={action} locale="en" section="planning" values={values} />);
 
-    await user.click(screen.getByRole("button", { name: "Save preferences" }));
+    await changeSomething(user, "planning");
     await waitFor(() => expect(action).toHaveBeenCalled());
     expect((action.mock.calls[0][1] as FormData).get("section")).toBe("planning");
   });
@@ -285,7 +294,7 @@ describe("a section submits its own fields, `section`, and `locale` — nothing 
     for (const section of ["general", "assistant", "planning", "ai"] as const) {
       const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
       const view = render(<SettingsForm action={action} locale="en" section={section} values={values} />);
-      await user.click(screen.getByRole("button", { name: "Save preferences" }));
+      await changeSomething(user, section);
       await waitFor(() => expect(action).toHaveBeenCalled());
       const keys = [...(action.mock.calls[0][1] as FormData).keys()];
       expect(keys, section).not.toContain("planningDay");
@@ -302,12 +311,12 @@ describe("`2P-SETTINGS-007` — a failed save keeps the input and names its sect
    * against a value the reader typed, because the fixture's defaults would pass
    * this even if the form had been rebuilt from scratch.
    */
-  it("keeps what the reader typed when the save fails, and offers the retry", async () => {
+  it("keeps what the reader typed when the save fails, and leaves every control usable", async () => {
     const user = userEvent.setup();
     const action = vi.fn(async () => ({
       status: "error" as const,
       section: "assistant" as const,
-      message: "Não foi possível salvar em Assistente.",
+      message: "Não foi possível salvar em Você e o assistente.",
     })) as ProfileFormAction;
     render(<SettingsForm action={action} locale="pt-BR" section="assistant" values={values} />);
 
@@ -315,17 +324,17 @@ describe("`2P-SETTINGS-007` — a failed save keeps the input and names its sect
     await user.clear(agentName);
     await user.type(agentName, "Aurora");
     await user.selectOptions(screen.getByLabelText("Tom"), "professional");
-    await user.click(screen.getByRole("button", { name: "Salvar preferências" }));
 
     await waitFor(() => expect(action).toHaveBeenCalled());
     // It says so, as an alert rather than a status — a failure the reader must
     // notice, not a result they may.
-    expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível salvar em Assistente");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível salvar em Você e o assistente");
     // The input is still theirs.
     expect(agentName).toHaveValue("Aurora");
     expect(screen.getByLabelText("Tom")).toHaveValue("professional");
-    // And the retry is the same control, still enabled.
-    expect(screen.getByRole("button", { name: "Salvar preferências" })).toBeEnabled();
+    // And the retry is the same controls, still enabled: changing one saves again.
+    for (const control of screen.getAllByRole("combobox")) expect(control).toBeEnabled();
+    expect(agentName).toBeEnabled();
   });
 
   /**
@@ -363,9 +372,74 @@ describe("`2P-SETTINGS-007` — a failed save keeps the input and names its sect
     expect(screen.getByRole("alert")).toHaveTextContent("Falhou em Planejamento.");
   });
 
-  it("announces the localized result returned by the server", () => {
+  it("announces the localized result returned by the server on the receipt", () => {
     const action = vi.fn(async () => ({ status: "success" as const, message: "Preferences saved." })) as ProfileFormAction;
     render(<SettingsForm action={action} initialState={{ status: "success", message: "Preferences saved." }} locale="en" section="general" values={values} />);
     expect(screen.getByRole("status")).toHaveTextContent("Preferences saved.");
+  });
+});
+
+describe("Life Brain E.1 — saves on change, with undo", () => {
+  it("saves when a select changes, with no button to press", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "Preferências salvas." }));
+    render(<SettingsForm action={action} locale="pt-BR" section="assistant" values={values} />);
+
+    await user.selectOptions(screen.getByLabelText("Tom"), "professional");
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect((action.mock.calls[0][1] as FormData).get("tone")).toBe("professional");
+    expect(await screen.findByRole("status")).toHaveTextContent("Preferências salvas.");
+  });
+
+  it("saves a text field when it loses focus changed, and not when it is unchanged", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
+    render(<SettingsForm action={action} locale="pt-BR" section="assistant" values={values} />);
+
+    const name = screen.getByLabelText("Nome do assistente");
+    await user.click(name);
+    await user.tab();
+    expect(action).not.toHaveBeenCalled();
+
+    await user.click(name);
+    await user.clear(name);
+    await user.type(name, "Aurora");
+    await user.tab();
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect((action.mock.calls[0][1] as FormData).get("agentName")).toBe("Aurora");
+  });
+
+  it("undoes a save by saving the values from before it, once", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
+    render(<SettingsForm action={action} locale="pt-BR" section="assistant" values={values} />);
+
+    await user.selectOptions(screen.getByLabelText("Tom"), "professional");
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+
+    await user.click(await screen.findByRole("button", { name: "Desfazer" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    expect((action.mock.calls[1][1] as FormData).get("tone")).toBe("direct");
+    expect(screen.getByLabelText("Tom")).toHaveValue("direct");
+    expect(await screen.findByRole("status")).toHaveTextContent("Desfeito");
+    // An undo is not itself undoable.
+    expect(screen.queryByRole("button", { name: "Desfazer" })).not.toBeInTheDocument();
+  });
+
+  it("undoes a profile choice, putting the routes back", async () => {
+    const user = userEvent.setup();
+    const action = vi.fn<ProfileFormAction>(async () => ({ status: "success" as const, message: "ok" }));
+    render(<SettingsForm action={action} locale="pt-BR" section="ai" values={values} />);
+
+    await user.click(screen.getByRole("radio", { name: "Econômico" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    expect((action.mock.calls[0][1] as FormData).get("chatModel")).toBe("gpt-5-mini");
+
+    await user.click(await screen.findByRole("button", { name: "Desfazer" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+    const undone = action.mock.calls[1][1] as FormData;
+    expect(undone.get("aiProfile")).toBe("quality");
+    expect(undone.get("chatModel")).toBe("gpt-5.6-terra");
+    expect(screen.getByRole("radio", { name: "Qualidade máxima" })).toBeChecked();
   });
 });

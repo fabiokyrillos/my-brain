@@ -157,13 +157,15 @@ test.describe("Dados e IA is one place", () => {
     testInfo.setTimeout(10 * 60_000);
     await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });
 
-    await page.goto("/pt-BR/app/settings");
+    // Life Brain E.1: Dados e IA is in "Privacidade e conta", the only home of
+    // these three doors now that the A.6 "Avançado" nav links are gone.
+    await page.goto("/pt-BR/app/settings/privacy");
     const section = page.getByRole("region", { name: "Dados e IA" });
     await expect(section).toBeVisible({ timeout: 30_000 });
     await expect(section.getByRole("link")).toHaveCount(3);
 
     for (const view of VIEWS) {
-      await page.goto("/pt-BR/app/settings");
+      await page.goto("/pt-BR/app/settings/privacy");
       await section.getByRole("link", { name: view.label }).click();
       await page.waitForURL(new RegExp(`/app/${view.route}$`), { timeout: 30_000 });
       // The URL did not move on: a redirect into Ajustes would have landed here

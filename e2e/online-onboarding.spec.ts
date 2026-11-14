@@ -153,12 +153,11 @@ test.describe("the guided path is offered to a new account and never imposed on 
      * the onboarding feature is allowed to have. Nothing here posts to a path
      * this slice invented, because this slice invented none.
      */
-    await page.goto("/pt-BR/app/settings");
+    // Life Brain E.1: the group's own URL, and the field saves when it loses focus.
+    await page.goto("/pt-BR/app/settings/general");
     await page.getByLabel("Nome do assistente").fill("Aurora");
-    // Named exactly, because the credential panel renders its own save above
-    // this one and `.first()` would have pressed that instead.
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.locator(".settings-feedback.success")).toBeVisible();
+    await page.getByLabel("Nome do assistente").press("Tab");
+    await expect(page.getByRole("status").filter({ hasText: "Preferências salvas" })).toBeVisible();
 
     await page.goto("/pt-BR/app");
     const step = page.locator('[data-step="assistant_identity"]');
@@ -197,7 +196,8 @@ test.describe("the guided path is offered to a new account and never imposed on 
     await page.reload();
     await expect(page.locator('[data-onboarding="offered"]')).toHaveCount(0);
 
-    await page.goto("/pt-BR/app/settings");
+    // Life Brain E.1: the group's own URL (on a phone `/app/settings` is the list).
+    await page.goto("/pt-BR/app/settings/general");
     const restore = page.locator(".onboarding-restore");
     await expect(restore).toBeVisible();
     await restore.getByRole("button", { name: "Mostrar o guia de novo" }).click();

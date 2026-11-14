@@ -87,17 +87,22 @@ test.describe("online Supabase authentication", () => {
     // is really asserting is that the shell greeted somebody at all.
     await expect(page.getByRole("heading", { name: /bom dia|boa tarde|boa noite/i })).toBeVisible();
 
-    await page.goto("/pt-BR/app/settings");
+    // Life Brain E.1: the group's own URL (on a phone `/app/settings` is the list).
+    await page.goto("/pt-BR/app/settings/general");
     await expect(page.getByLabel("Fuso horário")).toHaveValue("America/Sao_Paulo");
     await expect(page.getByLabel("Seu nome")).toHaveCount(0);
     await expect(page.getByLabel("Nome do agente")).toHaveCount(0);
     await expect(page.getByLabel("Resumo diário")).toHaveCount(0);
     await expect(page.getByLabel("Nível de autonomia")).toHaveCount(0);
+    // Life Brain E.1: each change saves itself, in its own form, with its own receipt.
     await page.getByLabel("Fuso horário").selectOption("America/Cayenne");
+    await expect(
+      page.locator('form[data-settings-form="general"]').getByRole("status").filter({ hasText: "Preferências salvas" }),
+    ).toBeVisible();
     await page.getByLabel("Detalhe das respostas").selectOption("detailed");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-
-    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
+    await expect(
+      page.locator('form[data-settings-form="assistant"]').getByRole("status").filter({ hasText: "Preferências salvas" }),
+    ).toBeVisible();
 
     // Read back as the user, through PostgREST, so RLS is what allows it. The
     // password grant is refused by hosted CAPTCHA for every client, so the

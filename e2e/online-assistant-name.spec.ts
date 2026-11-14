@@ -36,7 +36,6 @@ const strings = {
     loginPassword: "Senha",
     loginSubmit: "Entrar",
     nameLabel: "Nome do assistente",
-    save: "Salvar preferências",
     saved: "Preferências salvas.",
     destination: "Conversar",
     composerLabelDefault: "O que você quer dizer ao Brain?",
@@ -51,7 +50,6 @@ const strings = {
     loginPassword: "Password",
     loginSubmit: "Sign in",
     nameLabel: "Assistant name",
-    save: "Save preferences",
     saved: "Preferences saved.",
     destination: "Talk",
     composerLabelDefault: "What do you want to tell Brain?",
@@ -113,15 +111,17 @@ test.describe("the assistant name", () => {
       await page.goto(`/${locale}/app/chat`);
       await expect(page.getByLabel(text.composerLabelDefault)).toBeVisible();
 
-      // The field UX-06 found missing, carrying the stored default.
-      await page.goto(`/${locale}/app/settings`);
+      // The field UX-06 found missing, carrying the stored default. Life Brain
+      // E.1: the group's own URL, since on a phone `/app/settings` is the list.
+      await page.goto(`/${locale}/app/settings/general`);
       const nameField = page.getByLabel(text.nameLabel);
       await expect(nameField).toBeVisible();
       await expect(nameField).toHaveValue("Brain");
 
+      // Life Brain E.1: no save button; a text field saves when it loses focus.
       await nameField.fill(RENAMED);
-      await page.getByRole("button", { name: text.save }).click();
-      await expect(page.getByRole("status")).toContainText(text.saved, { timeout: 30_000 });
+      await nameField.press("Tab");
+      await expect(page.getByRole("status").filter({ hasText: text.saved })).toBeVisible({ timeout: 30_000 });
 
       // It persisted: a reload reads it back from the column, not from the form.
       await page.reload();
@@ -156,10 +156,10 @@ test.describe("the assistant name", () => {
       await expect(page).toHaveTitle(/My Brain/);
 
       // Restore, so the next locale starts from the documented default.
-      await page.goto(`/${locale}/app/settings`);
+      await page.goto(`/${locale}/app/settings/general`);
       await page.getByLabel(text.nameLabel).fill("Brain");
-      await page.getByRole("button", { name: text.save }).click();
-      await expect(page.getByRole("status")).toContainText(text.saved, { timeout: 30_000 });
+      await page.getByLabel(text.nameLabel).press("Tab");
+      await expect(page.getByRole("status").filter({ hasText: text.saved })).toBeVisible({ timeout: 30_000 });
     });
   }
 });

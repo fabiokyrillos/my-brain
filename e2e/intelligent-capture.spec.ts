@@ -378,13 +378,12 @@ test.describe("converged daily journey — capture, review, and confirmation", (
     await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
   });
 
-  test("Settings persists AI routing preferences under progressive disclosure", async () => {
-    await page.goto("/pt-BR/app/settings");
-    await page.getByText("IA avançada").click();
-    await page.getByRole("radio", { name: /Econômico/ }).click();
+  test("Settings persists AI routing preferences when the profile changes", async () => {
+    // Life Brain E.1: the AI group has its own page, and a change saves itself.
+    await page.goto("/pt-BR/app/settings/ai");
+    await page.getByRole("radio", { name: "Econômico" }).click();
     await expect(page.getByLabel("Chat principal")).toHaveValue("gpt-5-mini");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.getByRole("status")).toHaveText("Preferências salvas.");
+    await expect(page.getByRole("status").filter({ hasText: "Preferências salvas" })).toBeVisible();
     const preferencesResponse = await fetch(`${supabaseUrl}/rest/v1/agent_preferences?select=ai_profile,chat_model,reasoning_model,review_model&user_id=eq.${user!.userId}`, {
       headers: { apikey: publishableKey!, authorization: `Bearer ${user!.accessToken}` },
     });

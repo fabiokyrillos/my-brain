@@ -1,8 +1,10 @@
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import type { Locale } from "@/lib/preferences";
 import { getSettingsCopy } from "./copy";
-import { SETTINGS_PANEL_ID, type SettingsSection } from "./sections";
+import { SETTINGS_PANEL_ID, settingsSectionHref, type SettingsSection } from "./sections";
 
 /**
  * One section's content, as a named region that focus can land on.
@@ -31,10 +33,17 @@ import { SETTINGS_PANEL_ID, type SettingsSection } from "./sections";
 export function SettingsPanel({
   locale,
   section,
+  root = false,
   children,
 }: {
   locale: Locale;
   section: SettingsSection;
+  /**
+   * Life Brain E.1: rendered at `/app/settings` itself. On a desktop that is
+   * the default group beside the rail; on a phone it is the list of groups,
+   * and the panel is hidden (`settings-extended.css`).
+   */
+  root?: boolean;
   children: ReactNode;
 }) {
   const copy = getSettingsCopy(locale);
@@ -44,16 +53,27 @@ export function SettingsPanel({
     <section
       aria-label={name}
       className="settings-panel"
+      data-root={root ? "" : undefined}
       data-settings-section={section}
       id={SETTINGS_PANEL_ID}
       tabIndex={-1}
     >
       {/*
-        One sentence saying what is in here, before the controls. It is a
-        paragraph rather than a heading on purpose: it describes the section the
-        reader just chose, and a second heading between the page title and the
-        controls would push every control's own `<h2>` a level down for nothing.
+        Life Brain E.1: the phone's way back to the list of groups. Hidden on a
+        desktop, where the list never left. It points at `/app/settings`, which
+        on a phone shows the groups, rather than calling history.back(): a
+        group opened from a notification has no list behind it.
       */}
+      <Link className="settings-back" href={settingsSectionHref(locale, "general")}>
+        <ChevronLeft aria-hidden="true" size={16} />
+        {copy.back}
+      </Link>
+      {/*
+        The group's name, as the panel's visible title. A paragraph styled as a
+        title rather than a heading: the page's one `<h1>` is above, and every
+        component inside keeps the `<h2>` it already had (see the layout).
+      */}
+      <p aria-hidden="true" className="settings-panel-title">{name}</p>
       <p className="settings-panel-summary">{summary}</p>
       {children}
     </section>

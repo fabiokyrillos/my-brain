@@ -111,7 +111,8 @@ test.describe("conversational creation (2G.2)", () => {
 
       // The credential the turn will spend on — configured once, first locale.
       if (locale === "pt-BR") {
-        await page.goto("/en/app/settings");
+        // Life Brain E.1: the credential panel lives in "AI and costs".
+        await page.goto("/en/app/settings/ai");
         await page.getByLabel("API key").fill(productKey!);
         await page.getByRole("button", { name: /save/i }).click();
         await expect(page.getByText(/configured|active/i).first()).toBeVisible({ timeout: 60_000 });

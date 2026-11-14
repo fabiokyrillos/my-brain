@@ -1533,3 +1533,582 @@
 
   .notification-item-trailing .notification-menu-trigger--icon { flex: none; }
 }
+
+/* ==========================================================================
+   Life Brain E.1 (ADR-169) — Configurações redesenhada.
+
+   The approved mockups (`docs/reports/life-brain/evidence/proposal-ajustes/`):
+   six groups; on a phone a list of groups that opens each one, on a desktop a
+   rail beside the open group; cards of rows instead of numbered forms; a save
+   receipt with undo instead of a save bar.
+
+   At the END of the file on purpose, after every earlier settings rule: the
+   same reason the 2P.5 block above gives — a later base rule silently beats an
+   earlier media query of equal specificity.
+   ========================================================================== */
+
+/* --- The list of groups ------------------------------------------------- */
+
+.settings-nav-list { gap: var(--space-1); }
+.settings-nav-list-apart {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-default);
+}
+
+.settings-nav-link {
+  gap: var(--space-3);
+  font: var(--type-label);
+}
+
+.settings-nav-icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.settings-nav-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-nav-name { color: inherit; }
+
+/* The summary and the chevron belong to the phone's list; the desktop rail
+   shows the open group beside it, so they would only repeat it. */
+.settings-nav-summary,
+.settings-nav-chevron { display: none; }
+
+.settings-nav-link.active {
+  border-color: var(--border-default);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-1);
+}
+
+.settings-nav-link.active .settings-nav-icon { color: var(--link); }
+
+/* --- The open group ----------------------------------------------------- */
+
+.settings-back { display: none; }
+
+.settings-panel { gap: var(--space-6); }
+
+.settings-panel-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-title-2);
+}
+
+.settings-panel-summary {
+  margin: calc(-1 * var(--space-4)) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+/* A group: a small title, an optional note, and a card of rows. Scoped to the
+   panel so it outranks the 2P-era `.settings-form` card in `globals.css`,
+   which `@import` places after this file. */
+.settings-panel .settings-form {
+  margin: 0;
+  overflow: visible;
+  display: grid;
+  gap: var(--space-6);
+  border: 0;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.settings-group {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-group-title {
+  margin: 0 0 0 var(--space-1);
+  color: var(--text-muted);
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.settings-group-note {
+  margin: 0 0 var(--space-1) var(--space-1);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.settings-card {
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--border-default);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.settings-card > .settings-row:first-child,
+.settings-card > :first-child.settings-row { border-top: 0; }
+
+.settings-row-copy {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-row-copy label,
+.settings-row-copy strong,
+.settings-row-label {
+  color: var(--text-primary);
+  font: var(--type-body);
+  font-weight: 500;
+}
+
+.settings-row-copy small,
+.settings-row-hint {
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.settings-row-control {
+  display: flex;
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.settings-row-control select,
+.settings-row-control input[type="text"],
+.settings-row-control input[type="time"],
+.settings-row-control input[type="number"] {
+  min-height: var(--touch-target);
+  max-width: 280px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+
+.settings-row-control input[type="text"] { width: 220px; }
+.settings-row-control input[type="number"] { width: 88px; }
+.settings-row-control select { width: 260px; }
+
+/* A row stacked: a legend above a segmented control (the AI profile). */
+.settings-row-stack {
+  display: grid;
+  gap: var(--space-2);
+  min-inline-size: 0;
+}
+
+.settings-card.ai-routes { margin: 0; }
+
+.ai-profile-fieldset .settings-row-legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  color: var(--text-primary);
+  font: var(--type-body);
+  font-weight: 500;
+}
+
+.settings-row-link { cursor: pointer; }
+.settings-row-link:hover { background: var(--background-subtle); }
+.settings-row-link > svg { flex: 0 0 auto; color: var(--text-muted); }
+
+/* --- Segmented control and switch -------------------------------------- */
+
+.settings-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+}
+
+.settings-segment {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 var(--space-3);
+  border-radius: calc(var(--radius-md) - 2px);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.settings-segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-segment.active {
+  background: var(--background-surface);
+  box-shadow: var(--elevation-1);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.settings-segment:has(input:focus-visible),
+.settings-segment:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+/* The important-reminder override, drawn as a switch. Still a checkbox to the
+   form and to a screen reader (`role="switch"` names the shape). */
+.settings-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 26px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--border-strong);
+  appearance: none;
+  cursor: pointer;
+  transition: background var(--motion-standard) var(--ease-enter);
+}
+
+.settings-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--background-surface);
+  box-shadow: var(--elevation-1);
+  transition: transform var(--motion-standard) var(--ease-enter);
+}
+
+.settings-switch:checked { background: var(--tone-success-fg); }
+.settings-switch:checked::after { transform: translateX(18px); }
+.settings-switch:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* The switch is 26px tall, so its label carries the 44px target (`2O-MOBILE`):
+   the label is tied to it by `htmlFor`, and a press on it toggles the switch. */
+.settings-row:has(.settings-switch) .settings-row-copy label {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  cursor: pointer;
+}
+
+/* --- Disclosures: the explanations the surface no longer leads with ------ */
+
+.settings-how {
+  border: 0;
+  padding: 0;
+}
+
+.settings-how > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-how > summary::-webkit-details-marker { display: none; }
+.settings-how > summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--motion-standard) var(--ease-enter);
+}
+.settings-how[open] > summary::before { transform: rotate(45deg); }
+
+.settings-how[open] > :not(summary) { margin-top: var(--space-3); }
+
+/* --- The save receipt --------------------------------------------------- */
+
+.settings-feedback-region:empty { display: none; }
+
+.settings-feedback.error {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--tone-risk-bg, var(--background-subtle));
+  color: var(--tone-risk-fg);
+  font: var(--type-caption);
+}
+
+.settings-receipt {
+  position: fixed;
+  right: var(--space-8);
+  bottom: var(--space-6);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: min(560px, calc(100vw - 2 * var(--space-4)));
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--background-inverse);
+  box-shadow: var(--elevation-undo);
+  color: var(--text-inverse);
+  font: var(--type-label);
+}
+
+.settings-receipt-undo {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- The other groups' components, brought into the same shape ---------- */
+
+.settings-panel :is(.notification-settings, .appearance-section, .install-section, .data-ai-section, .automation-section, .credential-panel, .onboarding-restore) {
+  margin: 0;
+}
+
+/* Privacidade e conta: the components written as reading pages get the
+   surface's shape — a heading, small group titles, the census as a grid of
+   numbers, and the doors as rows of one card. Prefixed with `.settings-panel`
+   because `history.css` is imported after this file. */
+.settings-panel .data-ai-section {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  border: 0;
+}
+
+.settings-panel .data-ai-section > h2 {
+  margin: var(--space-2) 0 var(--space-1);
+  font: var(--type-heading);
+}
+
+.settings-panel .data-ai-section h3 {
+  margin: var(--space-4) 0 0 var(--space-1);
+  color: var(--text-muted);
+  font: var(--type-section);
+  letter-spacing: var(--eyebrow-tracking);
+  text-transform: uppercase;
+}
+
+.settings-panel .data-ai-intro { font: var(--type-caption); }
+
+.settings-panel .privacy-census {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--border-default);
+  list-style: none;
+}
+
+.settings-panel .privacy-census > li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--background-surface);
+}
+
+.settings-panel .privacy-census > li > strong {
+  order: 2;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.settings-panel .privacy-census > li > span:first-of-type {
+  order: 1;
+  color: var(--text-primary);
+  font: var(--type-reading);
+}
+
+.settings-panel .privacy-census > li > :is(a, .privacy-census-nosurface) {
+  order: 3;
+  font: var(--type-caption);
+}
+
+.settings-panel .privacy-census > li > a { color: var(--link); }
+
+.settings-panel .data-ai-doors {
+  grid-template-columns: 1fr;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+}
+
+.settings-panel .data-ai-doors > li + li { border-top: 1px solid var(--border-default); }
+
+.settings-panel .data-ai-door {
+  min-height: 56px;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 0;
+}
+
+.settings-panel .data-ai-door strong { font: var(--type-body); font-weight: 500; }
+
+.settings-panel .privacy-details[open] { display: grid; gap: var(--space-2); }
+
+/* "O que você aceitou": each document a row — its name, the version and date
+   accepted, whether it is current, and the link — instead of four inline
+   pieces that ran together ("Termos de usoVersão 2026-08-04…"). */
+.settings-panel .privacy-consent {
+  display: grid;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
+  list-style: none;
+}
+
+.settings-panel .privacy-consent > li {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.settings-panel .privacy-consent > li + li { border-top: 1px solid var(--border-default); }
+.settings-panel .privacy-consent > li > strong { color: var(--text-primary); font: var(--type-body); font-weight: 500; }
+.settings-panel .privacy-consent > li > a { color: var(--link); }
+
+/* --- Phone: a list of groups, then one group at a time ------------------ */
+
+@media (max-width: 899px) {
+  .settings-nav-list {
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-default);
+    border-top: 1px solid var(--border-default);
+    border-radius: var(--radius-lg);
+    background: var(--background-surface);
+  }
+
+  .settings-nav-list > li { border-bottom: 1px solid var(--border-default); }
+  .settings-nav-list > li:last-child { border-bottom: 0; }
+  .settings-nav-list-apart { margin-top: var(--space-4); padding-top: 0; }
+
+  .settings-nav-link,
+  .settings-nav-link.active {
+    min-height: 64px;
+    padding: var(--space-3) var(--space-4);
+    border: 0;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--text-primary);
+    font-weight: 500;
+  }
+
+  .settings-nav-icon,
+  .settings-nav-link.active .settings-nav-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    color: var(--background-surface);
+  }
+
+  .settings-nav-link[data-section="general"] .settings-nav-icon { background: var(--link); }
+  .settings-nav-link[data-section="day"] .settings-nav-icon { background: var(--tone-attention-fg); }
+  .settings-nav-link[data-section="autonomy"] .settings-nav-icon { background: var(--tone-success-fg); }
+  .settings-nav-link[data-section="ai"] .settings-nav-icon { background: var(--tone-suggestion-fg); }
+  .settings-nav-link[data-section="appearance"] .settings-nav-icon { background: var(--text-secondary); }
+  .settings-nav-link[data-section="privacy"] .settings-nav-icon { background: var(--tone-risk-fg); }
+
+  .settings-nav-name { font: var(--type-body); font-weight: 500; }
+  .settings-nav-summary { display: block; overflow: hidden; color: var(--text-secondary); font: var(--type-caption); text-overflow: ellipsis; white-space: nowrap; }
+  .settings-nav-chevron { display: block; flex: 0 0 auto; color: var(--text-muted); }
+
+  /* At `/app/settings` the phone shows the list; the default group it also
+     renders (for the desktop) waits behind its own row. */
+  .settings-layout:has(> .settings-panel[data-root]) > .settings-panel { display: none; }
+
+  /* Inside a group, the list and the page title step aside for the back link
+     and the group's own title. The `<h1>` stays in the accessibility tree. */
+  .settings-layout:has(> .settings-panel:not([data-root])) > .settings-nav { display: none; }
+  .settings-page:has(.settings-panel:not([data-root])) > .ui-page-header {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .settings-page:has(.settings-panel:not([data-root])) .settings-layout { margin-top: 0; }
+
+  .settings-back {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-height: var(--touch-target);
+    margin-bottom: calc(-1 * var(--space-4));
+    color: var(--link);
+    font: var(--type-label);
+    text-decoration: none;
+  }
+
+  .settings-panel-title { font: var(--type-title-1); }
+
+  /* A row whose control is wide (a select) puts it under its label. */
+  .settings-row:has(.settings-row-control select),
+  .settings-row:has(.settings-row-control input[type="text"]) {
+    flex-wrap: wrap;
+  }
+  .settings-row:has(.settings-row-control select) .settings-row-control,
+  .settings-row:has(.settings-row-control input[type="text"]) .settings-row-control {
+    flex: 1 1 100%;
+  }
+  .settings-row-control select,
+  .settings-row-control input[type="text"] { width: 100%; max-width: none; }
+
+  .settings-panel .privacy-census { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .settings-receipt {
+    right: var(--space-4);
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    left: var(--space-4);
+    justify-content: center;
+  }
+}

@@ -335,7 +335,7 @@ describe("a failure names its section and writes nothing", () => {
     );
     expect(result.status).toBe("error");
     expect(result.section).toBe("general");
-    expect(result.message).toContain("General");
+    expect(result.message).toContain("You and the assistant");
     expect(rpc).not.toHaveBeenCalled();
   });
 
@@ -345,7 +345,7 @@ describe("a failure names its section and writes nothing", () => {
     const result = await updateProfile({ status: "idle", message: "" }, sectionFormData("planning"));
     expect(result.status).toBe("error");
     expect(result.section).toBe("planning");
-    expect(result.message).toContain("Planning");
+    expect(result.message).toContain("Your day and alerts");
   });
 
   it("reports the section on success too, so the message lands on the right form", async () => {

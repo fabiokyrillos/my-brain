@@ -83,6 +83,10 @@ const ROUTES: readonly Route[] = [
   { name: "jobs", path: "/app/jobs" },
   { name: "costs", path: "/app/costs" },
   { name: "settings", path: "/app/settings", en: true },
+  // Life Brain E.1: the groups the 2P.5 slugs now redirect to, captured by name.
+  { name: "settings-general", path: "/app/settings/general" },
+  { name: "settings-day", path: "/app/settings/day" },
+  { name: "settings-autonomy", path: "/app/settings/autonomy" },
   { name: "settings-ai", path: "/app/settings/ai" },
   { name: "settings-notifications", path: "/app/settings/notifications" },
   { name: "settings-appearance", path: "/app/settings/appearance" },

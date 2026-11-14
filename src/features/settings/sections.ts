@@ -1,10 +1,11 @@
 /**
- * Phase 2P slice 2P.5 — the eight Settings sections, as one closed contract.
+ * Phase 2P slice 2P.5 — the Settings sections, as one closed contract (six
+ * groups since Life Brain E.1; see `SETTINGS_SECTIONS`).
  *
  * `2P-SETTINGS-001` names them and `2P-SETTINGS-002` requires each to carry a
  * stable deep link. Both are properties of this module: the list is closed, the
  * href is derived from the key, and nothing else in the product may invent a
- * ninth by writing a URL.
+ * seventh by writing a URL.
  *
  * ## Why Geral has no slug
  *
@@ -29,25 +30,46 @@
 import type { Locale } from "@/lib/preferences";
 
 /**
- * The eight, in the order they are presented.
+ * The six groups, in the order they are presented (Life Brain E.1, ADR-169).
  *
- * The order is the reading order the owner signed: what the product is set to
- * do (Geral, Assistente), what it is allowed to use (IA), when it acts
- * (Planejamento, Notificações), what it holds (Privacidade e dados), how it
- * looks (Aparência), and the way out (Conta) — last, because everything above
- * it is something you came here to change and this is where you go when you are
- * done.
+ * The owner's T4 feedback ("precisa ser redesenhada 1000%") and the mockups he
+ * approved on 2026-11-14 (`docs/reports/life-brain/evidence/proposal-ajustes/`)
+ * replaced 2P.5's eight sections with six groups named from the reader's side:
+ * who the assistant is (`general`), when it may interrupt (`day`, which joins
+ * Planejamento and Notificações), what it may do alone (`autonomy`), what it
+ * uses and costs (`ai`), how it looks (`appearance`), and what it holds plus
+ * the way out (`privacy`, which absorbed Conta) — still last.
  */
 export const SETTINGS_SECTIONS = [
   "general",
-  "assistant",
+  "day",
+  "autonomy",
   "ai",
-  "planning",
-  "notifications",
-  "privacy",
   "appearance",
-  "account",
+  "privacy",
 ] as const;
+
+/**
+ * The 2P.5 slugs that no longer name a group, and the group each now lives in.
+ *
+ * Every one of them was a published deep link (`2P-SETTINGS-002`), so none may
+ * start answering 404: `[section]/page.tsx` redirects each to its group.
+ */
+export const LEGACY_SETTINGS_SECTIONS = {
+  assistant: "general",
+  planning: "day",
+  notifications: "day",
+  account: "privacy",
+} as const satisfies Readonly<Record<string, SettingsSectionKey>>;
+
+type SettingsSectionKey = (typeof SETTINGS_SECTIONS)[number];
+
+export type LegacySettingsSection = keyof typeof LEGACY_SETTINGS_SECTIONS;
+
+export function legacySettingsTarget(value: unknown): SettingsSectionKey | null {
+  if (typeof value !== "string" || !Object.hasOwn(LEGACY_SETTINGS_SECTIONS, value)) return null;
+  return LEGACY_SETTINGS_SECTIONS[value as LegacySettingsSection];
+}
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number];
 
@@ -83,6 +105,20 @@ export function settingsSectionHref(locale: Locale, section: SettingsSection): s
 }
 
 /**
+ * The href a group's row in the list of groups opens (Life Brain E.1).
+ *
+ * The same as `settingsSectionHref` except for the default group, which opens
+ * its explicit `/general` slug: on a phone `/app/settings` IS the list of
+ * groups, so a row pointing there would never open anything. Both URLs mount
+ * the same component, so a desktop reader sees no difference.
+ */
+export function settingsGroupHref(locale: Locale, section: SettingsSection): string {
+  return section === DEFAULT_SETTINGS_SECTION
+    ? `/${locale}/app/settings/${section}`
+    : settingsSectionHref(locale, section);
+}
+
+/**
  * Which section a pathname is in, or `null` if it is not a settings route.
  *
  * Accepts both `/app/settings` and `/app/settings/general` for Geral, matching
@@ -95,11 +131,13 @@ export function settingsSectionFromPath(pathname: string): SettingsSection | nul
   if (!match) return null;
   const slug = match[1];
   if (slug === undefined) return DEFAULT_SETTINGS_SECTION;
-  return isSettingsSection(slug) ? slug : null;
+  // A 2P.5 slug resolves to the group it now lives in, so the rail and the
+  // section nav still mark the right place during the redirect.
+  return isSettingsSection(slug) ? slug : legacySettingsTarget(slug);
 }
 
 /**
- * The two route patterns that cover all eight sections, in every locale.
+ * The two route patterns that cover every section, in every locale.
  *
  * `node_modules/next/dist/docs/01-app/03-api-reference/04-functions/revalidatePath.md`
  * requires the `'page'` type whenever the path carries a dynamic segment, and

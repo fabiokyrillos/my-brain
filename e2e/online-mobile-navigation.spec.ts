@@ -81,8 +81,7 @@ test.describe("authenticated converged navigation", () => {
             switchLanguage: "Mudar idioma para inglês",
             allSaved: "Nada pendente. Tudo salvo.",
             attentionSection: "Precisa de você",
-            advanced: "IA avançada",
-            costsLink: "Ver custos de IA",
+            costsLink: /^Custos de IA/,
             hiddenSettings: ["Resumo diário", "Nível de autonomia", "Privacidade padrão"],
             reviewsHeading: "Revisões",
             onDemandReview: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
@@ -113,8 +112,7 @@ test.describe("authenticated converged navigation", () => {
             switchLanguage: "Switch language to Portuguese",
             allSaved: "Nothing pending. Everything is saved.",
             attentionSection: "Needs you",
-            advanced: "Advanced AI",
-            costsLink: "View AI costs",
+            costsLink: /^AI costs/,
             hiddenSettings: ["Daily review", "Autonomy level", "Default privacy"],
             reviewsHeading: "Reviews",
             onDemandReview: "Generate a review when you choose; nothing runs from a configured schedule.",
@@ -238,21 +236,22 @@ test.describe("authenticated converged navigation", () => {
       /*
         The retired preferences must be offered by NO section, so the absence is
         checked on every one of them rather than on the page they used to share.
-        The advanced routing disclosure is the IA section.
+        Life Brain E.1: the six groups, each at its own URL.
       */
-      for (const section of ["", "/assistant", "/ai", "/planning", "/privacy", "/appearance", "/account"]) {
+      for (const section of ["/general", "/day", "/autonomy", "/ai", "/appearance", "/privacy"]) {
         await page.goto(`/${locale}/app/settings${section}`);
         for (const hiddenSetting of labels.hiddenSettings) {
           await expect(page.getByLabel(hiddenSetting, { exact: true })).toHaveCount(0);
         }
       }
+      // Life Brain E.1: no "IA avançada" disclosure; the costs door is a visible
+      // row of the AI form, and is the touch target the summary used to be.
       await page.goto(`/${locale}/app/settings/ai`);
-      const advancedSummary = page.locator("summary").filter({ hasText: labels.advanced });
-      const advancedBox = await advancedSummary.boundingBox();
-      expect(advancedBox?.width).toBeGreaterThanOrEqual(44);
-      expect(advancedBox?.height).toBeGreaterThanOrEqual(44);
-      await advancedSummary.click();
-      await expect(page.getByRole("link", { name: labels.costsLink })).toHaveAttribute("href", `/${locale}/app/costs`);
+      const costsRow = page.locator('form[data-settings-form="ai"]').getByRole("link", { name: labels.costsLink });
+      const costsBox = await costsRow.boundingBox();
+      expect(costsBox?.width).toBeGreaterThanOrEqual(44);
+      expect(costsBox?.height).toBeGreaterThanOrEqual(44);
+      await expect(costsRow).toHaveAttribute("href", `/${locale}/app/costs`);
 
       await page.goto(`/${locale}/app/reviews`);
       await expect(page.getByRole("heading", { name: labels.reviewsHeading, exact: true })).toBeVisible();
