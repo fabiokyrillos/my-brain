@@ -467,8 +467,9 @@ describe("2P-CHAT-004/005: Conversation is reachable, and the way in carries no 
     expect(BRAIN_LENSES[0]).toBe("overview");
     expect(BRAIN_LENSES[1]).toBe("chat");
     expect(BRAIN_DOMAIN_LENSES[0]).toBe("chat");
-    // Nothing was dropped by the reorder.
-    expect(BRAIN_DOMAIN_LENSES).toHaveLength(8);
+    // Nothing was dropped by the reorder (seven since Life Brain E.3 took
+    // Relações out of Memória, ADR-171).
+    expect(BRAIN_DOMAIN_LENSES).toHaveLength(7);
     expect(new Set(BRAIN_LENSES).size).toBe(BRAIN_LENSES.length);
   });
 

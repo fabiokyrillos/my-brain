@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { UniversalStateLine } from "@/features/experience/universal-state";
 
-import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { getRelationsCopy } from "@/features/relations/copy";
@@ -95,13 +94,11 @@ export default async function RelationsPage({
       </header>
 
       {/*
-        The strip does not promote this surface. `2N-RELATION-006` says the graph
-        is never primary navigation, and it still is not: `relations` keeps
-        `visibility: "more"` in `capabilities.ts` and appears in the rail only
-        behind the disclosure. Being a lens of Brain is where it already sat in
-        the registry — this is the strip saying so.
+        Life Brain E.3 (ADR-171): no Memória lens strip here any more. The
+        owner took Relações out of Memória; this page is each person's and
+        project's "Ligações", reached from their pages, and a strip with no
+        current lens would say it belongs somewhere it no longer does.
       */}
-      <BrainLensTabs active="relations" locale={locale} />
 
       {outcome.status === "failed" ? (
         <section className="relations-section">

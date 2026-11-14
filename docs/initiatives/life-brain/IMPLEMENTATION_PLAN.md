@@ -313,6 +313,7 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 
 - A lente **Relações** sai da faixa da Memória; as ligações de cada pessoa ou projeto (pessoas, projetos, organizações, áreas) aparecem na página dela, numa seção "Ligações", com o tipo da E.2.
 - `/app/relations` (ou a rota da lente) redireciona para a Memória; o desenho de grafo deixa de ser um destino. Guards e jornadas atualizados.
+- **Implementado 2026-11-14 (ADR-171), sem migration, com um desvio:** Relações sai da faixa e do resumo da Memória (`NOT_A_LENS`), mas `/app/relations` **não** redireciona. A página já abre focada em uma pessoa ou projeto a partir do "Ver ligações" da página deles, então fica sendo as "Ligações" de cada um. Um redirecionamento quebraria esses links.
 
 ### E.4 — Memória por segmentos (2 d)
 

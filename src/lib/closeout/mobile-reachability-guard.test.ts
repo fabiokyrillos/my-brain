@@ -101,14 +101,23 @@ describe("the bar is what it says it is", () => {
 });
 
 describe("every context lens is reached from Brain, not only from the disclosure", () => {
-  it("the lens strip links to all eight", () => {
+  it("the lens strip links to all seven", () => {
     // The strip maps `BRAIN_LENSES` and builds each href through the registry,
     // so the eight are structurally present rather than transcribed. Asserted
     // against the derived list so an added ninth is covered without an edit.
     const strip = code("src/features/library/brain-lenses.tsx");
     expect(strip).toContain("BRAIN_LENSES.map");
     expect(strip).toContain("getNavigationHref(locale, lens)");
-    expect(BRAIN_DOMAIN_LENSES.length).toBe(8);
+    // Seven since Life Brain E.3 (ADR-171): Relações left the strip.
+    expect(BRAIN_DOMAIN_LENSES.length).toBe(7);
+  });
+
+  it("reaches Relações from every person's and project's page, since it left the strip", () => {
+    // Life Brain E.3: the page survives as each entity's "Ligações", so the
+    // phone's path to it is the link those two pages build.
+    for (const page of ["src/app/[locale]/app/people/[personId]/page.tsx", "src/app/[locale]/app/projects/[projectId]/page.tsx"]) {
+      expect(code(page), `${page} lost its way to Ligações`).toContain("relationViewHref(");
+    }
   });
 
   it("the overview draws a panel per lens, each linking to its route", () => {

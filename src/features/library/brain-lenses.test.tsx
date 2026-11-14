@@ -43,7 +43,8 @@ describe("BrainLensTabs", () => {
       "Áreas da vida",
       "Memórias",
       "Arquivos",
-      "Relações",
+      // Life Brain E.3 (ADR-171): Relações left Memória; it is each person's
+      // and project's "Ligações" now.
     ]);
   });
 
@@ -69,8 +70,7 @@ describe("BrainLensTabs", () => {
       "/pt-BR/app/contexts",
       "/pt-BR/app/memories",
       "/pt-BR/app/files",
-      "/pt-BR/app/relations",
-    ]);
+          ]);
   });
 
   it("marks exactly one lens as current, and it is the one it was told", () => {

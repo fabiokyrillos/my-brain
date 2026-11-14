@@ -42,10 +42,10 @@ const LENSES = [
   { route: "contexts", label: "Áreas da vida" },
   { route: "memories", label: "Memórias" },
   { route: "files", label: "Arquivos" },
-  { route: "relations", label: "Relações" },
+  // Life Brain E.3 (ADR-171): Relações left the strip.
 ] as const;
 
-/** The eight the overview draws a panel for: every lens but the overview itself. */
+/** The seven the overview draws a panel for: every lens but the overview itself. */
 const DOMAINS = LENSES.slice(1);
 
 test.describe("Brain's lenses are one space", () => {
@@ -61,7 +61,7 @@ test.describe("Brain's lenses are one space", () => {
       const strip = page.getByRole("navigation", { name: "Lentes da Memória" });
 
       await expect(strip, `${lens.route} does not carry the lens strip`).toBeVisible({ timeout: 30_000 });
-      // Nine links on every one of the nine surfaces: the strip is the same
+      // The same number of links on every lens surface: the strip is the same
       // strip, not a per-page subset.
       await expect(strip.getByRole("link")).toHaveCount(LENSES.length);
 
