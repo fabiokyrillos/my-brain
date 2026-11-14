@@ -358,14 +358,15 @@ function brainSurface() {
     "Arquivos",
     "Relações",
   ];
-  const strip = `<nav class="brain-lenses" aria-label="Lentes do Brain">`
+  // Life Brain D.2: the strip sits in a frame that fades the edge hiding tabs.
+  const strip = `<div class="brain-lenses-frame" data-overflow-start="false" data-overflow-end="true"><nav class="brain-lenses" aria-label="Lentes do Brain">`
     + lenses
       .map(
         (label, index) =>
           `<a class="brain-lens" href="#"${index === 0 ? ' aria-current="page"' : ""}>${label}</a>`,
       )
       .join("")
-    + `</nav>`;
+    + `</nav></div>`;
 
   const panels = [
     `<li><article class="brain-domain"><div class="brain-domain-head">`

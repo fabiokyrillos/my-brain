@@ -83,6 +83,8 @@ export const HISTORY_SUBJECT_ROUTES = {
   // automation section on Settings, and a link built from a category name this
   // row does not carry would be a guess.
   automation_category_policy: null,
+  // Life Brain D.2: a set of notices, `entity_id` null — no page to link to.
+  notification: null,
   /*
    * Phase 2R slice 2R.1 — **null, and a literal one.**
    *

@@ -29,6 +29,8 @@ const PALETTE = "src/features/palette/command-palette.tsx";
 const SEARCH = "src/features/search/search-surface.tsx";
 const LIBRARY = "src/app/[locale]/app/library/page.tsx";
 const LENS_STRIP = "src/features/library/brain-lenses.tsx";
+// Life Brain D.2: the `<nav>` and its frame moved into the scroller the strip mounts.
+const LENS_SCROLLER = "src/features/library/brain-lens-scroller.tsx";
 const CARD = "src/features/conversation-cards/card.tsx";
 const READ_ONLY = "src/features/conversation-cards/read-only-preview.tsx";
 const CARD_CONTRACT = "src/features/conversation-cards/contracts.ts";
@@ -96,11 +98,11 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
    * destination was renamed is the same failure, one file over.
    */
   it("pins the Brain lens strip, which nine surfaces mount", () => {
-    const strip = read(LENS_STRIP);
-    for (const token of ["brain-lenses", "brain-lens", 'aria-current={lens === active ? "page"']) {
+    const strip = read(LENS_STRIP) + read(LENS_SCROLLER);
+    for (const token of ["brain-lenses", "brain-lenses-frame", "brain-lens", 'aria-current={lens === active ? "page"']) {
       expect(strip, `${LENS_STRIP} no longer emits ${token}`).toContain(token);
     }
-    for (const token of ["brain-lenses", "brain-lens", 'aria-current="page"']) {
+    for (const token of ["brain-lenses", "brain-lenses-frame", "brain-lens", 'aria-current="page"']) {
       expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
     }
   });

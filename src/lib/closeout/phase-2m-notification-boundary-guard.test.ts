@@ -116,6 +116,12 @@ const PURE_MODULES = [
    * that may read the browser in order to answer it.
    */
   "src/features/notifications/device-reconciliation.ts",
+  /*
+   * Life Brain D.2 (ADR-166): the bulk verbs' transition and audit shape, and
+   * the answer they return. Data and copy only — no client, no writer.
+   */
+  "src/features/notifications/bulk.ts",
+  "src/features/notifications/bulk-state.ts",
 ];
 
 /** The modules slice 2M.4b earned, by name, plus slice 2O.6's two surfaces. */
@@ -164,6 +170,13 @@ const DELIVERY_MODULES = [
    * and mounts the two controls above; it reaches no client of its own.
    */
   "src/features/notifications/notification-history-row.tsx",
+  /*
+   * Life Brain D.2 (ADR-166): the bulk verbs' Server Actions, their owner-scoped
+   * reads and writes, and the bar that submits them behind authentication.
+   */
+  "src/features/notifications/bulk-actions.ts",
+  "src/features/notifications/bulk-data.ts",
+  "src/features/notifications/notification-bulk-bar.tsx",
 ];
 
 const GOVERNANCE = FEATURE.filter(({ file }) => PURE_MODULES.includes(file));

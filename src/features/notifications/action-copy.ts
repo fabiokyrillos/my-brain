@@ -12,7 +12,7 @@
  */
 
 import type { Locale } from "@/lib/preferences";
-import type { VerbId } from "./verbs";
+import type { VerbId, VerbScope } from "./verbs";
 
 export type NotificationActionCopy = {
   /**
@@ -36,6 +36,12 @@ export type NotificationActionCopy = {
   readonly openLabel: (subject: string) => string;
   readonly menuTrigger: string;
   readonly menuLabel: (subject: string) => string;
+  /**
+   * Life Brain D.2 — the menu's group labels, one per verb scope. They carry
+   * `2S-ACT-006`'s visible difference between changing the task and changing
+   * only the alert, so each item's paragraph can become its description.
+   */
+  readonly groupLabel: Readonly<Record<VerbScope, string>>;
   readonly untilLabel: string;
   readonly dueLabel: string;
   readonly reasonLabel: string;
@@ -69,6 +75,7 @@ const PT: NotificationActionCopy = {
   openLabel: (subject) => `Abrir e marcar como visto: ${subject}`,
   menuTrigger: "Mais ações",
   menuLabel: (subject) => `Mais ações para: ${subject}`,
+  groupLabel: { task: "Muda a tarefa", message: "Só este aviso", cadence: "Próximos avisos" },
   untilLabel: "Silenciar até",
   dueLabel: "Novo prazo",
   reasonLabel: "Motivo (curto)",
@@ -104,6 +111,7 @@ const EN: NotificationActionCopy = {
   openLabel: (subject) => `Open and mark seen: ${subject}`,
   menuTrigger: "More actions",
   menuLabel: (subject) => `More actions for: ${subject}`,
+  groupLabel: { task: "Changes the task", message: "This alert only", cadence: "Future alerts" },
   untilLabel: "Silence until",
   dueLabel: "New due date",
   reasonLabel: "Reason (short)",

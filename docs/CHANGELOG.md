@@ -1,5 +1,17 @@
 # Technical Changelog
 
+## 2026-11-12 — Life Brain D.2: lists and notices (ADR-166)
+
+- **No migration.**
+- **Bulk notices:** `notifications/bulk.ts` (pure transition, audit shape, undo window), `bulk-data.ts` (owner-scoped, state-guarded reads and writes), `bulk-actions.ts` (`applyNotificationBulk`, `undoNotificationBulk`), `bulk-state.ts`, `notification-bulk-bar.tsx` (one `useActionState`, refresh after settle, undo survives the refresh). "Marcar todos como lidos" / "Limpar os lidos", ≤ 500 per press, audited in `audit_logs` (ids and states only), undoable for 24 h and once. The page reads the unread and read totals to decide which verb to offer.
+- **History vocabulary:** entity `notification`; actions `notifications_marked_read` (changed), `notifications_cleared` (lifecycle), `notifications_bulk_undone` (undone); not linkable.
+- **Notice menu:** grouped under "Muda a tarefa" / "Só este aviso" / "Próximos avisos"; each meaning is the item's `sr-only` description; 44px rows.
+- **Memória strip:** `library/brain-lens-scroller.tsx` — current lens scrolled into view, faded overflow edges, thin visible scrollbar; "Nova organização" under the strip on every lens but Organizações.
+- **Pessoas:** `library/people-groups.ts` groups each page by area of life from the owner's own records (current readings, clear-only by the sensitivity contract, plus `person_contexts`); "Aparece no seu contexto" removed.
+- **Guards moved by name:** the audit-writer list and the Phase 2S notification-writer pins add `notifications/bulk-data.ts`; the notification boundary guard classifies the five new files; the no-gesture guard names the bar; the accessibility mirror pins the strip's frame.
+- **Tests:** `bulk.test.ts`, `bulk-data.test.ts`, `bulk-actions.test.ts`, `notification-bulk-bar.test.tsx`, `brain-lens-scroller.test.tsx`, `people-groups.test.ts`, new cases in `notification-row-actions.test.tsx` and `brain-lenses.test.tsx`; new lane `e2e/life-brain-d2-lists.spec.ts`.
+- **Evidence:** `docs/reports/life-brain/evidence/slice-d2/`.
+
 ## 2026-11-12 — Life Brain D.1: the Agenda (ADR-165)
 
 - **No migration.**

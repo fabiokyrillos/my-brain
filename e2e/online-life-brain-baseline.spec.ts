@@ -77,6 +77,8 @@ const ROUTES: readonly Route[] = [
   { name: "chat", path: "/app/chat", detail: /\/app\/chat\/[0-9a-f-]{36}/, en: true },
   { name: "questions", path: "/app/questions" },
   { name: "notifications", path: "/app/notifications" },
+  // Life Brain D.2: a notice's "⋯" menu, open.
+  { name: "notifications-menu", path: "/app/notifications", open: ".notification-menu-trigger" },
   { name: "history", path: "/app/history" },
   { name: "jobs", path: "/app/jobs" },
   { name: "costs", path: "/app/costs" },

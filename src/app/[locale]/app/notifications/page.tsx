@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/ui";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
+import { applyNotificationBulk, undoNotificationBulk } from "@/features/notifications/bulk-actions";
+import { NotificationBulkBar } from "@/features/notifications/notification-bulk-bar";
 import { NotificationHistoryRow } from "@/features/notifications/notification-history-row";
 import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import { projectNotificationRows } from "@/features/notifications/row-projection";
@@ -86,6 +88,17 @@ export default async function NotificationsPage({ params, searchParams }: { para
   const copy = getNotificationSettingsCopy(locale);
   const unread = items.filter((item) => item.status === "unread").length;
   /*
+    Life Brain D.2: the bulk verbs act on every notice, not on this page, so
+    their offer is decided by the totals. A count that cannot be read is zero:
+    the verb is not offered rather than offered blind.
+  */
+  const [unreadTotal, readTotal] = await Promise.all(
+    (["unread", "read"] as const).map(async (status) => {
+      const counted = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", user.id).eq("status", status);
+      return counted.error ? 0 : counted.count ?? 0;
+    }),
+  );
+  /*
     ONE resolution for the whole page, not one per row.
 
     `projectNotificationRows` reads every subject this page names in a single
@@ -132,7 +145,7 @@ export default async function NotificationsPage({ params, searchParams }: { para
     the two tints had none either. `role="status"` rather than a bare paragraph
     because the number changes when a row is marked read, and that change is the
     confirmation the action gives.
-  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p>{/*
+  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p><NotificationBulkBar applyAction={applyNotificationBulk} locale={locale} readCount={readTotal} undoAction={undoNotificationBulk} unreadCount={unreadTotal} />{/*
     Life Brain A.5: each notice is a `NotificationHistoryRow` — two lines and one
     visible control, the verbs behind a "⋯" (still the projected set, through
     `NotificationVerbs`), the destination behind the owner-scoped whitelist.

@@ -1259,36 +1259,72 @@
   box-shadow: 0 10px 30px rgb(0 0 0 / 12%);
 }
 
-.notification-verb-menu-list > li > div {
-  display: grid;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
+/*
+ * Life Brain D.2 — the menu is a list of short rows under three group labels.
+ * Each item's meaning is its description (`sr-only`), not a paragraph.
+ */
+.notification-verb-group-label {
+  padding: 8px 10px 2px;
+  font: var(--type-caption);
+  color: var(--text-muted);
 }
 
-.notification-verb-menu-list > li > div:hover,
-.notification-verb-menu-list > li > div:focus-within {
-  background: var(--background-subtle);
+.notification-verb-group-label:not(:first-child) {
+  margin-top: 4px;
+  border-top: 1px solid var(--border-divider);
+  padding-top: 10px;
 }
 
 .notification-verb-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
   width: 100%;
   border: 0;
+  border-radius: var(--radius-md);
   background: none;
-  padding: 0;
+  padding: 0 10px;
   text-align: left;
-  font-weight: 750;
+  font: var(--type-body);
+  font-weight: 600;
   color: var(--text-primary);
   /* 2S-MOBILE-006: a thumb target, not a text link. */
-  min-height: 32px;
+  min-height: 44px;
 }
 
-.notification-verb-meaning {
-  display: block;
+.notification-verb-menu-item:hover,
+.notification-verb-menu-item:focus-visible {
+  background: var(--background-subtle);
+}
+
+/* The bulk verbs above the list (Life Brain D.2). */
+.notification-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.notification-bulk-verbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.notification-bulk-outcome {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 0;
+}
+
+.notification-bulk-message {
+  margin: 0;
   font: var(--type-caption);
   color: var(--text-secondary);
 }
+
+/* Not hidden when empty: a live region must be in the tree before it speaks. */
 
 .notification-verb-panel {
   flex-basis: 100%;

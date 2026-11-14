@@ -87,6 +87,14 @@ const DECLARED_WRITERS = [
    * is unchanged by one more caller.
    */
   "src/features/privacy/actions.ts",
+  /*
+   * Life Brain D.2 (ADR-166): the bulk notice verbs and their undo. The owner
+   * asked for both "with audit and undo"; `undo_operations` takes writes only
+   * through a registered compensation handler (a migration), so the audit row
+   * IS the undo's record. Its writes are ids and states only — never a notice's
+   * title, body or url (`2M-NOTIFY-009`).
+   */
+  "src/features/notifications/bulk-data.ts",
 ].sort();
 
 function directWriters(): string[] {

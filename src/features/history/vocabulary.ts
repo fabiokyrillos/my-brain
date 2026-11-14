@@ -83,6 +83,9 @@ export const HISTORY_ENTITY_TYPES = [
   // is the undo operation's own id, not a row with a page — the place to see the
   // policy is the automation section on Settings, which this id does not carry.
   "automation_category_policy",
+  // Life Brain D.2 (ADR-166): the bulk notice verbs and their undo record the
+  // owner's notices as a set. `entity_id` is null; not linkable.
+  "notification",
 ] as const;
 export type HistoryEntityType = (typeof HISTORY_ENTITY_TYPES)[number];
 
@@ -153,6 +156,10 @@ export const HISTORY_ACTION_TYPES = [
   // Phase 2S slice 2S.1. The owner telling the agent to stop speaking about
   // one subject, either until an instant or permanently.
   "notification_suppressed",
+  // Life Brain D.2 (ADR-166): TypeScript writers in `notifications/bulk-actions.ts`.
+  "notifications_bulk_undone",
+  "notifications_cleared",
+  "notifications_marked_read",
   "operation_undone",
   "question_consequence_confirmed",
   // Slice G5 — the five owner-initiated reminder transitions plus the
@@ -284,6 +291,11 @@ export const HISTORY_ACTION_CATEGORY: Readonly<Record<HistoryActionType, History
   // the stream of notices about a subject, and nothing about the subject
   // itself is created, changed or undone.
   notification_suppressed: "lifecycle",
+  // Marking read changes an attribute of notices that stay; clearing ends their
+  // place in the list, like a dismissal; the undo is an undo.
+  notifications_marked_read: "changed",
+  notifications_cleared: "lifecycle",
+  notifications_bulk_undone: "undone",
   operation_undone: "undone",
   question_consequence_confirmed: "answered",
   // Cancel and restore end or resume a delivery, which is `lifecycle`; snooze,

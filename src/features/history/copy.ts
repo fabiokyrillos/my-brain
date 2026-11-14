@@ -205,6 +205,7 @@ const ptBR: HistoryCopy = {
     person_context: "vínculo com contexto",
     person_project: "vínculo com projeto",
     automation_category_policy: "automação de uma categoria",
+    notification: "avisos",
   },
   actions: {
     // No `{subject}` placeholder: the subject is the account itself, and the
@@ -259,6 +260,9 @@ const ptBR: HistoryCopy = {
     entry_lifecycle_rederived: "atualizou a situação do registro[ “{subject}”]",
     interpretation_confirmed: "confirmou a interpretação do registro[ “{subject}”]",
     notification_suppressed: "silenciou os avisos[ sobre “{subject}”]",
+    notifications_bulk_undone: "desfez a mudança em vários avisos",
+    notifications_cleared: "limpou os avisos lidos",
+    notifications_marked_read: "marcou todos os avisos como lidos",
     operation_undone: "desfez uma alteração[ em “{subject}”]",
     question_consequence_confirmed: "confirmou a consequência de uma resposta",
     reminder_cancelled: "cancelou o lembrete[ “{subject}”]",
@@ -403,6 +407,7 @@ const en: HistoryCopy = {
     person_context: "context link",
     person_project: "project link",
     automation_category_policy: "automation for one category",
+    notification: "alerts",
   },
   actions: {
     // No `{subject}` placeholder: the subject is the account itself, and the
@@ -446,6 +451,9 @@ const en: HistoryCopy = {
     entry_lifecycle_rederived: "updated the record[ “{subject}”] status",
     interpretation_confirmed: "confirmed the interpretation of the record[ “{subject}”]",
     notification_suppressed: "silenced the notices[ about “{subject}”]",
+    notifications_bulk_undone: "undid a change to several alerts",
+    notifications_cleared: "cleared the read alerts",
+    notifications_marked_read: "marked every alert as read",
     operation_undone: "undid a change[ to “{subject}”]",
     question_consequence_confirmed: "confirmed the consequence of an answer",
     reminder_cancelled: "cancelled the reminder[ “{subject}”]",

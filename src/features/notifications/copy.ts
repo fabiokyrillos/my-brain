@@ -150,6 +150,25 @@ export type NotificationSettingsCopy = {
   readonly pageDescription: string;
   readonly emptyTitle: string;
   readonly emptyBody: (agentName: string) => string;
+  /**
+   * Life Brain D.2 — emptying the queue (T5). Two verbs, their outcomes, and the
+   * undo, which is offered for `NOTIFICATION_BULK_UNDO_HOURS`.
+   */
+  readonly bulk: {
+    readonly label: string;
+    readonly markAllRead: string;
+    readonly clearRead: string;
+    readonly marked: (count: number) => string;
+    readonly cleared: (count: number) => string;
+    readonly truncated: (limit: number) => string;
+    readonly nothing: string;
+    readonly failed: string;
+    readonly undo: string;
+    readonly undone: (count: number) => string;
+    readonly undoExpired: string;
+    readonly undoAlready: string;
+    readonly undoFailed: string;
+  };
 };
 
 const PT_BR: NotificationSettingsCopy = {
@@ -244,6 +263,21 @@ const PT_BR: NotificationSettingsCopy = {
   pageDescription: "Somente sinais relevantes, com deduplicação e respeito ao silêncio.",
   emptyTitle: "Tudo tranquilo",
   emptyBody: (agentName) => `O ${agentName} permanece em silêncio quando não há nada realmente útil.`,
+  bulk: {
+    label: "Todos os avisos",
+    markAllRead: "Marcar todos como lidos",
+    clearRead: "Limpar os lidos",
+    marked: (count) => (count === 1 ? "1 aviso marcado como lido." : `${count} avisos marcados como lidos.`),
+    cleared: (count) => (count === 1 ? "1 aviso lido saiu da lista." : `${count} avisos lidos saíram da lista.`),
+    truncated: (limit) => `Foram os ${limit} mais recentes; aperte de novo para os demais.`,
+    nothing: "Não havia nada para mudar.",
+    failed: "Não deu para mudar os avisos agora. Tente de novo.",
+    undo: "Desfazer",
+    undone: (count) => (count === 1 ? "Desfeito: 1 aviso voltou como estava." : `Desfeito: ${count} avisos voltaram como estavam.`),
+    undoExpired: "Já passou o prazo para desfazer isso.",
+    undoAlready: "Isso já foi desfeito.",
+    undoFailed: "Não deu para desfazer agora. Tente de novo.",
+  },
 };
 
 const EN: NotificationSettingsCopy = {
@@ -338,6 +372,21 @@ const EN: NotificationSettingsCopy = {
   pageDescription: "Only relevant signals, deduplicated and respectful of quiet hours.",
   emptyTitle: "All quiet",
   emptyBody: (agentName) => `${agentName} stays quiet when there is nothing genuinely useful.`,
+  bulk: {
+    label: "All alerts",
+    markAllRead: "Mark all as read",
+    clearRead: "Clear read",
+    marked: (count) => (count === 1 ? "1 alert marked as read." : `${count} alerts marked as read.`),
+    cleared: (count) => (count === 1 ? "1 read alert left the list." : `${count} read alerts left the list.`),
+    truncated: (limit) => `That was the ${limit} most recent; press again for the rest.`,
+    nothing: "There was nothing to change.",
+    failed: "Could not change the alerts right now. Try again.",
+    undo: "Undo",
+    undone: (count) => (count === 1 ? "Undone: 1 alert is back as it was." : `Undone: ${count} alerts are back as they were.`),
+    undoExpired: "It is too late to undo that.",
+    undoAlready: "That was already undone.",
+    undoFailed: "Could not undo it right now. Try again.",
+  },
 };
 
 export function getNotificationSettingsCopy(locale: string): NotificationSettingsCopy {
