@@ -2569,3 +2569,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
   - The first visit of each day shows the derived suggestions, and the model's pick appears from the second visit on. This is deliberate: the alternative is a page that waits on a provider.
   - Not verified: a live call against OpenAI (every test mocks the provider), and the signed-in journey that would show a cached pick replacing the derived row.
   - Applying `202611090109` to the hosted project is the owner's separate decision, as for every migration before it. Deploying the application before it is safe by construction. With the table missing, the cache is unreadable, so there is no call and no trigger. Conversar shows the derived suggestions, and telemetry keeps sending `{category}` alone. The model pick starts working when the migration is applied.
+
+## ADR-164 — Life Brain gets a fourth track after the order: D.1 Agenda, D.2 lists and notices, D.3 small remainders
+
+- **Date:** 2026-11-12
+- **Status:** Accepted. Owner instruction of 2026-11-12. Documentation only: zero migrations, zero product code. Amends `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`.
+
+- **Context.** Every slice in the Life Brain order has shipped, then B.7 and B.8. The owner's feedback of 5 November (`docs/reports/life-brain/FEEDBACK_DONO_2026-11-05.md`) named four Agenda defects (T2), four list defects (T3) and a notice queue that only grows (T5). A.4 and A.5 delivered the structure of those screens, but their text named none of these complaints, and the owner confirmed in the code that none was met. The plan itself had also drifted: its §4 summary did not list B.8 and said five migrations were spent when six were, and its A.6 paragraph said the 28 `button-primary/secondary` call sites were migrated and, in the next sentence, that they remained.
+
+- **Decision 1 — A new §5, "Depois da ordem", with three slices.** D.1 (Agenda, T2), D.2 (lists and notices, T3 and T5) and D.3 (small remainders from `TODO.md`). Each is one pull request on a `life-brain/<slice>` branch. The §0 order is unchanged; track D comes after it.
+- **Decision 2 — No migration is allocated to track D.** Six Life Brain migrations are spent and applied hosted. A slice that needs a seventh stops and asks the owner in writing, as every earlier stop condition did.
+- **Decision 3 — Seven items stay out of scope until the owner decides:** the Ajustes redesign (T4), a typed relation between people (T6, schema), "organize memories as Claude does" (needs the owner's reference), B.6 (streaming), LB-OD-3, LB-OD-4 and LB-OD-7, the `LB-B-008` rule, and whether the Relações lens leaves Memória.
+- **Decision 4 — The two inconsistencies are corrected in place, with a dated note**, not rewritten silently: §4 gains the B.8 row and "6 gastas", and the A.6 paragraph keeps its history with the stale sentence explained.
+
+- **Consequences.** The plan's total grows from ≈ 25 d (which already omitted B.8's 2 d) to ≈ 27 d for the order and ≈ 34,5 d with track D. Nothing ships from this record by itself.

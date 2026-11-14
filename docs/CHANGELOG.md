@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-12 — Life Brain plan: track D after the order (ADR-164)
+
+- **Documentation only.** Zero migrations, zero product code.
+- **`docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`:**
+  - §4 lists B.8 and counts **six** spent migrations, naming each (`202611040104`, `…105`, `…106`, `202611050107`, `202611060108`, `202611090109`), all applied hosted.
+  - The A.6 paragraph no longer says, in consecutive sentences, that the 28 `button-primary/secondary` call sites were migrated and that they remained. The stale sentence is explained in a dated note.
+  - New §5, "Depois da ordem": D.1 (Agenda, T2), D.2 (lists and notices, T3 and T5) and D.3 (small remainders), each citing `FEEDBACK_DONO_2026-11-05.md` as its origin, with no migration allocated and the out-of-scope list the owner set.
+
 ## 2026-11-09 — `202611090109` applied to the hosted project (parity 109 = 109)
 
 - **Applied** with `supabase db push --linked` after PR #374 merged with all three CI jobs passing. One migration was pending and is now applied, and `migration list` reports `202611090109 | 202611090109 | 202611090109`. The migration's own verification blocks ran on the hosted database without aborting.
