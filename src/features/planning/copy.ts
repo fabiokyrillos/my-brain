@@ -50,6 +50,17 @@ export type PlannerCopy = {
   readonly outcome: string;
   /** `2M-PLAN-004` — this surface creates nothing. */
   readonly createsNothing: string;
+  /**
+   * Life Brain D.1 (T2: "Eu não sei o que é planejado"). What a planned day is,
+   * said before anything else on the screen — and what it is not: it moves no
+   * deadline and creates no reminder (`set_planned` declares neither effect).
+   */
+  readonly meaning: string;
+  /** Under "Disponível para planejar": the pool is the tasks with no day yet. */
+  readonly availableHint: string;
+  /** The one button on an available row, and on a planned row. */
+  readonly planHere: string;
+  readonly removeHere: string;
 };
 
 const ptBR: PlannerCopy = {
@@ -83,6 +94,10 @@ const ptBR: PlannerCopy = {
   },
   outcome: "Resultado da alteração",
   createsNothing: "Esta tela não cria tarefas. Ela só organiza o que já existe.",
+  meaning: "Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete: é só a sua intenção para aquele dia.",
+  availableHint: "Tarefas em aberto que ainda não têm um dia escolhido.",
+  planHere: "Planejar para este dia",
+  removeHere: "Tirar deste dia",
 };
 
 const en: PlannerCopy = {
@@ -116,6 +131,10 @@ const en: PlannerCopy = {
   },
   outcome: "Result of the change",
   createsNothing: "This screen creates no tasks. It only arranges what already exists.",
+  meaning: "Planning is choosing the day you intend to do a task. It does not move the deadline or create a reminder: it is only your intention for that day.",
+  availableHint: "Open tasks that do not have a chosen day yet.",
+  planHere: "Plan for this day",
+  removeHere: "Remove from this day",
 };
 
 const BY_LOCALE: Record<Locale, PlannerCopy> = { "pt-BR": ptBR, en };

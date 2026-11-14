@@ -5,6 +5,7 @@ import { ButtonLink, PageHeader, SegmentedControl, cn } from "@/components/ui";
 import type { Locale } from "@/lib/preferences";
 
 import { agendaLensHref, getAgendaHeaderCopy, type AgendaLens } from "./agenda-copy";
+import { AgendaDatePicker } from "./agenda-date-picker";
 
 /**
  * Life Brain A.4 (`LB-A-007`) — one header for the three lenses of the Agenda.
@@ -64,8 +65,24 @@ export type AgendaStep = {
   readonly disabled?: boolean;
 };
 
+/** What the period label needs to open a picker (Life Brain D.1). */
+export type AgendaPickerTarget = {
+  /** The page's URL with `AGENDA_DATE_TOKEN` where the chosen date goes. */
+  readonly hrefTemplate: string;
+  /** The navigation bound, `YYYY-MM-DD`. */
+  readonly min: string;
+  readonly max: string;
+  /** The anchor being shown and today, `YYYY-MM-DD`. */
+  readonly selected: string;
+  readonly today: string;
+};
+
 /**
  * Previous · the period · Today · Next, in the header.
+ *
+ * Life Brain D.1: the period is no longer a paragraph. It is the trigger of a
+ * month of days (`AgendaDatePicker`), so the arrows stop being the only way to
+ * move. It is required, not optional: a stepper without it is the defect.
  *
  * Links, never buttons: the URL is the state, the back button works, and a
  * period opens in a new tab. The arrows are icon-only, so their names are the
@@ -76,6 +93,7 @@ export function AgendaStepper({
   className,
   locale,
   next,
+  picker,
   previous,
   rangeClassName,
   rangeLabel,
@@ -84,6 +102,7 @@ export function AgendaStepper({
   readonly className?: string;
   readonly locale: Locale;
   readonly next: AgendaStep;
+  readonly picker: AgendaPickerTarget;
   readonly previous: AgendaStep;
   readonly rangeClassName?: string;
   readonly rangeLabel: string;
@@ -102,7 +121,16 @@ export function AgendaStepper({
         size="sm"
         variant="ghost"
       />
-      <p aria-live="polite" className={cn("agenda-stepper-range", rangeClassName)}>{rangeLabel}</p>
+      <AgendaDatePicker
+        className={rangeClassName}
+        hrefTemplate={picker.hrefTemplate}
+        label={rangeLabel}
+        locale={locale}
+        max={picker.max}
+        min={picker.min}
+        selected={picker.selected}
+        today={picker.today}
+      />
       <ButtonLink
         aria-disabled={next.disabled ? "true" : undefined}
         aria-label={next.label}

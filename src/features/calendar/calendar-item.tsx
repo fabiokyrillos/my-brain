@@ -53,6 +53,7 @@ function formatTime(instant: string, locale: Locale, timeZone: string): string {
 
 export function CalendarItem({
   dateBounds,
+  density = "full",
   item,
   locale,
   rescheduleAction,
@@ -67,6 +68,15 @@ export function CalendarItem({
    * test constructs to check masking.
    */
   dateBounds?: TaskDetailDateBounds;
+  /**
+   * Life Brain D.1. `compact` is the week grid's line: time, title and the lane
+   * word, nothing else. The commitment stays in the accessible name and in the
+   * border's style (dashed, dotted), which is shape and not colour, and the
+   * controls stay in the day view, where a column is wide enough for them.
+   * The words still pass through `ProtectedContent`: density is presentation,
+   * never a second path for content.
+   */
+  density?: "full" | "compact";
   item: CalendarItemView;
   locale: Locale;
   rescheduleAction?: TaskDetailCommandHandler;
@@ -78,19 +88,31 @@ export function CalendarItem({
   // Life Brain C.3: an all-day event has no hour to show.
   const time = item.span?.allDay ? copy.item.allDay : formatTime(item.at, locale, timezone);
 
+  const compact = density === "compact";
   return (
     <li
       className="calendar-item"
+      data-density={compact ? "compact" : undefined}
       data-lane={item.lane}
       data-commitment={item.commitment}
       data-elapsed={item.elapsed ? "true" : "false"}
     >
       <span className="calendar-item-meta">
         {/* Text, not only colour: 2M-ACCESS-005. */}
-        <span className="calendar-item-lane">{laneName}</span>
-        <span className="calendar-item-commitment">{commitment}</span>
-        <time className="calendar-item-time" dateTime={item.at}>{time}</time>
-        {item.elapsed ? <span className="calendar-item-elapsed">{copy.item.elapsed}</span> : null}
+        {compact ? (
+          <>
+            <time className="calendar-item-time" dateTime={item.at}>{time}</time>
+            <span className="calendar-item-lane">{laneName}</span>
+            <span className="sr-only">{commitment}</span>
+          </>
+        ) : (
+          <>
+            <span className="calendar-item-lane">{laneName}</span>
+            <span className="calendar-item-commitment">{commitment}</span>
+            <time className="calendar-item-time" dateTime={item.at}>{time}</time>
+          </>
+        )}
+        {item.elapsed && !compact ? <span className="calendar-item-elapsed">{copy.item.elapsed}</span> : null}
         {/*
           `2R-SURFACE-003`, slice 2R.3 — that it repeats, and how.
 
@@ -100,7 +122,7 @@ export function CalendarItem({
           one formatter, so this surface and the reminders list cannot phrase the
           same rule differently.
         */}
-        {item.repeats === null ? null : (
+        {item.repeats === null || compact ? null : (
           <span className="calendar-item-repeats">{item.repeats}</span>
         )}
         {/*
@@ -108,7 +130,7 @@ export function CalendarItem({
           listed as a second line for the same task. Time only — the title is
           the line's, under the line's classification.
         */}
-        {item.joinedReminders.length === 0 ? null : (
+        {item.joinedReminders.length === 0 || compact ? null : (
           <span className="calendar-item-repeats" data-joined-reminder="true">
             {copy.item.joinedReminder(item.joinedReminders.map((reminder) => formatTime(reminder.at, locale, timezone)).join(", "))}
           </span>
@@ -156,7 +178,7 @@ export function CalendarItem({
         caller is choosing. Hiding them behind the reveal would make the mask a
         capability gate, which is not what `2M-PRIVACY-001` asks for.
       */}
-      {item.reschedule && rescheduleAction && dateBounds ? (
+      {!compact && item.reschedule && rescheduleAction && dateBounds ? (
         <CalendarReschedule
           action={rescheduleAction}
           dateBounds={dateBounds}

@@ -167,9 +167,15 @@ describe("the lists", () => {
     expect(meta.textContent).not.toMatch(/\d{1,2}:\d{2}/);
   });
 
-  it("says an available item has no planned day at all", () => {
-    renderPlanner({ projection: projection({ available: [item("a")] }) });
-    expect(screen.getByText(getPlannedAtCopy("en").none)).toBeVisible();
+  /*
+    Life Brain D.1: the pool is by definition the tasks with no planned day, so
+    "No planned day" printed under each one (in monospace) said nothing the
+    section did not. The section's own sentence says it once.
+  */
+  it("does not repeat 'no planned day' under every available item", () => {
+    renderPlanner({ projection: projection({ available: [item("a"), item("b")] }) });
+    expect(screen.queryByText(getPlannedAtCopy("en").none)).not.toBeInTheDocument();
+    expect(screen.getByText(copy.availableHint)).toBeVisible();
   });
 
   it("offers selection only on the pool, because bulk planning sets a day", () => {
@@ -181,6 +187,51 @@ describe("the lists", () => {
     // bulk clear, which `clear_planned` is not eligible for: it carries no
     // value, so it is not one of the bounded verbs OD-2L-3 A admits.
     expect(screen.getAllByRole("checkbox")).toHaveLength(1);
+  });
+});
+
+describe("Life Brain D.1 — Planejar says what planned means, and plans in one tap", () => {
+  it("says what 'planned' means before anything else", () => {
+    renderPlanner();
+    expect(screen.getByText(copy.meaning)).toBeVisible();
+    // The meaning is the first thing under the lenses, before the counts.
+    const meaning = screen.getByText(copy.meaning);
+    const capacity = screen.getByLabelText(copy.capacity.heading);
+    expect(meaning.compareDocumentPosition(capacity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("an available task is planned for this day with one button, no date field and no Apply", async () => {
+    const action = vi.fn(async () => ({ status: "idle" }));
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    renderPlanner({ action, projection: projection({ available: [item("a")] }) });
+    const row = within(screen.getByLabelText(copy.available)).getAllByRole("listitem")[0];
+    expect(row.querySelector('input[type="date"]')).toBeNull();
+    expect(within(row).queryByRole("button", { name: /^apply$/i })).toBeNull();
+    const buttons = within(row).getAllByRole("button");
+    expect(buttons.map((button) => button.textContent)).toEqual([copy.planHere]);
+
+    await user.click(buttons[0]);
+    expect(action).toHaveBeenCalledTimes(1);
+    const sent = (action.mock.calls[0] as unknown as [unknown, FormData])[1];
+    expect(sent.get("action")).toBe("set_planned");
+    expect(sent.get("value")).toBe("2026-08-15");
+  });
+
+  it("a planned task leaves the day with one button", () => {
+    renderPlanner({ projection: projection({
+      planned: [item("p", { plannedAt: "2026-08-15T14:00:00.000Z" })],
+    }) });
+    const row = within(screen.getByLabelText(copy.planned)).getAllByRole("listitem")[0];
+    expect(row.querySelector('input[type="date"]')).toBeNull();
+    expect(within(row).getAllByRole("button").map((button) => button.textContent)).toEqual([copy.removeHere]);
+  });
+
+  it("the checkbox sits in its own 44px label, on the title's line", () => {
+    renderPlanner({ projection: projection({ available: [item("a")] }) });
+    const checkbox = screen.getByRole("checkbox", { name: "Task a" });
+    expect(checkbox.closest("label")).not.toBeNull();
+    expect(checkbox.closest("label")).toHaveClass("planner-select-label");
   });
 });
 

@@ -168,6 +168,12 @@ describe("2L-MOBILE-004: no gesture ships on a Work surface (OD-2L-5 option A)",
      */
     "src/features/calendar/agenda-header.tsx",
     /*
+     * Life Brain D.1: the date picker the period label opens. A month of days is
+     * where a swipe between months gets proposed; the days are `<Link>`s and the
+     * months move by two labelled buttons.
+     */
+    "src/features/calendar/agenda-date-picker.tsx",
+    /*
      * Added by slice 2M.2. The planner lives under `/app/calendar` and is
      * governed by the same OD-2M-6 A signature, and it is the surface where a
      * "drag a task onto a day" affordance would be most tempting of all --

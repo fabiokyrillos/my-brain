@@ -56,10 +56,17 @@ import {
  */
 export function ReminderSeriesControls({
   locale,
+  part = "all",
   reminder,
   anchorTimeValue,
 }: {
   locale: Locale;
+  /**
+   * Life Brain D.1. The card shows the rule's **facts** (that it repeats, how,
+   * detached) without opening anything, and keeps its **controls** in the
+   * "Mais" menu. `all` is both, as before.
+   */
+  part?: "all" | "facts" | "controls";
   reminder: ReminderViewModel;
   /**
    * The occurrence's wall clock as `HH:MM` in the owner's zone — **computed by
@@ -109,8 +116,12 @@ export function ReminderSeriesControls({
   // is the placeholder UX-12 refuses; absence says the same thing truthfully.
   const editable = series.active && !series.detached;
 
+  const facts = part !== "controls";
+  const controls = part !== "facts";
+
   return (
-    <div className="reminder-series">
+    <div className={part === "controls" ? "reminder-series reminder-series-controls" : "reminder-series"}>
+      {facts ? (
       <p className="reminder-series-facts">
         <span className="status-badge reminder-series-badge">
           <Repeat aria-hidden="true" size={12} /> {copy.badge}
@@ -134,10 +145,11 @@ export function ReminderSeriesControls({
           <span className="status-badge reminder-series-detached">{copy.detachedBadge}</span>
         ) : null}
       </p>
+      ) : null}
 
-      {series.detached ? <p className="reminder-series-hint">{copy.detachedHint}</p> : null}
+      {facts && series.detached ? <p className="reminder-series-hint">{copy.detachedHint}</p> : null}
 
-      {editable ? (
+      {controls && editable ? (
         <>
           <div className="reminder-action-row">
             <button

@@ -173,21 +173,33 @@ function controlMarkup(options: { action: string; label: string; kind: "date" | 
   </li>`;
 }
 
-/** One planner row, mirroring `src/features/planning/planner-view.tsx`. */
+/**
+ * One planner row, mirroring `src/features/planning/planner-view.tsx`.
+ *
+ * Life Brain D.1: a pool row (`selectable`) has its checkbox inside a 44px
+ * label, no meta line (the pool is the tasks with no day) and one preset button;
+ * a planned row has the meta line and one button that takes it off the day.
+ */
 function plannerRow(options: { locale: Locale; masked?: boolean; selectable?: boolean }): string {
   const body = options.masked
     ? '<span class="protected-content"><button type="button" class="row-action">Mostrar</button></span>'
     : '<a href="/pt-BR/app/work/t1">Entregar o relatório</a>';
-  return `<li class="planner-item" data-operation="${options.selectable === false ? "cleared" : "set"}">
+  const pool = options.selectable !== false;
+  return `<li class="planner-item" data-operation="${pool ? "set" : "cleared"}">
     <div class="planner-item-head">
-      ${options.selectable === false ? "" : '<input aria-label="Entregar o relatório" class="planner-select" type="checkbox" />'}
-      ${body}
+      ${pool ? '<label class="planner-select-label"><input aria-label="Entregar o relatório" class="planner-select" type="checkbox" /></label>' : ""}
+      <span class="planner-item-title">${options.masked ? body : "Revisar o contrato da Aurora Participações antes da reunião de quinta 5030"}</span>
     </div>
-    <p class="planner-item-meta">Planejado para 11 de ago. de 2026</p>
+    ${pool ? "" : '<p class="planner-item-meta">Planejado para 11 de ago. de 2026</p>'}
     <div class="planner-item-controls">
-      <div class="task-detail-controls task-detail-controls-inline">
+      <div class="task-detail-controls task-detail-controls-inline task-detail-controls-preset">
         <ul class="task-control-list">
-          ${controlMarkup({ action: "set_planned", label: "Aplicar", kind: "date" })}
+          <li class="task-control">
+            <form>
+              ${pool ? '<input type="hidden" name="value" value="2026-08-11" />' : ""}
+              <button class="row-action" type="submit">${pool ? "Planejar para este dia" : "Tirar deste dia"}</button>
+            </form>
+          </li>
         </ul>
       </div>
     </div>
@@ -239,7 +251,11 @@ function plannerPage(locale: Locale, rows: string[]): string {
       <div class="ui-page-header__actions">
         <nav aria-label="Navegar pelas datas" class="agenda-stepper planner-day-nav">
           <a aria-label="Dia anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-10" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
-          <p aria-live="polite" class="agenda-stepper-range">ter., 11 ago.</p>
+          <details class="agenda-date-picker">
+            <summary aria-label="ter., 11 ago.. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>ter., 11 ago.</span></summary>
+            <div aria-label="Escolher uma data" class="agenda-date-panel" role="group"></div>
+          </details>
+          <span aria-live="polite" class="sr-only">ter., 11 ago.</span>
           <a aria-label="Próximo dia" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-12" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
           <a class="ui-button ui-button--secondary ui-button--sm" href="?"><span class="ui-button__label">Hoje</span></a>
         </nav>
@@ -250,6 +266,7 @@ function plannerPage(locale: Locale, rows: string[]): string {
       <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
       <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
     </nav>
+    <p class="planner-meaning">Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete.</p>
     <p class="quiet-state planner-guarantee">Nada é criado aqui.</p>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
     <div class="planner-orientation">
@@ -268,6 +285,7 @@ function plannerPage(locale: Locale, rows: string[]): string {
     </div>
     <section aria-label="Planejado" class="planner-list">
       <h2>Planejado</h2>
+      <p class="quiet-state planner-list-hint">Tarefas em aberto que ainda não têm um dia escolhido.</p>
       ${rows.length === 0 ? `<p class="quiet-state">${copy.plannedEmpty}</p>` : `<ul>${rows.join("")}</ul>`}
     </section>
   </div>`);
@@ -983,13 +1001,16 @@ test.describe("the planner orients before it lists", () => {
   });
 
   test("a row reads as columns on a desktop and as a stack on a phone", async ({ page }) => {
-    const body = plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]);
+    // A planned row: the pool's rows carry no meta line since Life Brain D.1.
+    const body = plannerPage("pt-BR", [plannerRow({ locale: "pt-BR", selectable: false })]);
 
     await page.setViewportSize({ width: 1440, height: 900 });
     await open(page, body);
     let head = await page.locator(".planner-item-head").boundingBox();
     let meta = await page.locator(".planner-item-meta").boundingBox();
-    expect(head!.y).toBeCloseTo(meta!.y, 0);
+    // Life Brain D.1: the tracks are centred on one line, so the parts share a
+    // centre rather than a top edge.
+    expect(Math.abs((head!.y + head!.height / 2) - (meta!.y + meta!.height / 2))).toBeLessThanOrEqual(2);
     expect(head!.x).toBeLessThan(meta!.x);
 
     await page.setViewportSize({ width: 375, height: 800 });
@@ -1000,6 +1021,58 @@ test.describe("the planner orients before it lists", () => {
     const overflow = await page.evaluate(() =>
       document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+});
+
+/**
+ * Life Brain D.1 — Planejar, as the owner saw it on 5 November ("o checkbox
+ * desalinhado", "Sem dia planejado" in monospace, a nested card with an
+ * "Aplicar" per task). Each defect is a geometric or computed-style fact.
+ */
+test.describe("Life Brain D.1: Planejar is aligned, plain and one tap per row", () => {
+  test("the checkbox is centred on the title's first line and is a 44px target", async ({ page }) => {
+    for (const width of [375, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+      const [label, box, title] = await Promise.all([
+        page.locator(".planner-select-label").boundingBox(),
+        page.locator(".planner-select").boundingBox(),
+        page.locator(".planner-item-title").boundingBox(),
+      ]);
+      expect(label!.width, `label width at ${width}`).toBeGreaterThanOrEqual(44);
+      expect(label!.height, `label height at ${width}`).toBeGreaterThanOrEqual(44);
+      const lineHeight = await page.locator(".planner-item-title").evaluate((node) => parseFloat(getComputedStyle(node).lineHeight));
+      const boxCentre = box!.y + box!.height / 2;
+      const firstLineCentre = title!.y + Math.min(title!.height, lineHeight) / 2;
+      expect(Math.abs(boxCentre - firstLineCentre), `checkbox off the title's line at ${width}`).toBeLessThanOrEqual(6);
+    }
+  });
+
+  test("nothing on the planner is set in monospace", async ({ page }) => {
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" }), plannerRow({ locale: "pt-BR", selectable: false })]));
+    const mono = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".planner-page *")]
+      .filter((node) => node.childElementCount === 0 && (node.textContent ?? "").trim() !== "")
+      .filter((node) => /mono/i.test(getComputedStyle(node).fontFamily))
+      .map((node) => node.className || node.tagName));
+    expect(mono).toEqual([]);
+  });
+
+  test("a row's action is one button with no card around it", async ({ page }) => {
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+    await expect(page.locator(".planner-item input[type='date']")).toHaveCount(0);
+    await expect(page.locator(".planner-item button.row-action")).toHaveText("Planejar para este dia");
+    const frames = await page.locator(".planner-item .task-detail-controls, .planner-item .task-control form").evaluateAll((nodes) =>
+      nodes.map((node) => getComputedStyle(node).borderTopWidth));
+    expect(frames.every((width) => parseFloat(width) === 0)).toBe(true);
+  });
+
+  test("what planned means is said before the counts", async ({ page }) => {
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+    const [meaning, capacity] = await Promise.all([
+      page.locator(".planner-meaning").boundingBox(),
+      page.locator(".planner-capacity").boundingBox(),
+    ]);
+    expect(meaning!.y).toBeLessThan(capacity!.y);
   });
 });
 
