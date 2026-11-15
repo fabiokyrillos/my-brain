@@ -327,6 +327,7 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 - A resposta aparece enquanto é escrita, e o estado "pensando" sobrevive a um recarregamento.
 - O ledger de custo continua registrando cada chamada antes de qualquer escrita que dependa dela; uma resposta interrompida não vira mensagem pela metade.
 - Se o estado persistido exigir migration, a slice para e pede.
+- **Parte 1 implementada 2026-11-14 (ADR-173), sem migration:** o "pensando" sobrevive a recarregar, derivado da última mensagem ser a pergunta do dono (três minutos; depois, "ficou sem resposta"). **Parte 2, o streaming, não foi feita:** o plano está na ADR-173 Decisão 4 (um route handler com o mesmo pipeline, só o texto da resposta transmitido, e persistida só a resposta final validada).
 
 | Slice | d | Migration | Visível para o dono |
 | --- | --- | --- | --- |

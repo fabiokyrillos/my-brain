@@ -1,4 +1,6 @@
-Last updated: 2026-11-14 (**E.4 IMPLEMENTED — ADR-172. NO MIGRATION.** Memórias by segment, derived. Left open by it: the grouping is per page (25 rows), not across the whole list; filtering by one segment would need the segment in SQL (a view or a column — a migration, so the owner's call); a memory written in chat has no source record, so it is segmented by kind alone. Next: E.5.)
+Last updated: 2026-11-14 (**E.5 PART 1 IMPLEMENTED — ADR-173. NO MIGRATION.** The "pensando" state survives a reload. **Open: E.5 part 2, streaming**, planned in ADR-173 Decision 4 — a route handler that runs the same pipeline and streams the answer's text, persisting and citing only the validated final answer. Also open: a failed turn writes no assistant row, so it is only recognisable by age.)
+
+Previously: Last updated: 2026-11-14 (**E.4 IMPLEMENTED — ADR-172. NO MIGRATION.** Memórias by segment, derived. Left open by it: the grouping is per page (25 rows), not across the whole list; filtering by one segment would need the segment in SQL (a view or a column — a migration, so the owner's call); a memory written in chat has no source record, so it is segmented by kind alone. Next: E.5.)
 
 Previously: Last updated: 2026-11-14 (**E.3 IMPLEMENTED — ADR-171. NO MIGRATION.** Relações is no longer a Memória lens; its page is reached from each person's and project's page. Left open by it: renaming the page itself to "Ligações" (copy and navigation label), and whether the desktop rail should still list it. Next: E.4.)
 
