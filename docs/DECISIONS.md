@@ -2674,3 +2674,16 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 6 — What this slice does not do.** The extraction does not propose a link from a capture yet ("minha mãe Camila"); that is a worker change with parity guards and gets its own slice, on the birthday offer's model (ADR-158). The Relações lens leaving Memória is E.3.
 
 - **Consequences.** The person page says "Esposa/Esposo" under the name and lists "Pessoas ligadas". Life Brain migrations stay at six.
+
+## ADR-171 — Life Brain E.3: Relações is no longer a Memória lens; its page is each entity's "Ligações"
+
+- **Date:** 2026-11-14
+- **Status:** Accepted. Implements ADR-168 Decision 5. No migration.
+
+- **Context.** The owner decided the Relações lens leaves Memória. The plan's §6 sketched a redirect from `/app/relations` to Memória. Reading the code changed that: the person and project pages already link to `/app/relations` focused on themselves (`relationViewHref`), so the page already works as one entity's links. A redirect would have broken those links, and the 2N guards that pin the page.
+
+- **Decision 1 — Out of the strip and the overview, by name.** `NOT_A_LENS` in `lenses.ts` lists `relations`, and `BRAIN_DOMAIN_LENSES` drops it. The capability keeps `group: "context"`, so `LIBRARY_MEMBERS` still means every context destination, and the desktop rail and the palette still reach the page.
+- **Decision 2 — The page stays, without the strip.** A Memória lens strip with no current lens would say the page belongs to Memória. The page keeps its list and its drawing (`2N-RELATION-006`, `-007`).
+- **Decision 3 — The phone's path is the entity pages.** Relações was reached on a phone through the strip; it is now reached through the "Ver ligações" link on every person and project page, and `mobile-reachability-guard.test.ts` asserts that link exists on both.
+
+- **Consequences.** Memória has seven lenses. No URL dies. Renaming the page to "Ligações", and whether the desktop rail should still list it, are left open in `TODO.md`.

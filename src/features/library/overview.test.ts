@@ -150,10 +150,9 @@ describe("a refusal is a missing answer, never a wrong one", () => {
     // Contextos is counted and deliberately has no recent list (`2I-LIB-005`).
     expect(domain(summaries, "contexts").countSupported).toBe(true);
     expect(domain(summaries, "contexts").recencySupported).toBe(false);
-    // Relações has neither: a relation is derived at read time from several
-    // tables, so there is no row to count.
-    expect(domain(summaries, "relations").countSupported).toBe(false);
-    expect(domain(summaries, "relations").recencySupported).toBe(false);
+    // Life Brain E.3 (ADR-171): Relações is no longer a Memória domain, so the
+    // overview draws no panel for it at all.
+    expect(summaries.some((summary) => summary.key === "relations")).toBe(false);
   });
 });
 
@@ -247,7 +246,6 @@ describe("the overview stays a door", () => {
       "/en/app/contexts",
       "/en/app/memories",
       "/en/app/files",
-      "/en/app/relations",
-    ]);
+          ]);
   });
 });

@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain E.3: Relações leaves Memória (ADR-171)
+
+- **No migration.**
+- `library/lenses.ts`: `NOT_A_LENS = ["relations"]`; `BRAIN_DOMAIN_LENSES` (and so the strip and the overview) drop it. `LIBRARY_MEMBERS` still means every context destination.
+- `/app/relations` no longer mounts `BrainLensTabs`; the route, its focus links from the person and project pages, and the capability are unchanged.
+- Guards: seven lenses (mobile reachability, 2I library, 2P foundation); the reachability guard now asserts the person and project pages link to Ligações. `online-brain-lenses.spec.ts` updated.
+
 ## 2026-11-14 — Life Brain E.2: a relation between two people (ADR-170)
 
 - **No migration.** `person_relationships.related_person_id` (nullable since `202607160009`) carries the other person; RLS, the composite owner FKs and the entity-deletion RPC already covered it.

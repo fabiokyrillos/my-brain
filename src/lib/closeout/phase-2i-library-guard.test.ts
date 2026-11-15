@@ -22,7 +22,7 @@ import {
   LIBRARY_SUPPORTS_PINNING,
 } from "../../features/library/contracts";
 import { getLibraryCopy } from "../../features/library/copy";
-import { BRAIN_DOMAIN_LENSES, BRAIN_LENSES } from "../../features/library/lenses";
+import { BRAIN_DOMAIN_LENSES, BRAIN_LENSES, NOT_A_LENS } from "../../features/library/lenses";
 import { navigationCapabilities } from "../../features/shell/capabilities";
 import { getMessages } from "../../i18n/messages";
 
@@ -160,7 +160,10 @@ describe("Brain's lenses reach every context destination, and none twice", () =>
     // The strip is built as "declared order first, then whatever the registry
     // has that the order does not name", so nothing can be lost. This asserts
     // the other half: nothing is duplicated and nothing foreign is added.
-    expect([...BRAIN_DOMAIN_LENSES].sort()).toEqual([...LIBRARY_MEMBERS].sort());
+    // Life Brain E.3 (ADR-171): every context destination except the ones
+    // `NOT_A_LENS` names (Relações), each of which must still be a member.
+    for (const key of NOT_A_LENS) expect(LIBRARY_MEMBERS).toContain(key);
+    expect([...BRAIN_DOMAIN_LENSES].sort()).toEqual(LIBRARY_MEMBERS.filter((key) => !NOT_A_LENS.includes(key)).sort());
     expect(new Set(BRAIN_LENSES).size).toBe(BRAIN_LENSES.length);
     expect(BRAIN_LENSES[0]).toBe("overview");
   });

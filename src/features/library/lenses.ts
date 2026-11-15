@@ -71,13 +71,24 @@ const DECLARED_ORDER: readonly NavigationKey[] = [
   "contexts",
   "memories",
   "files",
-  "relations",
 ];
 
-/** Every context destination, in reading order, with nothing lost. */
+/**
+ * Context destinations that are deliberately NOT a Memória lens.
+ *
+ * Life Brain E.3 (ADR-171): the owner decided "Relações" leaves Memória. Its
+ * page survives as each person's and project's "Ligações" — reached from the
+ * "Ver ligações" link on their pages (`relationViewHref`), focused on them —
+ * and stays a `context` destination for the desktop rail and the palette. It
+ * is named here rather than moved to another group, so `LIBRARY_MEMBERS`
+ * keeps meaning "the context destinations".
+ */
+export const NOT_A_LENS: readonly NavigationKey[] = ["relations"];
+
+/** Every context destination that is a lens, in reading order, with nothing else lost. */
 export const BRAIN_DOMAIN_LENSES: readonly NavigationKey[] = [
   ...DECLARED_ORDER.filter((key) => LIBRARY_MEMBERS.includes(key)),
-  ...LIBRARY_MEMBERS.filter((key) => !DECLARED_ORDER.includes(key)),
+  ...LIBRARY_MEMBERS.filter((key) => !DECLARED_ORDER.includes(key) && !NOT_A_LENS.includes(key)),
 ];
 
 /** The strip, overview first. */
