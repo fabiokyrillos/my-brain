@@ -21,10 +21,14 @@ import { getEntityCopy } from "@/features/entities/copy";
 import { EntityEditForm } from "@/features/entities/entity-edit-form";
 import { loadOrganizationOptions } from "@/features/entities/organizations";
 import { RelationshipPanel } from "@/features/entities/relationship-panel";
+import { PersonLinksPanel } from "@/features/entities/person-links-panel";
+import { projectPersonLinks } from "@/features/entities/person-links-projection";
 import { describeRelationshipType } from "@/features/entities/relationship-vocabulary";
 import {
   createOwnerRelationship,
+  createPersonLink,
   endOwnerRelationship,
+  endPersonLink,
   updateOwnerRelationship,
 } from "@/features/entities/relationships";
 import { loadAliasesForEntity } from "@/features/entities/aliases";
@@ -124,6 +128,8 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     fileLinkOutcome,
     personChangeResult,
     agentName,
+    personLinkResult,
+    peopleOptionsResult,
   ] = await Promise.all([
     // `organization_id` joins the projection for the first time (UX-09).
     supabase.from("people").select("id,name,notes,organization_id,created_at,updated_at,birthday_month,birthday_day,birthday_year").eq("id", personId).maybeSingle(),
@@ -146,7 +152,7 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
     // Two relations the schema has modelled since `202607160009` and the page
     // has never shown (UX-09). Both are validity-scoped: a relationship that
     // ended is history, not the current answer to "who is this to me".
-    supabase.from("person_relationships").select("id,relationship_type,description,valid_from,valid_until").eq("person_id", personId).is("valid_until", null).order("valid_from", { ascending: false }).limit(withProbe(RELATION_LIMIT)),
+    supabase.from("person_relationships").select("id,relationship_type,description,valid_from,valid_until").eq("person_id", personId).is("related_person_id", null).is("valid_until", null).order("valid_from", { ascending: false }).limit(withProbe(RELATION_LIMIT)),
     supabase.from("person_contexts").select("context_id,valid_until").eq("person_id", personId).is("valid_until", null).limit(withProbe(RELATION_LIMIT)),
     loadOrganizationOptions(supabase),
     // EGC.2. The two selectors the association panels offer, bounded at 200 by
@@ -189,6 +195,9 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
      */
     supabase.from("audit_logs").select(CHANGE_SELECT).eq("user_id", user.id).eq("entity_type", "person").eq("entity_id", personId).order("created_at", { ascending: false }).limit(withProbe(RECENT_CHANGE_LIMIT)),
     getAgentName(),
+    // Life Brain E.2: links to the owner's other people, in both directions.
+    supabase.from("person_relationships").select("id,person_id,related_person_id,relationship_type").not("related_person_id", "is", null).is("valid_until", null).or(`person_id.eq.${personId},related_person_id.eq.${personId}`).limit(withProbe(RELATION_LIMIT)),
+    supabase.from("people").select("id,name").order("name").limit(PICKER_LIMIT),
   ]);
   const person = requireSupabaseData(personResult, "load person");
   const taskLinks = requireSupabaseData(taskLinkResult, "load person tasks") ?? [];
@@ -197,6 +206,12 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
   const memories = requireSupabaseData(memoryResult, "load person memories") ?? [];
   const relationships = requireSupabaseData(relationshipResult, "load person relationships") ?? [];
   const contextLinks = requireSupabaseData(contextLinkResult, "load person contexts") ?? [];
+  const peopleOptions = requireSupabaseData(peopleOptionsResult, "load people options") ?? [];
+  const personLinks = projectPersonLinks(
+    personId,
+    requireSupabaseData(personLinkResult, "load person links") ?? [],
+    new Map(peopleOptions.map((option) => [option.id, option.name])),
+  );
   if (!person) notFound();
 
   const taskIds = taskLinks.map((item) => item.task_id);
@@ -425,6 +440,19 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             nothing — the name is how the user got here.
           */}
           <h1>{person.name}</h1>
+          {/*
+            Life Brain E.2 (ADR-170): what this person is to you, under the
+            name — "Esposa/Esposo" — instead of only further down the page.
+            Known terms only; an unrecognised stored value stays in the panel.
+          */}
+          {relationships.some((relationship) => describeRelationshipType(locale, relationship.relationship_type)) ? (
+            <p className="entity-hero-relation">
+              {relationships
+                .map((relationship) => describeRelationshipType(locale, relationship.relationship_type))
+                .filter((label): label is string => label !== null)
+                .join(" · ")}
+            </p>
+          ) : null}
           {/*
             ADR-110 Decision 4: the note does not. It is free text about a human
             being with no classification of its own and no classifiable source,
@@ -705,6 +733,15 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
             since: formatDate(relationship.valid_from),
           }))}
           updateAction={updateOwnerRelationship}
+        />
+        <PersonLinksPanel
+          createAction={createPersonLink}
+          endAction={endPersonLink}
+          links={personLinks}
+          locale={locale}
+          people={peopleOptions}
+          personId={person.id}
+          personName={person.name}
         />
         <AssociationPanel
           addAction={associatePersonContext}

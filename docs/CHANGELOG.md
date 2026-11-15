@@ -1,5 +1,14 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain E.2: a relation between two people (ADR-170)
+
+- **No migration.** `person_relationships.related_person_id` (nullable since `202607160009`) carries the other person; RLS, the composite owner FKs and the entity-deletion RPC already covered it.
+- `relationship-vocabulary.ts`: `PERSON_LINK_TYPES` (family, friend, colleague, other), `inversePersonLinkType` (parent ↔ child), `personLinkOptions`.
+- `person-links-projection.ts`: one row read from either end; `repeatsLiveLink` catches a duplicate written from the other page.
+- `relationships.ts`: `createPersonLink`, `endPersonLink` (audited under the existing action types, with both ends); the owner-relationship reads and writes filter `related_person_id is null`, as do the person page and `relations/data.ts`.
+- Person page: the relationship to you under the name (`.entity-hero-relation`); `PersonLinksPanel` after "Relação com você".
+- Tests: `person-links-projection.test.ts`, `relationships-person-links.test.ts`.
+
 ## 2026-11-14 — Life Brain E.1: Configurações redesigned (ADR-169)
 
 - **No migration.**

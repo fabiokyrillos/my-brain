@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { RELATIONSHIP_TYPES } from "./relationship-vocabulary";
+import { PERSON_LINK_TYPES, RELATIONSHIP_TYPES } from "./relationship-vocabulary";
 
 /**
  * The validated shape of an entity edit (UX-08, UX-09).
@@ -204,6 +204,26 @@ export const relationshipEndSchema = z.object({
   personId: z.string().uuid(),
 }).strict();
 
+/**
+ * Life Brain E.2 (ADR-170): a link between two of the owner's people, written
+ * from the page of `personId` as "`otherPersonId` is `relationshipType` of
+ * `personId`". The two must differ; ownership of both is checked by the action
+ * and enforced by the composite foreign keys.
+ */
+export const personLinkCreateSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  otherPersonId: z.string().uuid(),
+  relationshipType: z.enum(PERSON_LINK_TYPES),
+}).strict().refine((value) => value.personId !== value.otherPersonId, { path: ["otherPersonId"] });
+
+/** Ending a link from either person's page; `personId` must be one of its ends. */
+export const personLinkEndSchema = z.object({
+  locale: z.enum(["pt-BR", "en"]),
+  personId: z.string().uuid(),
+  linkId: z.string().uuid(),
+}).strict();
+
 export const personContextSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),
   personId: z.string().uuid(),
@@ -242,6 +262,7 @@ export const personProjectEndSchema = z.object({
 
 export type RelationshipCreateInput = z.infer<typeof relationshipCreateSchema>;
 export type RelationshipUpdateInput = z.infer<typeof relationshipUpdateSchema>;
+export type PersonLinkCreateInput = z.infer<typeof personLinkCreateSchema>;
 export type PersonProjectInput = z.infer<typeof personProjectSchema>;
 
 export const projectUpdateSchema = z.object({
