@@ -1,3 +1,5 @@
+import { pendingTurn } from "@/features/chat/pending-turn";
+import { PendingTurnIndicator } from "@/features/chat/pending-turn-indicator";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { PageHeader, TextLink } from "@/components/ui";
@@ -165,6 +167,7 @@ export default async function ConversationPage({
    * plan's stopping condition is an unbounded per-source fan-out; the fix is
    * more batching, never the stored copy.
    */
+  const turn = pendingTurn(messages, new Date());
   const parsed = messages.map((message) => parseCitations(message.citations));
   const resolved = await Promise.all(
     parsed.map((citations) => resolveSources(supabase, user.id, citations, locale)),
@@ -197,6 +200,13 @@ export default async function ConversationPage({
             sources={resolved[index]!}
           />
         ))}
+        {/*
+          Life Brain E.5 part 1 (ADR-173): a question still being answered —
+          the last message is the owner's — keeps its "pensando" across a
+          reload and refreshes until the answer lands; an old one says it went
+          unanswered.
+        */}
+        {turn ? <PendingTurnIndicator agentName={agentName} locale={locale} turn={turn} /> : null}
       </div>
 
       <Composer

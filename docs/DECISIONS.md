@@ -2701,3 +2701,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 4 — Grouped within the page.** The list stays paginated as before, and each page is grouped. Grouping or filtering across the whole list needs the segment in SQL, which is a migration and the owner's call.
 
 - **Consequences.** Memórias reads as segments with counts. A memory saved from chat has no source record, so its segment comes from its kind.
+
+## ADR-173 — Life Brain E.5: the thinking state survives a reload now; streaming is planned, not built
+
+- **Date:** 2026-11-14
+- **Status:** Accepted. Implements part of ADR-168 Decision 4 (B.6). No migration.
+
+- **Context.** B.6 asks for two things: the answer appearing as it is written, and a "pensando" state that survives a reload. `sendChatMessage` is a 650-line Server Action. It authenticates, gates the key, admits the rate limit, embeds, retrieves, classifies and admits sensitive sources, calls the model with Structured Outputs, records each call in `ai_usage_events` before any dependent write, strips citations to ids it did not provide, and persists. It inserts the question before the model call and the answer after.
+
+- **Decision 1 — The thinking state is derived from the thread.** A thread whose last message is the owner's is a turn in flight. Within `PENDING_TURN_WINDOW_MS` (three minutes, above the longest turn the ledger has seen) the page renders "<assistente> está pensando…" and refreshes the server render every three seconds until the answer is in the thread. Past the window it says the question went unanswered, so it never spins forever. No status column, so no migration.
+- **Decision 2 — A refresh only reads.** `router.refresh()` re-renders under the owner's session like any page load; it neither retries the turn nor writes.
+- **Decision 3 — A failed turn is recognisable only by age.** The failure path records an error event and writes no assistant row. Writing a failure row would change the thread's contract (and `conversation_messages` has no field to mark it), so it is left as is.
+- **Decision 4 — Streaming is the next step, planned here.** A route handler (`app/[locale]/api/chat/route.ts`) runs the same pipeline, extracted from `sendChatMessage` into a shared server function so the two paths cannot diverge. The model call uses the Responses API's streaming with the same JSON schema. The handler forwards only the `answer` string's characters as they arrive, parsed incrementally from the partial JSON. It records usage when the stream completes, before persisting. It validates the complete object, strips foreign citation ids, then persists. The client renders the streamed text as a draft and replaces it with the persisted message on refresh. An aborted stream persists nothing, so a half answer never becomes a message. It needs no migration. It is its own pull request because it moves security-relevant code.
+
+- **Consequences.** A reload, a second device or a locked phone no longer loses the "pensando". The answer still appears all at once until part 2 ships.

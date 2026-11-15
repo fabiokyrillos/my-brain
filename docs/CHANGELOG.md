@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain E.5 part 1: the thinking state survives a reload (ADR-173)
+
+- **No migration.**
+- `chat/pending-turn.ts`: `pendingTurn` (last message the owner's → thinking for three minutes, then unanswered).
+- `chat/pending-turn-indicator.tsx`: the assistant's place in the thread while a turn is in flight; `router.refresh()` every 3 s until the answer or the deadline.
+- `/app/chat/[conversationId]`: mounts it after the messages.
+- Tests: `pending-turn.test.tsx`.
+
 ## 2026-11-14 — Life Brain E.4: memories by segment (ADR-172)
 
 - **No migration.**
