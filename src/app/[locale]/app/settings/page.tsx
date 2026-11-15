@@ -33,7 +33,7 @@ export default async function SettingsPage({ params }: { params: Promise<{ local
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
 
   return (
-    <SettingsPanel locale={locale} section={DEFAULT_SETTINGS_SECTION}>
+    <SettingsPanel locale={locale} root section={DEFAULT_SETTINGS_SECTION}>
       <SettingsSectionContent locale={locale} section={DEFAULT_SETTINGS_SECTION} />
     </SettingsPanel>
   );

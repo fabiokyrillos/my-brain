@@ -132,6 +132,8 @@ test.describe("the account can see what is stored, take it, and read what it agr
   test("2O-PRIVACY-002: the three withheld tables are named with their reason", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/settings/privacy");
+    // Life Brain E.1: the withheld tables sit behind a closed disclosure.
+    await page.locator("details.privacy-details > summary").click();
 
     const withheld = page.locator(".privacy-withheld");
     await expect(withheld).toBeVisible();
@@ -163,6 +165,8 @@ test.describe("the account can see what is stored, take it, and read what it agr
   test("2O-PRIVACY-007/-008/-009: retention, sessions and deletion are reachable", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/settings/privacy");
+    // Life Brain E.1: the retention schedule sits behind a closed disclosure.
+    await page.locator("details.privacy-details > summary").click();
 
     // `2O-PRIVACY-007`, generated from `RETENTION_SCHEDULE` and honesty-gated.
     await expect(page.getByRole("heading", { name: "Por quanto tempo guardamos" })).toBeVisible();

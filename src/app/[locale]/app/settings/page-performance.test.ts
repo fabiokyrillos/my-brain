@@ -55,7 +55,7 @@ describe("each settings section starts its independent projections together", ()
   });
 
   it("never awaits two reads in sequence inside one section", () => {
-    for (const section of ["general", "assistant", "ai", "planning", "notifications", "privacy", "appearance", "account"]) {
+    for (const section of ["general", "day", "autonomy", "ai", "appearance", "privacy"]) {
       const body = sectionBody(section);
       const reads = awaitedReads(body);
       // `Promise.all([...])` counts as ONE await however many loaders it holds,
@@ -72,7 +72,9 @@ describe("each settings section starts its independent projections together", ()
     // this file by having nothing left to batch.
     for (const [section, loaders] of [
       ["general", ["loadSettingsFormValues", "readDismissal"]],
-      ["assistant", ["loadSettingsFormValues", "loadAutomationStatus", "loadAutomationPolicyHistory"]],
+      // Life Brain E.1: Planejamento and Notificações share "Seu dia e avisos".
+      ["day", ["loadSettingsFormValues", "readPushConsent"]],
+      ["autonomy", ["loadAutomationStatus", "loadAutomationPolicyHistory"]],
       ["ai", ["loadSettingsFormValues", "loadCredentialMetadata", "loadPendingEntryCount", "getOwnerTimeZone"]],
       ["privacy", ["loadPrivacyCensus", "loadConsentRecord", "readPushConsent", "readSignedInEmail", "getOwnerTimeZone"]],
     ] as const) {

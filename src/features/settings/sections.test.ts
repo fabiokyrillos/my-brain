@@ -3,35 +3,73 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_SETTINGS_SECTION,
   SETTINGS_REVALIDATION_PATHS,
+  LEGACY_SETTINGS_SECTIONS,
   SETTINGS_SECTIONS,
   isSettingsSection,
+  legacySettingsTarget,
+  settingsGroupHref,
   settingsSectionFromPath,
   settingsSectionHref,
 } from "./sections";
 
-describe("the eight sections `2P-SETTINGS-001` names", () => {
-  it("declares exactly the eight, in the signed reading order", () => {
-    expect(SETTINGS_SECTIONS).toEqual([
-      "general",
-      "assistant",
-      "ai",
-      "planning",
-      "notifications",
-      "privacy",
-      "appearance",
-      "account",
-    ]);
+describe("the six groups Life Brain E.1 names (ADR-169)", () => {
+  it("declares exactly the six, in the approved reading order", () => {
+    expect(SETTINGS_SECTIONS).toEqual(["general", "day", "autonomy", "ai", "appearance", "privacy"]);
   });
 
-  it("ends on Conta, which is the way out rather than a preference", () => {
-    expect(SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]).toBe("account");
+  it("ends on Privacidade e conta, which is the way out rather than a preference", () => {
+    expect(SETTINGS_SECTIONS[SETTINGS_SECTIONS.length - 1]).toBe("privacy");
   });
 
   it("recognises its own members and nothing else", () => {
     for (const section of SETTINGS_SECTIONS) expect(isSettingsSection(section)).toBe(true);
     expect(isSettingsSection("automation")).toBe(false);
+    expect(isSettingsSection("assistant")).toBe(false);
     expect(isSettingsSection("General")).toBe(false);
     expect(isSettingsSection(undefined)).toBe(false);
+  });
+});
+
+describe("every 2P.5 slug still lands somewhere — `2P-SETTINGS-002`", () => {
+  it("maps each retired slug to the group that absorbed it", () => {
+    expect(LEGACY_SETTINGS_SECTIONS).toEqual({
+      assistant: "general",
+      planning: "day",
+      notifications: "day",
+      account: "privacy",
+    });
+  });
+
+  it("maps every retired slug to a real group, and no group to itself", () => {
+    for (const [slug, group] of Object.entries(LEGACY_SETTINGS_SECTIONS)) {
+      expect(isSettingsSection(group)).toBe(true);
+      expect(isSettingsSection(slug)).toBe(false);
+    }
+  });
+
+  it("resolves only retired slugs, never a group or an inherited key", () => {
+    expect(legacySettingsTarget("notifications")).toBe("day");
+    expect(legacySettingsTarget("general")).toBeNull();
+    expect(legacySettingsTarget("toString")).toBeNull();
+    expect(legacySettingsTarget(undefined)).toBeNull();
+  });
+
+  it("marks the group a retired URL redirects to while it redirects", () => {
+    expect(settingsSectionFromPath("/pt-BR/app/settings/account")).toBe("privacy");
+    expect(settingsSectionFromPath("/en/app/settings/planning")).toBe("day");
+  });
+});
+
+describe("the phone's list of groups opens each group", () => {
+  it("opens the default group by its explicit slug, since `/app/settings` is the list", () => {
+    expect(settingsGroupHref("pt-BR", "general")).toBe("/pt-BR/app/settings/general");
+    expect(settingsSectionFromPath(settingsGroupHref("pt-BR", "general"))).toBe("general");
+  });
+
+  it("opens every other group at its canonical href", () => {
+    for (const section of SETTINGS_SECTIONS.filter((entry) => entry !== "general")) {
+      expect(settingsGroupHref("en", section)).toBe(settingsSectionHref("en", section));
+    }
   });
 });
 
@@ -49,9 +87,9 @@ describe("every section has a stable deep link — `2P-SETTINGS-002`", () => {
   });
 
   it("puts every other section under the one dynamic segment", () => {
-    expect(settingsSectionHref("pt-BR", "assistant")).toBe("/pt-BR/app/settings/assistant");
-    expect(settingsSectionHref("en", "notifications")).toBe("/en/app/settings/notifications");
-    expect(settingsSectionHref("pt-BR", "account")).toBe("/pt-BR/app/settings/account");
+    expect(settingsSectionHref("pt-BR", "day")).toBe("/pt-BR/app/settings/day");
+    expect(settingsSectionHref("en", "autonomy")).toBe("/en/app/settings/autonomy");
+    expect(settingsSectionHref("pt-BR", "privacy")).toBe("/pt-BR/app/settings/privacy");
   });
 
   it("carries the locale into every href, so no section escapes the segment", () => {
@@ -84,7 +122,7 @@ describe("a URL resolves back to its section", () => {
 
   it("refuses a slug that is not a section, and everything outside the route", () => {
     expect(settingsSectionFromPath("/pt-BR/app/settings/automation")).toBeNull();
-    expect(settingsSectionFromPath("/pt-BR/app/settings/assistant/extra")).toBeNull();
+    expect(settingsSectionFromPath("/pt-BR/app/settings/day/extra")).toBeNull();
     expect(settingsSectionFromPath("/pt-BR/app/notifications")).toBeNull();
     expect(settingsSectionFromPath("/fr/app/settings")).toBeNull();
     expect(settingsSectionFromPath("")).toBeNull();
@@ -116,19 +154,5 @@ describe("revalidation names the route pattern, never the resolved path", () => 
     // keep in step with the route tree.
     expect(SETTINGS_REVALIDATION_PATHS).toHaveLength(2);
     expect(SETTINGS_REVALIDATION_PATHS[1].endsWith("/[section]")).toBe(true);
-  });
-});
-
-describe("Life Brain A.6 — Avançado names the destinations as the rail does", () => {
-  it("uses the navigation's own labels for Histórico and Custos de IA", async () => {
-    const { getSettingsCopy } = await import("./copy");
-    const { getMessages } = await import("@/i18n/messages");
-    for (const locale of ["pt-BR", "en"] as const) {
-      const advanced = getSettingsCopy(locale).advanced.links;
-      const nav = getMessages(locale).nav as Record<string, string>;
-      expect(advanced.history).toBe(nav.history);
-      expect(advanced.costs).toBe(nav.costs);
-      expect(advanced.jobs.length).toBeGreaterThan(0);
-    }
   });
 });

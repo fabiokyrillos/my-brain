@@ -85,7 +85,10 @@ test.describe("notifications say three things, and every surface recovers in one
       semantics, and a retarget that also needed the expectations rewritten
       would have been the evidence that it did not.
     */
-    await page.goto("/pt-BR/app/settings/notifications");
+    // Life Brain E.1: notifications live in "Seu dia e avisos", and the facts
+    // sit behind the closed "Como os avisos funcionam" disclosure.
+    await page.goto("/pt-BR/app/settings/day");
+    await page.locator(".notification-settings details.settings-how > summary").click();
 
     // The RSC assertion: the new Server Component rendered at all.
     const facts = page.locator(".notification-facts");
@@ -117,7 +120,9 @@ test.describe("notifications say three things, and every surface recovers in one
 
   test("2O-NOTIFY-005: the bounds are stated above the control, and the missing one is declared missing", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings/notifications");
+    // Life Brain E.1: the bounds share the facts' disclosure, still before the control.
+    await page.goto("/pt-BR/app/settings/day");
+    await page.locator(".notification-settings details.settings-how > summary").click();
 
     const bounds = page.locator("[data-notification-bounds]");
     await expect(bounds).toBeVisible();
@@ -163,7 +168,8 @@ test.describe("notifications say three things, and every surface recovers in one
 
   test("2O-NOTIFY-001: Ajustes reaches notifications, and the route keeps its list", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings/notifications");
+    // Life Brain E.1: the old slug redirects to "Seu dia e avisos".
+    await page.goto("/pt-BR/app/settings/day");
 
     const link = page.getByRole("link", { name: /Notifica/ }).first();
     await expect(link).toBeVisible();

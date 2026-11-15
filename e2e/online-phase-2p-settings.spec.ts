@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { signInOnline } from "./support/online-session";
 
@@ -43,19 +43,41 @@ const serviceRoleKey = process.env.ONLINE_SUPABASE_SERVICE_ROLE_KEY;
 const publishableKey = process.env.ONLINE_SUPABASE_PUBLISHABLE_KEY;
 const onlineConfigured = Boolean(supabaseUrl && serviceRoleKey && publishableKey);
 
-/** The eight, and the URL each one is claimed to have. */
+/**
+ * Life Brain E.1: the six groups, and the URL each one is claimed to have.
+ * `general` is also what `/app/settings` renders (beside the list on a desktop;
+ * behind it on a phone).
+ */
 const SECTIONS = [
-  { slug: "", name: "Geral" },
-  { slug: "/assistant", name: "Assistente" },
-  { slug: "/ai", name: "IA" },
-  { slug: "/planning", name: "Planejamento" },
-  { slug: "/notifications", name: "Notificações" },
-  { slug: "/privacy", name: "Privacidade e dados" },
-  { slug: "/appearance", name: "Aparência" },
-  { slug: "/account", name: "Conta" },
+  { slug: "general", name: "Você e o assistente" },
+  { slug: "day", name: "Seu dia e avisos" },
+  { slug: "autonomy", name: "O que ele faz sozinho" },
+  { slug: "ai", name: "IA e custos" },
+  { slug: "appearance", name: "Aparência" },
+  { slug: "privacy", name: "Privacidade e conta" },
 ] as const;
 
-test.describe("Settings is eight sections, each with its own URL", () => {
+/**
+ * Life Brain E.1: the 2P.5 slugs, each still a working deep link to its group.
+ * `assistant` lands on the canonical `/app/settings` (`settingsSectionHref`).
+ */
+const LEGACY_SECTIONS = [
+  { slug: "assistant", target: "general", url: /\/pt-BR\/app\/settings$/ },
+  { slug: "planning", target: "day", url: /\/pt-BR\/app\/settings\/day$/ },
+  { slug: "notifications", target: "day", url: /\/pt-BR\/app\/settings\/day$/ },
+  { slug: "account", target: "privacy", url: /\/pt-BR\/app\/settings\/privacy$/ },
+] as const;
+
+/**
+ * A group's link in the list of groups. By `data-section` rather than by name:
+ * each row's accessible name now also carries what the group is set to, and on
+ * a phone the list is `display: none` inside a group, where role queries skip it.
+ */
+function groupLink(page: Page, section: string) {
+  return page.locator(`nav[aria-label="Grupos das configurações"] a[data-section="${section}"]`);
+}
+
+test.describe("Settings is six groups, each with its own URL", () => {
   test.skip(!onlineConfigured, "Online Supabase credentials are not available.");
 
   const email = `codex-settings-${crypto.randomUUID()}@example.com`;
@@ -96,35 +118,51 @@ test.describe("Settings is eight sections, each with its own URL", () => {
     for (const section of SECTIONS) {
       // Entered directly rather than clicked: a deep link is a claim about what
       // a cold navigation produces, and clicking through would never test it.
-      await page.goto(`/pt-BR/app/settings${section.slug}`);
+      await page.goto(`/pt-BR/app/settings/${section.slug}`);
 
-      // The RSC assertion, per section: it rendered at all.
-      await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeVisible();
+      // The RSC assertion, per section: it rendered at all. Life Brain E.1: on a
+      // phone the `<h1>` is visually hidden inside a group, so it is asserted
+      // in the tree rather than on screen; the panel below is on screen.
+      await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeAttached();
       const panel = page.locator("#settings-panel");
       await expect(panel, `${section.name} did not render`).toBeVisible();
       await expect(panel).toHaveAttribute("aria-label", section.name);
-      await expect(panel).toHaveAttribute("data-settings-section", section.slug.slice(1) || "general");
+      await expect(panel).toHaveAttribute("data-settings-section", section.slug);
 
       // …and the nav says which one you are in, to a screen reader as well.
-      await expect(
-        page.getByRole("navigation", { name: "Seções das configurações" })
-          .getByRole("link", { name: section.name, exact: true }),
-      ).toHaveAttribute("aria-current", "page");
+      await expect(groupLink(page, section.slug)).toHaveAttribute("aria-current", "page");
+      await expect(groupLink(page, section.slug)).toContainText(section.name);
+    }
+
+    // `/app/settings` itself renders the default group, with no redirect.
+    await page.goto("/pt-BR/app/settings");
+    await expect(page).toHaveURL(/\/pt-BR\/app\/settings$/);
+    await expect(page.locator("#settings-panel")).toHaveAttribute("data-settings-section", "general");
+
+    // Life Brain E.1: every 2P.5 slug was a published deep link, so each one
+    // now lands on the group it moved into rather than answering 404.
+    for (const legacy of LEGACY_SECTIONS) {
+      await page.goto(`/pt-BR/app/settings/${legacy.slug}`);
+      await expect(page).toHaveURL(legacy.url);
+      await expect(page.locator("#settings-panel")).toHaveAttribute("data-settings-section", legacy.target);
     }
   });
 
-  test("`2P-SETTINGS-002`: back and forward mean what they mean", async ({ page }) => {
+  test("`2P-SETTINGS-002`: back and forward mean what they mean", async ({ page }, testInfo) => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/settings");
-    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Geral");
+    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Você e o assistente");
 
-    const nav = page.getByRole("navigation", { name: "Seções das configurações" });
-    await nav.getByRole("link", { name: "Aparência" }).click();
+    // At `/app/settings` the list is on screen at every width.
+    await groupLink(page, "appearance").click();
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/appearance$/);
     await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Aparência");
 
-    await nav.getByRole("link", { name: "Conta" }).click();
-    await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/account$/);
+    // Life Brain E.1: inside a group a phone hides the list, so the second hop
+    // there is a deep link — a history entry all the same.
+    if (testInfo.project.name === "mobile") await page.goto("/pt-BR/app/settings/privacy");
+    else await groupLink(page, "privacy").click();
+    await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/privacy$/);
 
     /*
       The back-button trap this design exists to avoid.
@@ -138,7 +176,7 @@ test.describe("Settings is eight sections, each with its own URL", () => {
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/appearance$/);
     await page.goBack();
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings$/);
-    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Geral");
+    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Você e o assistente");
 
     await page.goForward();
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/appearance$/);
@@ -153,21 +191,21 @@ test.describe("Settings is eight sections, each with its own URL", () => {
     // order precisely so a keyboard reader meets it first.
     await expect(page.locator("#settings-panel")).not.toBeFocused();
 
-    await page.getByRole("navigation", { name: "Seções das configurações" })
-      .getByRole("link", { name: "Planejamento" })
-      .click();
+    // Life Brain E.1: Planejamento is now part of "Seu dia e avisos".
+    await groupLink(page, "day").click();
 
     // On a change it must: otherwise a screen-reader user activates the link and
     // the content behind them silently becomes something else.
     await expect(page.locator("#settings-panel")).toBeFocused();
-    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Planejamento");
+    await expect(page.locator("#settings-panel")).toHaveAttribute("aria-label", "Seu dia e avisos");
   });
 
   test("`2P-SETTINGS-004`: saving one section leaves another's stored value alone", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
 
-    // Change something in Assistente, and read it back.
-    await page.goto("/pt-BR/app/settings/assistant");
+    // Change something in the assistant form, and read it back. Life Brain E.1:
+    // that form is in "Você e o assistente", and a select saves on change.
+    await page.goto("/pt-BR/app/settings/general");
     /*
       By id, which is the convention the other online lanes already use for a
       select — `online-ai-configuration.spec.ts` picks `#chat-model` the same
@@ -184,8 +222,9 @@ test.describe("Settings is eight sections, each with its own URL", () => {
       id keeps the assertion pointed at the control rather than at a name.
     */
     await page.locator("#tone").selectOption("professional");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.getByRole("status")).toBeVisible();
+    await expect(
+      page.locator('form[data-settings-form="assistant"]').getByRole("status").filter({ hasText: "Preferências salvas" }),
+    ).toBeVisible();
 
     /*
       Read back from the SERVER, by leaving and coming back rather than by
@@ -195,29 +234,32 @@ test.describe("Settings is eight sections, each with its own URL", () => {
       the owner's own choice whatever the server did — the exact false positive
       slice 2P.4's journey found on the automation select.
     */
-    await page.goto("/pt-BR/app/settings/assistant");
+    await page.goto("/pt-BR/app/settings/general");
     await expect(page.locator("#tone")).toHaveValue("professional");
 
-    // Now save a DIFFERENT section, changing something it owns.
-    await page.goto("/pt-BR/app/settings/planning");
+    // Now save a DIFFERENT section, changing something it owns. Life Brain E.1:
+    // the planning form is in "Seu dia e avisos", and a number saves on blur.
+    await page.goto("/pt-BR/app/settings/day");
     await page.locator("#max-followups").fill("7");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.getByRole("status")).toBeVisible();
+    await page.locator("#max-followups").press("Tab");
+    await expect(
+      page.locator('form[data-settings-form="planning"]').getByRole("status").filter({ hasText: "Preferências salvas" }),
+    ).toBeVisible();
 
     // Its own value landed…
-    await page.goto("/pt-BR/app/settings/planning");
+    await page.goto("/pt-BR/app/settings/day");
     await expect(page.locator("#max-followups")).toHaveValue("7");
 
     // …and Assistente's is untouched. This is the whole requirement: before the
     // section-scoped writer, Planejamento's save would have sent four fields and
     // blanked the other thirteen.
-    await page.goto("/pt-BR/app/settings/assistant");
+    await page.goto("/pt-BR/app/settings/general");
     await expect(page.locator("#tone")).toHaveValue("professional");
   });
 
   test("`2P-SETTINGS-007`: a failed save keeps the input and names the section", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings/assistant");
+    await page.goto("/pt-BR/app/settings/general");
 
     /*
       The failure is provoked at the schema rather than by breaking the network,
@@ -231,13 +273,15 @@ test.describe("Settings is eight sections, each with its own URL", () => {
     */
     const name = page.locator("#agent-name");
     await name.evaluate((input) => input.removeAttribute("maxlength"));
+    // Life Brain E.1: no save button; the field submits when it loses focus.
     await name.fill("x".repeat(80));
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
+    await name.press("Tab");
 
-    // It says so, as an alert — a failure the reader must notice.
+    // It says so, as an alert — a failure the reader must notice. Life Brain
+    // E.1: it names the group the form now sits in.
     const alert = page.locator(".settings-feedback[role='alert']");
     await expect(alert).toBeVisible();
-    await expect(alert, "the failure does not name its section").toContainText("Assistente");
+    await expect(alert, "the failure does not name its section").toContainText("Você e o assistente");
 
     // And the input is still theirs: the action returns rather than redirecting
     // or revalidating, so React keeps the form it is holding.
@@ -287,13 +331,15 @@ test.describe("Settings is eight sections, each with its own URL", () => {
     const link = page.getByRole("link", { name: "Ajustar preferências de notificação" });
     await expect(link).toHaveCount(1);
     await link.click();
-    await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/notifications$/);
+    // Life Brain E.1: the controls went to "Seu dia e avisos".
+    await expect(page).toHaveURL(/\/pt-BR\/app\/settings\/day$/);
     await expect(page.getByRole("heading", { name: "Notificações no aparelho" })).toBeVisible();
   });
 
   test("no automation was enabled, and the thresholds read as signed rather than proposed", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings/assistant");
+    // Life Brain E.1: automation is its own group, "O que ele faz sozinho".
+    await page.goto("/pt-BR/app/settings/autonomy");
 
     const section = page.locator(".automation-section");
     await expect(section.getByText(/nenhuma categoria age sozinha/i)).toBeVisible();
@@ -386,18 +432,19 @@ test.describe("the mobile bar is the handoff's bar", () => {
       expect(overflow, `${path} scrolls sideways`).toBeLessThanOrEqual(1);
     }
 
-    // `2P-SETTINGS-003`: a list, not an overflowing tab row. The eight links
+    // `2P-SETTINGS-003`: a list, not an overflowing tab row. The six links
     // stack, so the last one is far below the first rather than off to its side.
+    // Life Brain E.1: on a phone `/app/settings` is that list.
     await page.goto("/pt-BR/app/settings");
-    const nav = page.getByRole("navigation", { name: "Seções das configurações" });
-    const first = await nav.getByRole("link", { name: "Geral" }).boundingBox();
-    const last = await nav.getByRole("link", { name: "Conta" }).boundingBox();
+    await expect(groupLink(page, "general")).toBeVisible();
+    const first = await groupLink(page, "general").boundingBox();
+    const last = await groupLink(page, "privacy").boundingBox();
     expect(last!.y).toBeGreaterThan(first!.y);
     expect(Math.abs(last!.x - first!.x)).toBeLessThanOrEqual(1);
 
     // Every section link is a real target on a phone.
     for (const section of SECTIONS) {
-      const box = await nav.getByRole("link", { name: section.name, exact: true }).boundingBox();
+      const box = await groupLink(page, section.slug).boundingBox();
       expect(box?.height ?? 0, `${section.name} is under the touch target`).toBeGreaterThanOrEqual(44);
     }
 

@@ -131,7 +131,7 @@ export default async function NotificationsPage({ params, searchParams }: { para
     title hides on a phone. Its action is the one discreet contextual entry
     `2P-SETTINGS-008` allows, deliberately a link rather than a panel: the
     controls it points at live in Ajustes.
-  */}<PageHeader actions={<Link className="notification-preferences-link" href={settingsSectionHref(locale, "notifications")}>{copy.preferencesLink}</Link>} description={copy.pageDescription} size="compact" title={copy.pageTitle} />{/*
+  */}<PageHeader actions={<Link className="notification-preferences-link" href={settingsSectionHref(locale, "day")}>{copy.preferencesLink}</Link>} description={copy.pageDescription} size="compact" title={copy.pageTitle} />{/*
     The feed, as a named section of this page rather than as an unlabelled tail
     of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
     where notification CONTENT lives, behind the login — and the section keeps

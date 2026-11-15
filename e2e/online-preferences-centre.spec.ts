@@ -73,26 +73,26 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
 
   test("2O-PREF-001/-002: Ajustes reaches every preference, and no route ended", async ({ page }) => {
     await signInOnline(page, { email, locale: "pt-BR" });
-    await page.goto("/pt-BR/app/settings/account");
+    // Life Brain E.1: Conta joined "Privacidade e conta" (`/account` redirects here).
+    await page.goto("/pt-BR/app/settings/privacy");
 
-    // The page renders at all, which is the RSC assertion.
-    await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeVisible();
+    // The page renders at all, which is the RSC assertion. On a phone the `<h1>`
+    // is visually hidden inside a group, so it is asserted in the tree.
+    await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeAttached();
 
-    const accountSection = page.locator(".data-ai-section", { hasText: "Conta e dados" });
+    // By heading id: the privacy group now holds four `.data-ai-section`s.
+    const accountSection = page.locator("section[aria-labelledby='account-data-heading']");
     await expect(accountSection).toBeVisible();
     for (const door of ["Notificações", "Termos de uso", "Política de privacidade", "Apagar a conta"]) {
       await expect(accountSection.getByRole("link", { name: door })).toBeVisible();
     }
 
     /*
-      Dados e IA is still there — in Privacidade e dados since slice 2P.5, which
-      is a section away rather than a scroll away. The claim is unchanged: this
-      slice added a reaching section rather than replacing one, and BOTH still
-      exist. A single-page assertion would now be asserting the old layout.
+      Dados e IA is still there — and since Life Brain E.1 on the same page as
+      Conta e dados. The claim is unchanged: this slice added a reaching section
+      rather than replacing one, and BOTH still exist.
     */
-    await page.goto("/pt-BR/app/settings/privacy");
-    await expect(page.locator(".data-ai-section", { hasText: "Dados e IA" })).toBeVisible();
-    await page.goto("/pt-BR/app/settings/account");
+    await expect(page.locator("section[aria-labelledby='data-ai-heading']")).toBeVisible();
 
     /*
      * `2O-PREF-002`'s hardest half: the reached route **keeps its own URL and
@@ -109,8 +109,8 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     await expect(page).toHaveURL(/\/pt-BR\/app\/settings$/);
 
     // The deletion route, still outside `app/`, still asking properly.
-    await page.goto("/pt-BR/app/settings/account");
-    await page.locator(".data-ai-section", { hasText: "Conta e dados" })
+    await page.goto("/pt-BR/app/settings/privacy");
+    await page.locator("section[aria-labelledby='account-data-heading']")
       .getByRole("link", { name: "Apagar a conta" }).click();
     await expect(page).toHaveURL(/\/pt-BR\/account\/delete$/);
     await expect(page.getByRole("link", { name: "Voltar para Ajustes" })).toBeVisible();
@@ -120,34 +120,52 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     /*
       Two sections since slice 2P.5: the advanced routing disclosure is IA and
-      the review controls are Planejamento. Both assertions are unchanged.
+      the review controls are Planejamento.
+
+      Life Brain E.1: the model selects are on screen by design (there is no
+      "IA avançada" disclosure any more); what stays disclosed is the
+      explanation — the routes the profile sets on its own and how AI is used.
     */
     await page.goto("/pt-BR/app/settings/ai");
 
-    // `2O-PREF-009`: advanced is disclosed, and it is not the default view.
-    const advanced = page.locator("details.settings-advanced");
-    await expect(advanced).not.toHaveAttribute("open", "");
+    // `2O-PREF-009`: the advanced explanations are disclosed, and are not the default view.
+    const disclosures = page.locator("#settings-panel details.settings-how");
+    await expect(disclosures).not.toHaveCount(0);
+    for (const disclosure of await disclosures.all()) {
+      await expect(disclosure).not.toHaveAttribute("open", "");
+    }
 
-    await page.goto("/pt-BR/app/settings/planning");
+    // Life Brain E.1: the review controls are in "Seu dia e avisos".
+    await page.goto("/pt-BR/app/settings/day");
 
     // `2O-PREF-005`: the promise `/app/reviews` makes, repeated where a reader
     // could otherwise conclude the opposite.
     await expect(page.getByText(/Nada é executado por horário configurado/)).toBeVisible();
 
+    const planning = page.locator('form[data-settings-form="planning"]');
     const daily = page.getByLabel("Fechamento do dia a partir de");
     await expect(daily).toHaveValue("22:00");
+    // Life Brain E.1: a time field saves when it loses focus with a new value.
     await daily.fill("07:15");
-    await page.getByLabel("Dia do fechamento da semana").selectOption("2");
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
+    await daily.press("Tab");
 
     /*
      * `2O-PREF-010`. Not "Preferências salvas." alone — the sentence names what
      * will now behave differently, in the registry's own words. Asserting the
      * consequence rather than the field is the requirement's own emphasis.
      */
-    const feedback = page.getByRole("status");
+    const feedback = planning.getByRole("status");
     await expect(feedback).toContainText("Preferências salvas.");
     await expect(feedback).toContainText("página de revisões oferece fechar o dia");
+
+    // Life Brain E.1: a select saves on change. Its receipt reads like the one
+    // above, so the server action's response is what is waited on.
+    const weeklySaved = page.waitForResponse(
+      (response) => response.request().method() === "POST" && Boolean(response.request().headers()["next-action"]),
+    );
+    await page.getByLabel("Dia do fechamento da semana").selectOption("2");
+    await weeklySaved;
+    await expect(feedback).toContainText("Preferências salvas.");
 
     // `2O-PREF-004`: it is a real write, not a round trip. The reload proves the
     // column moved rather than the form remembering.
@@ -155,9 +173,18 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     await expect(page.getByLabel("Fechamento do dia a partir de")).toHaveValue("07:15");
     await expect(page.getByLabel("Dia do fechamento da semana")).toHaveValue("2");
 
-    // And a save that changes nothing says so instead of claiming an effect.
-    await page.getByRole("button", { name: "Salvar preferências" }).click();
-    await expect(page.getByRole("status")).toContainText("Nada mudou");
+    /*
+      And a save that changes nothing says so instead of claiming an effect.
+      Life Brain E.1: with no save button, the reader's way to submit an
+      unchanged form is Enter in its one text field — the assistant name, in
+      "Você e o assistente" (the planning form has several, so Enter does not
+      submit it).
+    */
+    await page.goto("/pt-BR/app/settings/general");
+    await page.getByLabel("Nome do assistente").press("Enter");
+    await expect(
+      page.locator('form[data-settings-form="assistant"]').getByRole("status"),
+    ).toContainText("Nada mudou");
   });
 
   test("2O-PREF-013/-014/-015: an explicit choice beats the machine, in both directions", async ({
@@ -259,12 +286,13 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
     await expect(page.getByRole("radio", { name: "Follow the device" })).toBeChecked();
     await expect(page.getByText(/does not follow your account to other devices/)).toBeVisible();
 
-    await page.goto("/en/app/settings/planning");
+    // Life Brain E.1: Planejamento is in "Your day and alerts", Conta in "Privacy and account".
+    await page.goto("/en/app/settings/day");
     await expect(page.getByLabel("Offer to close the day from")).toBeVisible();
     await expect(page.getByText(/Nothing runs from a configured schedule/)).toBeVisible();
 
-    await page.goto("/en/app/settings/account");
-    const accountSection = page.locator(".data-ai-section", { hasText: "Account and data" });
+    await page.goto("/en/app/settings/privacy");
+    const accountSection = page.locator("section[aria-labelledby='account-data-heading']");
     await expect(accountSection.getByRole("link", { name: "Terms of use" })).toBeVisible();
     await expect(accountSection.getByRole("link", { name: "Delete the account" })).toBeVisible();
   });

@@ -4,6 +4,8 @@ import { PageHeader } from "@/components/ui";
 import { getSettingsCopy } from "@/features/settings/copy";
 import { SettingsSectionFocus } from "@/features/settings/settings-section-focus";
 import { SettingsSectionNav } from "@/features/settings/settings-section-nav";
+import { loadSettingsSummaries } from "@/features/settings/summary-loader";
+import { requireUser } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
 
 /**
@@ -44,13 +46,18 @@ export default async function SettingsLayout({
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : "pt-BR";
   const copy = getSettingsCopy(locale);
+  // Life Brain E.1: what each group is set to now, for the phone's list of
+  // groups. The layout survives a group change, so this is read once per
+  // arrival and again only when a save revalidates the route.
+  const { supabase, user } = await requireUser(locale);
+  const summaries = await loadSettingsSummaries(supabase, user.id, locale);
 
   return (
     <div className="settings-page">
       {/* Life Brain A.6: the shared compact header — no eyebrow, the intro hidden on a phone. */}
       <PageHeader description={copy.intro} size="compact" title={copy.title} />
       <div className="settings-layout">
-        <SettingsSectionNav locale={locale} />
+        <SettingsSectionNav locale={locale} summaries={summaries} />
         {children}
       </div>
       <SettingsSectionFocus />

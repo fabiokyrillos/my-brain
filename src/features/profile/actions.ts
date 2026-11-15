@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getSettingsCopy } from "@/features/settings/copy";
+import { LEGACY_SETTINGS_SECTIONS, isSettingsSection } from "@/features/settings/sections";
 import { SETTINGS_REVALIDATION_PATHS } from "@/features/settings/sections";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +28,11 @@ function localized(locale: "pt-BR" | "en", pt: string, en: string) {
  * string here, so a section renamed once is renamed everywhere.
  */
 function sectionName(locale: "pt-BR" | "en", section: ProfileFormSection): string {
-  return getSettingsCopy(locale).sections[section].name;
+  // Life Brain E.1: `assistant` and `planning` are profile forms inside the
+  // "Você e o assistente" and "Seu dia e avisos" groups, so the message names
+  // the group the reader is looking at.
+  const group = isSettingsSection(section) ? section : LEGACY_SETTINGS_SECTIONS[section];
+  return getSettingsCopy(locale).sections[group].name;
 }
 
 export async function updateProfile(

@@ -174,8 +174,12 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
    `.candidate-item` grid, which is a different failure — but a section with no
    rule of its own is exactly the condition under which borrowing goes unnoticed.
    A debt counter records that something is owed; it still does not decide what
-   is worth paying first. */
-const RECORDED_UNSTYLED = 37;
+   is worth paying first.
+
+   **37 -> 35, Life Brain E.1 (ADR-169).** The redesign of Configurações drew
+   three of the privacy block's eight: `privacy-census` (a grid of numbers),
+   `privacy-census-nosurface` and `privacy-consent`. Five remain. */
+const RECORDED_UNSTYLED = 34;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();
@@ -210,12 +214,14 @@ describe("no surface is drawn entirely by the user-agent default", () => {
     ).toBeGreaterThanOrEqual(RECORDED_UNSTYLED);
   });
 
-  it("still finds the eight privacy elements this slice declined to restyle", () => {
+  it("still finds the five privacy elements nobody has restyled yet", () => {
     // The named half of the census. If these are styled later, the count falls
     // and the test above says so; if they silently disappear from the scan
     // because the extractor broke, this says so first.
     const privacy = census.filter((entry) => entry.includes("privacy-section.tsx") || entry.includes("consent-section.tsx"));
-    expect(privacy.length, "the privacy block's unstyled elements are no longer visible to this census").toBe(8);
+    // Eight at 2O.7; Life Brain E.1 styled `privacy-census`, its
+    // `privacy-census-nosurface` cell and `privacy-consent`.
+    expect(privacy.length, "the privacy block's unstyled elements are no longer visible to this census").toBe(5);
   });
 
   describe("the planted divergences", () => {

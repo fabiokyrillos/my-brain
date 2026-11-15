@@ -298,7 +298,8 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 - **Privacidade abre com as contagens** e depois as ações; "Apagar a conta" fica por último, em vermelho.
 - **Idioma** ganha uma linha em "Você e o assistente", com o mesmo efeito do "EN" do topo.
 - **Nenhum controle novo sem consumidor** (`R-2O-12`), sem migration.
-- **Aceite:** antes/depois em `evidence/slice-e1/`, iPhone e desktop, claro e escuro; baselines da ADR-159 de Ajustes redesenhadas no runner.
+- **Aceite:** antes/depois em `evidence/slice-e1/`, iPhone e desktop, claro e escuro. *(Correção de 2026-11-14: Ajustes nunca esteve na faixa de screenshots da ADR-159; não há baseline a redesenhar.)*
+- **Implementado 2026-11-14 (ADR-169), sem migration:** seis grupos com redirecionamento dos slugs da 2P.5; no telefone, a lista de grupos com o estado de cada um e uma página por grupo; linhas que salvam na mudança, com "Salvo · Desfazer"; explicações atrás de "Como funciona"; privacidade com contagens em grade. Fica para depois: o silêncio do envio push ao lado do silêncio do perfil, o painel da chave no formato antigo, o gasto do mês na lista. `2O-PREF-009` emendado para o roteamento de modelos (ADR-169 Decisão 5).
 
 ### E.2 — Relação entre pessoas (tema T6, 2 d, **uma migration autorizada, se precisar**)
 

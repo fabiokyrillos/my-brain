@@ -45,6 +45,8 @@ import type {
   NotificationType,
 } from "./consent-contract";
 import { getNotificationSettingsCopy } from "./copy";
+import { getSettingsCopy } from "@/features/settings/copy";
+
 import { NotificationBounds, NotificationFacts } from "./notification-facts";
 import { PushControls } from "./push-controls";
 import { deriveThreeFacts } from "./three-facts";
@@ -112,15 +114,19 @@ export function NotificationSettings({
           granted permission would otherwise conclude alerts work, and on this
           product's current hardware evidence they may not.
         */}
-        <NotificationFacts facts={deriveThreeFacts(state)} locale={locale} />
+        {/*
+          Life Brain E.1 (ADR-169): the three facts (`2O-NOTIFY-004`/`-006`/
+          `-007`) and the bounds (`2O-NOTIFY-005`) behind one disclosure. Still
+          above the control region in the DOM, which is what `2O-NOTIFY-005`
+          asks ("readable before deciding"); no longer the first thing a reader
+          has to scroll past to reach the switch.
+        */}
+        <details className="settings-how">
+          <summary>{getSettingsCopy(locale).howItWorks.notifications}</summary>
+          <NotificationFacts facts={deriveThreeFacts(state)} locale={locale} />
+          <NotificationBounds locale={locale} />
+        </details>
       </div>
-
-      {/*
-        `2O-NOTIFY-005`. Above the control, not inside the preferences that only
-        appear once consent exists — the requirement's own reason is that these
-        are what BOUND the consent, so they have to be readable before deciding.
-      */}
-      <NotificationBounds locale={locale} />
 
       <div className="notification-panel">
         {/*

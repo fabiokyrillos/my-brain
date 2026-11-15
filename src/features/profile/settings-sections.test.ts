@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { SETTINGS_SECTIONS } from "@/features/settings/sections";
+import { LEGACY_SETTINGS_SECTIONS, SETTINGS_SECTIONS } from "@/features/settings/sections";
 import { profileSchema } from "./schema";
 import {
   PROFILE_FIELD_WITHOUT_SECTION,
@@ -70,20 +70,31 @@ describe("the four groups partition the profile schema", () => {
   });
 });
 
-describe("the four are real settings sections", () => {
-  it("names only sections the routing contract declares", () => {
+describe("the four live in real settings groups", () => {
+  it("names only groups, or 2P.5 slugs the routing contract maps to a group", () => {
+    // Life Brain E.1: `assistant` is inside "Você e o assistente" and
+    // `planning` inside "Seu dia e avisos".
     for (const section of PROFILE_FORM_SECTIONS) {
-      expect(SETTINGS_SECTIONS, `${section} is not a settings section`).toContain(section);
+      const group = (SETTINGS_SECTIONS as readonly string[]).includes(section)
+        ? section
+        : LEGACY_SETTINGS_SECTIONS[section as keyof typeof LEGACY_SETTINGS_SECTIONS];
+      expect(SETTINGS_SECTIONS, `${section} reaches no settings group`).toContain(group);
     }
   });
 
-  it("leaves the four non-form sections owning no profile column", () => {
+  it("leaves the groups without a profile form owning no profile column", () => {
     const withoutForm = SETTINGS_SECTIONS.filter(
-      (section) => !(PROFILE_FORM_SECTIONS as readonly string[]).includes(section),
+      (section) =>
+        !(PROFILE_FORM_SECTIONS as readonly string[]).includes(section) &&
+        !Object.values(LEGACY_SETTINGS_SECTIONS).some(
+          (group, index) =>
+            group === section &&
+            (PROFILE_FORM_SECTIONS as readonly string[]).includes(Object.keys(LEGACY_SETTINGS_SECTIONS)[index]),
+        ),
     );
-    // Notificações, Privacidade e dados, Aparência and Conta. Each has its own
-    // writer or none at all, which is why none appears in the payload split.
-    expect(withoutForm).toEqual(["notifications", "privacy", "appearance", "account"]);
+    // O que ele faz sozinho, Aparência and Privacidade e conta. Each has its
+    // own writer or none at all, which is why none appears in the payload split.
+    expect(withoutForm).toEqual(["autonomy", "appearance", "privacy"]);
   });
 
   it("recognises its own members and refuses anything else", () => {

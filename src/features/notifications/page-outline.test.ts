@@ -129,8 +129,9 @@ describe("`2P-SETTINGS-008`: the governance controls are gone from this page", (
 });
 
 describe("exactly one discreet entry back to the preferences", () => {
-  it("links to the settings notifications section, resolved rather than typed", () => {
-    expect(code).toContain("settingsSectionHref(locale, \"notifications\")");
+  it("links to the group that holds the notification settings, resolved rather than typed", () => {
+    // Life Brain E.1: Notificações is part of "Seu dia e avisos" (`day`).
+    expect(code).toContain("settingsSectionHref(locale, \"day\")");
     expect(code).toContain("copy.preferencesLink");
   });
 

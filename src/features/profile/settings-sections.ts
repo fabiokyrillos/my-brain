@@ -37,7 +37,7 @@
  * the transcription would be a check that can only ever agree with itself.
  */
 
-import type { SettingsSection } from "@/features/settings/sections";
+import type { LegacySettingsSection, SettingsSection } from "@/features/settings/sections";
 import type { ProfileInput } from "./schema";
 
 /**
@@ -54,11 +54,13 @@ export const PROFILE_FORM_SECTIONS = ["general", "assistant", "ai", "planning"] 
 export type ProfileFormSection = (typeof PROFILE_FORM_SECTIONS)[number];
 
 /**
- * `ProfileFormSection` is a subset of `SettingsSection` by construction rather
- * than by coincidence: a section name that stopped existing in the routing
- * contract would fail to compile here.
+ * Every `ProfileFormSection` names a Settings group or a 2P.5 slug the routing
+ * contract still maps to one, by construction rather than by coincidence: a
+ * name that stopped existing in `sections.ts` would fail to compile here.
+ * Since Life Brain E.1 `assistant` lives in "Você e o assistente" and
+ * `planning` in "Seu dia e avisos" (`LEGACY_SETTINGS_SECTIONS`).
  */
-const _sectionsAreSettingsSections: readonly SettingsSection[] = PROFILE_FORM_SECTIONS;
+const _sectionsAreSettingsSections: readonly (SettingsSection | LegacySettingsSection)[] = PROFILE_FORM_SECTIONS;
 void _sectionsAreSettingsSections;
 
 /**

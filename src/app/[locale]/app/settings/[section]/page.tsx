@@ -1,7 +1,7 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { getSettingsCopy } from "@/features/settings/copy";
-import { isSettingsSection } from "@/features/settings/sections";
+import { isSettingsSection, legacySettingsTarget, settingsSectionHref } from "@/features/settings/sections";
 import { SettingsPanel } from "@/features/settings/settings-panel";
 import { SettingsSectionContent } from "@/features/settings/settings-section-content";
 import { isLocale } from "@/lib/preferences";
@@ -45,6 +45,12 @@ export default async function SettingsSectionPage({
 }) {
   const { locale: rawLocale, section } = await params;
   if (!isLocale(rawLocale)) notFound();
+  // Life Brain E.1: a 2P.5 slug (`assistant`, `planning`, `notifications`,
+  // `account`) was a published deep link, so it lands on its group instead of
+  // a 404. Temporary (307), so a slug can be reused later without a browser
+  // having cached the old answer for good.
+  const legacy = legacySettingsTarget(section);
+  if (legacy) redirect(settingsSectionHref(rawLocale, legacy));
   if (!isSettingsSection(section)) notFound();
 
   return (

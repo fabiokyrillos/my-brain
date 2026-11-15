@@ -1,5 +1,16 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain E.1: Configurações redesigned (ADR-169)
+
+- **No migration.**
+- `settings/sections.ts`: six groups (`general`, `day`, `autonomy`, `ai`, `appearance`, `privacy`); `LEGACY_SETTINGS_SECTIONS` maps `assistant`, `planning`, `notifications`, `account`, and `[section]/page.tsx` redirects them (307); `settingsGroupHref` opens the default group by its explicit slug.
+- `settings/summary.ts` + `summary-loader.ts`: the line under each group (assistant name, zone, language; quiet period and cap; automation; key state).
+- `settings-section-nav.tsx`: icons and summaries; the A.6 "Avançado" links left the nav (they remain as Dados e IA's doors in Privacidade e conta). `settings-panel.tsx`: back link and visible title. Phone: `.settings-layout:has(...)` shows the list at `/app/settings` and one group at a time below it.
+- `profile/settings-form.tsx`: groups of rows; save on change (selects, checkboxes, radios) and on blur (text, time, number) through `startTransition`, so React never resets a field being typed; "Salvo · Desfazer" undoes by saving the previous values. `profile/language-row.tsx`: Idioma as two links.
+- Disclosures: `CapabilitySummary`, `AiConfigSection`, the fixed AI routes, the notification facts and bounds, the census's withheld tables and the retention schedule.
+- Privacy: census as a grid of numbers, the export above the details, the consent list as rows.
+- Tests: `sections.test.ts`, `summary.test.ts`, save-on-change and undo in `settings-form.test.tsx`; guards updated (`page-performance`, stylesheet debt 37 → 34).
+
 ## 2026-11-14 — Life Brain track E planned; track D merged (ADR-168)
 
 - **Documentation only, no migration.** Track D merged: #377, #378, #379.
