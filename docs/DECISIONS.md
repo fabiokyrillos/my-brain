@@ -2625,3 +2625,20 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 5 — One breakpoint pair around 600 and 900.** Phone is `max-width: 600px`, below desktop is `max-width: 899px`, desktop is `min-width: 900px`. Two `max-width: 599px` queries became 600px (they disagreed with 38 others at exactly 600px) and five `max-width: 900px` became 899px (at exactly 900px they overlapped `min-width: 900px`). `breakpoint-guard.test.ts` refuses 599px, `max-width: 900px`, and `min-width` of 600px or 899px.
 
 - **Consequences.** Not verified: ⌘K on a real Mac (jsdom and Windows Chromium only), the birthday refusal signed in (the test account has no records with birthdays), the bars with real events signed in (none on the account), and a real iPhone.
+
+## ADR-168 — Life Brain gets a fifth track: E.1 Ajustes, E.2 relation between people, E.3 Relações leaves Memória, E.4 memories by segment, E.5 streaming
+
+- **Date:** 2026-11-14
+- **Status:** Accepted. Owner decisions of 2026-11-14. Documentation only: zero migrations, zero product code. Amends `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md` (new §6).
+
+- **Context.** Track D merged on 2026-11-14 (#377, #378, #379), with no migration, and `STATE.md` still described D.3 as a draft on its branch. ADR-164 Decision 3 left seven items out of scope until the owner decided. Asked item by item, the owner decided five and deferred the rest ("voltamos depois aqui").
+
+- **Decision 1 — The Ajustes redesign (T4) is authorized, proposal first.** Mockups were drawn with the product's tokens and only existing controls (`docs/reports/life-brain/evidence/proposal-ajustes/`) and the owner approved them ("Aprovado"). Slice E.1 implements them: six groups instead of eight sections, a drill-down list on the phone, list rows instead of numbered forms, save on change with undo, engineering copy behind disclosures. No migration.
+- **Decision 2 — A typed relation between people (T6) is authorized, including one migration.** The schema already has `person_relationships.relationship_type` (a 14-term vocabulary) and `related_person_id`, so slice E.2 creates the migration only if it proves the current schema insufficient. Applying it to the hosted project stays a separate, explicit step.
+- **Decision 3 — Memories are organized by segment, as Claude's are.** The owner's reference: segments such as health, work, personality. One segment per memory: "Sobre você" plus the existing life areas. Slice E.4 derives the segment from what the database already knows; a column would be an unauthorized migration and a stop condition.
+- **Decision 4 — B.6 (streaming and a persisted "thinking" state) is wanted.** Slice E.5. A migration is a stop condition.
+- **Decision 5 — The Relações lens leaves Memória.** A person's or project's links move to its own page (slice E.3), typed by E.2.
+- **Decision 6 — Still out of scope, at the owner's request:** LB-OD-3 (chat layout), LB-OD-4 (type scale), LB-OD-7 (default sensitivity) and the `LB-B-008` rule. Their recommendations stay recorded in `TODO.md`; the code already follows the first three.
+- **Decision 7 — `STATE.md` records that track D is merged**, instead of the D.3 sentence that called it a draft.
+
+- **Consequences.** About 10 days of work in five pull requests. Seven Life Brain migrations at most, if E.2 needs its own.

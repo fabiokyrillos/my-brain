@@ -277,3 +277,58 @@ Regras comuns às três: um PR por slice, branch `life-brain/<slice>`, teste ant
 ### Fora de escopo até o dono decidir
 
 O redesenho de Ajustes (T4), a relação tipada entre pessoas (T6, exige schema), "organizar memórias como o Claude faz" (exige uma referência do dono), a B.6 (streaming), as decisões LB-OD-3, LB-OD-4 e LB-OD-7, a regra do `LB-B-008` e se a lente Relações sai da Memória.
+
+*(Atualização de 2026-11-14, ADR-168: o dono decidiu cinco destes itens — T4, T6, as memórias por segmento, a B.6 e a lente Relações — e eles viraram a trilha E, na §6. Continuam fora de escopo, até o dono voltar a eles: LB-OD-3, LB-OD-4, LB-OD-7 e a regra do `LB-B-008`.)*
+
+## 6. Trilha E — o que o dono autorizou em 14 de novembro
+
+Acrescentada em 2026-11-14 (ADR-168). **Origem:** as respostas do dono aos itens fora de escopo da §5. A trilha D está mesclada (#377, #378 e #379) e não teve migration.
+
+Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste antes do código, lint, typecheck, testes e build zerados, Playwright em desktop e mobile, `STATE`/`CHANGELOG`/`TODO` no mesmo PR e uma ADR por decisão. Nada é aplicado no hospedado e nada é mesclado sem pedido explícito.
+
+**Migrations.** O dono autorizou **uma** migration para a E.2 (relação entre pessoas), a sétima do Life Brain. Ela só é criada se a slice provar que o schema atual não basta: `person_relationships` já tem `relationship_type` (vocabulário de 14 tipos em `src/features/entities/relationship-vocabulary.ts`) e `related_person_id`. Qualquer outra slice que precise de migration para e pede autorização escrita, como antes.
+
+### E.1 — Ajustes redesenhada (tema T4, 3 d)
+
+- **Proposta aprovada pelo dono em 2026-11-14:** `docs/reports/life-brain/evidence/proposal-ajustes/` (três telas de desktop e quatro de iPhone, uma no escuro).
+- **Seis grupos em vez de oito seções:** Você e o assistente · Seu dia e avisos (Planejamento e Notificações juntos) · O que ele faz sozinho · IA e custos · Aparência · Privacidade e conta. As URLs antigas continuam resolvendo (`settingsSectionFromPath`), com redirecionamento para o grupo novo.
+- **No telefone, uma lista de entrada** em que cada linha diz o estado atual e abre a página do grupo; no desktop, a navegação lateral com o grupo aberto ao lado.
+- **Linhas de lista** (rótulo à esquerda, controle à direita) agrupadas em cartões, sem o número de passo e sem a barra "Salvar preferências" por seção: **cada mudança vale na hora e mostra "Salvo · Desfazer"**, que reenvia o valor anterior.
+- **O texto de engenharia sai da frente** ("consumer verificável", nomes de tabela, os modelos reservados, a lista de prazos de retenção): passa para "Como a IA é usada" e "Ver tudo por categoria". Nada é apagado.
+- **Privacidade abre com as contagens** e depois as ações; "Apagar a conta" fica por último, em vermelho.
+- **Idioma** ganha uma linha em "Você e o assistente", com o mesmo efeito do "EN" do topo.
+- **Nenhum controle novo sem consumidor** (`R-2O-12`), sem migration.
+- **Aceite:** antes/depois em `evidence/slice-e1/`, iPhone e desktop, claro e escuro; baselines da ADR-159 de Ajustes redesenhadas no runner.
+
+### E.2 — Relação entre pessoas (tema T6, 2 d, **uma migration autorizada, se precisar**)
+
+- **A página da pessoa diz o que ela é para você**: "Camila · esposa", editável ali mesmo, a partir do `relationship_type` que já existe, sem a confiança numérica que a copy promete não mostrar.
+- **Relação entre duas pessoas suas** ("Camila é mãe da Laura") com `related_person_id`, mostrada nas duas páginas com o termo recíproco (mãe ↔ filha, casados ↔ casados).
+- **A extração propõe, não afirma**: uma relação dita num registro vira proposta para confirmar, como o aniversário (ADR-158); a categoria `relation` da automação continua "só sugere".
+- **Migration só se necessária** (unicidade da relação recíproca, restrição do vocabulário no banco). Se for criada, aplicar no hospedado é um passo separado, com pedido explícito.
+
+### E.3 — Relações sai da Memória (1 d)
+
+- A lente **Relações** sai da faixa da Memória; as ligações de cada pessoa ou projeto (pessoas, projetos, organizações, áreas) aparecem na página dela, numa seção "Ligações", com o tipo da E.2.
+- `/app/relations` (ou a rota da lente) redireciona para a Memória; o desenho de grafo deixa de ser um destino. Guards e jornadas atualizados.
+
+### E.4 — Memória por segmentos (2 d)
+
+- **Referência do dono:** as memórias do Claude, organizadas por segmento (saúde, trabalho, personalidade…).
+- A lente **Memórias** agrupa por segmento: **Sobre você** (personalidade, preferências, hábitos, regras) e as áreas da vida já existentes (Saúde, Trabalho, Família, Finanças, Casa, Estudos, Lazer, Viagens, Ideias). **Cada memória fica em um segmento só.**
+- Primeiro tenta derivar o segmento do que o banco já sabe (o `kind` da memória e a área do registro de origem). Se for preciso guardar o segmento numa coluna, isso é uma migration **não autorizada**: a slice para e pede.
+
+### E.5 — B.6: streaming e progresso real no Conversar (2 d)
+
+- A resposta aparece enquanto é escrita, e o estado "pensando" sobrevive a um recarregamento.
+- O ledger de custo continua registrando cada chamada antes de qualquer escrita que dependa dela; uma resposta interrompida não vira mensagem pela metade.
+- Se o estado persistido exigir migration, a slice para e pede.
+
+| Slice | d | Migration | Visível para o dono |
+| --- | --- | --- | --- |
+| E.1 | 3 | — | Ajustes nova |
+| E.2 | 2 | 1 autorizada, só se precisar | "Camila · esposa", relação entre duas pessoas |
+| E.3 | 1 | — | ligações na página da pessoa, sem a lente Relações |
+| E.4 | 2 | — (parar se precisar) | Memórias por segmento |
+| E.5 | 2 | — (parar se precisar) | resposta escrita aos poucos |
+| **Total da §6** | **≈ 10 d** | | |
