@@ -101,9 +101,9 @@ export type ByokCopy = {
 const ptBR: ByokCopy = {
   messages: {
     credentialRequired:
-      "Configure sua chave da OpenAI em Configurações para usar os recursos de IA.",
+      "Configure sua chave da OpenAI em Ajustes para usar os recursos de IA.",
     credentialUnreadable:
-      "Não foi possível usar sua chave da OpenAI. Configure-a novamente em Configurações.",
+      "Não foi possível usar sua chave da OpenAI. Configure-a novamente em Ajustes.",
   },
   settings: {
     title: "Sua chave da OpenAI",

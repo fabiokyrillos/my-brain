@@ -95,7 +95,7 @@ test.describe("authenticated converged navigation", () => {
               ["Lembretes", "reminders"],
               ["Histórico", "history"],
               ["Custos de IA", "costs"],
-              ["Configurações", "settings"],
+              ["Ajustes", "settings"],
             ] as const,
           }
         : {

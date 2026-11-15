@@ -47,7 +47,7 @@ const { supabaseUrl, serviceRoleKey } = onlineEnvironment;
 const onlineConfigured = onlineEnvironment.configured;
 
 const COPY = {
-  credentialRequired: "Configure sua chave da OpenAI em Configurações para usar os recursos de IA.",
+  credentialRequired: "Configure sua chave da OpenAI em Ajustes para usar os recursos de IA.",
   askAbout: "Perguntar sobre isto",
 } as const;
 

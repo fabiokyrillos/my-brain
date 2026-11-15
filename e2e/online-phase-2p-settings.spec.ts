@@ -74,7 +74,7 @@ const LEGACY_SECTIONS = [
  * a phone the list is `display: none` inside a group, where role queries skip it.
  */
 function groupLink(page: Page, section: string) {
-  return page.locator(`nav[aria-label="Grupos das configurações"] a[data-section="${section}"]`);
+  return page.locator(`nav[aria-label="Grupos dos ajustes"] a[data-section="${section}"]`);
 }
 
 test.describe("Settings is six groups, each with its own URL", () => {
@@ -123,7 +123,7 @@ test.describe("Settings is six groups, each with its own URL", () => {
       // The RSC assertion, per section: it rendered at all. Life Brain E.1: on a
       // phone the `<h1>` is visually hidden inside a group, so it is asserted
       // in the tree rather than on screen; the panel below is on screen.
-      await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeAttached();
+      await expect(page.getByRole("heading", { level: 1, name: "Ajustes" })).toBeAttached();
       const panel = page.locator("#settings-panel");
       await expect(panel, `${section.name} did not render`).toBeVisible();
       await expect(panel).toHaveAttribute("aria-label", section.name);
@@ -404,7 +404,7 @@ test.describe("the mobile bar is the handoff's bar", () => {
     const account = page.locator(".top-account .account-menu-header");
     await expect(account).toBeVisible();
     await account.locator("summary").click();
-    await expect(account.getByRole("link", { name: "Configurações" })).toBeVisible();
+    await expect(account.getByRole("link", { name: "Ajustes" })).toBeVisible();
     await expect(account.getByRole("button", { name: "Sair da conta" })).toBeVisible();
 
     // Perguntas, from Registros, with no open question to produce a link.

@@ -1,4 +1,6 @@
-Last updated: 2026-11-14 (**E.5 PART 1 IMPLEMENTED — ADR-173. NO MIGRATION.** The "pensando" state survives a reload. **Open: E.5 part 2, streaming**, planned in ADR-173 Decision 4 — a route handler that runs the same pipeline and streams the answer's text, persisting and citing only the validated final answer. Also open: a failed turn writes no assistant row, so it is only recognisable by age.)
+Last updated: 2026-11-15 (**Track E merged except E.5 part 2 (streaming), which is next. pt-BR settings label renamed to "Ajustes" (ADR-174).**)
+
+Previously: Last updated: 2026-11-14 (**E.5 PART 1 IMPLEMENTED — ADR-173. NO MIGRATION.** The "pensando" state survives a reload. **Open: E.5 part 2, streaming**, planned in ADR-173 Decision 4 — a route handler that runs the same pipeline and streams the answer's text, persisting and citing only the validated final answer. Also open: a failed turn writes no assistant row, so it is only recognisable by age.)
 
 Previously: Last updated: 2026-11-14 (**E.4 IMPLEMENTED — ADR-172. NO MIGRATION.** Memórias by segment, derived. Left open by it: the grouping is per page (25 rows), not across the whole list; filtering by one segment would need the segment in SQL (a view or a column — a migration, so the owner's call); a memory written in chat has no source record, so it is segmented by kind alone. Next: E.5.)
 

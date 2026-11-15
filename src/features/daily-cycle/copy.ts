@@ -159,7 +159,7 @@ export const dailyCycleCopy = {
       resolve_consistency: { title: "Revise este registro", description: "Encontramos uma inconsistência e preservamos o registro para sua revisão." },
       configure_ai_credential: {
         title: "Configure sua chave de IA",
-        description: "Seu registro foi salvo por completo. Para o {agent} interpretá-lo, configure sua própria chave de IA em Configurações.",
+        description: "Seu registro foi salvo por completo. Para o {agent} interpretá-lo, configure sua própria chave de IA em Ajustes.",
       },
       resolve_validity_conflict: {
         title: "Duas datas que não podem estar certas",
@@ -204,7 +204,7 @@ export const dailyCycleCopy = {
       action_failed: "Não foi possível concluir esta ação agora.",
       pending_entries_queued: "{count} registro(s) enviados para interpretação.",
       pending_entries_none: "Nenhum registro pendente para interpretar.",
-      credential_required: "Configure sua chave de IA em Configurações antes de usar este recurso.",
+      credential_required: "Configure sua chave de IA em Ajustes antes de usar este recurso.",
     },
   },
   en: {

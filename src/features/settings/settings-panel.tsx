@@ -11,7 +11,7 @@ import { SETTINGS_PANEL_ID, settingsSectionHref, type SettingsSection } from "./
  *
  * ## Why the panel is named and not headed
  *
- * The layout renders the page's one `<h1>Configurações</h1>`, and every
+ * The layout renders the page's one `<h1>Ajustes</h1>`, and every
  * component mounted inside a section keeps the `<h2>` it already had. The
  * outline is h1 → h2 → h3, which is the rule
  * `notifications/page-outline.test.ts` already enforces on the other surface

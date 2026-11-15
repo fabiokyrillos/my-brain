@@ -60,7 +60,7 @@ const COPY: readonly Copy[] = [
     signedInAs: "Conectado como",
     signOut: "Sair da conta",
     signedOut: "Você saiu da sua conta.",
-    settings: "Configurações",
+    settings: "Ajustes",
   },
   {
     locale: "en",

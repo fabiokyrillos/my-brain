@@ -103,7 +103,7 @@ const GROUPS = [
   ["Reflexão", ["Revisões", "Perguntas pendentes"]],
   ["Organização", ["Lembretes"]],
   ["Transparência", ["Histórico", "Custos de IA"]],
-  ["Preferências", ["Configurações"]],
+  ["Preferências", ["Ajustes"]],
 ] as const;
 
 /**

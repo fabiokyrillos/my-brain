@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-15 — "Configurações" becomes "Ajustes" (ADR-174)
+
+- pt-BR only: the navigation label, the account menu, the settings title and back link, the nav's accessible name ("Grupos dos ajustes"), and the four sentences that send the owner there (BYOK, daily cycle, onboarding). Tests and online specs follow. English stays "Settings".
+
 ## 2026-11-14 — Life Brain E.5 part 1: the thinking state survives a reload (ADR-173)
 
 - **No migration.**

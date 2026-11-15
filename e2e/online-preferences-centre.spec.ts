@@ -78,7 +78,7 @@ test.describe("one preferences centre, and a theme the reader owns", () => {
 
     // The page renders at all, which is the RSC assertion. On a phone the `<h1>`
     // is visually hidden inside a group, so it is asserted in the tree.
-    await expect(page.getByRole("heading", { level: 1, name: "Configurações" })).toBeAttached();
+    await expect(page.getByRole("heading", { level: 1, name: "Ajustes" })).toBeAttached();
 
     // By heading id: the privacy group now holds four `.data-ai-section`s.
     const accountSection = page.locator("section[aria-labelledby='account-data-heading']");

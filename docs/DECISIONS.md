@@ -2715,3 +2715,10 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 4 — Streaming is the next step, planned here.** A route handler (`app/[locale]/api/chat/route.ts`) runs the same pipeline, extracted from `sendChatMessage` into a shared server function so the two paths cannot diverge. The model call uses the Responses API's streaming with the same JSON schema. The handler forwards only the `answer` string's characters as they arrive, parsed incrementally from the partial JSON. It records usage when the stream completes, before persisting. It validates the complete object, strips foreign citation ids, then persists. The client renders the streamed text as a draft and replaces it with the persisted message on refresh. An aborted stream persists nothing, so a half answer never becomes a message. It needs no migration. It is its own pull request because it moves security-relevant code.
 
 - **Consequences.** A reload, a second device or a locked phone no longer loses the "pensando". The answer still appears all at once until part 2 ships.
+
+## ADR-174 — The settings surface is "Ajustes" in Portuguese
+
+- **Date:** 2026-11-15
+- **Status:** Accepted. Owner decision ("Pode ser ajustes"). Amends ADR-169 Decision 6, which kept "Configurações".
+
+- **Decision.** Every pt-BR place that names the surface says "Ajustes": the navigation and the account menu, the page title and the phone's back link, the nav's accessible name, and the sentences that send the owner there. English keeps "Settings". Historical comments that quote the old label as a measured fact are left as written.
