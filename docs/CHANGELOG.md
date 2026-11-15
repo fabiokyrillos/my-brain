@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-14 — Life Brain E.4: memories by segment (ADR-172)
+
+- **No migration.**
+- `memories/segments.ts`: twelve segments (Sobre você, nine areas, Pessoas, Outras); `memorySegment` (source record's area → `professional_context` → person or `relationship` → preference/habit/rule/restriction/goal → other); `areaByEntry` (one area per record, by segment order); `groupBySegment`.
+- `/app/memories`: two owner-scoped reads bounded by the page's source ids (`entry_entities` with `entity_type = 'context'`, then `contexts.kind`), and the rows grouped under a heading per segment with its count.
+- Tests: `segments.test.ts`.
+
 ## 2026-11-14 — Life Brain E.3: Relações leaves Memória (ADR-171)
 
 - **No migration.**
