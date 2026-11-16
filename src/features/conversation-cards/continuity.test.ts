@@ -133,3 +133,38 @@ describe("2K-CONT-001/004: the anchor is derived, never carried", () => {
     expect(Object.keys(handle)).not.toContain("anchor");
   });
 });
+
+describe("the handle is built in the browser too (the source list is a Client Component)", () => {
+  /*
+    Production regression, 2026-11-16: a thread citing an entry fell to the
+    error boundary on hydration. The browser's `Buffer` is Next's polyfill,
+    which does not know "base64url" and throws "Unknown encoding". The handle
+    must therefore be built without `Buffer` at all.
+  */
+  it("serializes and parses with no Buffer in scope, byte-identical to Node's base64url", () => {
+    const expected = Buffer.from(JSON.stringify(handle), "utf8").toString("base64url");
+    const original = globalThis.Buffer;
+    try {
+      // @ts-expect-error -- simulating the browser, where `Buffer` is not Node's.
+      delete globalThis.Buffer;
+      const serialized = serializeContinuityHandle(handle);
+      expect(serialized).toBe(expected);
+      expect(parseContinuityHandle(serialized)).toEqual({ status: "ok", handle });
+    } finally {
+      globalThis.Buffer = original;
+    }
+  });
+
+  it("does not throw under Next's browser Buffer polyfill", async () => {
+    // The module ships no types; it is the polyfill Next bundles for the browser.
+    // @ts-expect-error -- untyped compiled module.
+    const { Buffer: Polyfill } = (await import("next/dist/compiled/buffer")) as { Buffer: typeof Buffer };
+    const original = globalThis.Buffer;
+    try {
+      globalThis.Buffer = Polyfill;
+      expect(() => serializeContinuityHandle(handle)).not.toThrow();
+    } finally {
+      globalThis.Buffer = original;
+    }
+  });
+});
