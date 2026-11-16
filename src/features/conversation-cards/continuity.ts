@@ -128,8 +128,28 @@ export function messageAnchorId(messageId: string): string {
   return `message-${messageId}`;
 }
 
+/*
+  base64url without `Buffer`. The serializer runs inside `SourceList`, a Client
+  Component, and the browser's `Buffer` is Next's polyfill, which throws
+  "Unknown encoding: base64url" — that took every thread citing an entry or a
+  memory down to the error boundary (2026-11-16). `TextEncoder`, `btoa` and
+  `atob` exist in both the browser and Node 22, and the output is byte-identical
+  to Node's `base64url` (unpadded, `-` and `_`).
+*/
+function toBase64Url(text: string): string {
+  let binary = "";
+  for (const byte of new TextEncoder().encode(text)) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(raw: string): string {
+  const base64 = raw.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "="));
+  return new TextDecoder("utf-8", { fatal: true }).decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)));
+}
+
 export function serializeContinuityHandle(handle: ContinuityHandle): string {
-  return Buffer.from(JSON.stringify(handle), "utf8").toString("base64url");
+  return toBase64Url(JSON.stringify(handle));
 }
 
 export type ContinuityParse =
@@ -147,7 +167,7 @@ export function parseContinuityHandle(raw: unknown): ContinuityParse {
   if (typeof raw !== "string" || raw === "") return { status: "invalid" };
   let decoded: unknown;
   try {
-    decoded = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    decoded = JSON.parse(fromBase64Url(raw));
   } catch {
     return { status: "invalid" };
   }

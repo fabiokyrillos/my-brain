@@ -1,4 +1,6 @@
-Last updated: 2026-11-16 (**E.5 PART 2 IMPLEMENTED — ADR-175. NO MIGRATION.** The answer streams as it is written, through one pipeline shared by the route and the action. Still open: a failed turn writes no assistant row, so it is only recognisable by age (ADR-173 Decision 3); a sentence tried as a command first and then answered does not stream (it reaches the answer inside the action); a stream aborted by the provider leaves its partial cost unrecorded, because the Responses API reports usage only on a final response.)
+Last updated: 2026-11-16 (**Thread crash fixed (continuity handle without `Buffer`).** Open, owner's call: show conversation suggestions after the first conversation too (today they are drawn only on an empty surface, `2K-SUGG-003`), and the chat layout (LB-OD-3).)
+
+Previously: Last updated: 2026-11-16 (**E.5 PART 2 IMPLEMENTED — ADR-175. NO MIGRATION.** The answer streams as it is written, through one pipeline shared by the route and the action. Still open: a failed turn writes no assistant row, so it is only recognisable by age (ADR-173 Decision 3); a sentence tried as a command first and then answered does not stream (it reaches the answer inside the action); a stream aborted by the provider leaves its partial cost unrecorded, because the Responses API reports usage only on a final response.)
 
 Previously: Last updated: 2026-11-15 (**Track E merged except E.5 part 2 (streaming), which is next. pt-BR settings label renamed to "Ajustes" (ADR-174).**)
 

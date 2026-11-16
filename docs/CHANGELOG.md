@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-16 — A thread citing an entry or a memory no longer crashes in the browser
+
+- **No migration.**
+- `conversation-cards/continuity.ts`: `serializeContinuityHandle` and `parseContinuityHandle` use `TextEncoder`/`btoa` and `atob`/`TextDecoder` instead of `Buffer`. The serializer runs in `SourceList`, a Client Component, where `Buffer` is Next's polyfill and throws "Unknown encoding: base64url", taking the whole thread to the error boundary on hydration. Output is byte-identical to Node's base64url, so handles already in links still parse.
+- Tests: `continuity.test.ts` builds and parses the handle with no `Buffer` in scope, and under Next's browser polyfill.
+
 ## 2026-11-16 — Life Brain E.5 part 2: the answer streams as it is written (ADR-175)
 
 - **No migration.**
