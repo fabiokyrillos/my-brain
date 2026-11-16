@@ -117,18 +117,18 @@ describe("2K-PRIVACY-003: no content-bearing field is written into the citation 
     // The exact line this slice removed. Asserted by absence so it cannot come
     // back as an optimisation: it was a copy of the user's content in a second
     // table, and the source's classification did not travel with it.
-    expect(code("src/features/chat/actions.ts")).not.toMatch(/excerpt/);
-    expect(code("src/features/chat/actions.ts")).not.toMatch(/source\.content\.slice/);
+    expect(code("src/features/chat/chat-turn.ts")).not.toMatch(/excerpt/);
+    expect(code("src/features/chat/chat-turn.ts")).not.toMatch(/source\.content\.slice/);
   });
 
   it("persists through the envelope builder rather than by hand", () => {
     // The builder's type has nowhere to put content, which is what makes the
     // property structural. A hand-built object literal would not.
-    expect(code("src/features/chat/actions.ts")).toMatch(/buildCitationsEnvelope\(/);
+    expect(code("src/features/chat/chat-turn.ts")).toMatch(/buildCitationsEnvelope\(/);
   });
 
   it("derives the support kind server-side, not from the model", () => {
-    expect(code("src/features/chat/actions.ts")).toMatch(/supportKindForSource\(source\.type\)/);
+    expect(code("src/features/chat/chat-turn.ts")).toMatch(/supportKindForSource\(source\.type\)/);
   });
 
   it("derives insufficiency from retrieval, not from the citation count", () => {
@@ -137,9 +137,9 @@ describe("2K-PRIVACY-003: no content-bearing field is written into the citation 
      * both by "nothing retrieved" and by "retrieved but uncited". The signal
      * must come from `sources`, which is the retrieval result.
      */
-    expect(code("src/features/chat/actions.ts"))
+    expect(code("src/features/chat/chat-turn.ts"))
       .toMatch(/retrievedAnyQualifyingSource:\s*sources\.length > 0/);
-    expect(code("src/features/chat/actions.ts"))
+    expect(code("src/features/chat/chat-turn.ts"))
       .not.toMatch(/retrievedAnyQualifyingSource:\s*(references|citations)\.length/);
   });
 });

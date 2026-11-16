@@ -409,7 +409,7 @@ const SECOND_AUTHORITY_SITES = [
   "src/app/[locale]/app/history/page.tsx",
   "src/app/[locale]/app/reminders/page.tsx",
   "src/app/[locale]/app/work/cancelled/page.tsx",
-  "src/features/chat/actions.ts",
+  "src/features/chat/chat-turn.ts",
   "src/features/daily-cycle/task-detail-projection.ts",
   "src/features/daily-cycle/work-projection.ts",
   "src/features/reminders/actions.ts",

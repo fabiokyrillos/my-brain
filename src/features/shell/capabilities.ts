@@ -70,10 +70,10 @@ export type CapabilityDefinition = Readonly<{
 
 export const capabilityRegistry = [
   { key: "home_status", state: "informative", surface: "shell", consumerEvidence: ["loadInboxProjection", "loadAttentionProjection"], visible: true, columns: [], controls: [] },
-  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/actions", "agent/actions"], visible: true, columns: ["timezone"], controls: [] },
-  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/actions", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"], controls: [] },
+  { key: "timezone", state: "operational", surface: "settings", consumerEvidence: ["work-projection", "chat/chat-turn", "agent/actions"], visible: true, columns: ["timezone"], controls: [] },
+  { key: "response_style", state: "operational", surface: "settings", consumerEvidence: ["chat/chat-turn", "agent/actions"], visible: true, columns: ["personality", "tone", "response_detail"], controls: [] },
   { key: "quiet_hours", state: "operational", surface: "settings", consumerEvidence: ["claim_due_operations", "heartbeat"], visible: true, columns: ["quiet_start", "quiet_end", "max_followups_per_day", "important_reminder_override"], controls: [] },
-  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/actions", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"], controls: [] },
+  { key: "ai_routing", state: "advanced", surface: "settings", consumerEvidence: ["chat/chat-turn", "process-jobs/entry", "process-jobs/attachment", "agent/actions"], visible: true, columns: ["ai_profile", "chat_model", "extraction_model", "review_model", "file_model"], controls: [] },
   /*
    * `2O-AICONFIG-004`, and the row ADR-117 was written to make possible.
    *
@@ -103,7 +103,7 @@ export const capabilityRegistry = [
    * re-defaulting or migrating it, and this row is the whole of what this phase
    * does about it.
    */
-  { key: "embedding_route", state: "uncontrolled", surface: "settings", consumerEvidence: ["chat/actions", "memories/actions", "operations/actions", "process-jobs/entry"], visible: false, columns: ["embedding_model"], controls: [] },
+  { key: "embedding_route", state: "uncontrolled", surface: "settings", consumerEvidence: ["chat/chat-turn", "memories/actions", "operations/actions", "process-jobs/entry"], visible: false, columns: ["embedding_model"], controls: [] },
   // Slice F1 gave it an input and consumers, so it stops being `future`. The
   // evidence is the accessor plus the surfaces that read through it — this row
   // is the honest record of that, and it was honest before, when it said the

@@ -96,7 +96,7 @@ export const AI_ROUTE_CONTRACTS = [
     routeKey: "chatModel",
     operation: "chat",
     disposition: "controlled",
-    callSites: ["src/features/chat/actions.ts", "src/features/task-commands/actions.ts"],
+    callSites: ["src/features/chat/chat-turn.ts", "src/features/task-commands/actions.ts"],
     fallbackModel: "gpt-5.6-terra",
   },
   {
@@ -148,7 +148,7 @@ export const AI_ROUTE_CONTRACTS = [
      * longer reads the column.
      */
     callSites: [
-      "src/features/chat/actions.ts",
+      "src/features/chat/chat-turn.ts",
       "src/features/memories/actions.ts",
       "supabase/functions/process-jobs/entry.ts",
     ],

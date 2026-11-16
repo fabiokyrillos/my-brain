@@ -1,4 +1,6 @@
-Last updated: 2026-11-15 (**Track E merged except E.5 part 2 (streaming), which is next. pt-BR settings label renamed to "Ajustes" (ADR-174).**)
+Last updated: 2026-11-16 (**E.5 PART 2 IMPLEMENTED — ADR-175. NO MIGRATION.** The answer streams as it is written, through one pipeline shared by the route and the action. Still open: a failed turn writes no assistant row, so it is only recognisable by age (ADR-173 Decision 3); a sentence tried as a command first and then answered does not stream (it reaches the answer inside the action); a stream aborted by the provider leaves its partial cost unrecorded, because the Responses API reports usage only on a final response.)
+
+Previously: Last updated: 2026-11-15 (**Track E merged except E.5 part 2 (streaming), which is next. pt-BR settings label renamed to "Ajustes" (ADR-174).**)
 
 Previously: Last updated: 2026-11-14 (**E.5 PART 1 IMPLEMENTED — ADR-173. NO MIGRATION.** The "pensando" state survives a reload. **Open: E.5 part 2, streaming**, planned in ADR-173 Decision 4 — a route handler that runs the same pipeline and streams the answer's text, persisting and citing only the validated final answer. Also open: a failed turn writes no assistant row, so it is only recognisable by age.)
 

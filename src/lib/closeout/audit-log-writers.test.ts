@@ -61,7 +61,7 @@ function sourceFiles(directory: string, found: string[] = []): string[] {
  * what a decision to retain has to keep bounded.
  */
 const DECLARED_WRITERS = [
-  "src/features/chat/actions.ts",
+  "src/features/chat/chat-turn.ts",
   "src/features/entities/actions.ts",
   "src/features/entities/associations.ts",
   "src/features/entities/relationships.ts",

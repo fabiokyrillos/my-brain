@@ -1,7 +1,9 @@
 import type {
   ChatInput,
   ChatResult,
+  ChatStreamOptions,
   EmbeddingResult,
+  StreamedChatAnswer,
   ExtractionInput,
   ExtractionResult,
   SuggestionPickInput,
@@ -17,6 +19,13 @@ export interface AIProvider {
   extractEntry(input: ExtractionInput): Promise<ExtractionResult>;
   embedText(input: string): Promise<EmbeddingResult>;
   answerFromKnowledge(input: ChatInput): Promise<ChatResult>;
+  /**
+   * Life Brain E.5 part 2 (ADR-175). The same answer, streamed: each piece of
+   * the `answer` string is handed to `onAnswerDelta` as it is written, and the
+   * complete output comes back unvalidated with its usage. Validation, citation
+   * stripping and persistence stay with the caller.
+   */
+  streamAnswerFromKnowledge(input: ChatInput, options: ChatStreamOptions): Promise<StreamedChatAnswer>;
   /**
    * Turns one user sentence into a bounded command proposal. It selects
    * nothing and authorizes nothing: matching, eligibility, confirmation and

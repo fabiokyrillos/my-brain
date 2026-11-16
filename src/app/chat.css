@@ -93,6 +93,16 @@ body .side-rail { overflow-y: auto }
 .chat-message[data-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
 .chat-message[data-role="user"] .chat-message-body { color: var(--text-secondary) }
 
+/*
+ * Life Brain E.5 part 2 (ADR-175): the streamed turn's draft, set exactly as a
+ * persisted turn is. It sits between the thread and the composer, so it reads as
+ * the thread's next turn; `data-draft-role` keeps it out of every selector that
+ * addresses persisted messages.
+ */
+.chat-draft { display: grid; gap: 0; margin-bottom: var(--space-4) }
+.chat-message[data-draft-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
+.chat-message[data-draft-role="user"] .chat-message-body { color: var(--text-secondary) }
+
 /* The model that answered — provenance, in the smallest register there is. */
 .chat-message > small { display: block; margin-top: var(--space-3); color: var(--text-muted); font: var(--type-caption) }
 

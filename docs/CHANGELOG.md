@@ -1,5 +1,16 @@
 # Technical Changelog
 
+## 2026-11-16 — Life Brain E.5 part 2: the answer streams as it is written (ADR-175)
+
+- **No migration.**
+- `chat/chat-turn.ts`: the grounded-chat pipeline moved out of `sendChatMessage` unchanged — `openChatTurn` (validation, auth, account gate) and `runChatTurn(turn, generator)`; the model output is recorded in the ledger, then validated with `chatAnswerSchema`, then stripped of foreign citation ids, then persisted, for both transports. `chat/actions.ts` is that pipeline with `plainAnswer`.
+- `lib/ai/answer-stream.ts`: `createAnswerFieldExtractor`, the `answer` string read out of partial JSON (escapes, `\u` escapes, surrogates, any chunking).
+- `AIProvider.streamAnswerFromKnowledge` (`openai-provider.ts`): the same request as `answerFromKnowledge` (`knowledgeRequest`) with `stream: true`; returns usage and the unvalidated output; `incomplete` returns its usage with `output: null`.
+- `app/[locale]/api/chat/route.ts` → `chat/stream-route.ts`: same-origin and JSON-only before the session is read; NDJSON events (`chat/stream-protocol.ts`); the turn runs on under `after()` if the owner leaves.
+- Composer: `chat/streaming-choice.ts` (only `knowledge` turns stream), `chat/use-chat-stream.ts` (draft, refresh to the persisted message in one transition), `StreamedDraft` in `chat-composer.tsx`; `.chat-draft` in `chat.css`.
+- Guards repointed from `chat/actions.ts` to `chat/chat-turn.ts`: audit writers, 2K answer contract, 2P sink, 2R timezone census, AI input bound, AI-route call sites, capability evidence.
+- Tests: `answer-stream.test.ts`, `chat-stream-contract.test.ts`, `stream-route.test.ts`, `chat-composer-stream.test.tsx`.
+
 ## 2026-11-15 — "Configurações" becomes "Ajustes" (ADR-174)
 
 - pt-BR only: the navigation label, the account menu, the settings title and back link, the nav's accessible name ("Grupos dos ajustes"), and the four sentences that send the owner there (BYOK, daily cycle, onboarding). Tests and online specs follow. English stays "Settings".

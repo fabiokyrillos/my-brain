@@ -328,6 +328,7 @@ Mesmas regras da trilha D: um PR por slice, branch `life-brain/<slice>`, teste a
 - O ledger de custo continua registrando cada chamada antes de qualquer escrita que dependa dela; uma resposta interrompida não vira mensagem pela metade.
 - Se o estado persistido exigir migration, a slice para e pede.
 - **Parte 1 implementada 2026-11-14 (ADR-173), sem migration:** o "pensando" sobrevive a recarregar, derivado da última mensagem ser a pergunta do dono (três minutos; depois, "ficou sem resposta"). **Parte 2, o streaming, não foi feita:** o plano está na ADR-173 Decisão 4 (um route handler com o mesmo pipeline, só o texto da resposta transmitido, e persistida só a resposta final validada).
+- **Parte 2 implementada 2026-11-16 (ADR-175), sem migration:** uma pergunta simples é respondida enquanto é escrita, pelo mesmo pipeline da Server Action (`chat/chat-turn.ts`); o custo é registrado antes da validação e da escrita; um stream interrompido pelo provedor não persiste nada; sair da página não interrompe a resposta, que é salva inteira.
 
 | Slice | d | Migration | Visível para o dono |
 | --- | --- | --- | --- |

@@ -46,6 +46,9 @@ import { AskingAboutBanner } from "./asking-about-banner";
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   ConversationMemoryResolved: () => null,
 }));
+// The chat composer streams plain questions through `useRouter` since
+// ADR-175; nothing here submits one, so a stub router is enough.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock("next/link", () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => (
     <a href={href} {...rest}>{children}</a>
