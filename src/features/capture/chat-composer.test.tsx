@@ -16,6 +16,15 @@ import { idleAssistantComposerState, type AssistantComposerState } from "@/featu
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   ConversationMemoryResolved: () => null,
 }));
+// Life Brain E.5 part 2 (ADR-175). These cases pin the Server Action
+// contract, so every turn here takes the action path; the streamed path, which
+// a plain question takes in production, has its own suite
+// (`chat-composer-stream.test.tsx`).
+vi.mock("@/features/chat/streaming-choice", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/chat/streaming-choice")>()),
+  shouldStreamChatTurn: () => false,
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock("next/link", () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));

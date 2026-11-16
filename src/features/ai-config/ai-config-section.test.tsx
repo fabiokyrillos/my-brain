@@ -183,7 +183,7 @@ describe("2O-AICONFIG-009 and 2O-COST-005: the family renders itself without cal
   it("proves that scan can fail, on a module that really does call a provider", () => {
     // The planted counter-example, taken from the tree rather than invented, so
     // it also proves the patterns above describe what a real call looks like.
-    const realCaller = readFileSync(join(REPO, "src/features/chat/actions.ts"), "utf8");
+    const realCaller = readFileSync(join(REPO, "src/features/chat/chat-turn.ts"), "utf8");
     expect(/getAIProvider/.test(realCaller)).toBe(true);
   });
 

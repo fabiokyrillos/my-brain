@@ -30,7 +30,7 @@ const ENFORCEMENT: Record<AIInputBound, { file: string; contains: string }> = {
     contains: "max(AI_INPUT_BOUNDS.captureContent",
   },
   chatQuestion: {
-    file: "src/features/chat/actions.ts",
+    file: "src/features/chat/chat-turn.ts",
     contains: "max(AI_INPUT_BOUNDS.chatQuestion)",
   },
   memoryContent: {

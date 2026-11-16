@@ -83,6 +83,25 @@ export type ChatResult = AIUsageDetails & {
 };
 
 /**
+ * Life Brain E.5 part 2 (ADR-175). What a streamed answer returns: the bill and
+ * the model's complete output, **unvalidated**. `output` is the parsed JSON, or
+ * `null` when the text was not JSON (a truncated stream). The caller records
+ * the usage first and validates second, so a defective output still has its
+ * cost in the ledger.
+ */
+export type StreamedChatAnswer = AIUsageDetails & {
+  model: string;
+  output: unknown;
+};
+
+export type ChatStreamOptions = {
+  /** Called with each newly written piece of the `answer` string, decoded. */
+  onAnswerDelta: (text: string) => void;
+  /** Aborts the provider request, e.g. when the owner closes the page. */
+  signal?: AbortSignal;
+};
+
+/**
  * Life Brain B.8 (ADR-163). The candidates for today's conversation
  * suggestions, in the caller's order. `kind` is the caller's category name and
  * `label` the row's own name; both are data for the model, never instructions.

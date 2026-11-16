@@ -421,7 +421,7 @@ describe("2P-FOUNDATION-005: the telemetry map is already deployed", () => {
    * inverted; the direction each one guards is now the opposite one.
    */
   it("records to the sink from the chat path, and the boundary no longer denies the sink", () => {
-    const chat = tsCode(read("src/features/chat/actions.ts"));
+    const chat = tsCode(read("src/features/chat/chat-turn.ts"));
     expect(chat, "the chat path stopped recording failures").toContain("recordErrorEvent");
     // Both provider operations are distinguishable in the row, or the sink
     // cannot answer "is retrieval failing, or is generation failing".

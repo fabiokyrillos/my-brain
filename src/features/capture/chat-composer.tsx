@@ -18,7 +18,7 @@
  * *replace* the preview that produced it, not render beside it.
  */
 
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { useActionState } from "react";
@@ -36,6 +36,9 @@ import {
 
 import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { getPendingTurnCopy } from "@/features/chat/pending-turn";
+import { shouldStreamChatTurn } from "@/features/chat/streaming-choice";
+import { useChatStream, type ChatDraft } from "@/features/chat/use-chat-stream";
 
 import { fillField, useRegisterComposerSeed } from "./composer-seed";
 import { VoiceComposer, type TranscribeAction } from "./voice-composer";
@@ -136,8 +139,17 @@ export function ChatComposer({
    */
   initialText?: string;
 }) {
-  const [state, formAction, pending] = useActionState(action, idleAssistantComposerState);
+  const [state, formAction, actionPending] = useActionState(action, idleAssistantComposerState);
   const copy = getAssistantCopy(locale);
+  /*
+    Life Brain E.5 part 2 (ADR-175). A plain question streams through the chat
+    route and shows its answer as a draft while it is written; every other turn
+    goes through `runAssistantTurn` exactly as before. `pending` covers both, so
+    the field, the button and the live region behave the same either way.
+  */
+  const stream = useChatStream({ locale, conversationId });
+  const pending = actionPending || stream.streaming;
+  const streamFailure = stream.failure;
   const form = useRef<HTMLFormElement | null>(null);
   const field = useRef<HTMLTextAreaElement | null>(null);
 
@@ -185,6 +197,30 @@ export function ChatComposer({
   useEffect(() => {
     if (state.notice !== null) notice.current?.focus();
   }, [state]);
+  useEffect(() => {
+    if (streamFailure !== null) notice.current?.focus();
+  }, [streamFailure]);
+
+  /**
+   * ADR-175. Before the action runs: a plain question is taken off the action
+   * and streamed instead. `preventDefault` is what stops React running the form
+   * action; the field is emptied by hand because no form reset follows.
+   */
+  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+    const target = field.current;
+    const text = target?.value ?? "";
+    if (stream.streaming) {
+      event.preventDefault();
+      return;
+    }
+    if (!shouldStreamChatTurn(text)) {
+      stream.dismiss();
+      return;
+    }
+    event.preventDefault();
+    if (target) target.value = "";
+    void stream.send(text.trim());
+  }
 
   /**
    * What the field holds again after a turn that failed.
@@ -207,9 +243,11 @@ export function ChatComposer({
    * Keying on the route and the echo makes React mount a fresh field with the
    * restored text, and leaves a *successful* turn's empty field untouched.
    */
-  const restored = state.route === "knowledge_failed" || state.route === "invalid"
-    ? state.echo
-    : null;
+  const restored = streamFailure !== null
+    ? streamFailure.echo
+    : state.route === "knowledge_failed" || state.route === "invalid"
+      ? state.echo
+      : null;
 
   /**
    * `2P-CHAT-005`. The seed, and why it is `idle`-only.
@@ -251,7 +289,11 @@ export function ChatComposer({
         {pending ? copy.pendingAnnouncement : state.announcement}
       </div>
 
-      <form action={formAction} className="assistant-composer-form" ref={form}>
+      {stream.draft === null ? null : (
+        <StreamedDraft agentName={agentName} draft={stream.draft} locale={locale} />
+      )}
+
+      <form action={formAction} className="assistant-composer-form" onSubmit={onSubmit} ref={form}>
         <input name="intent" type="hidden" value="ask" />
         <input name="locale" type="hidden" value={locale} />
         {conversationId === undefined ? null : (
@@ -266,7 +308,9 @@ export function ChatComposer({
             disabled={pending}
             id={fieldId}
             key={
-              restored !== null
+              streamFailure !== null
+                ? `stream-failed:${streamFailure.seq}`
+                : restored !== null
                 ? `restored:${restored.length}:${state.route}`
                 : seeded !== null
                   ? `seeded:${seeded.length}`
@@ -299,7 +343,25 @@ export function ChatComposer({
         <p className="assistant-composer-hint" id={hintId}>{copy.submitHint}</p>
       </form>
 
-      {state.notice === null ? null : (
+      {streamFailure === null ? null : (
+        <div
+          aria-label={copy.resultRegionLabel(agentName)}
+          className="assistant-composer-notice"
+          data-route="knowledge_failed"
+          ref={notice}
+          role="region"
+          tabIndex={-1}
+        >
+          <p className="assistant-composer-echo">
+            <span>{copy.echoLabel}</span>
+            <q>{streamFailure.echo}</q>
+          </p>
+          <h3>{copy.knowledgeFailedHeading}</h3>
+          <p>{streamFailure.message}</p>
+        </div>
+      )}
+
+      {state.notice === null || streamFailure !== null ? null : (
         <div
           aria-label={copy.resultRegionLabel(agentName)}
           className="assistant-composer-notice"
@@ -367,5 +429,42 @@ export function ChatComposer({
         state={state.command}
       />
     </section>
+  );
+}
+
+/**
+ * Life Brain E.5 part 2 (ADR-175): the streamed turn, drawn as the thread draws
+ * a turn — the question, then the answer as it is written. A draft: no time,
+ * no sources, no model line, because none of that exists until the validated
+ * answer is persisted, and then the thread's own message replaces this.
+ *
+ * `data-draft-role`, not `data-role` or the `assistant`/`user` classes, so no
+ * selector that addresses persisted messages ever counts a draft.
+ */
+function StreamedDraft({ agentName, draft, locale }: { agentName: string; draft: ChatDraft; locale: Locale }) {
+  const copy = getAssistantCopy(locale);
+  return (
+    <div className="chat-draft" data-chat-draft="">
+      <article className="chat-message" data-draft-role="user">
+        <p className="chat-message-meta">
+          <span className="chat-message-speaker">{copy.speakerYou}</span>
+        </p>
+        {/* Owner content, rendered as text. */}
+        <p className="chat-message-body">{draft.question}</p>
+      </article>
+      <article aria-busy="true" className="chat-message" data-draft-role="assistant">
+        <p className="chat-message-meta">
+          <span className="chat-message-speaker">{agentName}</span>
+        </p>
+        {draft.text === "" ? (
+          <p className="chat-message-body" role="status">
+            <LoaderCircle aria-hidden="true" className="spin" size={16} /> {getPendingTurnCopy(locale).thinking(agentName)}
+          </p>
+        ) : (
+          // Model output, rendered as text — never markup.
+          <p className="chat-message-body">{draft.text}</p>
+        )}
+      </article>
+    </div>
   );
 }
