@@ -67,7 +67,9 @@ const CONTEXTUAL_SURFACES = [
   { file: "src/app/[locale]/app/projects/[projectId]/page.tsx", source: "getOwnerTimeZone", kind: "formats" },
   { file: "src/app/[locale]/app/memories/[memoryId]/page.tsx", source: "getOwnerTimeZone", kind: "formats" },
   { file: "src/app/[locale]/app/files/page.tsx", source: "getOwnerTimeZone", kind: "formats" },
-  { file: "src/app/[locale]/app/chat/page.tsx", source: "getOwnerTimeZone", kind: "formats" },
+  // Life Brain E.6 (ADR-176): the conversation list moved into the menu, so the
+  // page stamps nothing itself; it hands the zone to the menu's loader.
+  { file: "src/app/[locale]/app/chat/page.tsx", source: "getOwnerTimeZone", kind: "threads" },
   { file: "src/app/[locale]/app/inbox/page.tsx", source: "getOwnerTimeZone", kind: "threads" },
   // The entry detail is the exception, and deliberately: its projection already
   // carries the owner's zone, and its two child components stamp from the same
@@ -84,7 +86,7 @@ describe("LDC-CONTEXT-001: every contextual surface stamps through the contract"
     } else {
       // A threading surface must hand the zone to something. A page that reads
       // it and never passes it on is a query with no consumer.
-      expect(code, `${file} reads a zone it never passes on`).toMatch(/timeZone=\{timeZone\}/);
+      expect(code, `${file} reads a zone it never passes on`).toMatch(/timeZone=\{timeZone\}|, timeZone\)/);
     }
   });
 
@@ -94,7 +96,7 @@ describe("LDC-CONTEXT-001: every contextual surface stamps through the contract"
     // would be silently unreachable.
     const kinds = new Set(CONTEXTUAL_SURFACES.map((surface) => surface.kind));
     expect(kinds).toEqual(new Set(["formats", "threads"]));
-    expect(CONTEXTUAL_SURFACES.filter((s) => s.kind === "formats").length).toBe(6);
+    expect(CONTEXTUAL_SURFACES.filter((s) => s.kind === "formats").length).toBe(5);
   });
 
   it("has no surface build its own formatter beside the contract", () => {

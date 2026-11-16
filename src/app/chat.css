@@ -132,3 +132,234 @@ body .side-rail { overflow-y: auto }
 /* Life Brain A.1 — the four starter questions under the empty state. */
 .chat-starters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chat-starters > .ui-button { white-space: normal; text-align: start; min-height: var(--control-md); }
+
+/*
+ * Life Brain E.6 (ADR-176) — the Conversar surface.
+ *
+ * The owner's reference is ChatGPT: the screen is the conversation. A sticky
+ * header (menu ☰, title, new conversation), the thread or the
+ * new-conversation screen filling the height and resting on the field, and
+ * the field docked at the bottom. The other conversations are in the menu,
+ * which covers the screen on a phone and sits beside the conversation on a
+ * wide one. On a phone the shell's top bar steps aside here: search, language
+ * and notices stay one tab away.
+ */
+.chat-surface {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: calc(100dvh - var(--header-height));
+}
+
+.chat-column { display: flex; flex-direction: column; min-width: 0 }
+
+.chat-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: 0 var(--space-3);
+  background: var(--background-canvas);
+  border-bottom: 1px solid var(--border-default);
+}
+.chat-header-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: 600 15px/1.3 var(--font-ui);
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chat-header-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.chat-header-button:hover { background: var(--background-subtle) }
+.chat-header-button[data-current] { color: var(--text-muted) }
+
+/* The conversation or the new-conversation screen, resting on the field. */
+.chat-stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  width: min(760px, 100% - 2 * var(--gutter));
+  margin: 0 auto;
+  padding-top: var(--space-6);
+}
+
+.chat-intro { display: grid; gap: var(--space-4) }
+/* A question streamed into the new-conversation screen takes its place. */
+.chat-stage:has([data-chat-draft]) .chat-intro { display: none }
+.chat-hello { display: grid; gap: var(--space-2) }
+.chat-hello h2 { margin: 0; font: 400 30px/1.15 var(--font-reading); letter-spacing: -.01em; color: var(--text-primary) }
+.chat-hello p { margin: 0; font: var(--type-body); color: var(--text-secondary); max-width: var(--width-reading) }
+.chat-intro .conversational-questions { margin: 0 }
+
+.chat-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+  width: min(760px, 100% - 2 * var(--gutter));
+  margin: 0 auto;
+  padding: var(--space-3) 0 var(--space-4);
+  background: linear-gradient(to bottom, transparent, var(--background-canvas) var(--space-4));
+}
+.chat-dock .assistant-composer-hint { display: none }
+
+/* The thread: the owner's turn on the right, the answer in the reading face. */
+.chat-surface .message-stream { margin-bottom: 0 }
+.chat-surface .chat-message { border-top: 0; padding: var(--space-3) 0 }
+.chat-surface .chat-message[data-role="user"],
+.chat-surface .chat-message[data-draft-role="user"] {
+  justify-self: end;
+  max-width: 85%;
+  margin: var(--space-3) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: 18px 18px var(--radius-sm) 18px;
+  background: var(--background-subtle);
+}
+.chat-surface .chat-message[data-role="user"] .chat-message-body,
+.chat-surface .chat-message[data-draft-role="user"] .chat-message-body { font: var(--type-body); color: var(--text-primary) }
+/* The speaker line stays for assistive technology; the side already says who. */
+.chat-surface .chat-message[data-role="user"] .chat-message-meta,
+.chat-surface .chat-message[data-draft-role="user"] .chat-message-meta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The conversations menu. */
+.chat-menu[hidden] { display: none }
+.chat-menu {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 300px;
+  height: calc(100dvh - var(--header-height));
+  padding: var(--space-3);
+  overflow-y: auto;
+  border-right: 1px solid var(--border-default);
+  background: var(--background-subtle);
+}
+.chat-menu-head { display: flex; align-items: center; gap: var(--space-2) }
+.chat-menu-new {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: 600 14px/1 var(--font-ui);
+}
+.chat-menu-close { display: none }
+.chat-menu-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-muted);
+}
+.chat-menu-search input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--touch-target);
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--type-body);
+}
+.chat-menu-search input:focus { outline: none }
+.chat-menu-search:focus-within { border-color: var(--border-strong); box-shadow: var(--focus-ring) }
+.chat-menu-groups { display: grid; gap: var(--space-3); padding-bottom: var(--space-6) }
+.chat-menu-group ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none }
+.chat-menu-group-title {
+  margin: var(--space-2) var(--space-2) var(--space-1);
+  font: var(--type-section);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.chat-menu-group a {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  min-height: var(--touch-target);
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font: var(--type-body);
+  line-height: calc(var(--touch-target) - 2 * var(--space-2));
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.chat-menu-group a:hover { background: var(--background-surface) }
+.chat-menu-group a[aria-current="page"] { background: var(--background-surface); font-weight: 600 }
+.chat-menu-empty, .chat-menu-note { margin: var(--space-2); font: var(--type-caption); color: var(--text-muted) }
+.chat-menu-scrim { display: none }
+
+@media (max-width: 899px) {
+  .app-frame:has([data-chat-surface]) .top-bar { display: none }
+  .chat-surface {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 100dvh;
+    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  }
+  .chat-header { padding: 0 var(--space-1) }
+  .chat-header-title { text-align: center }
+  .chat-stage, .chat-dock { width: calc(100% - 2 * var(--space-4)) }
+  .chat-dock { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--space-2) }
+  .chat-hello h2 { font-size: 28px }
+  .chat-menu {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: var(--z-dialog);
+    width: min(316px, 86vw);
+    height: 100dvh;
+    background: var(--background-canvas);
+    box-shadow: var(--elevation-sheet);
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+  }
+  .chat-menu-close {
+    display: grid;
+    place-items: center;
+    width: var(--touch-target);
+    height: var(--touch-target);
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-primary);
+  }
+  .chat-menu-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-dialog) - 1);
+    background: rgb(0 0 0 / .32);
+  }
+}

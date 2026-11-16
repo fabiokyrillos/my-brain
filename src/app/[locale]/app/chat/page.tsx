@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
-import { EmptyState, List, ListItem, PageHeader } from "@/components/ui";
 import { ConversationalQuestions } from "@/features/agent/conversational-questions";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { Composer } from "@/features/capture/composer";
 import { ComposerSeedProvider, MAX_SEED_LENGTH } from "@/features/capture/composer-seed";
 import { transcribeRecording } from "@/features/capture/transcribe-action";
 import { getAssistantCopy } from "@/features/assistant/copy";
+import { ChatFrame } from "@/features/chat/chat-frame";
+import { ChatDraftSlot, ChatStreamProvider } from "@/features/chat/chat-stream-context";
+import { loadConversationMenu } from "@/features/chat/conversation-menu";
+import { getChatSurfaceCopy } from "@/features/chat/surface-copy";
 import { askAboutCopy, parseAskAbout } from "@/features/conversation-cards/ask-about";
 import { AskingAboutBanner } from "@/features/conversation-cards/asking-about-banner";
 import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
@@ -24,45 +27,44 @@ import { SuggestionRow } from "@/features/conversation-cards/suggestion-row";
 import { formatLocalDate, isSupportedTimeZone, localDateOf } from "@/lib/time/local-day";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getAgentName } from "@/features/profile/agent-identity";
-import { PaginationLinks } from "@/features/shell/pagination-links";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
-import { formatInstant } from "@/lib/time/instant-format";
-import { pageRange, paginateRows, parsePage } from "@/lib/pagination";
 import { isLocale } from "@/lib/preferences";
-import { requireSupabaseData } from "@/lib/supabase/result";
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
+/**
+ * Life Brain E.6 (ADR-176) — a new conversation, the whole screen.
+ *
+ * The owner's reference is ChatGPT: the screen is the conversation, the field
+ * sits at the bottom, the suggestions sit above it, and the other
+ * conversations are behind the menu (☰) rather than listed here. Asking a
+ * plain question streams the answer into this same screen, and the address
+ * becomes the conversation's without the owner "entering" anything
+ * (`use-chat-stream.ts`).
+ */
 export default async function ChatPage({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string | string[]; about?: string | string[]; q?: string | string[] }>;
+  searchParams: Promise<{ about?: string | string[]; q?: string | string[] }>;
 }) {
   const { locale: candidate } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const copy = getAssistantCopy(locale);
+  const surface = getChatSurfaceCopy(locale);
   const chipCopy = getConversationCardsCopy(locale).suggestions;
   const agentName = await getAgentName();
   const query = await searchParams;
-  const page = parsePage(query.page);
-  const { from, to } = pageRange(page);
   const { supabase, user } = await requireUser(locale);
   // `LDC-CONTEXT-001`. One accessor, cached per request: this page and every
   // other contextual surface stamp instants from the same source.
   const timeZone = await getOwnerTimeZone();
-
-  const result = await supabase
-    .from("conversations")
-    .select("id,title,updated_at")
-    .order("updated_at", { ascending: false })
-    .range(from, to);
-  const { items, hasNext } = paginateRows(requireSupabaseData(result, "load conversations") ?? []);
+  const menu = await loadConversationMenu(supabase, locale, timeZone);
 
   /*
     `2P-CHAT-005` — arriving from a person's or project's page seeds the
@@ -77,10 +79,11 @@ export default async function ChatPage({
     : askAboutCopy(locale).seed(askingAbout.name);
 
   /*
-    Life Brain B.7 (T7). The suggestions are read **only when they will be
-    drawn**, which is the empty conversation surface — the same condition
-    `2K-SUGG-003` shipped with. An owner who already has conversations pays for
-    none of these reads, which is why they can afford to be six.
+    Life Brain B.7 (T7), changed by E.6 (ADR-176). The suggestions are read on
+    every new conversation now, not only while the owner has none: this screen
+    is where every conversation starts, and the owner asked for the
+    suggestions to stay on it. The reads are the derivation's own, owner-scoped
+    and model-free; the model pick is still at most one call a day (B.8).
 
     A scoped conversation hands its subject down: the owner found "Perguntando
     sobre Família" offering "Quando fui ao médico pela última vez?", and a
@@ -90,80 +93,76 @@ export default async function ChatPage({
   let suggestions: readonly ConversationSuggestion[] = [];
   let suggestionSource: "derived" | "model" = "derived";
   let pickPending = false;
-  if (items.length === 0) {
-    const now = new Date();
-    const inputs = await loadSuggestionInputs(supabase, {
-      now,
-      scope: askingAbout === null ? null : askingAbout.subject,
-      timeZone,
-    });
-    suggestions = deriveConversationSuggestions(inputs);
-    /*
-      Life Brain B.8 (ADR-163). Today's model pick, when there is one, replaces
-      the derived three; it is only ever `{category, id}` pairs resolved against
-      today's own candidates, so the sentences are still ours. A scoped
-      conversation keeps the derivation: its one subject leaves nothing to pick.
-      When today has no pick yet, the trigger below asks for one after render,
-      and this visit shows the derivation.
-    */
-    if (askingAbout === null && isSupportedTimeZone(timeZone)) {
-      const picks = await readTodaysPicks(supabase, formatLocalDate(localDateOf(now, timeZone)));
-      const chosen = picks ? suggestionsFromPicks(picks, suggestionCandidates(inputs)) : [];
-      if (chosen.length > 0) {
-        suggestions = chosen;
-        suggestionSource = "model";
-      }
-      // `undefined` is an unreadable cache: no trigger, because nothing could be stored.
-      pickPending = picks === null;
+  const now = new Date();
+  const inputs = await loadSuggestionInputs(supabase, {
+    now,
+    scope: askingAbout === null ? null : askingAbout.subject,
+    timeZone,
+  });
+  suggestions = deriveConversationSuggestions(inputs);
+  /*
+    Life Brain B.8 (ADR-163). Today's model pick, when there is one, replaces
+    the derived three; it is only ever `{category, id}` pairs resolved against
+    today's own candidates, so the sentences are still ours. A scoped
+    conversation keeps the derivation: its one subject leaves nothing to pick.
+    When today has no pick yet, the trigger below asks for one after render,
+    and this visit shows the derivation.
+  */
+  if (askingAbout === null && isSupportedTimeZone(timeZone)) {
+    const picks = await readTodaysPicks(supabase, formatLocalDate(localDateOf(now, timeZone)));
+    const chosen = picks ? suggestionsFromPicks(picks, suggestionCandidates(inputs)) : [];
+    if (chosen.length > 0) {
+      suggestions = chosen;
+      suggestionSource = "model";
     }
+    // `undefined` is an unreadable cache: no trigger, because nothing could be stored.
+    pickPending = picks === null;
   }
 
   return (
-    <div className="content-page chat-page">
-      {/*
-        Life Brain A.1 (ADR-145 Decision 4). The page used to open with an
-        eyebrow, a display title and a lead — a third of an iPhone screen before
-        the field. Now: one compact header, then the composer, which stays the
-        first interactive element (UX-07).
-      */}
-      <PageHeader description={copy.description} size="compact" title={copy.title(agentName)} />
+    <ChatStreamProvider locale={locale}>
+      <ChatFrame activeId={null} groups={menu.groups} limited={menu.limited} locale={locale} title={agentName}>
+        {/*
+          Life Brain B.7. Everything that can put a question **in** the field is
+          inside this provider, which is the whole mechanism: the composer
+          registers its field, a chip calls the filler, and nothing between them
+          submits. The owner's rule, in his words: "é preencher, não enviar."
+        */}
+        <ComposerSeedProvider>
+          <div className="chat-stage">
+            {/* Hidden by CSS once a turn is being streamed into this screen. */}
+            <div className="chat-intro">
+              <div className="chat-hello">
+                <h2>{surface.hello}</h2>
+                <p>{surface.helloDescription(agentName)}</p>
+              </div>
 
-      {askingAbout === null ? null : (
-        <AskingAboutBanner locale={locale} resolved={askingAbout} />
-      )}
+              {askingAbout === null ? null : (
+                <AskingAboutBanner locale={locale} resolved={askingAbout} />
+              )}
 
-      {/*
-        Life Brain B.7. Everything that can put a question **in** the field is
-        inside this provider, which is the whole mechanism: the composer
-        registers its field, a chip calls the filler, and nothing between them
-        submits. The owner's rule, in his words: "é preencher, não enviar."
-      */}
-      <ComposerSeedProvider>
-        <Composer
-          mode="chat"
-          transcribeAction={transcribeRecording}
-          action={runAssistantTurn}
-          agentName={agentName}
-          initialText={initialText}
-          locale={locale}
-          memoryAction={createProposedMemory}
-          memoryUndoAction={undoProposedMemory}
-        />
+              {/*
+                Proactive questions stay — they are the agent's own open loops and
+                deleting them would lose a lifecycle. Here they are one line that
+                leads to where they are answered.
+              */}
+              <ConversationalQuestions compact supabase={supabase} userId={user.id} locale={locale} mode="proactive" />
 
-        {items.length === 0 ? (
-          <EmptyState
-            description={copy.emptyDescription}
-            size="compact"
-            title={copy.emptyTitle(agentName)}
-            action={
-              /*
-                Defect 3 of 5 November: in a scoped conversation these four
-                generic life questions were exactly the chips the owner quoted
-                as having nothing to do with "Família". The banner above already
-                says what the conversation is about, and the field is already
-                seeded with it, so the generic starters stand down.
-              */
-              askingAbout !== null ? undefined : (
+              {/*
+                `2K-SUGG-003`, extended by B.7. At most three suggestions derived from
+                the owner's own people, projects, dates and open loops — and nothing at
+                all when none is honestly appropriate.
+              */}
+              <SuggestionRow locale={locale} source={suggestionSource} suggestions={suggestions} />
+              {pickPending ? <SuggestionPickTrigger locale={locale} /> : null}
+
+              {/*
+                When the owner's records offer nothing to suggest, the four life
+                questions do. In a scoped conversation they stand down (defect 3
+                of 5 November): the banner already says what it is about, and
+                the field is already seeded with it.
+              */}
+              {suggestions.length > 0 || askingAbout !== null ? null : (
                 <div className="chat-starters" role="group" aria-label={copy.startersLabel}>
                   {copy.starters.map((question) => (
                     <SeedChip
@@ -180,44 +179,28 @@ export default async function ChatPage({
                     />
                   ))}
                 </div>
-              )
-            }
-          />
-        ) : null}
+              )}
+            </div>
 
-        {/*
-          `2K-SUGG-003`, extended by B.7. At most three suggestions derived from
-          the owner's own people, projects, dates and open loops — and nothing at
-          all when none is honestly appropriate.
-        */}
-        <SuggestionRow locale={locale} source={suggestionSource} suggestions={suggestions} />
-        {pickPending ? <SuggestionPickTrigger locale={locale} /> : null}
-      </ComposerSeedProvider>
+            <div className="message-stream">
+              <ChatDraftSlot agentName={agentName} locale={locale} />
+            </div>
+          </div>
 
-      {/*
-        Proactive questions stay — they are the agent's own open loops and
-        deleting them would lose a lifecycle. They sit below the composer and
-        read as secondary so their answer fields do not compete with it.
-      */}
-      <ConversationalQuestions supabase={supabase} userId={user.id} locale={locale} mode="proactive" />
-
-      {items.length ? (
-        <section className="conversation-list" aria-labelledby="chat-recent-title">
-          <h2 id="chat-recent-title">{copy.recentTitle}</h2>
-          <List>
-            {items.map((conversation) => (
-              <ListItem
-                href={`/${locale}/app/chat/${conversation.id}`}
-                key={conversation.id}
-                meta={formatInstant(conversation.updated_at, "dayAndTime", locale, timeZone)}
-                title={conversation.title}
-              />
-            ))}
-          </List>
-        </section>
-      ) : null}
-
-      <PaginationLinks locale={locale} path="chat" page={page} hasNext={hasNext} />
-    </div>
+          <div className="chat-dock">
+            <Composer
+              mode="chat"
+              transcribeAction={transcribeRecording}
+              action={runAssistantTurn}
+              agentName={agentName}
+              initialText={initialText}
+              locale={locale}
+              memoryAction={createProposedMemory}
+              memoryUndoAction={undoProposedMemory}
+            />
+          </div>
+        </ComposerSeedProvider>
+      </ChatFrame>
+    </ChatStreamProvider>
   );
 }

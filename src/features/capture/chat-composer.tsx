@@ -18,7 +18,7 @@
  * *replace* the preview that produced it, not render beside it.
  */
 
-import { ArrowUp, LoaderCircle } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { useActionState } from "react";
@@ -36,9 +36,9 @@ import {
 
 import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
 import { getAssistantCopy } from "@/features/assistant/copy";
-import { getPendingTurnCopy } from "@/features/chat/pending-turn";
+import { StreamedDraft, useSharedChatStream } from "@/features/chat/chat-stream-context";
 import { shouldStreamChatTurn } from "@/features/chat/streaming-choice";
-import { useChatStream, type ChatDraft } from "@/features/chat/use-chat-stream";
+import { useChatStream } from "@/features/chat/use-chat-stream";
 
 import { fillField, useRegisterComposerSeed } from "./composer-seed";
 import { VoiceComposer, type TranscribeAction } from "./voice-composer";
@@ -147,7 +147,14 @@ export function ChatComposer({
     goes through `runAssistantTurn` exactly as before. `pending` covers both, so
     the field, the button and the live region behave the same either way.
   */
-  const stream = useChatStream({ locale, conversationId });
+  /*
+    Life Brain E.6 (ADR-176): on the Conversar surface the stream is shared, so
+    the thread above draws the draft. Elsewhere this composer keeps its own and
+    draws the draft itself. Both hooks always run, so the hook order is fixed.
+  */
+  const shared = useSharedChatStream();
+  const own = useChatStream({ locale, conversationId });
+  const stream = shared ?? own;
   const pending = actionPending || stream.streaming;
   const streamFailure = stream.failure;
   const form = useRef<HTMLFormElement | null>(null);
@@ -289,7 +296,7 @@ export function ChatComposer({
         {pending ? copy.pendingAnnouncement : state.announcement}
       </div>
 
-      {stream.draft === null ? null : (
+      {shared !== null || stream.draft === null ? null : (
         <StreamedDraft agentName={agentName} draft={stream.draft} locale={locale} />
       )}
 
@@ -429,42 +436,5 @@ export function ChatComposer({
         state={state.command}
       />
     </section>
-  );
-}
-
-/**
- * Life Brain E.5 part 2 (ADR-175): the streamed turn, drawn as the thread draws
- * a turn — the question, then the answer as it is written. A draft: no time,
- * no sources, no model line, because none of that exists until the validated
- * answer is persisted, and then the thread's own message replaces this.
- *
- * `data-draft-role`, not `data-role` or the `assistant`/`user` classes, so no
- * selector that addresses persisted messages ever counts a draft.
- */
-function StreamedDraft({ agentName, draft, locale }: { agentName: string; draft: ChatDraft; locale: Locale }) {
-  const copy = getAssistantCopy(locale);
-  return (
-    <div className="chat-draft" data-chat-draft="">
-      <article className="chat-message" data-draft-role="user">
-        <p className="chat-message-meta">
-          <span className="chat-message-speaker">{copy.speakerYou}</span>
-        </p>
-        {/* Owner content, rendered as text. */}
-        <p className="chat-message-body">{draft.question}</p>
-      </article>
-      <article aria-busy="true" className="chat-message" data-draft-role="assistant">
-        <p className="chat-message-meta">
-          <span className="chat-message-speaker">{agentName}</span>
-        </p>
-        {draft.text === "" ? (
-          <p className="chat-message-body" role="status">
-            <LoaderCircle aria-hidden="true" className="spin" size={16} /> {getPendingTurnCopy(locale).thinking(agentName)}
-          </p>
-        ) : (
-          // Model output, rendered as text — never markup.
-          <p className="chat-message-body">{draft.text}</p>
-        )}
-      </article>
-    </div>
   );
 }

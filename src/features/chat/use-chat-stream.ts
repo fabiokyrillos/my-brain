@@ -47,7 +47,13 @@ export function useChatStream({ locale, conversationId }: { locale: Locale; conv
       startTransition(() => {
         setDraft(null);
         if (sameThread) router.refresh();
-        else router.push(href);
+        /*
+          Life Brain E.6 (ADR-176): a new conversation is not "entered". The
+          thread page draws the same surface, so replacing the route inside the
+          transition swaps the draft for the persisted turn in one commit, and
+          the back button does not return to an empty new-conversation screen.
+        */
+        else router.replace(href, { scroll: false });
       });
     },
     [router],
@@ -98,6 +104,15 @@ export function useChatStream({ locale, conversationId }: { locale: Locale; conv
           if (ended) return;
           if (event.type === "conversation") {
             thread = event.conversationId;
+            /*
+              ADR-176: the address becomes the conversation's as soon as it
+              exists, without a navigation (Next integrates the native history
+              API). A reload mid-answer then lands on the thread, where the
+              "pensando" state of ADR-173 takes over.
+            */
+            if (conversationId === undefined && typeof window !== "undefined") {
+              window.history.replaceState(null, "", `/${locale}/app/chat/${event.conversationId}`);
+            }
           } else if (event.type === "delta") {
             setDraft((current) => (current === null ? current : { ...current, text: current.text + event.text }));
           } else if (event.type === "done") {

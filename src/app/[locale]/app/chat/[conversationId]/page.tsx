@@ -1,8 +1,9 @@
 import { pendingTurn } from "@/features/chat/pending-turn";
 import { PendingTurnIndicator } from "@/features/chat/pending-turn-indicator";
-import { ArrowLeft } from "lucide-react";
+import { ChatFrame } from "@/features/chat/chat-frame";
+import { ChatDraftSlot, ChatStreamProvider } from "@/features/chat/chat-stream-context";
+import { loadConversationMenu } from "@/features/chat/conversation-menu";
 import { notFound } from "next/navigation";
-import { PageHeader, TextLink } from "@/components/ui";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { Composer } from "@/features/capture/composer";
 import { transcribeRecording } from "@/features/capture/transcribe-action";
@@ -126,7 +127,6 @@ export default async function ConversationPage({
   const { locale: candidate, conversationId } = await params;
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
-  const copy = getAssistantCopy(locale);
   const { supabase, user } = await requireUser(locale);
   const agentName = await getAgentName();
   // `LDC-SEARCH-001`. A cited source must not be dated differently from the page
@@ -169,18 +169,21 @@ export default async function ConversationPage({
    */
   const turn = pendingTurn(messages, new Date());
   const parsed = messages.map((message) => parseCitations(message.citations));
-  const resolved = await Promise.all(
-    parsed.map((citations) => resolveSources(supabase, user.id, citations, locale)),
-  );
+  const [resolved, menu] = await Promise.all([
+    Promise.all(parsed.map((citations) => resolveSources(supabase, user.id, citations, locale))),
+    // Life Brain E.6 (ADR-176): the other conversations, behind the menu.
+    loadConversationMenu(supabase, locale, timeZone),
+  ]);
 
   return (
-    <div className="content-page chat-thread">
-      <TextLink className="back-link" href={`/${locale}/app/chat`} tone="muted">
-        <ArrowLeft aria-hidden="true" size={16} />{copy.backToConversations}
-      </TextLink>
-      {/* Life Brain A.1: one compact header; the eyebrow "BRAIN COM FONTES" is retired. */}
-      <PageHeader size="compact" title={conversation.title} />
-
+    <ChatStreamProvider conversationId={conversationId} locale={locale}>
+      {/*
+        Life Brain E.6 (ADR-176): the thread is the same surface as a new
+        conversation — the menu (☰) holds the others, the title is the
+        conversation's, and the field stays at the bottom.
+      */}
+      <ChatFrame activeId={conversationId} groups={menu.groups} limited={menu.limited} locale={locale} title={conversation.title}>
+      <div className="chat-stage">
       {resumed === null ? null : <ResumedCard locale={locale} resumption={resumed} />}
 
       <div className="message-stream">
@@ -207,8 +210,11 @@ export default async function ConversationPage({
           unanswered.
         */}
         {turn ? <PendingTurnIndicator agentName={agentName} locale={locale} turn={turn} /> : null}
+        <ChatDraftSlot agentName={agentName} locale={locale} />
+      </div>
       </div>
 
+      <div className="chat-dock">
       <Composer
         mode="chat"
         transcribeAction={transcribeRecording}
@@ -219,6 +225,8 @@ export default async function ConversationPage({
         memoryAction={createProposedMemory}
         memoryUndoAction={undoProposedMemory}
       />
-    </div>
+      </div>
+      </ChatFrame>
+    </ChatStreamProvider>
   );
 }
