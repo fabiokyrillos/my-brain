@@ -280,6 +280,8 @@ O redesenho de Ajustes (T4), a relação tipada entre pessoas (T6, exige schema)
 
 *(Atualização de 2026-11-14, ADR-168: o dono decidiu cinco destes itens — T4, T6, as memórias por segmento, a B.6 e a lente Relações — e eles viraram a trilha E, na §6. Continuam fora de escopo, até o dono voltar a eles: LB-OD-3, LB-OD-4, LB-OD-7 e a regra do `LB-B-008`.)*
 
+*(Atualização de 2026-11-16, ADR-176: a LB-OD-3 foi decidida pelo dono na E.6 — o Conversar virou uma tela só, no estilo do ChatGPT, com a lista de conversas num menu. Continuam fora de escopo: LB-OD-4, LB-OD-7 e a regra do `LB-B-008`.)*
+
 ## 6. Trilha E — o que o dono autorizou em 14 de novembro
 
 Acrescentada em 2026-11-14 (ADR-168). **Origem:** as respostas do dono aos itens fora de escopo da §5. A trilha D está mesclada (#377, #378 e #379) e não teve migration.

@@ -67,12 +67,19 @@ export async function ConversationalQuestions({
   locale,
   mode,
   limit = 3,
+  compact = false,
 }: {
   supabase: SupabaseClient;
   userId: string;
   locale: "pt-BR" | "en";
   mode: ConversationalQuestionsMode;
   limit?: number;
+  /**
+   * Life Brain E.6 (ADR-176): one line on the new-conversation screen, which
+   * is all the room it has above the suggestions. The questions are answered
+   * on their own page, one tap away.
+   */
+  compact?: boolean;
 }) {
   const text = withAgentName(copy[locale], await getAgentName());
 
@@ -99,6 +106,19 @@ export async function ConversationalQuestions({
 
   // Proactive surface + the cooldown/quiet-hours module chose not to nudge:
   // collapse to one quiet, reachable link so nothing is ever hidden.
+  if (compact) {
+    const count = decision?.openQuestionCount ?? items.length;
+    return (
+      <section className="conversational-questions conversational-questions-quiet" aria-label={text.proactiveTitle} data-compact="">
+        <ConversationalQuestionsViewed itemCount={count} locale={locale} />
+        <CircleHelp size={16} aria-hidden="true" />
+        <Link href={`/${locale}/app/questions`} className="conversational-questions-quiet-link">
+          {text.reachableLink(count)} · {text.reachableAction}
+        </Link>
+      </section>
+    );
+  }
+
   const proactiveSuppressed = mode === "proactive" && (!decision || !decision.surface);
   if (proactiveSuppressed) {
     const count = decision?.openQuestionCount ?? items.length;

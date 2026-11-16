@@ -1,5 +1,17 @@
 # Technical Changelog
 
+## 2026-11-16 — Life Brain E.6: Conversar is one surface (ADR-176)
+
+- **No migration.**
+- `chat/chat-frame.tsx`: the header (menu ☰, title, new conversation) and the conversations menu — an overlay on a phone (scroll lock, Escape, scrim, focus to the search and back), beside the conversation on a wide screen (open by default; closing holds for the session in `sessionStorage`).
+- `chat/conversation-groups.ts` (pure: Today, Yesterday, 7 days, 30 days, then per month, in the owner's zone; accent-insensitive title search) and `chat/conversation-menu.ts` (one owner-scoped read of the 100 most recent).
+- `chat/chat-stream-context.tsx`: the streamed turn shared by the surface, so the draft is drawn in the thread above the docked field (`ChatDraftSlot`); the thread opens at its end and follows a growing answer.
+- `use-chat-stream.ts`: a new conversation's address is set with `history.replaceState` as soon as it exists, and `done` does `router.replace` instead of `router.push`.
+- `/app/chat`: the whole screen for a new conversation; suggestions on every visit; proactive questions as one line (`ConversationalQuestions compact`); the conversation list and its pagination moved into the menu.
+- `/app/chat/[id]`: the same frame; the back link and page header are gone.
+- `chat.css`: the surface, the docked field, the owner's turn on the right, the menu; on a phone the shell's top bar steps aside on this surface.
+- Tests: `conversation-groups.test.ts`, `chat-surface.test.tsx`; `local-day-correction-convergence` reclassifies the chat page as threading the zone.
+
 ## 2026-11-16 — A thread citing an entry or a memory no longer crashes in the browser
 
 - **No migration.**

@@ -1,4 +1,6 @@
-Last updated: 2026-11-16 (**Thread crash fixed (continuity handle without `Buffer`).** Open, owner's call: show conversation suggestions after the first conversation too (today they are drawn only on an empty surface, `2K-SUGG-003`), and the chat layout (LB-OD-3).)
+Last updated: 2026-11-16 (**E.6 IMPLEMENTED — ADR-176. NO MIGRATION. LB-OD-3 closed by it.** Left open: the menu holds the 100 most recent conversations, and its search covers only those (searching all would be a server query); a turn that goes through the action (a command, a memory) still navigates to the thread, which now looks the same; the sources under an answer keep their titled block rather than the mockup's chips. Still open from before: LB-OD-4, LB-OD-7, LB-B-008.)
+
+Previously: Last updated: 2026-11-16 (**Thread crash fixed (continuity handle without `Buffer`).** Open, owner's call: show conversation suggestions after the first conversation too (today they are drawn only on an empty surface, `2K-SUGG-003`), and the chat layout (LB-OD-3).)
 
 Previously: Last updated: 2026-11-16 (**E.5 PART 2 IMPLEMENTED — ADR-175. NO MIGRATION.** The answer streams as it is written, through one pipeline shared by the route and the action. Still open: a failed turn writes no assistant row, so it is only recognisable by age (ADR-173 Decision 3); a sentence tried as a command first and then answered does not stream (it reaches the answer inside the action); a stream aborted by the provider leaves its partial cost unrecorded, because the Responses API reports usage only on a final response.)
 
