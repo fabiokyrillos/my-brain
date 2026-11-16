@@ -63,9 +63,9 @@ export type SettingsCopy = Readonly<{
 
 const copy: Readonly<Record<Locale, SettingsCopy>> = {
   "pt-BR": {
-    title: "Configurações",
+    title: "Ajustes",
     intro: "O que o assistente é, quando ele pode falar com você, e o que fica guardado.",
-    navLabel: "Grupos das configurações",
+    navLabel: "Grupos dos ajustes",
     sections: {
       general: {
         name: "Você e o assistente",
@@ -92,7 +92,7 @@ const copy: Readonly<Record<Locale, SettingsCopy>> = {
         summary: "O que está guardado, como levar uma cópia, e como encerrar a conta.",
       },
     },
-    back: "Configurações",
+    back: "Ajustes",
     saved: "Salvo",
     undone: "Desfeito",
     undo: "Desfazer",

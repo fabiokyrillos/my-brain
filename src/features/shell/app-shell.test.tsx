@@ -497,7 +497,7 @@ describe("AppShell", () => {
     it("adds no navigation destination, and reaches Settings as the route it already is", () => {
       render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
 
-      const settings = screen.getAllByRole("link", { name: "Configurações" });
+      const settings = screen.getAllByRole("link", { name: "Ajustes" });
       // Two from the account panels plus the two existing More disclosures.
       expect(settings.length).toBeGreaterThanOrEqual(2);
       for (const link of settings) expect(link).toHaveAttribute("href", "/pt-BR/app/settings");

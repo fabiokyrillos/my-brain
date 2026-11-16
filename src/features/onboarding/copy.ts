@@ -97,7 +97,7 @@ const PT: OnboardingCopy = {
     "Não foi possível verificar todos os passos agora. O que aparece como não verificado pode já estar feito.",
   dismiss: {
     action: "Dispensar este guia",
-    hint: "Você pode trazê-lo de volta em Configurações.",
+    hint: "Você pode trazê-lo de volta em Ajustes.",
   },
   next: {
     label: "Próximo passo",

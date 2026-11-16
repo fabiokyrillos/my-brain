@@ -109,7 +109,7 @@ const messages = {
       history: "Histórico",
       costs: "Custos de IA",
       notifications: "Notificações",
-      settings: "Configurações",
+      settings: "Ajustes",
       capture: "Captura rápida",
       more: "Mais",
     },

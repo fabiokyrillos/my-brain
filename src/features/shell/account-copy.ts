@@ -40,7 +40,7 @@ const ptBR: AccountCopy = {
   panelLabel: "Conta e sessão",
   signedInAs: "Conectado como",
   accountFallback: "Sua conta",
-  settings: "Configurações",
+  settings: "Ajustes",
   signOut: "Sair da conta",
   signingOut: "Saindo…",
   signOutFailed: "Não foi possível sair agora. Tente de novo.",
