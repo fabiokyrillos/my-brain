@@ -1152,3 +1152,20 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:var(--control-lg)}
 @media(max-width:600px){.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:calc(var(--space-16) + var(--space-4))}}
 @media(max-width:600px){.home-dashboard .notice-attention-row .notification-primary-action,.home-dashboard .notice-attention-row .notification-menu-trigger{flex:0 1 auto}}
+
+/*
+ * Editorial calmo, slice 3 — every stacked list (ADR-180, Decision 1).
+ *
+ * Registros, Tarefas, Lembretes, Memórias, Pessoas, Projetos, Contextos,
+ * Organizações and Arquivos all build their lists from `.list-stack` and
+ * `.list-row`. Each row was its own bordered card nine pixels from the next;
+ * they are rows between hairlines now, which is the same object Hoje shows, so
+ * following "Ver tudo" no longer changes what an item looks like.
+ *
+ * Only the box changes. The row's grid, its container rule at 700px and every
+ * page's own refinements are untouched, which is why this is four declarations.
+ */
+.list-stack{gap:0}
+.list-stack .list-row{border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;box-shadow:none;padding:var(--space-4) 0}
+.list-stack a.list-row:hover{border-color:var(--border-default);box-shadow:none;background:var(--background-subtle)}
+.list-stack .list-row-main strong{overflow-wrap:anywhere}

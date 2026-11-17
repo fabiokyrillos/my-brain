@@ -3,7 +3,7 @@
 - **Opened:** 2026-11-16, by the owner, from a phone recording of Hoje.
 - **Decision record:** ADR-180.
 - **Record of the work:** [`docs/reports/editorial-calmo/`](../../reports/editorial-calmo/HOJE.md).
-- **Status:** slice 1 (Hoje) implemented on `design/hoje-editorial-calmo`. Slices 2–7 not started.
+- **Status:** slices 1 (Hoje) and 3 (the stacked lists, box only) implemented on `design/hoje-editorial-calmo`. Slices 2 and 4–7 not started.
 
 ## 1. What the owner said
 
@@ -76,7 +76,7 @@ Measured on the preview fixture (four attention items, three priorities), the pa
 | --- | --- | --- |
 | 1 — done | Hoje (`/app`) | §3.2 |
 | 2 | Shared primitives | Move the row and the section heading out of `operations.css` into `src/components/ui` (`ListItem` exists with no call site; a `SectionHeader` does not exist), so slices 3–6 adopt components rather than copy rules |
-| 3 | Registros (`/app/inbox`), Tarefas (`/app/work`, `/app/work/cancelled`), Lembretes (`/app/reminders`) | `.list-row` cards and `.work-row` become rows; group headings become section headings |
+| 3 — box done ([record](../../reports/editorial-calmo/LISTAS.md)) | Registros (`/app/inbox`), Tarefas (`/app/work`, `/app/work/cancelled`), Lembretes (`/app/reminders`) | `.list-row` cards and `.work-row` become rows; group headings become section headings |
 | 4 | Memória (`/app/library`, `/app/memories`), Pessoas, Projetos, Contextos, Organizações, Arquivos, Relações | Same, for the entity lists |
 | 5 | Avisos (`/app/notifications`), Histórico, Perguntas, Revisões, Busca | Avisos is already a divided list (Life Brain A.5); align its heading and type. The rest adopt rows |
 | 6 | Detail pages (`inbox/[entryId]`, `work/[taskId]`, people, projects, contexts, organizations, memories, reviews) | Section headings and the two-face rule; `.mini-list` and `.timeline-list` become rows |

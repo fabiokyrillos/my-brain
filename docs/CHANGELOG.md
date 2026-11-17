@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-17 — Editorial calmo, slice 3: every stacked list is rows between hairlines (ADR-180)
+
+- `app/operations.css`: inside `.list-stack`, a `.list-row` is no longer a bordered card — no box, no gap, a hairline beneath, a tint on hover, titles that break. Reaches Registros, Tarefas, Lembretes, Memórias, Pessoas, Projetos, Contextos, Organizações, Arquivos and Jobs with no markup change.
+- Verified on a Registros fixture and by the static layout contracts (212 passed); the other pages were not rendered — `docs/reports/editorial-calmo/LISTAS.md`. No migration.
+
 ## 2026-11-17 — Editorial calmo, slice 1: Hoje (ADR-180)
 
 - `shell/home-view.tsx`: a section's link sits in its heading, before the rows; the greeting is one line; the lead attention item is a `NeedsAttentionItemRow`, not a proposal card.
