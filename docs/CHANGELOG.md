@@ -1,5 +1,9 @@
 # Technical Changelog
 
+## 2026-11-16 — Docs: Life Brain status after track E
+
+- `STATE.md` and `TODO.md`: a new head entry, plus the Life Brain section headings rewritten. Track E (#380–#391) and ADR-179 (#392) are merged, hosted parity is 109 = 109, and LB-OD-1…9 are all decided. The STATE heading had stopped at B.7 with "parity 107 = 107"; the TODO heading still said LB-OD-3, 4 and 7 were open. Documentation only.
+
 ## 2026-11-16 — The conversations search past the menu ignores accents (ADR-179)
 
 - `chat/conversation-groups.ts`: `matchesConversationSearch(title, query)`, the one title rule (case- and accent-insensitive), now used by `filterGroups`; `CONVERSATION_SEARCH_SCAN_LIMIT = 1000`, the read ceiling.
