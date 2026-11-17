@@ -20,6 +20,7 @@ vi.mock("openai", () => ({
   },
 }));
 
+import { BilledAnswerStreamFailure } from "./answer-stream";
 import { CHAT_ANSWER_MAX_OUTPUT_TOKENS, OpenAIProvider } from "./openai-provider";
 
 const input = {
@@ -102,6 +103,41 @@ describe("streamAnswerFromKnowledge", () => {
 
     create.mockResolvedValue(events([{ type: "response.failed", response: completed }]));
     await expect(provider().streamAnswerFromKnowledge(input, { onAnswerDelta: () => undefined })).rejects.toThrow();
+  });
+
+  it("carries the bill of a failed response that reports one, so the caller can record it", async () => {
+    create.mockResolvedValue(events([...deltas('{"answer":"Come', 3), { type: "response.failed", response: completed }]));
+
+    const failure = await provider()
+      .streamAnswerFromKnowledge(input, { onAnswerDelta: () => undefined })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(BilledAnswerStreamFailure);
+    expect((failure as BilledAnswerStreamFailure).billed).toEqual({
+      model: "gpt-5.6-terra",
+      providerRequestId: "resp_1",
+      transportRequestId: null,
+      inputTokens: 120,
+      cachedInputTokens: 0,
+      outputTokens: 30,
+      reasoningTokens: 4,
+    });
+  });
+
+  it("carries no bill when the provider reported none: no usage on the failure, an error event, or a dropped stream", async () => {
+    const { usage: _usage, ...unbilled } = completed;
+    for (const list of [
+      [{ type: "response.failed", response: unbilled }],
+      [{ type: "error", message: "server_error" }],
+      deltas('{"answer":"meio', 4),
+    ]) {
+      create.mockResolvedValue(events(list));
+      const failure = await provider()
+        .streamAnswerFromKnowledge(input, { onAnswerDelta: () => undefined })
+        .catch((error: unknown) => error);
+      expect(failure).toBeInstanceOf(Error);
+      expect(failure).not.toBeInstanceOf(BilledAnswerStreamFailure);
+    }
   });
 
   it("propagates an abort from the transport", async () => {

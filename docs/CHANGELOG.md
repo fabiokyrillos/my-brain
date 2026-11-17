@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-181)
+
+- `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.
+- `openai-provider.ts`: `response.failed` with usage throws it; without usage, and on an `error` event, a plain `Error` as before.
+- `chat/chat-turn.ts`: the turn records that bill as `chat` before rethrowing; the success path uses the same `recordChatUsage`.
+- Tests: `chat-stream-contract.test.ts` (billed and unbilled failures), `stream-route.test.ts` (the bill recorded, nothing persisted). No migration.
+
 ## 2026-11-16 — LB-M5: the database stops setting a sensitivity (ADR-180)
 
 - **One migration, `202611160110_life_brain_lb_od7_retire_level_writers.sql`** (the seventh Life Brain migration, authorized by the owner on 2026-11-16).

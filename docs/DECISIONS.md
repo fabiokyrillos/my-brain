@@ -2806,3 +2806,15 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 4 — A correction to ADR-178 Decision 4.** It said "two suggestion RPCs still skip `highly_sensitive` rows". No SQL function does: the skip was the TypeScript derivation's `readable` (`conversation-cards/suggestions.ts`), which E.8 already made admit every level. Nothing about it is in this migration.
 
 - **Consequences.** Nothing in the database writes a sensitivity. Left open: the deployed worker's comment in `process-jobs/entry.ts` still says the link gives health and finance their default level. Correcting it is a worker change and a deploy, so it waits for the next one.
+
+## ADR-181 — A failed answer stream records the bill the provider reported
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16 ("pode fazer também") for the three Conversar items left open by ADR-175. No migration.
+
+- **Context.** ADR-175 recorded a streamed answer's cost when the response completed or was truncated (`incomplete`), and left one hole: "a stream aborted by the provider leaves its partial cost unrecorded". The Responses API reports usage only on a terminal response, and `failed` is terminal too; it may carry `usage`. The provider threw a plain `Error` on it, so a paid call left no ledger row.
+
+- **Decision 1 — The bill travels with the failure.** On `response.failed` with usage, `streamAnswerFromKnowledge` throws `BilledAnswerStreamFailure` (`lib/ai/answer-stream.ts`) holding the normalized usage and model. `runChatTurn` records it as the `chat` operation, against the conversation, before rethrowing; the turn then fails as before.
+- **Decision 2 — No bill, no row.** A `failed` response without usage, an `error` event and a stream that drops before any terminal response carry no usage. They still throw a plain `Error` and record nothing: an estimated row would be an invention in an append-only ledger.
+
+- **Consequences.** Every provider response that reports a cost is in the ledger, whichever way it ended. Left open, by design: a transport drop with no terminal event stays unrecorded, because the provider told us nothing.
