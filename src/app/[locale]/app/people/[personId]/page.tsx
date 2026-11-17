@@ -564,24 +564,6 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
         />
       </details>
 
-      {/*
-        Where the handoff draws the generated summary. See the module header on
-        why no summary is rendered and why the empty sentence `04-estados.md`
-        offers for it is not used. This band is what genuinely exists in its
-        place — and it is the project workspace's own section, mounted here
-        rather than reimplemented, so one change is narrated one way wherever it
-        is read.
-      */}
-      <section className="entity-changes" id="changes">
-        <h2>{copy.recentChanges}</h2>
-        <SectionOriginNote locale={locale} origin="derived" />
-        <p className="section-explainer">{copy.personChangesExplainer}</p>
-        {boundedChanges.items.length ? (
-          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <UniversalStateLine description={copy.personChangesEmpty} locale={locale} state="empty" />}
-        <BoundedNotice list={boundedChanges} locale={locale} />
-      </section>
-
       <div className="entity-workspace-columns">
         <section className="entity-workspace-column" aria-labelledby="workspace-open">
           <h2 id="workspace-open">{copy.openWork}</h2>
@@ -859,6 +841,30 @@ export default async function PersonDetailPage({ params }: { params: Promise<{ l
           </div>
         ) : <p className="quiet-state">{pt ? "A linha do tempo começa na próxima menção." : "The timeline starts with the next mention."}</p>}
         <BoundedNotice list={boundedEntries} locale={locale} />
+      </section>
+
+      {/*
+        Where the handoff draws the generated summary. See the module header on
+        why no summary is rendered and why the empty sentence `04-estados.md`
+        offers for it is not used. This band is what genuinely exists in its
+        place — and it is the project workspace's own section, mounted here
+        rather than reimplemented, so one change is narrated one way wherever it
+        is read.
+      */}
+      <section className="entity-changes" id="changes">
+        {/*
+          Collapsed, and last on the page (owner, 2026-11-17): what changed is
+          a detail for whoever wants it, not the first thing the page says.
+        */}
+        <details className="entity-changes-disclosure">
+          <summary><h2>{copy.recentChanges}</h2></summary>
+          <SectionOriginNote locale={locale} origin="derived" />
+          <p className="section-explainer">{copy.personChangesExplainer}</p>
+          {boundedChanges.items.length ? (
+            <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+          ) : <UniversalStateLine description={copy.personChangesEmpty} locale={locale} state="empty" />}
+          <BoundedNotice list={boundedChanges} locale={locale} />
+        </details>
       </section>
 
       {/*

@@ -5,6 +5,7 @@
 - Perguntas, Busca, Revisões and Arquivos: the per-item card becomes a row between hairlines (`agent.css`, `palette.css`, `reviews.css`, `files.css`). The cards stay where the same object sits inside a transcript or an answer.
 - Pessoa, Projeto, Contexto, Organização and Memória detail: a block is a heading over a hairline with rows beneath, not a card holding rows (`entities.css`, `timelines.css`).
 - Arquivos no longer hides an unbreakable file name behind `overflow: hidden`; the name breaks.
+- From the owner's review: a resolved question rests collapsed (`QuestionOutcomeCard` is a `<details>`); on Pessoa and Projeto "O que mudou recentemente" is collapsed at the foot of the page; *Abrir original* in Arquivos is a link.
 - CSS only; no migration. What was rendered and what was not: `docs/reports/editorial-calmo/PAGINAS.md`.
 
 ## 2026-11-17 — Editorial calmo: a notice on Hoje is the weight of its neighbours (ADR-180)

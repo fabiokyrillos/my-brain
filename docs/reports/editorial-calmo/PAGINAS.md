@@ -16,6 +16,12 @@
 | Pessoa, Projeto | `app/entities.css` | The workspace panels lose their card: a heading over a hairline, rows beneath. `.relation-row` is a row. Blocks are separated by space (`--space-8`). |
 | Contexto, Organização, Memória (detail) | `app/timelines.css`, `app/entities.css` | `.entity-columns > section`, `.entity-timeline`, `.entity-memory`, `.entity-decisions`, `.entity-changes` lose their card the same way. |
 
+## Second round, the same day — from the owner's review of the images
+
+- **Perguntas, resolved tab.** A resolved question rests collapsed: its state, its date and the question. The reason, the answer, the consequence and the link open beneath (`QuestionOutcomeCard` is a native `<details>`; its tests open it before reading it, and one asserts the resting state). [Image](evidence/paginas/resolvidas-mobile.png).
+- **Arquivos.** The name is the one heavy line; kind and state are one line of plain text; *Abrir original* is a link, not a bordered button.
+- **Pessoa, Projeto.** "O que mudou recentemente" moved to the foot of the page, collapsed — markup changed in both pages and in the accessibility fixture, whose outline assertion now lists it last. Each block opens with the stronger rule (`--border-strong`) and a heading in the reading face, so a block reads apart from a row.
+
 ## Evidence
 
 390 × 844, light, through the compiled application stylesheet. **Not a signed-in session.** The person page is the fixture `entityWorkspace()` from `e2e/accessibility.spec.ts`, verbatim. The other four are markup written by hand from the components' JSX, so they prove the rules against that markup, not against the running page.

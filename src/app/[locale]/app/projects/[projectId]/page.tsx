@@ -426,22 +426,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         />
       </details>
 
-      {/*
-        The changes band takes the position the handoff draws the generated
-        summary in — the same move the person workspace makes, and for the same
-        reason: no per-entity summary exists, and inventing one would cost a
-        migration and a model call per page load.
-      */}
-      <section className="entity-changes" id="changes">
-        <h2>{copy.recentChanges}</h2>
-        <SectionOriginNote locale={locale} origin="derived" />
-        <p className="section-explainer">{copy.recentChangesExplainer}</p>
-        {boundedChanges.items.length ? (
-          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <UniversalStateLine description={copy.recentChangesEmpty} locale={locale} state="empty" />}
-        <BoundedNotice list={boundedChanges} locale={locale} />
-      </section>
-
       <div className="entity-workspace-columns">
         <section className="entity-workspace-column" aria-labelledby="workspace-open">
           <h2 id="workspace-open">{copy.openWork}</h2>
@@ -664,6 +648,28 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </div>
         ) : <UniversalStateLine description={copy.timelineEmpty} locale={locale} state="empty" />}
         <BoundedNotice list={boundedEntries} locale={locale} />
+      </section>
+
+      {/*
+        The changes band stands where a generated summary would — the same move
+        the person workspace makes, and for the same reason: no per-entity
+        summary exists, and inventing one would cost a migration and a model
+        call per page load.
+      */}
+      <section className="entity-changes" id="changes">
+        {/*
+          Collapsed, and last on the page (owner, 2026-11-17): what changed is
+          a detail for whoever wants it, not the first thing the page says.
+        */}
+        <details className="entity-changes-disclosure">
+          <summary><h2>{copy.recentChanges}</h2></summary>
+          <SectionOriginNote locale={locale} origin="derived" />
+          <p className="section-explainer">{copy.recentChangesExplainer}</p>
+          {boundedChanges.items.length ? (
+            <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+          ) : <UniversalStateLine description={copy.recentChangesEmpty} locale={locale} state="empty" />}
+          <BoundedNotice list={boundedChanges} locale={locale} />
+        </details>
       </section>
 
       {/* Last on the page, for the reason the person page states. */}

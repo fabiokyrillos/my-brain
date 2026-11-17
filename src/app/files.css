@@ -45,3 +45,22 @@
 @media (max-width: 899px) {
   .file-list .list-meta .row-action { display: inline-flex; align-items: center; min-height: var(--touch-target); }
 }
+
+/*
+ * Owner, 2026-11-17: the list still read as noise, *Abrir original* was too
+ * large, and two files did not look like two things. So: the name is the one
+ * heavy line in a row and each row has room around it; the kind and the state
+ * are one quiet line of text; *Abrir original* is a link, as *Abrir* is on Hoje.
+ */
+.file-list > .file-card { padding: var(--space-3) 0; }
+.file-list > .file-card > header { gap: var(--space-1); padding: var(--space-3) 0 0; }
+.file-list > .file-card > header strong { font: var(--type-heading); margin: 0; }
+.file-list > .file-card > header p { margin-top: var(--space-1); }
+.file-list .list-meta { gap: var(--space-3); font: var(--type-caption); }
+.file-list .list-meta .file-kind { font: var(--type-caption); letter-spacing: 0; text-transform: none; }
+.file-list .list-meta .status-badge { padding: 0; border-radius: 0; background: none; font: var(--type-caption); letter-spacing: 0; text-transform: none; }
+.file-list .list-meta .status-badge.completed { color: var(--text-muted); }
+.file-list .list-meta .row-action { margin-left: auto; border: 0; background: none; padding: 0; color: var(--link); font: var(--type-label); }
+.file-list .list-meta .row-action:hover { text-decoration: underline; }
+.file-list .file-analysis > summary { font: var(--type-caption); font-weight: 500; }
+.file-list .file-links h3 { color: var(--text-muted); font: var(--type-caption); }
