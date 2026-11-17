@@ -2887,3 +2887,15 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 2 — No bill, no row.** A `failed` response without usage, an `error` event and a stream that drops before any terminal response carry no usage. They still throw a plain `Error` and record nothing: an estimated row would be an invention in an append-only ledger.
 
 - **Consequences.** Every provider response that reports a cost is in the ledger, whichever way it ended. Left open, by design: a transport drop with no terminal event stays unrecorded, because the provider told us nothing.
+## ADR-193 — A sentence tried as a command first streams its answer too
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16 for the three Conversar items left open by ADR-175. No migration.
+
+- **Context.** ADR-175 streamed only a turn the pure router sends straight to the answer (`knowledge`). A statement such as "Algo sobre o Jaime e a proposta" is `command_first`: it goes through `runAssistantTurn`, the command parse declines it (`not_a_task_command`), and the action answered it inside `sendChatMessage`, all at once.
+
+- **Decision 1 — The action hands the answer back.** The composer posts `streamAnswer=1`. When the command path declines the sentence and it is not a relato, `runAssistantTurn` returns the new route `stream_answer` with the question in `echo`, and answers nothing. Without the flag, or with any other value, it answers in the action as before.
+- **Decision 2 — The composer streams it.** On `stream_answer` the composer sends the echo through the chat route, once per state, exactly like a plain question. The route re-authenticates, re-validates and runs the pipeline `sendChatMessage` runs, so the flag chooses a transport, never an authority.
+- **Decision 3 — Nothing else is handed over.** A command (preview, confirmation, refusal), a relato and every other route stay in the action.
+
+- **Consequences.** Every turn that ends in a grounded answer shows it as it is written. The command parse is still one model call before the answer, and still billed as before. Left open: none from ADR-175's list for this path.

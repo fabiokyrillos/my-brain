@@ -111,6 +111,13 @@
 - `app/operations.css`: one block scoped to `.home-dashboard` — sections without panels, hairline rows, titles that break and lists that shrink (the sideways scroll on a phone), notice controls on shared lines, a capture field that rests at one line, "Ir para" as one quiet row.
 - Tests: every attention item is one linking row; the section link precedes the rows; the greeting is one line. Design in `docs/initiatives/editorial-calmo/DESIGN.md`, evidence in `docs/reports/editorial-calmo/HOJE.md`. No migration. The screenshot lane's Hoje baselines are not redrawn yet.
 
+## 2026-11-17 — A sentence tried as a command first streams its answer (ADR-193)
+
+- `assistant/composer-state.ts`: new route `stream_answer`.
+- `assistant/actions.ts`: on the command fallthrough (not a relato), `streamAnswer=1` returns `stream_answer` with the question in `echo` instead of answering in the action.
+- `capture/chat-composer.tsx`: posts `streamAnswer=1` and streams a handed-back question once per state.
+- Tests: `actions.test.ts` (handed back only on the fallthrough and only on "1"; commands, relatos and refusals never), `chat-composer-stream.test.tsx` (the action, then the stream). No migration.
+
 ## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-192)
 
 - `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.

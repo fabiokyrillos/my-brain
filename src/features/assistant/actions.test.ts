@@ -192,6 +192,49 @@ describe("runAssistantTurn — fallthrough is classified, never caught", () => {
       .rejects.toThrow("NEXT_REDIRECT");
   });
 
+  it("hands the answer to the stream when the composer can stream, and answers nothing itself (ADR-193)", async () => {
+    commandMock.mockResolvedValue(
+      commandState({ unsupportedReason: "not_a_task_command", terminal: true }),
+    );
+    const result = await runAssistantTurn(
+      idleAssistantComposerState,
+      ask("Algo sobre o Jaime e a proposta", { streamAnswer: "1" }),
+    );
+
+    expect(commandMock).toHaveBeenCalledTimes(1);
+    expect(chatMock).not.toHaveBeenCalled();
+    expect(result.route).toBe("stream_answer");
+    expect(result.echo).toBe("Algo sobre o Jaime e a proposta");
+    expect(result.notice).toBeNull();
+  });
+
+  it("still answers in the action when the composer cannot stream, or the flag is anything else", async () => {
+    commandMock.mockResolvedValue(
+      commandState({ unsupportedReason: "not_a_task_command", terminal: true }),
+    );
+    for (const overrides of [{}, { streamAnswer: "0" }, { streamAnswer: "yes" }] as Record<string, string>[]) {
+      chatMock.mockClear();
+      const result = await runAssistantTurn(idleAssistantComposerState, ask("Algo sobre o Jaime e a proposta", overrides));
+      expect(chatMock).toHaveBeenCalledTimes(1);
+      expect(result.route).toBe("knowledge_failed");
+    }
+  });
+
+  it("never hands a command, a relato or a refusal to the stream", async () => {
+    commandMock.mockResolvedValue(commandState({ control: "confirm" }));
+    const command = await runAssistantTurn(idleAssistantComposerState, ask("Cancele a tarefa do relatório", { streamAnswer: "1" }));
+    expect(command.route).toBe("command");
+
+    commandMock.mockResolvedValue(commandState({ unsupportedReason: "not_a_task_command", terminal: true }));
+    const relato = await runAssistantTurn(idleAssistantComposerState, ask("Combinei algo com Jaime ontem à noite", { streamAnswer: "1" }));
+    expect(relato.route).toBe("capture_intent");
+
+    commandMock.mockResolvedValue(commandState({ unsupportedReason: "value_not_allowed_for_action", terminal: true }));
+    const refused = await runAssistantTurn(idleAssistantComposerState, ask("Faça aquilo", { streamAnswer: "1" }));
+    expect(refused.route).toBe("command");
+    expect(chatMock).not.toHaveBeenCalled();
+  });
+
   it("keeps the conversation id on the fallthrough so a thread answer joins its thread", async () => {
     commandMock.mockResolvedValue(commandState({ unsupportedReason: "not_a_task_command" }));
     await runAssistantTurn(idleAssistantComposerState, ask("E depois disso", { conversationId: "c-9" }));
