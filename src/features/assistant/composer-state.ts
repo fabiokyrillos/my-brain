@@ -58,6 +58,14 @@ export const ASSISTANT_ROUTES = [
   "capture_intent",
   "capture_ambiguous",
   "knowledge_failed",
+  /**
+   * `stream_answer` — ADR-182. The sentence was tried as a command first, the
+   * command path declined it (`not_a_task_command`, not a relato), and the
+   * composer said it can stream. Nothing has been answered or written: `echo`
+   * carries the question, and the composer streams it through the chat route,
+   * which re-authenticates and runs the same pipeline the action would have.
+   */
+  "stream_answer",
   "invalid",
 ] as const;
 

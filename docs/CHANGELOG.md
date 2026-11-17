@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-17 — A sentence tried as a command first streams its answer (ADR-182)
+
+- `assistant/composer-state.ts`: new route `stream_answer`.
+- `assistant/actions.ts`: on the command fallthrough (not a relato), `streamAnswer=1` returns `stream_answer` with the question in `echo` instead of answering in the action.
+- `capture/chat-composer.tsx`: posts `streamAnswer=1` and streams a handed-back question once per state.
+- Tests: `actions.test.ts` (handed back only on the fallthrough and only on "1"; commands, relatos and refusals never), `chat-composer-stream.test.tsx` (the action, then the stream). No migration.
+
 ## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-181)
 
 - `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.
