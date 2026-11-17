@@ -2792,3 +2792,18 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 2 — A read ceiling.** `CONVERSATION_SEARCH_SCAN_LIMIT = 1000` bounds the read. It equals the project's PostgREST `max_rows`, which would truncate a longer read anyway, and keeps one search to about a thousand short rows.
 
 - **Consequences.** The same text finds the same conversations everywhere. Left open: a conversation older than the owner's 1,000 most recent is not found by the search. If that ever matters, `unaccent` (or a normalized title column) and a migration move the match back into SQL.
+
+## ADR-180 — Editorial calmo: Hoje is sections over hairlines and rows, and the pass continues page by page
+
+- **Date:** 2026-11-17
+- **Status:** Accepted for slice 1 (Hoje), implemented on its branch. Slices 2–7 are planned in `docs/initiatives/editorial-calmo/DESIGN.md` and not authorized individually. No migration.
+
+- **Context.** The owner recorded Hoje on his phone on 16 November 2026: the page could be dragged sideways, "Precisa de você" was "muito grande, muito desproporcional", the text sat badly, and he asked for something premium, on every page, the home page first. Shown three directions as mockups, he chose the flat editorial one, asked to keep the identity (ADR-114's faces and palette), asked for a capture field that rests at one line, and asked that the whole row be the link.
+
+- **Decision 1 — The language.** A section is a heading, a count and one link on a single line over a hairline. An item is a row between hairlines: an optional leading mark, a title, one line of context, at most one visible verb. The row is the link. The owner's words are set in the reading face, the interface in the UI face, and stamps are not monospaced. Every value is an existing token.
+- **Decision 2 — Nothing is wider than the screen.** Titles on Hoje break anywhere and every list there has a `minmax(0,1fr)` track. The sideways scroll came from one unbreakable identifier in a task title.
+- **Decision 3 — The lead attention item is a row.** ADR-145's cockpit expanded the first item into a proposal card. On a phone that card was most of "muito grande". The decision is made on the record, one tap away. `NeedsAttentionLeadCard` has no call site left.
+- **Decision 4 — "Ir para" stays, quieter.** The strip is `2P-MOBILE-001`: it exists because the owner could not find Lembretes and Revisões on his device. It is one row of four quiet targets now. Removing it is his decision (EC-OD-1), not a consequence of this pass.
+- **Decision 5 — Scoped, then promoted.** Slice 1 lives in one block of `operations.css` under `.home-dashboard`, so `.list-row` keeps its card shape elsewhere. Slice 2 moves the row and the section heading into `src/components/ui` before any other page adopts them.
+
+- **Consequences.** The four Hoje baselines of the screenshot lane (ADR-159) are stale until redrawn through `visual-baselines.yml`. Section hints are not drawn under 900px; they remain in the document. Left open: EC-OD-1; one task appearing as two notices and a priority on the same screen; a greeting that knows the hour and the owner's name; the 34px notice verbs at desktop widths.

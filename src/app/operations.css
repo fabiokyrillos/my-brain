@@ -1023,3 +1023,125 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
    save person decisions, confirm candidates): full width with the top margin
    `.button-primary` used to carry. */
 .form-primary-action{margin-top:var(--space-3)}
+
+/*
+ * Hoje — editorial calmo.
+ *
+ * Owner review of 16 November 2026, on a phone: the page could be dragged
+ * sideways, "Precisa de você" was "muito grande, muito desproporcional", and the
+ * text sat badly. Three things answer that, and all three are placement and
+ * weight rather than new values — every number below is a token.
+ *
+ * 1. NOTHING IS WIDER THAN THE SCREEN. A task title holding one unbreakable
+ *    identifier sized its flex item to its own length; grids without an explicit
+ *    `minmax(0,1fr)` track then grew to fit it. Titles now break anywhere and
+ *    every list here has a track that can shrink.
+ * 2. ONE KIND OF ROW. A section is a heading over a hairline and its items are
+ *    rows separated by hairlines — no card inside a panel inside the page. The
+ *    whole row is the link; a verb appears only where the row has one.
+ * 3. TWO FACES. The owner's own words are set in the reading face and the
+ *    interface in the UI face; stamps stop being monospaced.
+ *
+ * Scoped to `.home-dashboard` so the shared `.list-row` keeps its card shape on
+ * the surfaces that have not been through this pass yet.
+ */
+.home-dashboard{overflow-wrap:anywhere}
+.home-dashboard .today-hero .eyebrow{margin-bottom:var(--space-2)}
+.home-dashboard .home-status{margin-top:var(--space-2)}
+.home-dashboard .today-capture{margin-top:var(--space-6)}
+.home-dashboard .today-capture .capture-card{margin-top:0}
+.home-dashboard .today-destinations{margin-top:var(--space-4)}
+.home-dashboard .today-columns{margin-top:var(--space-8)}
+.home-dashboard .today-main,.home-dashboard .today-side{gap:var(--space-8);grid-template-columns:minmax(0,1fr)}
+
+.home-dashboard .home-section{border:0;border-radius:0;background:none;padding:0;min-width:0}
+.home-dashboard .home-section>header{align-items:center;min-height:var(--touch-target);margin:0;border-bottom:1px solid var(--border-default)}
+.home-section-title{display:flex;align-items:baseline;gap:var(--space-2);min-width:0}
+.home-dashboard .home-section h2{font:var(--type-section);letter-spacing:0;color:var(--text-primary)}
+.home-dashboard .home-section .count{display:inline;width:auto;height:auto;border-radius:0;background:none;color:var(--text-muted);font:var(--type-caption);font-variant-numeric:tabular-nums}
+.home-dashboard .home-section>header .panel-view-all{flex:none;margin:0;font:var(--type-label)}
+.home-dashboard .panel-view-all{font:var(--type-label)}
+.home-section-hint{margin:var(--space-2) 0 0;color:var(--text-muted);font:var(--type-caption)}
+.home-dashboard .home-section>.quiet-state,.home-dashboard .home-section>.home-question,.home-dashboard .home-section>.home-quiet,.home-dashboard .home-section>.home-endofday{margin-top:var(--space-3)}
+
+.home-dashboard .home-list,.home-dashboard .home-priorities{gap:0;grid-template-columns:minmax(0,1fr)}
+.home-dashboard .home-group{grid-template-columns:minmax(0,1fr);gap:0;margin-top:var(--space-4)}
+.home-dashboard .home-group-hint{margin:var(--space-1) 0 0}
+
+.home-dashboard .list-row,.home-dashboard .home-task{border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;box-shadow:none;padding:var(--space-3) 0;min-height:var(--space-16);min-width:0}
+.home-dashboard a.list-row:hover,.home-dashboard .home-task:hover{border-color:var(--border-default);box-shadow:none;background:var(--background-subtle)}
+.home-dashboard .list-row{grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-3)}
+.home-dashboard .list-row::before{content:"";width:var(--space-2);height:var(--space-2);border-radius:var(--radius-full);background:var(--mark-decorative)}
+.home-dashboard .needs-attention-row::before{background:var(--tone-attention-fg)}
+.home-dashboard .notice-attention-row{align-items:center}
+.home-dashboard .list-row-main strong{margin-bottom:var(--space-1);font:var(--type-reading);line-height:1.3;color:var(--text-primary)}
+.home-dashboard .notice-attention-row .list-row-main strong{font:var(--type-heading)}
+.home-dashboard .list-row-main p{white-space:normal;overflow-wrap:anywhere}
+.home-dashboard .notice-attention-eyebrow{margin:0 0 var(--space-1);color:var(--text-muted)}
+.home-dashboard .list-meta{font:var(--type-caption);color:var(--text-muted)}
+/* The row is the link, so the sentence that named its destination is redundant
+   beside it. It stays in the document for the queue page, which shares the row. */
+.home-dashboard .needs-attention-action-hint{display:none}
+
+.home-dashboard .home-task{align-items:center;gap:var(--space-4)}
+.home-dashboard .home-task strong{flex:1 1 auto;font:var(--type-body);font-weight:500;overflow-wrap:anywhere}
+.home-dashboard .home-task-meta{flex:none;font:var(--type-caption);white-space:normal}
+.home-dashboard .priority-reason[data-reason="overdue"]{background:none;padding:0;color:var(--tone-risk-fg)}
+.home-dashboard .home-agenda-time{font:var(--type-caption);font-variant-numeric:tabular-nums}
+
+@media(max-width:600px){
+  .home-dashboard .list-row{grid-template-columns:auto minmax(0,1fr)}
+  .home-dashboard .list-row>.list-meta{grid-column:2;width:auto}
+  .home-dashboard .home-task{align-items:flex-start;gap:var(--space-1)}
+}
+@media(max-width:899px){.home-section-hint{display:none}}
+
+/*
+ * The capture field at rest is one line, and it opens when it is being written
+ * in. Keyed on the TEXTAREA's focus, not on `:focus-within`: pressing the
+ * microphone or the paperclip must not move them out from under the finger.
+ */
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>*{grid-column:1/-1}
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{grid-column:1;min-height:var(--control-lg);padding:var(--space-3) var(--space-4);resize:none}
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-actions{grid-column:2;border-top:0;background:none;padding:0 var(--space-2) 0 0}
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .composer-hint,
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-actions button[type=submit],
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-no-classification{display:none}
+@media(max-width:600px){.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{min-height:calc(var(--space-16) + var(--space-4))}}
+
+/* A notice's stamp takes its own line and its controls share the next one, so a
+   row with verbs is two lines taller than a row without — not five. The outcome
+   regions keep their place in the document and move to the end of the wrap. */
+.home-dashboard .notice-attention-row .list-meta{align-items:center;gap:var(--space-2)}
+.home-dashboard .notice-attention-row .list-meta>span{flex-basis:100%}
+.home-dashboard .notice-attention-row .notification-row-actions{flex:none;order:1}
+.home-dashboard .notice-attention-row .notice-open-control{order:2;margin-left:auto}
+.home-dashboard .notice-attention-row .notice-open-outcome{order:3}
+@media(min-width:601px){
+  .home-dashboard .notice-attention-row .list-meta{justify-content:flex-end;max-width:calc(var(--space-16) * 5)}
+  .home-dashboard .notice-attention-row .list-meta>span{text-align:right}
+  .home-dashboard .notice-attention-row .notice-open-control{margin-left:0}
+}
+
+/* The day's other destinations stay on the first screen (`2P-MOBILE-001`) and
+   stop being the loudest thing on it: one row of four quiet targets. */
+.home-dashboard .today-destinations ul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)}
+.home-dashboard .today-destination{justify-content:center;width:100%;padding:0 var(--space-1);border-color:transparent;border-radius:var(--radius-md);background:var(--background-subtle);overflow-wrap:normal}
+@media(max-width:899px){.home-dashboard .today-destinations-label,.home-dashboard .home-group-hint{display:none}}
+@media(min-width:900px){.home-dashboard .today-destinations ul{display:flex}.home-dashboard .today-destination{width:auto;padding:0 var(--space-4)}}
+@media(max-width:600px){
+  /* The stamp and *Abrir* share a line; the verbs take the next one, side by
+     side. The menu wrapper dissolves so its trigger sits beside the primary verb
+     and its list — in the flow at this width — still opens beneath both. */
+  .home-dashboard .notice-attention-row .list-meta>span{flex:1 1 auto}
+  .home-dashboard .notice-attention-row .notice-open-control{order:0}
+  .home-dashboard .notice-attention-row .notification-row-actions{order:2;flex:1 1 100%}
+  .home-dashboard .notice-attention-row .notification-verb-menu{display:contents}
+  .home-dashboard .notice-attention-row .notification-verb-menu-list{flex-basis:100%}
+}
+/* At rest the field is exactly one control tall; a textarea's own two rows
+   would otherwise decide its height. */
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:var(--control-lg)}
+@media(max-width:600px){.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:calc(var(--space-16) + var(--space-4))}}
+@media(max-width:600px){.home-dashboard .notice-attention-row .notification-primary-action,.home-dashboard .notice-attention-row .notification-menu-trigger{flex:0 1 auto}}

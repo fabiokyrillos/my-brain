@@ -9,7 +9,6 @@ import { ConflictAttentionItemRow } from "@/features/daily-cycle/conflict-attent
 import type { HomeAgendaItem } from "@/features/daily-cycle/home-agenda";
 import { InboxItemRow } from "@/features/daily-cycle/inbox-item";
 import { NeedsAttentionItemRow } from "@/features/daily-cycle/needs-attention-item";
-import { NeedsAttentionLeadCard } from "@/features/daily-cycle/needs-attention-lead";
 import { AttentionNoticeRow } from "@/features/notifications/attention-notice-row";
 import type { NotificationVerbHandlers } from "@/features/notifications/notification-row-actions";
 import type { NotificationRowView } from "@/features/notifications/row-projection";
@@ -183,15 +182,22 @@ function Section({
 }) {
   return (
     <section className="home-section" aria-label={title}>
+      {/*
+        Editorial calmo (owner review of 16 November 2026: *"Precisa de você está
+        muito grande, muito desproporcional"*). The heading, its count and the
+        section's one link share a single line above a hairline, and the link
+        comes BEFORE the rows in the document because that is where it is drawn
+        — focus order stays equal to visual order.
+      */}
       <header>
-        <div>
+        <div className="home-section-title">
           <h2>{title}</h2>
-          {hint ? <p>{hint}</p> : null}
+          {count ? <span className="count">{count}</span> : null}
         </div>
-        {count ? <span className="count">{count}</span> : null}
+        {action}
       </header>
+      {hint ? <p className="home-section-hint">{hint}</p> : null}
       {children}
-      {action}
     </section>
   );
 }
@@ -304,7 +310,10 @@ export function HomeView({
     <div className="dashboard home-dashboard today-page">
       <header className="hero today-hero">
         <p className="eyebrow">{view.todayLabel}</p>
-        <h1>{copy.greeting}<br /><span>{copy.prompt}</span></h1>
+        {/* One line. The question that used to follow the greeting took two more
+            lines of the first screen and said nothing the status line below does
+            not say with a number. */}
+        <h1>{copy.greeting}</h1>
         {/*
           The state of the day as one sentence under the greeting rather than as
           its own dark panel. The old "Estado agora" panel restated the count that
@@ -458,15 +467,13 @@ export function HomeView({
                   leadIsMasked ? (
                     <p className="home-masked" data-masked="true">{copy.maskedLabel}</p>
                   ) : (
-                    <NeedsAttentionLeadCard
-                      agentName={agentName}
-                      item={leadAttention}
-                      locale={locale}
-                      proposesLabel={sections.attention.proposes}
-                      reversibleLabel={sections.attention.reversible}
-                      surface="home"
-                      timeZone={view.timeZone}
-                    />
+                    /*
+                      Editorial calmo: the lead is a row like the rest. The
+                      expanded proposal card made four items fill nearly three
+                      phone screens; the decision itself is one tap away, on the
+                      record, where it can actually be made.
+                    */
+                    <NeedsAttentionItemRow agentName={agentName} item={leadAttention} locale={locale} surface="home" timeZone={view.timeZone} />
                   )
                 ) : null}
                 {restAttention.map((item) =>
