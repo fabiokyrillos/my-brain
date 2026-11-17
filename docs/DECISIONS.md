@@ -2899,3 +2899,16 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 3 — Nothing else is handed over.** A command (preview, confirmation, refusal), a relato and every other route stay in the action.
 
 - **Consequences.** Every turn that ends in a grounded answer shows it as it is written. The command parse is still one model call before the answer, and still billed as before. Left open: none from ADR-175's list for this path.
+## ADR-194 — A turn that fails after its question is saved leaves a failure mark in the thread
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16. Reverses ADR-173 Decision 3. No migration.
+
+- **Context.** ADR-173 Decision 3 left a failed turn "recognisable only by age": the failure path recorded an `error_events` row and wrote no assistant row, so the thread's last message stayed the question. A reload showed "pensando" for three minutes and then "ficou sem resposta", although the turn had already failed and its sentence existed. The reason given was that `conversation_messages` has no field to mark a failure.
+
+- **Decision 1 — The mark lives in `citations`.** Each message's metadata is already the `citations` jsonb. `chat/failed-turn.ts` defines a strict mark, `{ v, turn: "failed", failure, reference }`, holding only the failure class and the `error_events` correlation id. It never holds a provider string or a fragment of the half-written answer. `parseCitations` reads it as no citations, so a failure draws no source block.
+- **Decision 2 — Every failure after the question.** In `runChatTurn`, once the question row is saved, the BYOK gate, the rate-limit refusal, an agenda failure and the pipeline's catch all go through `failAfterQuestion`: one assistant row with the sentence the owner is shown, `model: null`, and the mark. Both transports share it. Refusals before the question is saved (validation, session, conversation not found) write nothing, as before.
+- **Decision 3 — Never after an answer.** If the answer row was written and a later write (the conversation timestamp, the audit) fails, no mark is written. The answer stands, and the failure is still recorded and shown in the composer. The insert is best effort: if it fails too, the turn fails as it did before.
+- **Decision 4 — Not something the assistant said.** The history sent to the model drops marks, and so does the "has this conversation an earlier turn" test of `LB-B-008`. The thread renders a mark as an assistant message with `data-turn="failed"`, set in a quieter colour.
+
+- **Consequences.** A failed turn says so in the thread at once, on every device and after a reload. "Pensando" now covers only a turn in flight, or one whose process died before it could write. A mark takes one of the `CHAT_HISTORY_TURNS` slots the history read returns before it is filtered out.

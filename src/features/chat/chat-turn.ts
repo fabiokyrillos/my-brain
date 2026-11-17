@@ -18,6 +18,7 @@ import { recordAIUsage } from "@/lib/ai/usage";
 import { requireSupabaseData, requireSupabaseSuccess } from "@/lib/supabase/result";
 import { recordErrorEvent, type ErrorOperation, type ErrorSurface } from "@/lib/observability/error-sink";
 import { chatFailureMessage, classifyChatFailure, withChatFailureReference } from "./diagnostics";
+import { buildFailedTurnEnvelope, isFailedTurn } from "./failed-turn";
 import { needsAskForChatPrompt } from "@/features/sensitivity/contracts";
 import { admitsSource, readSensitiveAsk } from "./sensitive-admission";
 import { classifyKnowledgeSources, FAIL_CLOSED, sourceKey, type ClassificationClient } from "./source-classification";
@@ -235,7 +236,8 @@ async function memoriesInForce(
 async function answerAgendaTurn(
   supabase: SupabaseServerClient,
   input: { userId: string; conversationId: string; locale: Locale; span: AgendaSpan; surface: ErrorSurface },
-): Promise<ChatState | null> {
+): Promise<{ state: ChatState; answerWritten: boolean } | null> {
+  let answerWritten = false;
   try {
     const answer = await loadAgendaAnswer(supabase, {
       userId: input.userId,
@@ -252,6 +254,7 @@ async function answerAgendaTurn(
       model: null,
     });
     if (answerError) throw answerError;
+    answerWritten = true;
 
     const [conversationUpdate, auditInsert] = await Promise.all([
       supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", input.conversationId),
@@ -278,10 +281,13 @@ async function answerAgendaTurn(
     });
     console.error("Agenda answer failed", { reason, correlationId });
     return {
-      status: "error",
-      message: chatFailureMessage(input.locale, failure, correlationId),
-      failure,
-      reference: correlationId,
+      state: {
+        status: "error",
+        message: chatFailureMessage(input.locale, failure, correlationId),
+        failure,
+        reference: correlationId,
+      },
+      answerWritten,
     };
   }
 }
@@ -329,12 +335,14 @@ export async function runChatTurn(
     if (!ownedConversation) return refuse({ status: "error", message: copy.conversationNotFound });
     const { data: earlierTurns } = await supabase
       .from("conversation_messages")
-      .select("role,content")
+      .select("role,content,citations")
       .eq("conversation_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(CHAT_HISTORY_TURNS);
     history = (earlierTurns ?? [])
-      .filter((turn): turn is { role: "user" | "assistant"; content: string } => turn.role === "user" || turn.role === "assistant")
+      // ADR-194: a failure mark is not something the assistant said.
+      .filter((turn) => !isFailedTurn(turn.citations))
+      .filter((turn): turn is typeof turn & { role: "user" | "assistant" } => turn.role === "user" || turn.role === "assistant")
       .reverse()
       .map((turn) => ({ role: turn.role, content: turn.content }));
   } else {
@@ -357,6 +365,31 @@ export async function runChatTurn(
   if (userMessageError) return fail({ status: "error", message: copy.questionNotSaved });
   hooks.onConversation?.(conversationId);
 
+  /**
+   * ADR-194. The question is saved, so from here a failure also leaves an
+   * assistant row: the sentence the owner is shown, with a mark holding only
+   * the failure class and the correlation id. The thread then says what
+   * happened instead of "pensando" and, three minutes later, "ficou sem
+   * resposta". Never after an answer row was written — a failure in the audit
+   * that follows an answer must not contradict the answer. Best effort: if the
+   * mark cannot be saved either, the turn still fails as it did before.
+   */
+  let answerWritten = false;
+  const failAfterQuestion = async (state: ChatState): Promise<ChatTurnOutcome> => {
+    if (!answerWritten) {
+      const { error: markError } = await supabase.from("conversation_messages").insert({
+        user_id: userId,
+        conversation_id: conversationId,
+        role: "assistant",
+        content: state.message,
+        citations: buildFailedTurnEnvelope({ failure: state.failure, reference: state.reference }),
+        model: null,
+      });
+      if (markError) console.error("Chat failure mark not saved", { code: markError.code });
+    }
+    return fail(state);
+  };
+
   /*
    * Life Brain B.1. Decided again here, from the text, rather than trusted from
    * the composer's routing: the decision is pure and cheap, and re-deriving it
@@ -365,7 +398,10 @@ export async function runChatTurn(
   const agendaSpan = detectAgendaQuestion(question);
   if (agendaSpan !== null) {
     const failed = await answerAgendaTurn(supabase, { userId, conversationId, locale, span: agendaSpan, surface });
-    if (failed) return fail(failed);
+    if (failed) {
+      answerWritten = failed.answerWritten;
+      return failAfterQuestion(failed.state);
+    }
     return { status: "answered", conversationId, locale };
   }
 
@@ -403,7 +439,7 @@ export async function runChatTurn(
         operation: "chat_answer",
         reason: "permission_denied",
       });
-      return fail({
+      return failAfterQuestion({
         status: "error",
         message: withChatFailureReference(
           locale,
@@ -432,7 +468,7 @@ export async function runChatTurn(
     // fault — so this path must not record a second one. What it gains here is
     // the class, so a caller can route the owner to their usage.
     if (!admission.ok) {
-      return fail({ status: "error", message: admission.message, failure: "quota", reference: null });
+      return failAfterQuestion({ status: "error", message: admission.message, failure: "quota", reference: null });
     }
 
     const preferencesResult = await supabase.from("agent_preferences").select("chat_model,embedding_model,personality,tone,response_detail").eq("user_id", userId).maybeSingle();
@@ -705,6 +741,7 @@ export async function runChatTurn(
       ...(answer.outputTokens === undefined ? {} : { output_tokens: answer.outputTokens }),
     });
     if (answerError) throw answerError;
+    answerWritten = true;
 
     const [conversationUpdate, auditInsert] = await Promise.all([
       supabase.from("conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId),
@@ -761,7 +798,7 @@ export async function runChatTurn(
      * `error_events` has no free-text column.
      */
     console.error("Grounded chat failed", { operation, reason, correlationId });
-    return fail({
+    return failAfterQuestion({
       status: "error",
       message: chatFailureMessage(locale, failure, correlationId),
       failure,
