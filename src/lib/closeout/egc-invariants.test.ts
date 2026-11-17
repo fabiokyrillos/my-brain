@@ -176,7 +176,10 @@ const REPO = resolve(__dirname, "../../..");
 // suggestion pick cache and the `source` telemetry property, one migration the
 // owner authorized on 2026-11-09. Moved in the commit that adds it; Entity Graph
 // Completion still spends nothing.
-const AUTHORIZED_MIGRATION_HEAD = "202611090109";
+// Chain head moved to 202611160110 by Life Brain LB-M5 (ADR-191): the area link
+// stops stamping `private` and `set_entry_sensitivity` is dropped, one migration
+// the owner authorized on 2026-11-16. Entity Graph Completion still spends nothing.
+const AUTHORIZED_MIGRATION_HEAD = "202611160110";
 
 /**
  * The head at Entity Graph Completion's close, which nothing may ever change.

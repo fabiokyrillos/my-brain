@@ -4177,10 +4177,6 @@ export type Database = {
         Args: { p_category: string; p_operation_key: string; p_state: string }
         Returns: Json
       }
-      set_entry_sensitivity: {
-        Args: { p_entry_id: string; p_sensitivity: string }
-        Returns: Json
-      }
       set_person_birthday: {
         Args: {
           p_day: number

@@ -1,19 +1,19 @@
 -- Life Brain LB-M1 (slice C.1, ADR-148): life areas are contexts.
 --
 -- Pins the widened `contexts.kind` vocabulary, the one-context-per-area index,
--- the area link the worker writes, the area's default sensitivity, the owner's
--- override of it, and the boundaries around all three: service role only for
--- the worker's RPC, owner only for the override, no cross-user reach, and
--- idempotence when the same interpretation is linked twice.
+-- the area link the worker writes and the boundaries around it: service role
+-- only, no cross-user reach, and idempotence when the same interpretation is
+-- linked twice. Since LB-M5 (`202611160110`, ADR-191) the link sets no
+-- sensitivity and the owner's `set_entry_sensitivity` is gone.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(33);
+select plan(28);
 
 -- Structure -------------------------------------------------------------------
 
 select has_function('private', 'ensure_life_area_context', array['uuid', 'text', 'text']);
 select has_function('public', 'link_entry_life_area', array['uuid', 'text', 'numeric', 'text', 'uuid']);
-select has_function('public', 'set_entry_sensitivity', array['uuid', 'text']);
+select hasnt_function('public', 'set_entry_sensitivity', array['uuid', 'text'], 'the sensitivity override is retired (ADR-191)');
 select has_index('public', 'contexts', 'contexts_user_life_area_idx', 'one context per life area per user');
 
 select ok(
@@ -25,10 +25,6 @@ select ok(
   'the area link pins an empty search_path'
 );
 select ok(
-  (select proconfig @> array['search_path=""'] from pg_proc where oid = 'public.set_entry_sensitivity(uuid,text)'::regprocedure),
-  'the sensitivity override pins an empty search_path'
-);
-select ok(
   (select proconfig @> array['search_path=""'] from pg_proc where oid = 'private.ensure_life_area_context(uuid,text,text)'::regprocedure),
   'the area resolver pins an empty search_path'
 );
@@ -37,11 +33,6 @@ select ok(
   and not has_function_privilege('anon', 'public.link_entry_life_area(uuid,text,numeric,text,uuid)', 'execute')
   and has_function_privilege('service_role', 'public.link_entry_life_area(uuid,text,numeric,text,uuid)', 'execute'),
   'only the service role may link an area'
-);
-select ok(
-  has_function_privilege('authenticated', 'public.set_entry_sensitivity(uuid,text)', 'execute')
-  and not has_function_privilege('anon', 'public.set_entry_sensitivity(uuid,text)', 'execute'),
-  'an authenticated owner may set a sensitivity; anon may not'
 );
 select ok(
   not has_function_privilege('authenticated', 'private.ensure_life_area_context(uuid,text,text)', 'execute')
@@ -133,8 +124,8 @@ select is(
 );
 select is(
   (select sensitivity from public.entries where id = 'e1111111-1111-4111-8111-111111111111'),
-  'private',
-  'a health entry defaults to private'
+  'normal',
+  'a health entry keeps its sensitivity (ADR-191)'
 );
 
 select is(
@@ -192,38 +183,13 @@ select is(
 );
 reset role;
 
--- The owner's override ------------------------------------------------------------------
-
-set local role authenticated;
-select set_config('request.jwt.claims', '{"sub":"a1111111-1111-4111-8111-111111111111","role":"authenticated"}', true);
-select is(
-  (public.set_entry_sensitivity('e1111111-1111-4111-8111-111111111111', 'normal') ->> 'sensitivity'),
-  'normal',
-  'the owner can lower the area default'
-);
-select throws_ok(
-  $$ select public.set_entry_sensitivity('e3333333-3333-4333-8333-333333333333', 'normal') $$,
-  'P0002',
-  null,
-  'the owner cannot reach another user''s entry'
-);
-reset role;
-
-set local role service_role;
-select set_config('request.jwt.claims', '{"role":"service_role"}', true);
-select public.link_entry_life_area('e1111111-1111-4111-8111-111111111111', 'health', 0.9, 'pt-BR', 'a1111111-1111-4111-8111-111111111111');
-select is(
-  (select sensitivity from public.entries where id = 'e1111111-1111-4111-8111-111111111111'),
-  'normal',
-  'a later reading never overrides the owner''s own choice'
-);
-reset role;
+-- The audit row ---------------------------------------------------------------------
 
 select is(
-  (select count(*)::int from public.audit_logs
-   where user_id = 'a1111111-1111-4111-8111-111111111111' and action_type = 'entry_sensitivity_set' and actor = 'user'),
-  1,
-  'the owner''s change is audited as the owner''s'
+  (select (before_state ->> 'sensitivity') || ':' || (after_state ->> 'sensitivity') from public.audit_logs
+   where source_entry_id = 'e1111111-1111-4111-8111-111111111111' and action_type = 'entry_life_area_linked'),
+  'normal:normal',
+  'the link''s audit row records the level, unchanged'
 );
 
 select * from finish();
