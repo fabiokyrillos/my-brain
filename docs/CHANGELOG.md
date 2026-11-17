@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-16 — The conversations search past the menu ignores accents (ADR-179)
+
+- `chat/conversation-groups.ts`: `matchesConversationSearch(title, query)`, the one title rule (case- and accent-insensitive), now used by `filterGroups`; `CONVERSATION_SEARCH_SCAN_LIMIT = 1000`, the read ceiling.
+- `chat/conversation-search.ts`: no `ilike`; reads the owner's `id,title` newest first, at most 1,000, matches in Node with the shared function, returns at most 30 in the same order. Zod input and `requireUser` unchanged; `escapeLike` removed.
+- Tests: "medico" and "MÉDICO" find "Médico amanhã"; order and limit; the read ceiling; invalid input reads nothing; the server answers every text of a corpus exactly as the local filter does, and a source guard pins the shared function. No migration.
+
 ## 2026-11-16 — Life Brain E.8: nothing is private or restricted (ADR-178)
 
 - `sensitivity/contracts.ts`: every level shows on every surface; `admitsToChatPrompt` admits every level. Notifications still omit content.
