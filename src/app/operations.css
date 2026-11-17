@@ -1182,3 +1182,44 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .list-stack .list-row{border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;box-shadow:none;padding:var(--space-4) 0}
 .list-stack a.list-row:hover{border-color:var(--border-default);box-shadow:none;background:var(--background-subtle)}
 .list-stack .list-row-main strong{overflow-wrap:anywhere}
+
+/*
+ * Editorial calmo — the record page (`inbox/[entryId]`, ADR-180 Decision 1).
+ *
+ * The page was six cards in a column: the owner's words, the reading, the
+ * actions, what now exists, earlier decisions and the technical disclosure,
+ * each in its own bordered box with a round icon. They are sections now — a
+ * rule across the column, a heading in the reading face, the content beneath —
+ * which is the same object the person and project pages use.
+ *
+ * What KEEPS its box is what is one object to decide on: the attention notice
+ * (colour says one thing) and each candidate card, which is a form.
+ *
+ * Scoped to `.record-detail`, so the blocks inside the technical disclosure
+ * (`.interpretation-main`, the trust panel, the history) are not reached.
+ */
+.record-detail .record-detail-columns{gap:var(--space-8)}
+.record-detail .record-decision,.record-detail .record-explanation{gap:var(--space-8)}
+.record-detail .original-entry,
+.record-detail .record-decision .review-understanding,
+.record-detail .review-next-actions,
+.record-detail .entry-outcomes,
+.record-detail .candidate-outcome-history,
+.record-detail .record-explanation>.technical-details{border:0;border-top:1px solid var(--border-strong);border-radius:0;background:none;margin:0;padding:var(--space-4) 0 0;overflow:visible}
+.record-detail .section-heading{grid-template-columns:minmax(0,1fr);gap:0}
+.record-detail .section-heading>span,.record-detail .section-heading>svg{display:none}
+.record-detail .section-heading h2,.record-detail .record-explanation .section-heading h2{margin:0 0 var(--space-1);font:var(--type-reading-lg);line-height:1.3;color:var(--text-primary)}
+/* The owner's own words are the page's subject: no rule above them, a rule
+   beside them, as a quotation is set. */
+.record-detail .original-entry{border-top:0;padding-top:0}
+.record-detail .review-original-content{margin:var(--space-3) 0 0;padding:0 0 0 var(--space-4);border-top:0;border-left:2px solid var(--border-strong)}
+.record-detail .review-understanding-body{margin-top:var(--space-3)}
+/* The reading's fields are pairs in a list, not a row of pills. */
+.record-detail .review-facts{display:grid;gap:0;margin-top:var(--space-3);border-top:1px solid var(--border-default)}
+.record-detail .review-facts div{justify-content:space-between;gap:var(--space-4);border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;padding:var(--space-2) 0;font:var(--type-caption)}
+.record-detail .review-facts dd{text-align:right;overflow-wrap:anywhere}
+.record-detail .notice-card{margin-bottom:0}
+.record-detail .entry-outcome-title{font-weight:500}
+/* The technical disclosure is the page's footnote: the lighter rule, one line. */
+.record-detail .record-explanation>.technical-details{border-top-color:var(--border-default);padding-top:0}
+.record-detail .record-explanation>.technical-details>summary{min-height:var(--touch-target);padding:var(--space-3) 0;font:var(--type-label)}

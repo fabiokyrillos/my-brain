@@ -1,5 +1,10 @@
 # Technical Changelog
 
+## 2026-11-17 — Editorial calmo: the record page is sections, not six cards (ADR-180)
+
+- `app/operations.css`, scoped to `.record-detail`: the owner's words are set as a quotation; the reading, the actions, what now exists, earlier decisions and the technical disclosure are sections under a rule with a heading in the reading face; the reading's fields are label–value pairs instead of pills. The attention notice and the candidate cards keep their box.
+- CSS only; no migration. Rendered from `EntryReview` with a fixture; which forms were not rendered is in `docs/reports/editorial-calmo/REGISTRO.md`.
+
 ## 2026-11-17 — Editorial calmo: the remaining cards are rows (ADR-180)
 
 - Perguntas, Busca, Revisões and Arquivos: the per-item card becomes a row between hairlines (`agent.css`, `palette.css`, `reviews.css`, `files.css`). The cards stay where the same object sits inside a transcript or an answer.
