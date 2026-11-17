@@ -25,3 +25,23 @@
   color: var(--text-muted);
   white-space: nowrap;
 }
+
+/*
+ * Editorial calmo, slice 4 (ADR-180, Decision 1). A file in the list is a row
+ * between hairlines. Its analysis and its links lose the inset they had inside
+ * the card, so everything in the row starts on the row's own left edge.
+ */
+.file-list > .file-card { border: 0; border-bottom: 1px solid var(--border-default); border-radius: 0; background: none; overflow: visible; }
+.file-list > .file-card > header { padding: var(--space-4) 0; }
+.file-list > .file-card > .form-error { padding: 0; }
+.file-list .file-analysis { border-top: 0; }
+.file-list .file-analysis > summary { min-height: var(--touch-target); padding: var(--space-3) 0; background: none; color: var(--link); }
+.file-list .file-analysis > div { padding: 0; }
+.file-list .file-analysis > small { padding: var(--space-3) 0; }
+.file-list .file-links { border-top: 0; padding: 0 0 var(--space-4); }
+/* The card clipped a long file name; a row has to let it break instead. */
+.file-list > .file-card > header > div { min-width: 0; max-width: 100%; }
+.file-list > .file-card > header strong { display: block; overflow-wrap: anywhere; }
+@media (max-width: 899px) {
+  .file-list .list-meta .row-action { display: inline-flex; align-items: center; min-height: var(--touch-target); }
+}

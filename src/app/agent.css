@@ -37,3 +37,11 @@
 .empty-list-link{display:inline-flex;align-items:center;min-height:44px;margin-top:10px;font: var(--type-body);font-weight:750;color:var(--link)}
 .empty-list-link:hover{text-decoration:underline}
 @media(max-width:600px){.question-tabs a{flex:1 1 0;justify-content:center}}
+
+/*
+ * Editorial calmo, slice 5 (ADR-180, Decision 1). On Perguntas a question is a
+ * row between hairlines, like every other stacked list. The card stays where a
+ * question is one object inside a transcript (Conversar).
+ */
+.list-stack>.question-card,.list-stack>.question-outcome{border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;padding:var(--space-5) 0}
+.list-stack>.question-card>span{right:0;top:var(--space-5)}
