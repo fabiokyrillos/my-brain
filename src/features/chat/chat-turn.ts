@@ -8,7 +8,9 @@ import { gateMessageKey, openAiGate } from "@/lib/byok/gate";
 import { getAIProvider, type AIProvider, type ChatInput, type ChatSource } from "@/lib/ai";
 import { chatAnswerSchema } from "@/lib/ai/chat-schema";
 import { CHAT_HISTORY_TURNS } from "@/lib/ai/knowledge-prompt";
+import { BilledAnswerStreamFailure } from "@/lib/ai/answer-stream";
 import type { ChatTurn, StreamedChatAnswer } from "@/lib/ai/types";
+import type { AIUsageDetails } from "@/lib/ai/usage-details";
 import { defaultAgentPreferences, locales, resolveLocale, type Locale } from "@/lib/preferences";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { createClient } from "@/lib/supabase/server";
@@ -556,38 +558,49 @@ export async function runChatTurn(
     if (answeredWithoutModel) {
       answer = { answer: copy.noEvidenceAnswer, citedSourceIds: [], model: null };
     } else {
-      const generated = await generate(provider, {
-        question,
-        locale,
-        timezone,
-        // `LB-B-003`: the model finally learns what day it is.
-        now: new Date().toISOString(),
-        history,
-        sources,
-        responseDetail: preferences?.response_detail ?? "short",
-        agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
-      });
+      const recordChatUsage = (billed: AIUsageDetails & { readonly model: string }) =>
+        recordAIUsage(supabase, {
+          operation: "chat",
+          model: billed.model,
+          userId,
+          usage: {
+            providerRequestId: billed.providerRequestId,
+            transportRequestId: billed.transportRequestId,
+            inputTokens: billed.inputTokens,
+            cachedInputTokens: billed.cachedInputTokens,
+            outputTokens: billed.outputTokens,
+            reasoningTokens: billed.reasoningTokens,
+          },
+          sourceType: "conversation",
+          sourceId: conversationId,
+        });
+      let generated: StreamedChatAnswer;
+      try {
+        generated = await generate(provider, {
+          question,
+          locale,
+          timezone,
+          // `LB-B-003`: the model finally learns what day it is.
+          now: new Date().toISOString(),
+          history,
+          sources,
+          responseDetail: preferences?.response_detail ?? "short",
+          agentStyle: `${preferences?.personality ?? "proactive"}, ${preferences?.tone ?? "direct"}`,
+        });
+      } catch (error) {
+        // ADR-192: a provider response that failed after reporting its bill is
+        // still a call that was paid for, so it is recorded before the turn
+        // fails. Every other failure carries no usage and records nothing.
+        if (error instanceof BilledAnswerStreamFailure) await recordChatUsage(error.billed);
+        throw error;
+      }
       /*
        * ADR-175. The bill first, then the trust. The usage row is written as
        * soon as the call has completed and BEFORE the output is validated, so a
        * defective or truncated output still has its cost in the ledger; and
        * before any dependent write, as every AI call here does.
        */
-      await recordAIUsage(supabase, {
-        operation: "chat",
-        model: generated.model,
-        userId,
-        usage: {
-          providerRequestId: generated.providerRequestId,
-          transportRequestId: generated.transportRequestId,
-          inputTokens: generated.inputTokens,
-          cachedInputTokens: generated.cachedInputTokens,
-          outputTokens: generated.outputTokens,
-          reasoningTokens: generated.reasoningTokens,
-        },
-        sourceType: "conversation",
-        sourceId: conversationId,
-      });
+      await recordChatUsage(generated);
       // The complete object, validated here whatever the transport was. A
       // failure throws into the catch below: classified, recorded, and nothing
       // persisted — a half or malformed answer never becomes a message.

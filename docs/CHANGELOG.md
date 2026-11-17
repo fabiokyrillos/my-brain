@@ -111,6 +111,13 @@
 - `app/operations.css`: one block scoped to `.home-dashboard` — sections without panels, hairline rows, titles that break and lists that shrink (the sideways scroll on a phone), notice controls on shared lines, a capture field that rests at one line, "Ir para" as one quiet row.
 - Tests: every attention item is one linking row; the section link precedes the rows; the greeting is one line. Design in `docs/initiatives/editorial-calmo/DESIGN.md`, evidence in `docs/reports/editorial-calmo/HOJE.md`. No migration. The screenshot lane's Hoje baselines are not redrawn yet.
 
+## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-192)
+
+- `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.
+- `openai-provider.ts`: `response.failed` with usage throws it; without usage, and on an `error` event, a plain `Error` as before.
+- `chat/chat-turn.ts`: the turn records that bill as `chat` before rethrowing; the success path uses the same `recordChatUsage`.
+- Tests: `chat-stream-contract.test.ts` (billed and unbilled failures), `stream-route.test.ts` (the bill recorded, nothing persisted). No migration.
+
 ## 2026-11-16 — LB-M5: the database stops setting a sensitivity (ADR-191)
 
 - **One migration, `202611160110_life_brain_lb_od7_retire_level_writers.sql`** (the seventh Life Brain migration, authorized by the owner on 2026-11-16).

@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAIProvider } from "@/lib/ai";
+import { BilledAnswerStreamFailure } from "@/lib/ai/answer-stream";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { recordErrorEvent } from "@/lib/observability/error-sink";
 
@@ -205,6 +206,26 @@ describe("a streamed answer", () => {
     expect(log).toEqual(["insert:user", "usage:semantic_search"]);
     expect(assistantInsert).toBeNull();
     expect(recordErrorEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ surface: "route_handler", operation: "chat_answer" }));
+  });
+
+  it("records the bill of a failed provider response that reports one, before failing the turn", async () => {
+    stubProvider(async (_input, { onAnswerDelta }) => {
+      onAnswerDelta("A Ana ped");
+      throw new BilledAnswerStreamFailure({ ...usage, model: "gpt-5.6-terra" });
+    });
+
+    const received = await events(await handleChatStreamRequest(request(question)));
+
+    expect(received.at(-1)).toMatchObject({ type: "error", conversationId });
+    expect(log).toEqual(["insert:user", "usage:semantic_search", "usage:chat"]);
+    expect(vi.mocked(recordAIUsage).mock.calls.at(-1)?.[1]).toMatchObject({
+      operation: "chat",
+      model: "gpt-5.6-terra",
+      usage: { outputTokens: usage.outputTokens },
+      sourceType: "conversation",
+      sourceId: conversationId,
+    });
+    expect(assistantInsert).toBeNull();
   });
 
   it("records the bill but persists nothing when the complete output fails validation", async () => {

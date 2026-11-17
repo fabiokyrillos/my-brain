@@ -19,6 +19,8 @@
  * JSON every possible way.
  */
 
+import type { AIUsageDetails } from "./usage-details";
+
 export type AnswerFieldExtractor = {
   /** Feeds the next chunk of raw model output; returns the newly decoded answer text (often ""). */
   push(chunk: string): string;
@@ -140,4 +142,24 @@ export function createAnswerFieldExtractor(): AnswerFieldExtractor {
       return out;
     },
   };
+}
+
+/**
+ * A streamed answer the provider ended as `failed`, after reporting what it
+ * billed (ADR-192).
+ *
+ * The Responses API reports usage only on a terminal response. `completed` and
+ * `incomplete` return it to the caller as a normal result; `failed` is also
+ * terminal and may carry usage, so the stream throws this, holding the bill,
+ * and the pipeline records it in `ai_usage_events` before it fails the turn.
+ * A stream that ends with an `error` event, or that drops before any terminal
+ * response, carries no usage: there is nothing truthful to record, so it
+ * throws a plain `Error` and the ledger stays without a row rather than with an
+ * invented one.
+ */
+export class BilledAnswerStreamFailure extends Error {
+  constructor(readonly billed: AIUsageDetails & { readonly model: string }) {
+    super("OpenAI reported a failed answer stream");
+    this.name = "BilledAnswerStreamFailure";
+  }
 }
