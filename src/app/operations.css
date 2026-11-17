@@ -1078,9 +1078,15 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .home-dashboard .needs-attention-row::before{background:var(--tone-attention-fg)}
 .home-dashboard .notice-attention-row{align-items:center}
 .home-dashboard .list-row-main strong{margin-bottom:var(--space-1);font:var(--type-reading);line-height:1.3;color:var(--text-primary)}
-.home-dashboard .notice-attention-row .list-row-main strong{font:var(--type-heading)}
 .home-dashboard .list-row-main p{white-space:normal;overflow-wrap:anywhere}
-.home-dashboard .notice-attention-eyebrow{margin:0 0 var(--space-1);color:var(--text-muted)}
+/* A notice is headed by what it is ABOUT, in the same face and size as the rows
+   around it. What kind of notice it is — the stored title, "Tarefa atrasada" —
+   is a caption beside the eyebrow, not a bold headline over the subject. */
+.home-dashboard .notice-attention-row .list-row-main{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:var(--space-2)}
+.home-dashboard .notice-attention-eyebrow{margin:0;color:var(--text-muted)}
+.home-dashboard .notice-attention-row .list-row-main strong{margin:0;font:var(--type-caption);color:var(--text-secondary);overflow-wrap:normal}
+.home-dashboard .notice-attention-row .notice-attention-eyebrow~p{flex-basis:100%;margin-top:var(--space-1);font:var(--type-reading);line-height:1.3;color:var(--text-primary)}
+.home-dashboard .notice-attention-row .row-action{border-color:var(--border-default);padding:0 var(--space-3);font:var(--type-label)}
 .home-dashboard .list-meta{font:var(--type-caption);color:var(--text-muted)}
 /* The row is the link, so the sentence that named its destination is redundant
    beside it. It stays in the document for the queue page, which shares the row. */
@@ -1138,14 +1144,21 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 @media(max-width:899px){.home-dashboard .today-destinations-label,.home-dashboard .home-group-hint{display:none}}
 @media(min-width:900px){.home-dashboard .today-destinations ul{display:flex}.home-dashboard .today-destination{width:auto;padding:0 var(--space-4)}}
 @media(max-width:600px){
-  /* The stamp and *Abrir* share a line; the verbs take the next one, side by
-     side. The menu wrapper dissolves so its trigger sits beside the primary verb
-     and its list — in the flow at this width — still opens beneath both. */
-  .home-dashboard .notice-attention-row .list-meta>span{flex:1 1 auto}
-  .home-dashboard .notice-attention-row .notice-open-control{order:0}
-  .home-dashboard .notice-attention-row .notification-row-actions{order:2;flex:1 1 100%}
+  /* The stamp is a line of text; under it ONE line holds the verbs and *Abrir*.
+     Both wrappers dissolve so the buttons, the link and — in the flow at this
+     width — the open menu are all items of the same wrap. The rows' gap is
+     carried by margins, because the two live regions are full-width items that
+     are empty at rest and a row gap would be paid once for each of them. */
+  .home-dashboard .notice-attention-row .list-meta{row-gap:0}
+  .home-dashboard .notice-attention-row .list-meta>span{margin-bottom:var(--space-1)}
+  .home-dashboard .notice-attention-row .notification-row-actions,
   .home-dashboard .notice-attention-row .notification-verb-menu{display:contents}
-  .home-dashboard .notice-attention-row .notification-verb-menu-list{flex-basis:100%}
+  .home-dashboard .notice-attention-row .notice-open-control{order:1}
+  .home-dashboard .notice-attention-row .notification-verb-menu-list,
+  .home-dashboard .notice-attention-row .notification-verb-panel,
+  .home-dashboard .notice-attention-row .notification-row-outcome,
+  .home-dashboard .notice-attention-row .notice-open-outcome{order:2;flex-basis:100%}
+  .home-dashboard .notice-attention-row .notification-verb-menu-list{margin-top:var(--space-2)}
 }
 /* At rest the field is exactly one control tall; a textarea's own two rows
    would otherwise decide its height. */

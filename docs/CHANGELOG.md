@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-17 — Editorial calmo: a notice on Hoje is the weight of its neighbours (ADR-180)
+
+- `app/operations.css`: a notice row on Hoje is headed by its subject in the reading face; the stored title ("Tarefa atrasada") is a caption beside the eyebrow. On a phone the verbs and *Abrir* share one line under the stamp. Owner report, 2026-11-17: the row and its open menu were out of proportion.
+- `app/settings-extended.css`: the verb menu's items are regular weight, its border is the default one, and in the flow on a phone it is 300px wide at most. Shared with `/app/notifications`.
+- Verified on the Hoje fixture at 390px, light (`docs/reports/editorial-calmo/HOJE.md`), unit tests and the static layout contracts (224 passed). CSS only; no migration.
+
 ## 2026-11-17 — Editorial calmo, slice 3: every stacked list is rows between hairlines (ADR-180)
 
 - `app/operations.css`: inside `.list-stack`, a `.list-row` is no longer a bordered card — no box, no gap, a hairline beneath, a tint on hover, titles that break. Reaches Registros, Tarefas, Lembretes, Memórias, Pessoas, Projetos, Contextos, Organizações, Arquivos and Jobs with no markup change.

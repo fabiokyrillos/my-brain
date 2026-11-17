@@ -43,6 +43,12 @@ Measured in the same run:
 - **The capture field inside the real composer.** The resting state is keyed on `:has(textarea:placeholder-shown:not(:focus))`. The preview used a static copy of the composer's markup; voice recording, a kept draft and a pending attachment were not exercised.
 - **Width 1440 and the `en` locale** were not captured.
 
+## Follow-up, 2026-11-17 — the notice row
+
+The owner saw the merged page on his iPhone and reported the notice row, with its menu open, as out of proportion. CSS only (`operations.css`, `settings-extended.css`): the subject heads the row in the reading face, the kind of notice is a caption, the verbs and *Abrir* share a line, and the menu is regular weight and at most 300px wide.
+
+Same fixture, 390px, light: [closed](evidence/hoje/notice-mobile-light.png) · [menu open](evidence/hoje/notice-menu-open-mobile-light.png). The row is 147px closed; the open menu is 300 × 346px; no target under 44px; no horizontal overflow. Not seen on the device, and the dark theme and the desktop width were not re-captured.
+
 ## Left open
 
 Listed in `docs/TODO.md` under *Editorial calmo*.
