@@ -254,9 +254,17 @@ describe("Phase 2P declarations", () => {
       laterLifeBrainB8.length,
       `B.8 is authorized exactly one migration: ${laterLifeBrainB8.join(", ")}`,
     ).toBeLessThanOrEqual(1);
+    // Life Brain LB-M5 (ADR-180), attributed by name for the same reason: a SEVENTH
+    // Life Brain migration, authorized separately on 2026-11-16, retiring the
+    // database's sensitivity writers after ADR-178.
+    const laterLifeBrainLbOd7 = migrations.filter((name) => /life_brain_lb_od7_/i.test(name));
+    expect(
+      laterLifeBrainLbOd7.length,
+      `LB-M5 is authorized exactly one migration: ${laterLifeBrainLbOd7.join(", ")}`,
+    ).toBeLessThanOrEqual(1);
     expect(migrations).toHaveLength(
       99 + laterPhase2q.length + laterPhase2r.length + laterPhase2s.length
-      + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length + laterLifeBrainB8.length,
+      + laterNotifyHeartbeat.length + laterLifeBrain.length + laterLifeBrainB7.length + laterLifeBrainB8.length + laterLifeBrainLbOd7.length,
     );
   });
 

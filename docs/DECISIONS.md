@@ -2792,3 +2792,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 2 — A read ceiling.** `CONVERSATION_SEARCH_SCAN_LIMIT = 1000` bounds the read. It equals the project's PostgREST `max_rows`, which would truncate a longer read anyway, and keeps one search to about a thousand short rows.
 
 - **Consequences.** The same text finds the same conversations everywhere. Left open: a conversation older than the owner's 1,000 most recent is not found by the search. If that ever matters, `unaccent` (or a normalized title column) and a migration move the match back into SQL.
+
+## ADR-180 — LB-M5: the database stops setting a sensitivity
+
+- **Date:** 2026-11-16
+- **Status:** Accepted. Owner's authorization of 2026-11-16, given for the optional follow-up ADR-178 Decision 4 left, and for applying it to the hosted project after the merge. It is the seventh Life Brain migration, `202611160110`. The owner declined the `unaccent` search at the same time (ADR-179 stands).
+
+- **Context.** After ADR-178 every level renders, searches and reaches the chat alike, but the database still held two writers of `entries.sensitivity`. `link_entry_life_area` stamped a newly linked health or finance entry `private`. `set_entry_sensitivity` had lost its only caller, the record page's form, in E.8.
+
+- **Decision 1 — The area link sets no level.** `link_entry_life_area` is recreated with the same signature, checks, grants and audit shape, minus the stamp. The audit row still carries the level before and after, and the two are now always equal. The worker deployed today calls it unchanged.
+- **Decision 2 — The override is dropped.** `set_entry_sensitivity(uuid, text)` is removed, so `authenticated` loses one definer function. Its `entry_sensitivity_set` audit rows already written stay readable in Histórico.
+- **Decision 3 — No row is rewritten.** An entry already `private` stays so: since ADR-178 the value changes nothing the owner sees, and rewriting history to say it did would be an automatic action with nothing to show for it. The column, its CHECK and the TypeScript contract stay (ADR-178 Decision 3).
+- **Decision 4 — A correction to ADR-178 Decision 4.** It said "two suggestion RPCs still skip `highly_sensitive` rows". No SQL function does: the skip was the TypeScript derivation's `readable` (`conversation-cards/suggestions.ts`), which E.8 already made admit every level. Nothing about it is in this migration.
+
+- **Consequences.** Nothing in the database writes a sensitivity. Left open: the deployed worker's comment in `process-jobs/entry.ts` still says the link gives health and finance their default level. Correcting it is a worker change and a deploy, so it waits for the next one.

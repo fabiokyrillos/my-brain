@@ -141,6 +141,7 @@ export const HISTORY_ACTION_TYPES = [
   "automation_policy_changed",
   "entry_person_candidates_resolved",
   // Life Brain C.1 (ADR-148): written by `link_entry_life_area` and `set_entry_sensitivity`.
+  // LB-M5 (ADR-180) dropped `set_entry_sensitivity`; its rows already written stay readable.
   "entry_life_area_linked",
   "entry_sensitivity_set",
   "entry_event_candidates_confirmed",

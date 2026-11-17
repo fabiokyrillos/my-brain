@@ -1,5 +1,14 @@
 # Technical Changelog
 
+## 2026-11-16 — LB-M5: the database stops setting a sensitivity (ADR-180)
+
+- **One migration, `202611160110_life_brain_lb_od7_retire_level_writers.sql`** (the seventh Life Brain migration, authorized by the owner on 2026-11-16).
+- `link_entry_life_area` is recreated without the `private` stamp for health and finance. Signature, checks, grants and audit shape are unchanged; the audit's level before and after are now always equal.
+- `set_entry_sensitivity` is dropped and removed from `database.types.ts`. No row is changed.
+- pgTAP `life_brain_m1_life_areas.sql` follows: health stays `normal`, the override is absent, and the link's audit records the level unchanged (`plan(28)`).
+- Guards: the chain head is `202611160110` (110 migrations), LB-M5 is attributed by name in the 2N/2O/2P budgets and listed in the post-2H retention correction. The migration's name avoids "sensitiv", which 2N's notes-posture guard reserves. B.8's old "not applied" lines are marked superseded.
+- `DATABASE.md`, `SECURITY.md`; ADR-180 also corrects ADR-178 Decision 4 (the `highly_sensitive` suggestion skip was TypeScript, not SQL).
+
 ## 2026-11-16 — Docs: Life Brain status after track E
 
 - `STATE.md` and `TODO.md`: a new head entry, plus the Life Brain section headings rewritten. Track E (#380–#391) and ADR-179 (#392) are merged, hosted parity is 109 = 109, and LB-OD-1…9 are all decided. The STATE heading had stopped at B.7 with "parity 107 = 107"; the TODO heading still said LB-OD-3, 4 and 7 were open. Documentation only.
