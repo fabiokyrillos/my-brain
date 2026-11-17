@@ -1,8 +1,26 @@
 # Technical Changelog
 
+## 2026-11-17 — Editorial calmo: a notice on Hoje is the weight of its neighbours (ADR-180)
+
+- `app/operations.css`: a notice row on Hoje is headed by its subject in the reading face; the stored title ("Tarefa atrasada") is a caption beside the eyebrow. On a phone the verbs and *Abrir* share one line under the stamp. Owner report, 2026-11-17: the row and its open menu were out of proportion.
+- `app/settings-extended.css`: the verb menu's items are regular weight, its border is the default one, and in the flow on a phone it is 300px wide at most. Shared with `/app/notifications`.
+- Verified on the Hoje fixture at 390px, light (`docs/reports/editorial-calmo/HOJE.md`), unit tests and the static layout contracts (224 passed). CSS only; no migration.
+
+## 2026-11-17 — Editorial calmo, slice 3: every stacked list is rows between hairlines (ADR-180)
+
+- `app/operations.css`: inside `.list-stack`, a `.list-row` is no longer a bordered card — no box, no gap, a hairline beneath, a tint on hover, titles that break. Reaches Registros, Tarefas, Lembretes, Memórias, Pessoas, Projetos, Contextos, Organizações, Arquivos and Jobs with no markup change.
+- Verified on a Registros fixture and by the static layout contracts (212 passed); the other pages were not rendered — `docs/reports/editorial-calmo/LISTAS.md`. No migration.
+
+## 2026-11-17 — Editorial calmo, slice 1: Hoje (ADR-180)
+
+- `shell/home-view.tsx`: a section's link sits in its heading, before the rows; the greeting is one line; the lead attention item is a `NeedsAttentionItemRow`, not a proposal card.
+- `app/operations.css`: one block scoped to `.home-dashboard` — sections without panels, hairline rows, titles that break and lists that shrink (the sideways scroll on a phone), notice controls on shared lines, a capture field that rests at one line, "Ir para" as one quiet row.
+- Tests: every attention item is one linking row; the section link precedes the rows; the greeting is one line. Design in `docs/initiatives/editorial-calmo/DESIGN.md`, evidence in `docs/reports/editorial-calmo/HOJE.md`. No migration. The screenshot lane's Hoje baselines are not redrawn yet.
+
 ## 2026-11-16 — Docs: Life Brain status after track E
 
-- `STATE.md` and `TODO.md`: a new head entry, plus the Life Brain section headings rewritten. Track E (#380–#391) and ADR-179 (#392) are merged, hosted parity is 109 = 109, and LB-OD-1…9 are all decided. The STATE heading had stopped at B.7 with "parity 107 = 107"; the TODO heading still said LB-OD-3, 4 and 7 were open. Documentation only.
+- `STATE.md` and `TODO.md`: a new entry, plus the Life Brain section headings rewritten. Track E (#380–#391) and ADR-179 (#392) are merged, hosted parity is 109 = 109, and LB-OD-1…9 are all decided. The STATE heading had stopped at B.7 with "parity 107 = 107"; the TODO heading still said LB-OD-3, 4 and 7 were open. Documentation only.
+- Merged on 2026-11-17, after Editorial calmo (#396, #397): the entry sits below the Editorial calmo head, and its "Next" now points at the two open pull requests that carry that work — #394 (LB-M5, the LB-OD-7 migration) and #395 (Conversar, ADR-181–183) — neither on `main` yet.
 
 ## 2026-11-16 — The conversations search past the menu ignores accents (ADR-179)
 

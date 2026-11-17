@@ -245,7 +245,12 @@ describe("HomeView", () => {
    * (`06-interacoes.md` §4/§5), so this asserts the card renders the proposal and
    * routes there, not that it writes.
    */
-  it("expands the first attention item and collapses the rest", () => {
+  /*
+    Editorial calmo (owner review of 16 November 2026). The first item used to
+    expand into a proposal card, and four items filled nearly three phone
+    screens. Every item is now one row and the row is the link to the decision.
+  */
+  it("renders every attention item as one row that links to its decision", () => {
     renderHome(
       viewModel({
         attention: [
@@ -256,13 +261,30 @@ describe("HomeView", () => {
     );
 
     const attention = screen.getByRole("region", { name: "Precisa de você" });
-    // The lead carries the owner's own words and the proposal's own heading.
-    expect(within(attention).getByText("Preciso falar com o João sobre o orçamento.")).toBeInTheDocument();
-    expect(within(attention).getByText("Revise a interpretação")).toBeInTheDocument();
-    // Nothing has been created, and the card says so.
-    expect(within(attention).getByText("Nada foi criado ainda.")).toBeInTheDocument();
-    // The second is a row, not a second card: it has no proposal eyebrow.
-    expect(within(attention).getAllByText(/o Brain propõe/i)).toHaveLength(1);
+    const first = within(attention).getByText("Preciso falar com o João sobre o orçamento.").closest("a");
+    const second = within(attention).getByText("Segundo item").closest("a");
+    expect(first).toHaveClass("needs-attention-row");
+    expect(second).toHaveClass("needs-attention-row");
+    // No expanded proposal card is left on this surface.
+    expect(within(attention).queryByText(/o Brain propõe/i)).not.toBeInTheDocument();
+    expect(attention.querySelector(".attention-lead")).toBeNull();
+  });
+
+  it("puts a section's link in its heading, before the rows", () => {
+    renderHome(viewModel({ attention: [attentionItem({ key: "a1", title: "Primeiro item" })] }));
+
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    const link = within(attention).getByRole("link", { name: "Ver tudo" });
+    const row = within(attention).getByText("Primeiro item");
+    expect(link.closest("header")).not.toBeNull();
+    // Focus order equals visual order: the link is drawn above the list.
+    expect(link.compareDocumentPosition(row) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("greets in one line, without the question that used to follow", () => {
+    renderHome(viewModel({}));
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Boa tarde\.$/);
   });
 
   it("renders the agenda in the owner's zone, not the runner's", () => {
