@@ -222,7 +222,9 @@ describe("LDC-HOME-001: Home's today is computed in the owner's zone, not format
       expect(attributes, `${name} renders without the owner's zone`).toContain("timeZone={view.timeZone}");
     }
 
-    const rows = ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow", "NeedsAttentionLeadCard", "AgendaRow"];
+    // `NeedsAttentionLeadCard` left this list with the editorial-calmo pass: the
+    // lead is a `NeedsAttentionItemRow` like the rest, and it still takes the zone.
+    const rows = ["InboxItemRow", "NeedsAttentionItemRow", "ConflictAttentionItemRow", "AgendaRow"];
     for (const row of rows) {
       expect(view, `${row} must receive the owner's zone`).toContain(row);
     }
