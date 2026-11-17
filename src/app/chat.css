@@ -92,6 +92,8 @@ body .side-rail { overflow-y: auto }
  */
 .chat-message[data-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
 .chat-message[data-role="user"] .chat-message-body { color: var(--text-secondary) }
+/* ADR-183: a turn that failed after its question was saved says so in the thread, quieter than an answer. */
+.chat-message[data-turn="failed"] .chat-message-body { color: var(--text-secondary); font: var(--type-body) }
 
 /*
  * Life Brain E.5 part 2 (ADR-175): the streamed turn's draft, set exactly as a

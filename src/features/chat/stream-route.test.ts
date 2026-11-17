@@ -13,9 +13,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAIProvider } from "@/lib/ai";
+import { BilledAnswerStreamFailure } from "@/lib/ai/answer-stream";
 import { recordAIUsage } from "@/lib/ai/usage";
 import { recordErrorEvent } from "@/lib/observability/error-sink";
 
+import { buildFailedTurnEnvelope } from "./failed-turn";
 import { handleChatStreamRequest } from "./stream-route";
 import { chatStreamEventSchema, type ChatStreamEvent } from "./stream-protocol";
 
@@ -48,6 +50,8 @@ const entryId = "44444444-4444-4444-8444-444444444444";
 /** Every write and ledger call, in the order it happened. */
 let log: string[] = [];
 let assistantInsert: Record<string, unknown> | null = null;
+/** The earlier turns the history read returns, newest first, as the query orders them. */
+let earlier: { role: string; content: string; citations?: unknown }[] = [];
 
 function chain(result: { data: unknown; error: unknown }) {
   const builder: Record<string, unknown> = {};
@@ -68,7 +72,7 @@ function stubSupabase(user: { id: string } | null) {
     }
     if (table === "conversation_messages") {
       return {
-        select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: [], error: null }) }) }) }),
+        select: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: earlier, error: null }) }) }) }),
         insert: async (payload: Record<string, unknown>) => {
           log.push(`insert:${String(payload.role)}`);
           if (payload.role === "assistant") assistantInsert = payload;
@@ -132,6 +136,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   log = [];
   assistantInsert = null;
+  earlier = [];
   afterTasks.length = 0;
   vi.mocked(recordAIUsage).mockImplementation(async (_client, event) => {
     log.push(`usage:${event.operation}`);
@@ -193,7 +198,7 @@ describe("a streamed answer", () => {
     expect(recordErrorEvent).not.toHaveBeenCalled();
   });
 
-  it("persists nothing after the question when the provider stream aborts mid-answer", async () => {
+  it("writes only the failure mark after the question when the provider stream aborts mid-answer (ADR-183)", async () => {
     stubProvider(async (_input, { onAnswerDelta }) => {
       onAnswerDelta("A Ana ped");
       throw Object.assign(new Error("Request was aborted."), { name: "AbortError" });
@@ -202,12 +207,33 @@ describe("a streamed answer", () => {
     const received = await events(await handleChatStreamRequest(request(question)));
 
     expect(received.at(-1)).toMatchObject({ type: "error", conversationId });
-    expect(log).toEqual(["insert:user", "usage:semantic_search"]);
-    expect(assistantInsert).toBeNull();
+    expect(log).toEqual(["insert:user", "usage:semantic_search", "insert:assistant"]);
+    expect(assistantInsert).toMatchObject({ role: "assistant", model: null, citations: { turn: "failed", reference: "33333333-3333-4333-8333-333333333333" } });
+    expect(String(assistantInsert!.content)).not.toContain("A Ana ped");
     expect(recordErrorEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ surface: "route_handler", operation: "chat_answer" }));
   });
 
-  it("records the bill but persists nothing when the complete output fails validation", async () => {
+  it("records the bill of a failed provider response that reports one, before failing the turn", async () => {
+    stubProvider(async (_input, { onAnswerDelta }) => {
+      onAnswerDelta("A Ana ped");
+      throw new BilledAnswerStreamFailure({ ...usage, model: "gpt-5.6-terra" });
+    });
+
+    const received = await events(await handleChatStreamRequest(request(question)));
+
+    expect(received.at(-1)).toMatchObject({ type: "error", conversationId });
+    expect(log).toEqual(["insert:user", "usage:semantic_search", "usage:chat", "insert:assistant"]);
+    expect(vi.mocked(recordAIUsage).mock.calls.at(-1)?.[1]).toMatchObject({
+      operation: "chat",
+      model: "gpt-5.6-terra",
+      usage: { outputTokens: usage.outputTokens },
+      sourceType: "conversation",
+      sourceId: conversationId,
+    });
+    expect(assistantInsert).toMatchObject({ citations: { turn: "failed" } });
+  });
+
+  it("records the bill and writes only the failure mark when the complete output fails validation", async () => {
     stubProvider(async (_input, { onAnswerDelta }) => {
       onAnswerDelta("Começo");
       return { ...usage, model: "gpt-5.6-terra", output: null };
@@ -216,8 +242,31 @@ describe("a streamed answer", () => {
     const received = await events(await handleChatStreamRequest(request(question)));
 
     expect(received.at(-1)).toMatchObject({ type: "error" });
-    expect(log).toEqual(["insert:user", "usage:semantic_search", "usage:chat"]);
-    expect(assistantInsert).toBeNull();
+    expect(log).toEqual(["insert:user", "usage:semantic_search", "usage:chat", "insert:assistant"]);
+    expect(assistantInsert).toMatchObject({ citations: { turn: "failed" } });
+    expect(String(assistantInsert!.content)).not.toContain("Começo");
+  });
+
+  it("keeps a failure mark out of the history the model reads (ADR-183)", async () => {
+    earlier = [
+      { role: "assistant", content: "Não foi possível responder agora.", citations: buildFailedTurnEnvelope({ failure: "provider", reference: null }) },
+      { role: "user", content: "O que a Ana pediu?" },
+      { role: "assistant", content: "Ela pediu o contrato.", citations: { v: "2026-08-09.1", evidence: "evidenced", reach: ["entry"], sources: [] } },
+      { role: "user", content: "Quem é a Ana?" },
+    ];
+    let seen: { history?: { role: string; content: string }[] } = {};
+    stubProvider(async (input) => {
+      seen = input as typeof seen;
+      return { ...usage, model: "gpt-5.6-terra", output: { answer: "Sim.", citedSourceIds: [] } };
+    });
+
+    await events(await handleChatStreamRequest(request({ ...question, conversationId })));
+
+    expect(seen.history).toEqual([
+      { role: "user", content: "Quem é a Ana?" },
+      { role: "assistant", content: "Ela pediu o contrato." },
+      { role: "user", content: "O que a Ana pediu?" },
+    ]);
   });
 
   it("keeps the turn running when the owner leaves, and persists only the complete answer", async () => {

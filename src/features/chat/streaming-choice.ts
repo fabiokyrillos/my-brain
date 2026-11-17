@@ -11,7 +11,9 @@ import type { Locale } from "@/lib/preferences";
  * memory and capture intents write nothing through chat, a command needs its
  * preview, an agenda question is answered without a model and so has nothing
  * to stream, and a sentence that is tried as a command first only reaches the
- * answer after that model call. Deciding this on the client is a choice of
+ * answer after that model call — so it goes to the action first, and ADR-182
+ * has the action hand its answer back as `stream_answer` when the command path
+ * declines it, which this composer then streams. Deciding this on the client is a choice of
  * transport, never of authority: the route re-validates and re-authenticates,
  * and runs the same pipeline the action does.
  */

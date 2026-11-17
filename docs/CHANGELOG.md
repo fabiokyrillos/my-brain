@@ -1,5 +1,26 @@
 # Technical Changelog
 
+## 2026-11-17 — A failed turn leaves a failure mark in the thread (ADR-183)
+
+- New `chat/failed-turn.ts`: the strict mark `{ v, turn: "failed", failure, reference }`, `buildFailedTurnEnvelope`, `isFailedTurn`.
+- `chat/chat-turn.ts`: after the question row, every failure (BYOK gate, rate limit, agenda, the pipeline's catch) writes one assistant row with the shown sentence and the mark, never after an answer row; the history read drops marks.
+- `/app/chat/[id]`: a mark renders with `data-turn="failed"`; `chat.css` sets it quieter.
+- Tests: `failed-turn.test.ts`; `stream-route.test.ts` (abort, validation and billed failures leave one mark; marks never reach the history); `actions.test.ts` (agenda and rate-limit failures leave a mark; no mark after a saved answer; a mark is not an earlier turn). No migration.
+
+## 2026-11-17 — A sentence tried as a command first streams its answer (ADR-182)
+
+- `assistant/composer-state.ts`: new route `stream_answer`.
+- `assistant/actions.ts`: on the command fallthrough (not a relato), `streamAnswer=1` returns `stream_answer` with the question in `echo` instead of answering in the action.
+- `capture/chat-composer.tsx`: posts `streamAnswer=1` and streams a handed-back question once per state.
+- Tests: `actions.test.ts` (handed back only on the fallthrough and only on "1"; commands, relatos and refusals never), `chat-composer-stream.test.tsx` (the action, then the stream). No migration.
+
+## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-181)
+
+- `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.
+- `openai-provider.ts`: `response.failed` with usage throws it; without usage, and on an `error` event, a plain `Error` as before.
+- `chat/chat-turn.ts`: the turn records that bill as `chat` before rethrowing; the success path uses the same `recordChatUsage`.
+- Tests: `chat-stream-contract.test.ts` (billed and unbilled failures), `stream-route.test.ts` (the bill recorded, nothing persisted). No migration.
+
 ## 2026-11-16 — LB-M5: the database stops setting a sensitivity (ADR-180)
 
 - **One migration, `202611160110_life_brain_lb_od7_retire_level_writers.sql`** (the seventh Life Brain migration, authorized by the owner on 2026-11-16).
