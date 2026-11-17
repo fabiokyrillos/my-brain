@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-17 — The record page is recomposed, and a person is decided with one tap (ADR-184)
+
+- `features/daily-cycle/entry-review.tsx`: the owner's text is the page's largest element; the reading is a remark under it; the state badge is drawn only for states other than `ready` and `needs_attention`; the explanatory sentences under each heading are removed; "Decisões anteriores" is a collapsed `<details>`. Document order and heading levels are unchanged.
+- `features/interpretations/person-candidate-form.tsx`: one question per person — *Criar pessoa*, *Ignorar*, *Mudar o nome* — each answer writing that single resolution through the unchanged `resolvePersonCandidates`. The radio pair and "Salvar decisões sobre pessoas" are gone.
+- `app/operations.css`: one block scoped to `.record-detail`; the person card's rules become a row's. `RECORDED_UNSTYLED` falls to 33.
+- Tests: the person form's unit tests and its section of `e2e/layout-contracts.spec.ts` are rewritten for the new shape (five widths, long name, open name field, keyboard, print). No migration. Record: `docs/reports/editorial-calmo/REGISTRO.md`.
+
 ## 2026-11-17 — Editorial calmo: the remaining cards are rows (ADR-180)
 
 - Perguntas, Busca, Revisões and Arquivos: the per-item card becomes a row between hairlines (`agent.css`, `palette.css`, `reviews.css`, `files.css`). The cards stay where the same object sits inside a transcript or an answer.

@@ -179,7 +179,7 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
    **37 -> 35, Life Brain E.1 (ADR-169).** The redesign of Configurações drew
    three of the privacy block's eight: `privacy-census` (a grid of numbers),
    `privacy-census-nosurface` and `privacy-consent`. Five remain. */
-const RECORDED_UNSTYLED = 34;
+const RECORDED_UNSTYLED = 33;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

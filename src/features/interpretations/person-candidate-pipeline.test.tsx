@@ -135,11 +135,10 @@ describe("an extracted person that is not linked yet reaches the confirmation co
     // The evidence travelled with the candidate, so the owner is deciding on a
     // quotation from their own entry rather than on a bare name.
     expect(group).toHaveTextContent("relatório de Sweepstakes pra Garo");
-    // Both decisions are offered, and neither is preselected: creating a person
-    // is an explicit confirmation, never a default.
-    expect(screen.getByRole("radio", { name: "Criar pessoa" })).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: "Ignorar menção" })).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Salvar decisões sobre pessoas" })).toBeDisabled();
+    // Both decisions are offered as explicit acts, and nothing is written until
+    // one is tapped: creating a person is a confirmation, never a default.
+    expect(screen.getByRole("button", { name: "Criar pessoa" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Ignorar" })).toBeEnabled();
     // The name is editable before it is committed, seeded with what was said.
     expect(screen.getByLabelText("Nome para criar: Garo")).toHaveValue("Garo");
   });
