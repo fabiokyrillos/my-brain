@@ -1,5 +1,7 @@
 Last updated: 2026-11-17 (**Editorial calmo, slice 1 (Hoje) implemented on its branch — ADR-180. NO MIGRATION.** Open work is listed under *Editorial calmo* below: the owner decision EC-OD-1, the repeated item, the greeting, the screenshot baselines, slices 2–7.)
 
+Previously: Last updated: 2026-11-16 (**Track E merged (#380–#391), ADR-179 merged (#392); LB-OD-1…9 all decided.** Next, owner-authorized 2026-11-16: the LB-OD-7 migration (stop the `private` stamp, drop the `highly_sensitive` skip in the two suggestion RPCs, retire `set_entry_sensitivity`), applied hosted after its merge; then, in Conversar, streaming for a sentence tried as a command first, an assistant row for a failed turn, and the partial cost of an aborted stream. The `unaccent` search was declined by the owner: ADR-179's ceiling stays. *As of 2026-11-17 both are in review, not on `main`: #394 (LB-M5) and #395 (ADR-181–183).*)
+
 Previously: Last updated: 2026-11-16 (**Server conversation search is accent-insensitive — ADR-179. NO MIGRATION.** Closes ADR-177's "the server search is not accent-insensitive". Left open by it: the search reads the owner's 1,000 most recent conversations, so an older one is not found; matching in SQL would need `unaccent` and a migration, the owner's call.)
 
 Previously: Last updated: 2026-11-16 (**LIFE BRAIN E.8 IMPLEMENTED ON ITS BRANCH — ADR-178. NO MIGRATION.** The owner decided LB-OD-7 the other way: nothing in the app is private or restricted. Every sensitivity level now shows on every surface, enters the chat, and is found by a default search; the controls that set a level are gone. RLS between accounts is untouched; notifications still carry no content. Left in the database, inert: the health/finance `private` stamp and two suggestion RPCs skipping `highly_sensitive` — changing them is an optional migration.)
@@ -135,7 +137,7 @@ Design and page-by-page plan: `docs/initiatives/editorial-calmo/DESIGN.md`. Reco
 - The notice verbs are 34px tall from 601px up (unchanged by this slice).
 - Slices 2–7: shared row and section-heading primitives, then Registros/Tarefas/Lembretes, the entity lists, Avisos/Histórico/Perguntas/Revisões/Busca, the detail pages, the shell.
 
-## Life Brain — OPENED 2026-10-30 (ADR-145) — every slice in the order shipped, then B.7 (LB-M1…M4 and `202611060108` applied hosted); owner decisions LB-OD-3, 4, 7 OPEN
+## Life Brain — OPENED 2026-10-30 (ADR-145) — tracks A–E merged (E.8 #391, ADR-179 #392); LB-M1…M4, `202611060108` and `202611090109` applied hosted (109 = 109); owner decisions LB-OD-1…9 all DECIDED
 
 Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → A.1 → B.0 → A.2 → B.1 → C.0 → A.3 → B.2 → C.1(M1) → A.4 → B.3(M3) → C.2 → C.3(M2) → A.5 → C.4 → B.4 → C.5 → A.6 → B.5.
 
@@ -249,7 +251,7 @@ Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → 
 
 - **LB-OD-1 — Mobile bar. DECIDED 2026-10-31 (owner: "Sim, A.2 aqui"):** `Hoje · Conversar · [+] · Agenda · Memória`; Registros and Trabalho leave the bar, become the rail's secondary pair and sit in Hoje's destination strip. Shipped in A.2. *(Alternative, preserved: keep Registros and drop Memória.)*
 - **LB-OD-2 — Routes. DECIDED 2026-10-31 as recommended:** every existing route kept, labels and grouping changed only, zero redirects, guards updated. Shipped in A.2. *(Alternative, preserved: new `/app/agenda`, `/app/memory` with 308 redirects.)*
-- **LB-OD-3 — Chat layout.** Recommendation: two-voice thread (user turn in a subtle surface, assistant in plain reading face), composer sticky above the bar. The Phase 2K "transcript, not a chat log" layout is replaced on the evidence that the surface had zero conversations.
+- **LB-OD-3 — Chat layout. DECIDED 2026-11-16 by the owner in E.6 (ADR-176):** one surface in the ChatGPT style, with the conversations in a menu. Recommendation was: two-voice thread (user turn in a subtle surface, assistant in plain reading face), composer sticky above the bar. The Phase 2K "transcript, not a chat log" layout is replaced on the evidence that the surface had zero conversations.
 - **LB-OD-4 — Type scale. DECIDED 2026-11-16 as shipped (ADR-177):** Recommendation: body 15px / label 13.5px / caption 12.5px (slice A.0). Alternative: 14px body.
 - **LB-OD-5 — Events. DECIDED 2026-11-04 as recommended (ADR-152):** a real `events` table (LB-M2), superseding OD-2M-3 A. Built in C.3, applied hosted 2026-11-05. *(Alternative, preserved: encode a period in `tasks`, rejected in `LIFE_DATA_MODEL.md` §3.)*
 - **LB-OD-6 — Life area representation. DECIDED 2026-11-04 (owner: "pode ampliar"):** widen `contexts.kind` (LB-M1), on-demand context creation for areas only. Built in C.1 (ADR-148). *(Alternative, preserved: a new `life_areas` table.)*
