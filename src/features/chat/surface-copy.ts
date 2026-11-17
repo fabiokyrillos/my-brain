@@ -17,6 +17,8 @@ export type ChatSurfaceCopy = Readonly<{
   noMatches: string;
   /** Shown when the menu holds the most recent conversations only. */
   olderHidden: (count: number) => string;
+  /** The group a search past the menu's limit adds (ADR-177). */
+  olderGroup: string;
   groups: Readonly<{ today: string; yesterday: string; week: string; month: string }>;
   /** The new-conversation screen. */
   hello: string;
@@ -33,7 +35,8 @@ const copy = {
     searchPlaceholder: "Buscar conversas",
     noConversations: "Nenhuma conversa ainda.",
     noMatches: "Nenhuma conversa com esse texto.",
-    olderHidden: (count) => `Mostrando as ${count} mais recentes.`,
+    olderHidden: (count) => `Mostrando as ${count} mais recentes. A busca encontra as outras.`,
+    olderGroup: "Mais antigas",
     groups: { today: "Hoje", yesterday: "Ontem", week: "Últimos 7 dias", month: "Últimos 30 dias" },
     hello: "O que você quer saber?",
     helloDescription: (agent) => `O ${agent} responde com o que você já registrou e diz de onde veio.`,
@@ -47,7 +50,8 @@ const copy = {
     searchPlaceholder: "Search conversations",
     noConversations: "No conversations yet.",
     noMatches: "No conversation matches that.",
-    olderHidden: (count) => `Showing the ${count} most recent.`,
+    olderHidden: (count) => `Showing the ${count} most recent. Search finds the rest.`,
+    olderGroup: "Older",
     groups: { today: "Today", yesterday: "Yesterday", week: "Previous 7 days", month: "Previous 30 days" },
     hello: "What do you want to know?",
     helloDescription: (agent) => `${agent} answers from what you have recorded and says where it came from.`,

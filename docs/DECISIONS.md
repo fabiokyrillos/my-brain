@@ -2752,3 +2752,17 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 5 — The turns.** The owner's turn sits on the right in a quiet fill, the answer in the reading face with its sources below, as LB-OD-3 recommended. The speaker line of the owner's turn stays for assistive technology only.
 
 - **Consequences.** A conversation starts and continues on one screen. Left open: the menu holds the 100 most recent and searches only those; a turn that runs through the action (a command, a memory) still navigates, now to a page that looks the same; the sources keep their titled block.
+
+## ADR-177 — Life Brain E.7: Conversar finishing — the action path stays in place, the menu searches everything, sources are chips
+
+- **Date:** 2026-11-16
+- **Status:** Accepted. Owner's choice ("Acabamento do Conversar"), closing the three items ADR-176 left open. Records the owner's ratification of LB-OD-4 and the `LB-B-008` rule as shipped. No migration.
+
+- **Context.** ADR-176 made Conversar one surface but left three gaps: a question that went through the Server Action (a sentence tried as a command first, or any turn when the composer does not stream) still *entered* the thread with a pushed history entry; the menu held the 100 most recent conversations and searched only those; and the sources under an answer kept their titled block rather than the approved mockup's chips.
+
+- **Decision 1 — The action's redirect replaces.** `sendChatMessage` ends in `redirect(href, RedirectType.replace)`. A Server Action's redirect pushes by default (Next 16 `redirect` docs), so Back returned to an empty new-conversation screen; now both transports land the same way.
+- **Decision 2 — The menu's search reaches past the menu.** When the menu is limited, a search of two or more characters also calls `searchConversations` (a read-only Server Action: Zod-validated locale and text of 2–100 characters, `requireUser`, RLS-scoped `ilike` on the title with `%`, `_` and `\` escaped, newest first, at most 30). What it finds beyond the loaded conversations is listed under "Mais antigas"; a stale answer is never shown (the result is kept with the text it answered), and "no matches" waits for it. The server search is case-insensitive but not accent-insensitive (no extension, no migration); the local filter stays accent-insensitive.
+- **Decision 3 — Sources are chips.** Each source is one chip, "Registro · 5 nov.", that opens it (with the 2K-CONT continuity handle). The support kind is in the chip's accessible name; an inference is dashed; an unavailable source is a chip with no link. A chip carries no snippet, so the source list still holds no sensitivity logic. The insufficiency sentence, the reach sentence, the explanation panel and the answer event are unchanged.
+- **Decision 4 — LB-OD-4 and `LB-B-008` closed as shipped.** The owner ratified the type scale A.0 shipped (body 15px, label 13.5px, caption 12.5px) and the `LB-B-008` rule as applied (the fixed "não encontrei" only on a conversation's first turn). LB-OD-7 was **not** ratified: the owner wants nothing private or restricted; that is the next slice.
+
+- **Consequences.** Every way a question is answered lands in place; every conversation is findable from the menu. Left open: the server search is not accent-insensitive; a sentence tried as a command first still does not stream (ADR-175).

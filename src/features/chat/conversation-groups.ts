@@ -13,8 +13,11 @@ export type ConversationRow = Readonly<{ id: string; title: string; updated_at: 
 export type ConversationLink = Readonly<{ id: string; title: string }>;
 export type ConversationGroup = Readonly<{ key: string; label: string; items: readonly ConversationLink[] }>;
 
-/** How many conversations the menu holds. Older ones are reachable by search once they are loaded; see ADR-176. */
+/** How many conversations the menu holds. Older ones are reached by the menu's server search (ADR-177). */
 export const CONVERSATION_MENU_LIMIT = 100;
+
+/** How many older conversations one search past the menu returns (ADR-177). */
+export const CONVERSATION_SEARCH_LIMIT = 30;
 
 /**
  * Life Brain E.6 (ADR-176) — the conversations menu, grouped by when each was

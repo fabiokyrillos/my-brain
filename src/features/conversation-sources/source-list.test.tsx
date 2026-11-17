@@ -57,11 +57,13 @@ const evidenced: ParsedCitations = {
 };
 
 describe("2K-SRC-001/003: every rendered source names what it is and links to it", () => {
-  it("shows the support kind, the content and the link", () => {
+  it("is one chip — type and date — that names its support kind and opens the source (ADR-177)", () => {
     render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]} />);
-    expect(screen.getByText(copy.supportKinds.direct_record)).toBeInTheDocument();
-    expect(screen.getByText("conversa com a Ana")).toBeInTheDocument();
-    expect(screen.getByRole("link")).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY}`);
+    const chip = screen.getByRole("link");
+    expect(chip).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY}`);
+    expect(chip.textContent).toMatch(/^Você escreveu isto: Registro · De \d/);
+    // A chip carries no content: the answer says what the source says.
+    expect(screen.queryByText("conversa com a Ana")).not.toBeInTheDocument();
   });
 
   it("renders a source the user can no longer read as unavailable, with no link", () => {
@@ -94,7 +96,7 @@ describe("2K-SRC-004: freshness renders, and is absent rather than fabricated", 
     render(
       <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[{ ...entrySource, occurredAt: null }]} />,
     );
-    expect(screen.getByText(copy.freshnessUnknown)).toBeInTheDocument();
+    expect(screen.getByRole("link").textContent).toContain(`Registro · ${copy.freshnessUnknown}`);
     expect(screen.queryByRole("time")).not.toBeInTheDocument();
   });
 });
@@ -199,7 +201,7 @@ describe("2K-PRIVACY-004: a legacy row says less rather than guessing", () => {
         sources={[entrySource]}
       />,
     );
-    expect(screen.getByText("conversa com a Ana")).toBeInTheDocument();
+    expect(screen.getByRole("link")).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY}`);
     expect(screen.queryByText(copy.reach)).not.toBeInTheDocument();
   });
 });

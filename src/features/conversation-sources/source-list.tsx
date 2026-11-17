@@ -15,19 +15,22 @@
  * 4. **Reach** — records and memories, and nothing else. The limit is stated
  *    rather than hidden.
  *
- * ## It renders cards; it does not decide them
+ * ## Chips, not cards (Life Brain E.7, ADR-177)
  *
- * Every source is a `ConversationCard` already resolved by
- * `resolve-sources.ts`, carrying the **current** classification. Masking,
- * revealing and the `unavailable` shape all belong to `ConversationCardView`,
- * so this component holds no sensitivity logic of its own — which is what
- * `sensitivity-boundary.test.ts` requires and what stops a second answer to
- * "what may be shown" appearing here.
+ * Each source is a chip under the answer — its type and its date, "Registro ·
+ * 5 nov." — that opens the source, as in the approved Conversar mockup. The
+ * answer above already says what the source says; the chip says where it came
+ * from and takes the owner there. The support kind is read to assistive
+ * technology inside the chip's name, and an inference is drawn differently.
+ *
+ * A chip carries **no content** — no snippet — so this component still holds no
+ * sensitivity logic of its own (`sensitivity-boundary.test.ts`): there is
+ * nothing in it to mask. The `unavailable` shape is the card's own state,
+ * decided by `resolve-sources.ts`, and an unavailable source has no link.
  */
 
 import Link from "next/link";
 
-import { ConversationCardView } from "@/features/conversation-cards/card";
 import {
   CONTINUITY_HANDLE_VERSION,
   serializeContinuityHandle,
@@ -47,11 +50,12 @@ function Freshness({ locale, occurredAt, timeZone }: { locale: Locale; occurredA
   if (occurredAt === null) {
     // Absent, never fabricated. A made-up date on a source is the preview's
     // first lie wearing a different costume.
-    return <span className="conversation-source-freshness">{copy.freshnessUnknown}</span>;
+    return <span className="conversation-source-freshness"> · {copy.freshnessUnknown}</span>;
   }
   return (
     <span className="conversation-source-freshness">
-      {copy.freshnessLabel}{" "}
+      {" · "}
+      <span className="sr-only">{copy.freshnessLabel} </span>
       <time dateTime={occurredAt}>
         {formatInstant(occurredAt, "day", locale, timeZone)}
       </time>
@@ -143,22 +147,37 @@ export function SourceList({
         <p className="conversation-sources-insufficient">{where.insufficient}</p>
       ) : (
         <>
-          <strong className="conversation-sources-title">{copy.title}</strong>
+          <strong className="conversation-sources-title sr-only">{copy.title}</strong>
           <ul className="conversation-sources-list">
-            {sources.map((source) => (
-              <li key={source.key}>
-                <span className="conversation-source-support">
-                  {copy.supportKinds[source.support]}
-                </span>
-                <ConversationCardView card={source.card} locale={locale} />
-                <Freshness locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
-                {openHref(source.card, continuity) === null ? null : (
-                  <Link className="conversation-card-open" href={openHref(source.card, continuity)!}>
-                    {cardCopy.open}
-                  </Link>
-                )}
-              </li>
-            ))}
+            {sources.map((source) => {
+              const href = openHref(source.card, continuity);
+              const unavailable = source.card.state === "unavailable";
+              const label = (
+                <>
+                  <span className="conversation-source-support sr-only">{copy.supportKinds[source.support]}: </span>
+                  <span className="conversation-source-type">
+                    {cardCopy.types[source.card.cardType]}
+                    {unavailable ? ` · ${cardCopy.states.unavailable}` : null}
+                  </span>
+                  {unavailable ? null : (
+                    <Freshness locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
+                  )}
+                </>
+              );
+              return (
+                <li data-support={source.support} key={source.key}>
+                  {href === null || unavailable ? (
+                    <span className="conversation-source-chip" data-unavailable={unavailable ? "" : undefined}>
+                      {label}
+                    </span>
+                  ) : (
+                    <Link className="conversation-source-chip" href={href}>
+                      {label}
+                    </Link>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </>
       )}

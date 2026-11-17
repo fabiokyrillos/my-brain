@@ -36,6 +36,7 @@ vi.mock("@/features/rate-limits/server", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
+  RedirectType: { push: "push", replace: "replace" },
   redirect: vi.fn(() => {
     throw new Error("NEXT_REDIRECT");
   }),
@@ -387,6 +388,13 @@ describe("sendChatMessage citation hydration", () => {
     await expect(sendChatMessage(idleState, form())).rejects.toThrow("NEXT_REDIRECT");
     return insertedAssistantMessage;
   }
+
+  it("replaces the history entry rather than pushing one (ADR-177)", async () => {
+    const { redirect } = await import("next/navigation");
+    vi.mocked(redirect).mockClear();
+    await run(["entry:33333333-3333-4333-8333-333333333333"]);
+    expect(vi.mocked(redirect)).toHaveBeenCalledWith(expect.stringMatching(/\/app\/chat\/[0-9a-f-]{36}$/), "replace");
+  });
 
   it("hydrates a cited source that is present", async () => {
     const message = await run(["entry:33333333-3333-4333-8333-333333333333"]);
