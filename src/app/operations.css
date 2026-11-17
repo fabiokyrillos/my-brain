@@ -1045,7 +1045,10 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  * Scoped to `.home-dashboard` so the shared `.list-row` keeps its card shape on
  * the surfaces that have not been through this pass yet.
  */
-.home-dashboard{overflow-wrap:anywhere}
+/* Breaking is granted to the TITLES, not to the page: `anywhere` also lowers an
+   element's minimum width to nothing, and on a container that let an `auto`
+   grid track collapse its title to a column 0px wide (layout-contracts). */
+.home-dashboard .list-row-main strong,.home-dashboard .home-task strong,.home-dashboard .home-question{overflow-wrap:anywhere;max-width:100%}
 .home-dashboard .today-hero .eyebrow{margin-bottom:var(--space-2)}
 .home-dashboard .home-status{margin-top:var(--space-2)}
 .home-dashboard .today-capture{margin-top:var(--space-6)}
@@ -1089,11 +1092,15 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .home-dashboard .priority-reason[data-reason="overdue"]{background:none;padding:0;color:var(--tone-risk-fg)}
 .home-dashboard .home-agenda-time{font:var(--type-caption);font-variant-numeric:tabular-nums}
 
-@media(max-width:600px){
+/* The same 700px container threshold `.list-row` already stacks at: below it
+   the context drops under the title instead of taking the title's column. A
+   media query would be wrong here — the main column is 540px wide on a 1280px
+   screen. */
+@container (max-width: 700px){
   .home-dashboard .list-row{grid-template-columns:auto minmax(0,1fr)}
   .home-dashboard .list-row>.list-meta{grid-column:2;width:auto}
-  .home-dashboard .home-task{align-items:flex-start;gap:var(--space-1)}
 }
+@media(max-width:600px){.home-dashboard .home-task{align-items:flex-start;gap:var(--space-1)}}
 @media(max-width:899px){.home-section-hint{display:none}}
 
 /*
@@ -1118,7 +1125,7 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .home-dashboard .notice-attention-row .notification-row-actions{flex:none;order:1}
 .home-dashboard .notice-attention-row .notice-open-control{order:2;margin-left:auto}
 .home-dashboard .notice-attention-row .notice-open-outcome{order:3}
-@media(min-width:601px){
+@container (min-width: 701px){
   .home-dashboard .notice-attention-row .list-meta{justify-content:flex-end;max-width:calc(var(--space-16) * 5)}
   .home-dashboard .notice-attention-row .list-meta>span{text-align:right}
   .home-dashboard .notice-attention-row .notice-open-control{margin-left:0}

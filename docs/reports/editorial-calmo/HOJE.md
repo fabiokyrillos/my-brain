@@ -32,7 +32,9 @@ Measured in the same run:
 | --- | --- | --- |
 | Horizontal overflow, with `dev_digital_bi.test_schema.nc_booking_population` in a title | 0px | 0px |
 | Interactive targets under 44px | 0 | 4 — the notice verbs, 34px, unchanged by this slice |
-| Page height | 1,857px | 1,397px |
+| Page height | 1,857px | 1,613px |
+
+`e2e/layout-contracts.spec.ts` (static fixtures through the real stylesheets, desktop and Pixel 7): 120 passed. It caught one regression while this slice was being written — the new row grid overrode the 700px container rule that stacks a row's context under its title, and a long context starved the title to 0px in a narrow column. The row now stacks at the same container width.
 
 ## Not verified
 
