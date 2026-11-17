@@ -7,7 +7,8 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExtern
 import { useScrollLock } from "@/features/shell/use-scroll-lock";
 import type { Locale } from "@/lib/preferences";
 
-import { filterGroups, type ConversationGroup } from "./conversation-groups";
+import { filterGroups, type ConversationGroup, type ConversationLink } from "./conversation-groups";
+import { searchConversations } from "./conversation-search";
 import { getChatSurfaceCopy } from "./surface-copy";
 
 /** Below this width the menu covers the screen; above it, it sits beside the conversation. */
@@ -44,6 +45,9 @@ function subscribeToWidth(onChange: () => void): () => void {
 
 const noSubscription = () => () => {};
 
+/** How long the menu waits after the last keystroke before searching past what it holds. */
+const OLDER_SEARCH_DELAY_MS = 250;
+
 function isOverlay(): boolean {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
     && window.matchMedia(CHAT_MENU_OVERLAY_QUERY).matches;
@@ -58,6 +62,10 @@ function isOverlay(): boolean {
  * On a phone the menu covers the screen (scroll locked, Escape or the scrim
  * closes it, focus goes to the search and back to the button). On a wide
  * screen it opens beside the conversation, and closing it holds for the session.
+ *
+ * ADR-177: when the owner has more conversations than the menu holds, a search
+ * of two or more characters also asks the server, and what it finds beyond the
+ * loaded ones is listed under "Mais antigas".
  */
 export function ChatFrame({
   activeId,
@@ -87,6 +95,8 @@ export function ChatFrame({
   const [chosen, setChosen] = useState<boolean | null>(null);
   const open = chosen ?? (!overlay && remembered);
   const [query, setQuery] = useState("");
+  /** The server's answer, kept with the text it answered, so a stale answer is never shown. */
+  const [older, setOlder] = useState<{ query: string; items: readonly ConversationLink[] } | null>(null);
   const button = useRef<HTMLButtonElement | null>(null);
   const search = useRef<HTMLInputElement | null>(null);
 
@@ -123,8 +133,39 @@ export function ChatFrame({
     if (isOverlay()) setChosen(false);
   }, []);
 
-  const visible = useMemo(() => filterGroups(groups, query), [groups, query]);
+  const needle = query.trim();
+  const searchesOlder = limited !== null && needle.length >= 2;
+
+  useEffect(() => {
+    if (!searchesOlder) return;
+    let current = true;
+    const timer = window.setTimeout(() => {
+      searchConversations(locale, needle).then(
+        (items) => {
+          if (current) setOlder({ query: needle, items });
+        },
+        () => {
+          // The local filter still answers; a failed read adds nothing.
+          if (current) setOlder({ query: needle, items: [] });
+        },
+      );
+    }, OLDER_SEARCH_DELAY_MS);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
+  }, [locale, needle, searchesOlder]);
+
+  const visible = useMemo(() => {
+    const local = filterGroups(groups, query);
+    if (!searchesOlder || older === null || older.query !== needle) return local;
+    const loaded = new Set(groups.flatMap((group) => group.items.map((item) => item.id)));
+    const beyond = older.items.filter((item) => !loaded.has(item.id));
+    return beyond.length === 0 ? local : [...local, { key: "older", label: copy.olderGroup, items: beyond }];
+  }, [copy.olderGroup, groups, needle, older, query, searchesOlder]);
   const empty = groups.length === 0;
+  /** A search past the menu has not answered this text yet: "no matches" would be premature. */
+  const awaitingOlder = searchesOlder && older?.query !== needle;
 
   return (
     <div className="chat-surface" data-chat-surface="" data-menu={open ? "open" : "closed"}>
@@ -155,7 +196,7 @@ export function ChatFrame({
         )}
         <div className="chat-menu-groups">
           {empty ? <p className="chat-menu-empty">{copy.noConversations}</p> : null}
-          {!empty && visible.length === 0 ? <p className="chat-menu-empty">{copy.noMatches}</p> : null}
+          {!empty && visible.length === 0 && !awaitingOlder ? <p className="chat-menu-empty">{copy.noMatches}</p> : null}
           {visible.map((group) => (
             <section aria-labelledby={`${menuId}-${group.key}`} className="chat-menu-group" key={group.key}>
               <h2 className="chat-menu-group-title" id={`${menuId}-${group.key}`}>{group.label}</h2>

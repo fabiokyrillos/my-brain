@@ -20,6 +20,8 @@ const push = vi.fn();
 const replace = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push, replace }) }));
 vi.mock("@/features/product-analytics/interaction-events", () => ({ ConversationMemoryResolved: () => null }));
+const searchConversations = vi.fn();
+vi.mock("./conversation-search", () => ({ searchConversations: (...args: unknown[]) => searchConversations(...args) }));
 vi.mock("next/link", () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => (
     <a href={href} {...rest}>{children}</a>
@@ -63,6 +65,7 @@ beforeEach(() => {
   push.mockReset();
   replace.mockReset();
   fetchMock.mockReset();
+  searchConversations.mockReset();
   vi.stubGlobal("fetch", fetchMock);
   vi.stubGlobal("scrollTo", vi.fn());
   window.sessionStorage.clear();
@@ -153,9 +156,9 @@ const groups: readonly ConversationGroup[] = [
   { key: "week", label: "Últimos 7 dias", items: [{ id: "b", title: "Viagem a Lisboa" }] },
 ];
 
-function renderFrame(activeId: string | null = conversationId) {
+function renderFrame(activeId: string | null = conversationId, limited: number | null = null) {
   return render(
-    <ChatFrame activeId={activeId} groups={groups} limited={null} locale="pt-BR" title="Quando fui ao médico?">
+    <ChatFrame activeId={activeId} groups={groups} limited={limited} locale="pt-BR" title="Quando fui ao médico?">
       <p>thread</p>
     </ChatFrame>,
   );
@@ -202,6 +205,33 @@ describe("the other conversations are behind the menu", () => {
     unmount();
     renderFrame(null);
     expect(screen.queryByRole("navigation", { name: "Conversas" })).toBeNull();
+  });
+
+  it("never asks the server while the menu holds every conversation", async () => {
+    setWidth(true);
+    renderFrame();
+    await userEvent.click(screen.getByRole("button", { name: "Mostrar conversas" }));
+    await userEvent.type(screen.getByRole("searchbox"), "dentista");
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(searchConversations).not.toHaveBeenCalled();
+    expect(screen.getByText("Nenhuma conversa com esse texto.")).toBeTruthy();
+  });
+
+  it("past the limit, searches the server and lists what lies beyond under Mais antigas (ADR-177)", async () => {
+    setWidth(true);
+    searchConversations.mockResolvedValue([
+      { id: "b", title: "Viagem a Lisboa" },
+      { id: "old-1", title: "Lisboa em 2024" },
+    ]);
+    renderFrame(conversationId, 100);
+    await userEvent.click(screen.getByRole("button", { name: "Mostrar conversas" }));
+    await userEvent.type(screen.getByRole("searchbox"), "lisboa");
+    const older = await screen.findByRole("region", { name: "Mais antigas" });
+    expect(searchConversations).toHaveBeenLastCalledWith("pt-BR", "lisboa");
+    // Only what the menu did not already hold; the loaded match stays in its own group.
+    expect(within(older).getAllByRole("link").map((link) => link.textContent)).toEqual(["Lisboa em 2024"]);
+    expect(within(older).getByRole("link").getAttribute("href")).toBe("/pt-BR/app/chat/old-1");
+    expect(screen.getByRole("region", { name: "Últimos 7 dias" })).toBeTruthy();
   });
 
   it("names the screen with its title and offers a new conversation", () => {

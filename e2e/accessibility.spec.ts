@@ -520,7 +520,8 @@ function conversationResumed() {
 }
 
 /**
- * Mirrors `src/features/conversation-sources/source-list.tsx` — slice 2K.4.
+ * Mirrors `src/features/conversation-sources/source-list.tsx` — slice 2K.4,
+ * drawn as chips since Life Brain E.7 (ADR-177): one that opens, one unavailable.
  *
  * Both branches, side by side, because the requirement is that they be
  * **visually distinct**: an evidenced answer and one that found nothing used to
@@ -529,16 +530,17 @@ function conversationResumed() {
  */
 function conversationSources() {
   const evidenced = `<div class="conversation-sources" data-evidence="evidenced">`
-    + `<strong class="conversation-sources-title">O que eu usei</strong>`
-    + `<ul class="conversation-sources-list"><li>`
-    + `<span class="conversation-source-support">Você escreveu isto</span>`
-    + `<article class="conversation-card" data-card-type="entry" data-state="previewed">`
-    + `<header class="conversation-card-head">`
-    + `<span class="conversation-card-type">Registro</span>`
-    + `<span class="conversation-card-state">Encontrei isto</span></header>`
-    + `<p class="conversation-card-snippet">conversa com a Ana</p></article>`
-    + `<span class="conversation-source-freshness">De <time datetime="2026-07-20T10:00:00Z">20 de jul.</time></span>`
-    + `<a class="conversation-card-open" href="#">Abrir</a>`
+    + `<strong class="conversation-sources-title sr-only">O que eu usei</strong>`
+    + `<ul class="conversation-sources-list"><li data-support="direct_record">`
+    + `<a class="conversation-source-chip" href="#">`
+    + `<span class="conversation-source-support sr-only">Você escreveu isto: </span>`
+    + `<span class="conversation-source-type">Registro</span>`
+    + `<span class="conversation-source-freshness"> · <span class="sr-only">De </span>`
+    + `<time datetime="2026-07-20T10:00:00Z">20 de jul.</time></span></a>`
+    + `</li><li data-support="product_state">`
+    + `<span class="conversation-source-chip" data-unavailable="">`
+    + `<span class="conversation-source-support sr-only">O que eu guardo como verdadeiro: </span>`
+    + `<span class="conversation-source-type">Memória · Isto não está mais disponível para você</span></span>`
     + `</li></ul>`
     + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
     + `</div>`;

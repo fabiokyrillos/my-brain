@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { redirect, RedirectType } from "next/navigation";
 import type { ChatState } from "./chat-state";
 import { openChatTurn, plainAnswer, runChatTurn } from "./chat-turn";
 
@@ -16,6 +16,11 @@ import { openChatTurn, plainAnswer, runChatTurn } from "./chat-turn";
  * stripping, persistence and audit. What stays here is the transport — the
  * whole answer in one provider call, then a revalidation and a redirect into
  * the thread that holds it.
+ *
+ * The redirect REPLACES the history entry (Life Brain E.7, ADR-177): a Server
+ * Action's `redirect()` pushes by default, which made a question asked on the
+ * new-conversation screen an entry the owner had to go Back out of — exactly
+ * the "entering" ADR-176 removed from the streamed path.
  */
 export async function sendChatMessage(_state: ChatState, formData: FormData): Promise<ChatState> {
   const opened = await openChatTurn(Object.fromEntries(formData));
@@ -25,5 +30,5 @@ export async function sendChatMessage(_state: ChatState, formData: FormData): Pr
   if (outcome.status === "failed") return outcome.state;
 
   revalidatePath(`/${outcome.locale}/app/chat/${outcome.conversationId}`);
-  redirect(`/${outcome.locale}/app/chat/${outcome.conversationId}`);
+  redirect(`/${outcome.locale}/app/chat/${outcome.conversationId}`, RedirectType.replace);
 }

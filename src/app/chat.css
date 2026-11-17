@@ -109,13 +109,16 @@ body .side-rail { overflow-y: auto }
 /*
  * The sources under an answer.
  *
- * They are the reason to trust the paragraph above them, so they are a titled
- * block rather than a row of chips — and each one is a link back to the record
- * it came from, which is the return-to-source the grounding contract promises.
+ * Each one is a link back to the record it came from, which is the
+ * return-to-source the grounding contract promises. Since Life Brain E.7
+ * (ADR-177) they are a row of chips under the answer, as in the approved
+ * Conversar mockup, so the rule above them is gone; the chips style themselves
+ * (`conversation-cards.css`), and the rules below reach only the other links
+ * and headings the block can hold.
  */
-.message-sources { display: grid; gap: var(--space-2); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-default) }
-.message-sources strong { display: flex; align-items: center; gap: var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary) }
-.message-sources a {
+.message-sources { display: grid; gap: var(--space-2); margin-top: var(--space-3) }
+.message-sources strong:not(.sr-only) { display: flex; align-items: center; gap: var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary) }
+.message-sources a:not(.conversation-source-chip) {
   display: block;
   padding: var(--space-2) var(--space-3);
   border-inline-start: 2px solid var(--border-default);
@@ -123,7 +126,7 @@ body .side-rail { overflow-y: auto }
   font: var(--type-body);
   line-height: 1.45;
 }
-.message-sources a:hover { border-inline-start-color: var(--action-primary); color: var(--text-primary) }
+.message-sources a:not(.conversation-source-chip):hover { border-inline-start-color: var(--action-primary); color: var(--text-primary) }
 
 @media (max-width: 600px) {
   .chat-message { padding-block: var(--space-5) }

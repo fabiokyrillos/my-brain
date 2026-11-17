@@ -359,30 +359,48 @@
   color: var(--tone-archived-fg);
 }
 
+/* Life Brain E.7 (ADR-177): the sources are chips under the answer — type and
+   date, wrapping onto a second line rather than scrolling sideways. */
 .conversation-sources-list {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.conversation-sources-list > li {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.conversation-source-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--background-surface);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  text-decoration: none;
 }
 
-.conversation-source-support {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--tone-information-fg);
+a.conversation-source-chip:hover {
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
+/* An inference is not something the owner wrote: drawn dashed, read aloud by its support kind. */
+.conversation-sources-list > li[data-support="inference"] .conversation-source-chip {
+  border-style: dashed;
+}
+
+.conversation-source-type,
 .conversation-source-freshness {
-  font-size: 0.75rem;
-  color: var(--tone-archived-fg);
+  white-space: nowrap;
+}
+
+.conversation-source-chip[data-unavailable] {
+  color: var(--text-muted);
+  background: transparent;
 }
 
 /* The honest "I had nothing". Attention rather than risk: finding nothing is a

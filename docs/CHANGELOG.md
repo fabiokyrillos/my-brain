@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-16 — Life Brain E.7: Conversar finishing (ADR-177)
+
+- `sendChatMessage` redirects with `RedirectType.replace`: a question answered through the action no longer pushes a history entry.
+- New `src/features/chat/conversation-search.ts` (read-only Server Action) and the menu's "Mais antigas" group: the search reaches conversations past the 100 the menu holds.
+- `SourceList` draws each source as a chip (type · date) that opens it; `.message-sources` loses its rule and its link styling for chips; the accessibility mirror follows.
+- Tests: the replace redirect, the server search (validation, escaping, bounds), the menu's older group, the chips. No migration.
+
 ## 2026-11-16 — Life Brain E.6: Conversar is one surface (ADR-176)
 
 - **No migration.**
