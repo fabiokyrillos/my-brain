@@ -125,7 +125,7 @@ describe("streamAnswerFromKnowledge", () => {
   });
 
   it("carries no bill when the provider reported none: no usage on the failure, an error event, or a dropped stream", async () => {
-    const { usage: _usage, ...unbilled } = completed;
+    const unbilled = { ...completed, usage: undefined };
     for (const list of [
       [{ type: "response.failed", response: unbilled }],
       [{ type: "error", message: "server_error" }],
