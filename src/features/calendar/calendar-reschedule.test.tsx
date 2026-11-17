@@ -193,10 +193,10 @@ describe("2M-CAL-010 / 2M-MOBILE-004: it happens where the user is", () => {
   });
 });
 
-describe("2M-PRIVACY-001: masking withholds words, not the ability to move a date", () => {
+describe("2M-PRIVACY-001: a highly sensitive item can be read and moved", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("keeps the controls available on a highly sensitive item without revealing it", () => {
+  it("shows a highly sensitive item's title and keeps its date controls", () => {
     const { action } = handler();
     const { container } = render(
       <CalendarItem
@@ -207,10 +207,9 @@ describe("2M-PRIVACY-001: masking withholds words, not the ability to move a dat
         timezone="America/Sao_Paulo"
       />,
     );
-    // The title is withheld …
-    expect(container.textContent).not.toContain("Entregar o relatório");
-    // … and the date controls are still there. A mask that removed them would
-    // make a privacy setting into a capability gate.
+    // Life Brain E.8 (ADR-178): the title is shown in the clear …
+    expect(container.textContent).toContain("Entregar o relatório");
+    // … and the date controls are there too.
     expect(container.querySelector("details.calendar-reschedule")).not.toBeNull();
   });
 

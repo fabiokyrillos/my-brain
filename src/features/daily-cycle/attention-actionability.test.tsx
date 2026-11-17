@@ -215,8 +215,9 @@ describe("2J-ATTN-005: filtering narrows what is loaded, without a second query"
   });
 });
 
-describe("2J-PRIVACY-001/004/005: the attention surface masks in place", () => {
-  it("withholds the preview for highly_sensitive and keeps the row", () => {
+describe("2J-PRIVACY-001/004/005: the attention surface shows every level (ADR-178)", () => {
+  it("shows the preview for highly_sensitive and keeps the row", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     const { container } = renderList(
       [
         item("review_interpretation", { entryId: "e1" }),
@@ -224,8 +225,8 @@ describe("2J-PRIVACY-001/004/005: the attention surface masks in place", () => {
       ],
       vi.fn(),
     );
-    expect(container.querySelectorAll('[data-masked="true"]')).toHaveLength(1);
-    expect(screen.getAllByText("Título review_interpretation")).toHaveLength(1);
+    expect(container.querySelectorAll('[data-masked="true"]')).toHaveLength(0);
+    expect(screen.getAllByText("Título review_interpretation")).toHaveLength(2);
   });
 
   it("shows normal and private unchanged", () => {
@@ -236,11 +237,10 @@ describe("2J-PRIVACY-001/004/005: the attention surface masks in place", () => {
     }
   });
 
-  it("does not offer inline retry on a masked row", () => {
-    // Acting on content you cannot see is not resolution -- and the button
-    // would confirm what the mask exists to withhold.
+  it("offers inline retry on a highly sensitive row, since it is shown", () => {
+    // ADR-178: the row is no longer masked, so it takes the ordinary actions.
     renderList([item("retry_processing", { sensitivity: "highly_sensitive" })], vi.fn());
-    expect(screen.queryByRole("button", { name: "Tentar de novo" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeInTheDocument();
   });
 });
 

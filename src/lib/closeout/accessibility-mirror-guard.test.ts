@@ -69,7 +69,8 @@ describe("2J-ACCESS-001: the accessibility mirror tracks the components it claim
 
   it("pins search's landmark and its labelled controls", () => {
     const search = read(SEARCH);
-    for (const token of ['role="search"', "search-input", "search-sensitive", 'aria-live="polite"']) {
+    // `search-sensitive` left with the toggle (ADR-178): a search covers every level.
+    for (const token of ['role="search"', "search-input", 'aria-live="polite"']) {
       expect(search, `${SEARCH} no longer emits ${token}`).toContain(token);
       expect(mirror, `${MIRROR} no longer mirrors ${token}`).toContain(token);
     }

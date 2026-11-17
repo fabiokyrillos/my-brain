@@ -24,8 +24,6 @@ import { EntryReprocessButton, InterpretationRevisionEditor } from "@/features/i
 import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/actions";
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 import { getAgentName } from "@/features/profile/agent-identity";
-import { setEntrySensitivity } from "@/features/sensitivity/entry-sensitivity-actions";
-import { EntrySensitivityForm } from "@/features/sensitivity/entry-sensitivity-form";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
 import { getMemoryCopy } from "@/features/memories/copy";
 import { MemoryProposalCard } from "@/features/memories/memory-proposal-card";
@@ -352,10 +350,6 @@ export default async function EntryDetailPage({
           ),
         }}
       />
-      {/* Life Brain C.1 (`LB-C-006`): the owner sets what the area defaulted. */}
-      {review.sensitivity ? (
-        <EntrySensitivityForm action={setEntrySensitivity} entryId={entryId} locale={locale} sensitivity={review.sensitivity} />
-      ) : null}
     </div>
   );
 }

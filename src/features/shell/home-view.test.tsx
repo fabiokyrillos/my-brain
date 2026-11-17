@@ -376,32 +376,29 @@ describe("HomeView", () => {
 describe("HomeView: withheld task content (OD-2L-1 option B)", () => {
   const secret = { kind: "derived", level: "highly_sensitive" } as const;
 
-  it("withholds a protected task's title in the priority section", () => {
-    // Before this slice there was nothing to diverge from: `tasks` carried no
-    // classification at all. The moment Work began withholding one, a task
-    // masked on /app/work and printed in full on /app would be the exact defect
-    // the central contract was written to prevent.
+  it("shows a highly sensitive task's title in the priority section", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them;
+    // Hoje and Work still ask one contract, which now shows every level.
     renderHome(viewModel({
       priorities: [
         { taskId: "a", title: "Contrato Aurora", reason: "overdue", dueLabel: "01 ago.", sensitivity: secret },
       ],
     }));
 
-    expect(screen.queryByText("Contrato Aurora")).toBeNull();
-    expect(screen.getByText(getWorkCopy("pt-BR").protected.label)).toBeVisible();
+    expect(screen.getByText("Contrato Aurora")).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("pt-BR").protected.label)).toBeNull();
   });
 
-  it("withholds the reason and the due label with it", () => {
-    // A masked title beside "Atrasada" is a mask that leaks the interesting
-    // half: both are facts about a task the owner asked to be protected.
+  it("shows the reason and the due label with it", () => {
+    // ADR-178.
     renderHome(viewModel({
       priorities: [
         { taskId: "a", title: "Contrato Aurora", reason: "overdue", dueLabel: "01 ago.", sensitivity: secret },
       ],
     }));
 
-    expect(screen.queryByText("Atrasada")).toBeNull();
-    expect(screen.queryByText("01 ago.")).toBeNull();
+    expect(screen.getByText("Atrasada")).toBeVisible();
+    expect(screen.getByText("01 ago.")).toBeVisible();
   });
 
   it("keeps the masked row, so the count and the ordering stay truthful", () => {
@@ -416,14 +413,15 @@ describe("HomeView: withheld task content (OD-2L-1 option B)", () => {
     expect(screen.getByText("Ligar para a Marina")).toBeVisible();
   });
 
-  it("withholds a protected task in the today list too", () => {
+  it("shows a highly sensitive task in the today list too", () => {
+    // ADR-178.
     renderHome(viewModel({
       priorities: [],
       today: [{ taskId: "t9", title: "Segredo", dueLabel: null, stateLabel: "Não iniciada", sensitivity: secret }],
     }));
 
-    expect(screen.queryByText("Segredo")).toBeNull();
-    expect(screen.getByText(getWorkCopy("pt-BR").protected.label)).toBeVisible();
+    expect(screen.getByText("Segredo")).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("pt-BR").protected.label)).toBeNull();
   });
 
   it("leaves a manual task untouched", () => {

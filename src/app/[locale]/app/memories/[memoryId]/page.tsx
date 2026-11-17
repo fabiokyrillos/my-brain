@@ -28,7 +28,6 @@ import { MemoryEditForm } from "@/features/memories/memory-edit-form";
 import { asMemoryKind } from "@/features/memories/read";
 import { DeleteEntityControl } from "@/features/deletion/delete-entity-control";
 import { ProtectedContent } from "@/features/operations/protected-content";
-import { toSensitivityLevel } from "@/features/sensitivity/contracts";
 import { deriveSubjectSensitivity, readableLevelsOf } from "@/features/sensitivity/subject-derivation";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
@@ -154,21 +153,6 @@ export default async function MemoryDetailPage({
     describeEntityChanges(changes, historyCopy, formatDateTime),
     RECENT_CHANGE_LIMIT,
   );
-  /*
-   * `2N-KNOWS-007` — read from the current row, and narrowed through the
-   * **contract's** predicate rather than `asMemorySensitivity`.
-   *
-   * The two disagree on exactly one input and it is the one that matters: for a
-   * value outside the vocabulary, `asMemorySensitivity` returns `normal` and
-   * `toSensitivityLevel` returns `highly_sensitive`. This page both *states* the
-   * classification and *acts* on it, so taking them from two predicates that
-   * fail in opposite directions would let it print "Normal" beside content the
-   * mask is withholding. One read, one answer, failing closed.
-   *
-   * `asMemorySensitivity` is left alone: it is a narrowing used by a write path's
-   * schema, and re-pointing that is not this slice's business.
-   */
-  const sensitivity = toSensitivityLevel(memory.sensitivity);
   // The memory is its own subject, so the map it is looked up in is the row that
   // was just read. Absence would still mean unreadable — `maybeSingle` returning
   // nothing already sent this page to `notFound()` above.
@@ -328,10 +312,6 @@ export default async function MemoryDetailPage({
             )}
           </dd>
         </div>
-        <div>
-          <dt>{copy.sensitivityLabel}</dt>
-          <dd>{copy.sensitivities[sensitivity]}</dd>
-        </div>
         {/*
           `2N-KNOWS-004` asks for THREE facts — when it was recorded, from when
           it is in force, and until when — and the page used to show two labels.
@@ -400,7 +380,6 @@ export default async function MemoryDetailPage({
           id: memory.id,
           content: memory.content,
           kind,
-          sensitivity,
           important: memory.important,
           personId: memory.person_id,
           projectId: memory.project_id,

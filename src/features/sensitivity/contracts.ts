@@ -196,7 +196,6 @@ export type Presentation = {
 };
 
 const SHOW: Presentation = { outcome: "show", revealable: false };
-const MASK: Presentation = { outcome: "mask", revealable: true };
 const OMIT: Presentation = { outcome: "omit", revealable: false };
 
 /**
@@ -209,24 +208,24 @@ const OMIT: Presentation = { outcome: "omit", revealable: false };
  * `omit` for all three, and why `notificationCopy()` below exists instead.
  */
 const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
-  hoje: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  attention: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  capture_receipt: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  review_summary: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  hoje: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  attention: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  capture_receipt: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  review_summary: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   notification: { normal: OMIT, private: OMIT, highly_sensitive: OMIT },
-  chat: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  chat: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   // Masked rather than excluded, for the reason the module header gives and for
   // one that is sharper on Work than anywhere else: a Work list is a list the
   // user *operates on*. Dropping a row would remove a task from the count, from
   // the filter and from any selection — so the user would act on a set that is
   // not the set they own. The row stays, the content does not.
-  work: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  work: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   // Masked rather than excluded, and on a calendar the reason is sharper than
   // anywhere else: dropping a row would leave a **day that looks empty**. A user
   // who cannot see that Thursday is full would plan into it, which is a worse
   // outcome than a masked title and is also a lie about their own data. The row
   // keeps its lane, its instant and its position; the words do not.
-  calendar: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  calendar: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   // The four contextual surfaces take the identical posture, and their sameness
   // is the point rather than a copy-paste. `2N-PRIVACY-004` requires counts
   // computed over everything the user owns, and `2N-PRIVACY-005` requires
@@ -234,22 +233,22 @@ const RULES: Record<GovernedSurface, Record<SensitivityLevel, Presentation>> = {
   // that hid three memories would report a count that matches nothing the user
   // can see, and the gap between the number and the rows is itself the oracle
   // OD-2J-1 refuses. A masked row keeps the count honest and says nothing.
-  person: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  project: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  memory: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
-  file: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  person: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  project: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  memory: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
+  file: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   // The relations surface takes the identical posture, and here "masked rather
   // than excluded" has a sharper consequence than anywhere else: an excluded
   // edge would remove a node from the picture, and a missing node in a drawing
   // is not a gap the reader can see — it looks exactly like a person who has no
   // links. The relation stays, its own sentence does not.
-  graph: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  graph: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
   // Life Brain C.4. The area page takes the contextual surfaces' posture, and a
   // health area is where it matters most: its records default to `private`
   // (C.1) and the owner opened the area to read them, so `private` shows; a
   // `highly_sensitive` record stays in the timeline, in position, masked — a
   // timeline with a silent gap would misdate the owner's own history.
-  area: { normal: SHOW, private: SHOW, highly_sensitive: MASK },
+  area: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },
 };
 
 /**
@@ -266,8 +265,11 @@ export function admitsToChatPrompt(
   level: SensitivityLevel,
   ask: { readonly explicit: boolean; readonly sameArea: boolean },
 ): boolean {
-  if (level !== "highly_sensitive") return true;
-  return ask.explicit || ask.sameArea;
+  // Life Brain E.8 (ADR-178): the owner wants nothing withheld — everything in
+  // the app is something they said. Every level enters the prompt.
+  void level;
+  void ask;
+  return true;
 }
 
 /** Whether a level is the one `admitsToChatPrompt` asks an area or a request of. */

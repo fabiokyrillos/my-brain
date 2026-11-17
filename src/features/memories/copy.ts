@@ -2,7 +2,7 @@ import type { MemorySegment } from "./segments";
 import type { Locale } from "@/lib/preferences";
 
 import type { MemoryLifecycleState } from "./lifecycle";
-import type { MemoryKind, MemorySensitivity } from "./schema";
+import type { MemoryKind } from "./schema";
 
 /**
  * The Memories copy, as one typed record per locale (ADR-036).
@@ -137,8 +137,6 @@ type MemoryCopy = {
   /** Life Brain E.4 (ADR-172): the segment headings on Memórias. */
   readonly segments: Readonly<Record<MemorySegment, string>>;
   readonly segmentsLabel: string;
-  readonly sensitivityLabel: string;
-  readonly sensitivities: Readonly<Record<MemorySensitivity, string>>;
   readonly importantLabel: string;
   readonly importantBadge: string;
   readonly importantExplainer: string;
@@ -281,8 +279,6 @@ const copy = {
       other: "Outras",
     },
     segmentsLabel: "Memórias por segmento",
-    sensitivityLabel: "Sensibilidade",
-    sensitivities: { normal: "Normal", private: "Privada", highly_sensitive: "Muito sensível" },
     importantLabel: "Marcar como importante",
     importantBadge: "Importante",
     importantExplainer: "Memórias importantes aparecem primeiro nesta lista.",
@@ -408,8 +404,6 @@ const copy = {
       other: "Other",
     },
     segmentsLabel: "Memories by segment",
-    sensitivityLabel: "Sensitivity",
-    sensitivities: { normal: "Normal", private: "Private", highly_sensitive: "Highly sensitive" },
     importantLabel: "Mark as important",
     importantBadge: "Important",
     importantExplainer: "Important memories appear first in this list.",

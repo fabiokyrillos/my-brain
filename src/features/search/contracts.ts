@@ -50,11 +50,13 @@ export type SensitivityLevel = (typeof SENSITIVITY_LEVELS)[number];
 /**
  * The levels a default search may return.
  *
- * OD-1, as data rather than as a condition buried in a query builder — so a
- * guard can assert `highly_sensitive` is absent from it, and so adding a level
- * is a visible change to a constant.
+ * OD-1, as data rather than as a condition buried in a query builder. Since
+ * Life Brain E.8 (ADR-178) it is every level: the owner wants nothing in the
+ * app withheld, so a search finds everything they wrote. The explicit scope
+ * below is kept only so the request and telemetry contracts stay unchanged;
+ * the surface no longer offers it.
  */
-export const DEFAULT_SENSITIVITY: readonly SensitivityLevel[] = ["normal", "private"];
+export const DEFAULT_SENSITIVITY: readonly SensitivityLevel[] = ["normal", "private", "highly_sensitive"];
 
 /** The levels the explicit sensitive scope adds. Never the default. */
 export const SENSITIVE_SCOPE_SENSITIVITY: readonly SensitivityLevel[] = [

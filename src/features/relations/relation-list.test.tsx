@@ -1,5 +1,4 @@
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import type { Locale } from "@/lib/preferences";
@@ -112,18 +111,17 @@ describe("2N-RELATION-002/-009: every row says what it asserts and where it came
   });
 });
 
-describe("2N-PRIVACY-001: the owner's own sentence is withheld by default", () => {
+describe("2N-PRIVACY-001: the owner's own sentence is shown (ADR-178)", () => {
   const withNote = {
     people: [MARINA],
     relationships: [{ ...RELATIONSHIP, description: "casamos em Recife" }],
   };
 
-  it("does not print it until it is asked for", async () => {
+  it("prints it without being asked, with no reveal control", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     list(withNote);
-    expect(screen.queryByText("casamos em Recife")).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: /mostrar/i }));
     expect(screen.getByText("casamos em Recife")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /mostrar/i })).toBeNull();
   });
 
   it("keeps it out of every attribute, not only out of the text", () => {

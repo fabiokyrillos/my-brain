@@ -312,9 +312,7 @@ function searchSurface() {
     + `<select id="search-type"><option>Tudo</option></select>`
     + `<label for="search-period">Período</label>`
     + `<select id="search-period"><option>Sempre</option></select>`
-    + `<label class="search-sensitive"><input type="checkbox"> Incluir muito sensível</label>`
     + `</div>`
-    + `<p class="search-hint">Itens muito sensíveis ficam de fora por padrão.</p>`
     + `</form>`
     + `<p class="sr-only" role="status" aria-live="polite">3 resultados</p>`
     + `<ul class="search-results"><li><a href="#">Contrato da Aurora</a></li></ul>`

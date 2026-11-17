@@ -168,7 +168,8 @@ describe("2L-PRIVACY-007: list and detail resolve presentation through one funct
     expect(GOVERNED_SURFACES).toContain("work");
     expect(presentationFor("work", "normal").outcome).toBe("show");
     expect(presentationFor("work", "private").outcome).toBe("show");
-    expect(presentationFor("work", "highly_sensitive")).toEqual({ outcome: "mask", revealable: true });
+    // Life Brain E.8 (ADR-178): highly_sensitive is shown on Work too.
+    expect(presentationFor("work", "highly_sensitive")).toEqual({ outcome: "show", revealable: false });
   });
 
   it("shows a `normal` or `private` source in the clear", () => {
@@ -178,16 +179,17 @@ describe("2L-PRIVACY-007: list and detail resolve presentation through one funct
     }
   });
 
-  it("masks a `highly_sensitive` source in place, revealable locally", () => {
+  it("shows a `highly_sensitive` source in the clear, with no reveal control", () => {
+    // ADR-178: nothing is withheld.
     expect(resolveTaskContent({ kind: "derived", level: "highly_sensitive" }, "task-1"))
-      .toEqual({ show: false, masked: true, revealable: true });
+      .toEqual({ show: true, masked: false, revealable: false });
   });
 
-  it("reveals only the key the user acted on", () => {
+  it("shows a `highly_sensitive` source whether or not its key was revealed", () => {
     const state = { revealed: new Set(["task-1"]) };
-    const masked = { kind: "derived", level: "highly_sensitive" } as const;
-    expect(resolveTaskContent(masked, "task-1", state).show).toBe(true);
-    expect(resolveTaskContent(masked, "task-2", state).show).toBe(false);
+    const sensitive = { kind: "derived", level: "highly_sensitive" } as const;
+    expect(resolveTaskContent(sensitive, "task-1", state).show).toBe(true);
+    expect(resolveTaskContent(sensitive, "task-2", state).show).toBe(true);
   });
 
   it("shows an undetermined task without ever asking for a level", () => {

@@ -31,7 +31,8 @@ describe("AreaSections — an area of life's page", () => {
     expect(within(timeline).getByText("2 registros")).toBeInTheDocument();
   });
 
-  it("keeps a highly sensitive record in position with its words withheld", () => {
+  it("keeps a highly sensitive record in position with its words shown", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     render(
       <AreaSections
         events={{ status: "ok", events: [] }}
@@ -44,8 +45,8 @@ describe("AreaSections — an area of life's page", () => {
         timeZone={ZONE}
       />,
     );
-    expect(screen.queryByText("Diagnóstico que não deve aparecer")).toBeNull();
-    expect(document.querySelector('[data-masked="true"]')).not.toBeNull();
+    expect(screen.getByText("Diagnóstico que não deve aparecer")).toBeInTheDocument();
+    expect(document.querySelector('[data-masked="true"]')).toBeNull();
   });
 
   it("says a failed read failed, and an event with a period offers what happened inside it", () => {

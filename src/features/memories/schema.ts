@@ -63,7 +63,6 @@ export const memoryUpdateSchema = z.object({
   locale: z.enum(["pt-BR", "en"]),
   content: memoryContent,
   kind: z.enum(MEMORY_KINDS),
-  sensitivity: z.enum(MEMORY_SENSITIVITIES),
   important: checkbox,
   personId: optionalRelation,
   projectId: optionalRelation,

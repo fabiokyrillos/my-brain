@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-16 — Life Brain E.8: nothing is private or restricted (ADR-178)
+
+- `sensitivity/contracts.ts`: every level shows on every surface; `admitsToChatPrompt` admits every level. Notifications still omit content.
+- Search: `DEFAULT_SENSITIVITY` is every level; the sensitive toggle, hint and banner are removed (copy and CSS too).
+- Removed the record page's `EntrySensitivityForm` (and its action, state, copy, CSS) and the memory edit form's sensitivity field; `memoryUpdateSchema` no longer accepts `sensitivity`; a memory from a record no longer inherits its level.
+- The chat's sources no longer draw the "used highly sensitive content" note.
+- Tests rewritten to the new posture; guards and the accessibility mirror follow. No migration.
+
 ## 2026-11-16 — Life Brain E.7: Conversar finishing (ADR-177)
 
 - `sendChatMessage` redirects with `RedirectType.replace`: a question answered through the action no longer pushes a history entry.

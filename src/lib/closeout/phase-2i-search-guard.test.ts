@@ -104,9 +104,9 @@ describe("T-2I-01 / 2I-SEARCH-004: ownership is RLS, and nothing may bypass it",
   });
 });
 
-describe("OD-1: the exclusion is a predicate, and the default cannot drift", () => {
-  it("keeps highly_sensitive out of the default scope constant", () => {
-    expect(DEFAULT_SENSITIVITY).not.toContain("highly_sensitive");
+describe("OD-1: the scope is a predicate, and the default cannot drift", () => {
+  it("keeps every level in the default scope constant (ADR-178: nothing is withheld)", () => {
+    expect(DEFAULT_SENSITIVITY).toEqual(["normal", "private", "highly_sensitive"]);
   });
 
   it("applies the sensitivity filter inside the query", () => {

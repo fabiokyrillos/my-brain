@@ -115,7 +115,8 @@ describe("loadStructuredSources", () => {
     expect(sources[0]!.occurredAt).toBe("2026-10-01T12:00:00Z");
   });
 
-  it("never sends the model a task or reminder whose source is highly sensitive, or unreadable", async () => {
+  it("sends the model a task or reminder whose source is highly sensitive, or unreadable", async () => {
+    // Life Brain E.8 (ADR-178): every level reaches the prompt; nothing is withheld.
     const { client, calls } = fakeClient({
       tasks: [
         { id: "t1", title: "Exame de rotina", status: "todo", due_at: null, planned_at: null, source_entry_id: "e-normal", created_at: "2026-11-01T00:00:00Z" },
@@ -132,16 +133,17 @@ describe("loadStructuredSources", () => {
     });
     const result = await loadStructuredSources(client, { ...base, question: "exames" });
 
-    expect(result.sources.map((source) => source.id)).toEqual(["task:t1"]);
-    expect(result.sources.some((source) => source.content.includes("biópsia"))).toBe(false);
-    expect(result.withheld).toBe(3);
+    expect(result.sources.map((source) => source.id)).toEqual(["task:t1", "task:t2", "task:t3", "reminder:r1"]);
+    expect(result.sources.some((source) => source.content.includes("biópsia"))).toBe(true);
+    expect(result.withheld).toBe(0);
     const entries = calls.find((call) => call.table === "entries")!;
     expect(entries.in?.[0]).toBe("id");
     expect([...(entries.in?.[1] ?? [])].sort()).toEqual(["e-gone", "e-normal", "e-secret"]);
     expect(entries.eq).toEqual(["user_id", "u1"]);
   });
 
-  it("fails closed: if the classifications cannot be read, nothing sourced from an entry is sent", async () => {
+  it("still sends what is sourced from an entry when the classifications cannot be read", async () => {
+    // ADR-178: the fail-closed level is admitted like every level.
     const { client } = fakeClient({
       tasks: [
         { id: "t1", title: "Exame manual", status: "todo", due_at: null, planned_at: null, source_entry_id: null, created_at: "2026-11-01T00:00:00Z" },
@@ -150,7 +152,7 @@ describe("loadStructuredSources", () => {
     }, ["entries"]);
     const { sources } = await loadStructuredSources(client, { ...base, question: "exames" });
 
-    expect(sources.map((source) => source.id)).toEqual(["task:t1"]);
+    expect(sources.map((source) => source.id)).toEqual(["task:t1", "task:t2"]);
   });
 
   it("lets one failed table cost only its own sources", async () => {

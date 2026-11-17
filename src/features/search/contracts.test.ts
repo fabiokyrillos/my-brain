@@ -23,10 +23,9 @@ import {
 } from "./contracts";
 import { getSearchCopy } from "./copy";
 
-describe("OD-1: highly_sensitive is excluded by default", () => {
-  it("omits highly_sensitive from the default scope", () => {
-    expect(DEFAULT_SENSITIVITY).toEqual(["normal", "private"]);
-    expect(DEFAULT_SENSITIVITY).not.toContain("highly_sensitive");
+describe("OD-1, as amended by ADR-178: a default search covers every level", () => {
+  it("includes highly_sensitive in the default scope", () => {
+    expect(DEFAULT_SENSITIVITY).toEqual(["normal", "private", "highly_sensitive"]);
   });
 
   it("includes it only under the explicit sensitive scope", () => {

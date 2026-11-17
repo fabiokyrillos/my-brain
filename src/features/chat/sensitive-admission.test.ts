@@ -53,15 +53,18 @@ describe("admitsSource — LB-B-010", () => {
     expect(admitsSource({ level: "private", area: "health" }, ordinary)).toBe(true);
   });
 
-  it("admits a highly sensitive source only on an explicit ask or the same area", () => {
+  it("admits a highly sensitive source to any question", () => {
+    // Life Brain E.8 (ADR-178): nothing is withheld from the prompt.
     const secret = { level: "highly_sensitive" as const, area: "health" as const };
-    expect(admitsSource(secret, ordinary)).toBe(false);
+    expect(admitsSource(secret, ordinary)).toBe(true);
     expect(admitsSource(secret, { explicit: true, areas: new Set() })).toBe(true);
     expect(admitsSource(secret, readSensitiveAsk("como está minha saúde?"))).toBe(true);
-    expect(admitsSource(secret, readSensitiveAsk("quanto gastei na viagem?"))).toBe(false);
+    expect(admitsSource(secret, readSensitiveAsk("quanto gastei na viagem?"))).toBe(true);
   });
 
-  it("never admits a highly sensitive source with no area by naming an area", () => {
-    expect(admitsSource({ level: "highly_sensitive", area: null }, readSensitiveAsk("minha saúde"))).toBe(false);
+  it("admits a highly sensitive source with no area too", () => {
+    // ADR-178.
+    expect(admitsSource({ level: "highly_sensitive", area: null }, readSensitiveAsk("minha saúde"))).toBe(true);
+    expect(admitsSource({ level: "highly_sensitive", area: null }, ordinary)).toBe(true);
   });
 });

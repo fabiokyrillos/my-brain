@@ -81,11 +81,9 @@ describe("2K-CARD-008: the read-only preview exposes no mutating control", () =>
     expect(container.querySelector("input")).toBeNull();
   });
 
-  it("still renders no control when the snippet is masked and revealable", () => {
-    // The reveal is the one control a masked read-only card *does* get, and it
-    // is a disclosure control rather than a mutation: it writes nothing and
-    // leaves no trace beyond this render. Asserted explicitly so the two are
-    // never conflated.
+  it("renders no control at all for a highly sensitive snippet", () => {
+    // Life Brain E.8 (ADR-178): the snippet is shown in the clear, so not even
+    // a reveal control is drawn.
     const { container } = render(
       <ReadOnlyPreview
         card={readOnlyPreviewCard({
@@ -98,7 +96,7 @@ describe("2K-CARD-008: the read-only preview exposes no mutating control", () =>
       />,
     );
     expect(container.querySelector("form")).toBeNull();
-    expect(container.querySelectorAll("button")).toHaveLength(1);
-    expect(container.querySelector("button")).toHaveAttribute("type", "button");
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    expect(container.textContent).toContain("resultado do exame");
   });
 });

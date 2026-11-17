@@ -121,10 +121,11 @@ describe("ConflictAttentionItemRow", () => {
    * words. The dates stay: they are the fault being reported, not content, and a
    * masked row that hid them could not explain itself.
    */
-  it("masks a highly sensitive memory's text but keeps the dates and the action", () => {
+  it("shows a highly sensitive memory's text with the dates and the action", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     render(<ConflictAttentionItemRow agentName="Brain" item={item({ sensitivity: "highly_sensitive" })} surface="needs_attention" locale="pt-BR" timeZone="America/Sao_Paulo" />);
-    expect(screen.queryByText("Trabalho na Acme")).not.toBeInTheDocument();
-    expect(screen.getByText("Conteúdo muito sensível, oculto")).toBeInTheDocument();
+    expect(screen.getByText("Trabalho na Acme")).toBeInTheDocument();
+    expect(screen.queryByText("Conteúdo muito sensível, oculto")).not.toBeInTheDocument();
     expect(screen.getByText(/1 de set\. de 2026, 09:00/)).toBeInTheDocument();
     expect(screen.getByRole("link")).toBeInTheDocument();
   });
@@ -176,10 +177,11 @@ describe("ConflictAttentionItemRow", () => {
  * wrong one and nothing would fail.
  */
 describe("the governing surface is the caller's, not a constant", () => {
-  it("masks a highly sensitive memory on Hoje too", () => {
+  it("shows a highly sensitive memory on Hoje too", () => {
+    // ADR-178.
     render(<ConflictAttentionItemRow agentName="Brain" item={item({ sensitivity: "highly_sensitive" })} surface="home" locale="pt-BR" timeZone="UTC" />);
-    expect(screen.getByText("Conteúdo muito sensível, oculto")).toBeInTheDocument();
-    expect(screen.queryByText("Trabalho na Acme")).not.toBeInTheDocument();
+    expect(screen.queryByText("Conteúdo muito sensível, oculto")).not.toBeInTheDocument();
+    expect(screen.getByText("Trabalho na Acme")).toBeInTheDocument();
   });
 
   it("shows a normal memory on Hoje", () => {

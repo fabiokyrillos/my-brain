@@ -242,8 +242,9 @@ describe("both locales carry the copy", () => {
   });
 });
 
-describe("2N-PRIVACY-002: a classified subject is masked in place", () => {
-  it("withholds a highly sensitive label and offers a local reveal", () => {
+describe("2N-PRIVACY-002: a classified subject is shown in place (ADR-178)", () => {
+  it("shows a highly sensitive label with no reveal control", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     render(
       <LinkedFilesSection
         files={boundedList(
@@ -255,8 +256,8 @@ describe("2N-PRIVACY-002: a classified subject is masked in place", () => {
         statusLabel={(value) => value}
       />,
     );
-    expect(screen.queryByText("contrato.pdf")).toBeNull();
-    expect(screen.getByRole("button")).toBeTruthy();
+    expect(screen.getByText("contrato.pdf")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("shows a normal label with no reveal control at all", () => {
@@ -275,7 +276,8 @@ describe("2N-PRIVACY-002: a classified subject is masked in place", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("does not put the withheld name into the accessible name of the control", () => {
+  it("puts a highly sensitive name in the page like any other", () => {
+    // ADR-178.
     const { container } = render(
       <LinkedFilesSection
         files={boundedList(
@@ -287,6 +289,6 @@ describe("2N-PRIVACY-002: a classified subject is masked in place", () => {
         statusLabel={(value) => value}
       />,
     );
-    expect(container.innerHTML).not.toContain("contrato.pdf");
+    expect(container.innerHTML).toContain("contrato.pdf");
   });
 });

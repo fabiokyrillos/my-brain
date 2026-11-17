@@ -80,21 +80,12 @@ describe("RelationshipPanel", () => {
     expect(screen.getByText(/desde 15 de março de 2019/)).toBeVisible();
   });
 
-  it("withholds the owner's own sentence by default, and reveals it only when asked", async () => {
-    /*
-     * `2N-PRIVACY-001`, ADR-110 Decision 4 — slice 2N.6's convergence fix.
-     *
-     * This used to assert the sentence was simply visible. It is free text about
-     * a human being, on a table with no `sensitivity` column and no classifiable
-     * source, printed one section below `people.notes`, which the same page
-     * masks — two postures for one predicate. The mask is the convergence, and
-     * the reveal is what keeps it usable.
-     */
+  it("shows the owner's own sentence without being asked, with no reveal control", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them;
+    // `people.notes` and the relationship sentence still share one posture.
     render(panel({ relationships: [{ ...spouse, description: "casamos em Recife" }] }));
-    expect(screen.queryByText("casamos em Recife")).toBeNull();
-
-    await userEvent.click(screen.getByRole("button", { name: /mostrar/i }));
     expect(screen.getByText("casamos em Recife")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /mostrar/i })).toBeNull();
   });
 
   it("keeps the withheld sentence out of every attribute, not only out of the text", () => {

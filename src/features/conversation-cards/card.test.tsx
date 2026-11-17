@@ -8,7 +8,6 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
 import { ConversationCardView } from "./card";
@@ -70,7 +69,7 @@ describe("2K-CARD-008: a read-only card type cannot reach a mutating control", (
   });
 });
 
-describe("2K-PRIVACY-001/002/004: the chat surface masks in place", () => {
+describe("2K-PRIVACY-001/002/004: the chat surface shows every level (ADR-178)", () => {
   it("shows a `private` snippet, because the contract shows it", () => {
     render(
       <ConversationCardView
@@ -87,8 +86,8 @@ describe("2K-PRIVACY-001/002/004: the chat surface masks in place", () => {
     expect(screen.queryByRole("button", { name: copy.reveal })).not.toBeInTheDocument();
   });
 
-  it("masks a `highly_sensitive` snippet and offers a local, transient reveal", async () => {
-    const user = userEvent.setup();
+  it("shows a `highly_sensitive` snippet in the clear, with no reveal", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     render(
       <ConversationCardView
         card={readOnlyPreviewCard({
@@ -100,14 +99,9 @@ describe("2K-PRIVACY-001/002/004: the chat surface masks in place", () => {
         locale="pt-BR"
       />,
     );
-    expect(screen.queryByText("resultado do exame")).not.toBeInTheDocument();
-    expect(screen.getByText(copy.masked)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: copy.reveal }));
     expect(screen.getByText("resultado do exame")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: copy.hide }));
-    expect(screen.queryByText("resultado do exame")).not.toBeInTheDocument();
+    expect(screen.queryByText(copy.masked)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.reveal })).not.toBeInTheDocument();
   });
 
   it("says nothing about the object on an unavailable card", () => {
