@@ -20,6 +20,16 @@ export const CONVERSATION_MENU_LIMIT = 100;
 export const CONVERSATION_SEARCH_LIMIT = 30;
 
 /**
+ * How many of the owner's most recent conversations one search past the menu
+ * reads before matching titles in Node (ADR-179). The match has to happen in
+ * Node to ignore accents without the `unaccent` extension, so the read is a
+ * plain `id,title` list; this ceiling keeps it bounded (~1,000 short rows) and
+ * equals the project's PostgREST `max_rows`, which would cut a longer read
+ * anyway. A conversation older than the 1,000 most recent is not found.
+ */
+export const CONVERSATION_SEARCH_SCAN_LIMIT = 1000;
+
+/**
  * Life Brain E.6 (ADR-176) — the conversations menu, grouped by when each was
  * last active, in the owner's own zone: Today, Yesterday, the previous 7 days,
  * the previous 30 days, then one group per month ("Outubro", or "Outubro de
@@ -80,10 +90,18 @@ export function normalizeForSearch(text: string): string {
   return text.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase();
 }
 
+/**
+ * The one title-matching rule, shared by the menu's local filter and the
+ * server search past the menu (ADR-179), so the same text finds the same
+ * conversations inside and outside the 100 the menu holds.
+ */
+export function matchesConversationSearch(title: string, query: string): boolean {
+  return normalizeForSearch(title).includes(normalizeForSearch(query.trim()));
+}
+
 export function filterGroups(groups: readonly ConversationGroup[], query: string): readonly ConversationGroup[] {
-  const needle = normalizeForSearch(query.trim());
-  if (needle === "") return groups;
+  if (normalizeForSearch(query.trim()) === "") return groups;
   return groups
-    .map((group) => ({ ...group, items: group.items.filter((item) => normalizeForSearch(item.title).includes(needle)) }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => matchesConversationSearch(item.title, query)) }))
     .filter((group) => group.items.length > 0);
 }

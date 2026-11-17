@@ -2780,3 +2780,15 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Decision 4 — What is left in the database.** `link_entry_life_area` still stamps a newly linked health or finance entry `private`, and two suggestion RPCs still skip `highly_sensitive` rows. Both are now inert for the owner — `private` renders like `normal`, and nothing can set `highly_sensitive` any more — and changing them is a migration, which this slice was not authorized to write. Recorded as an optional follow-up.
 
 - **Consequences.** The owner sees, searches and asks about everything they wrote, with no mask and no reveal. Left open: the optional migration of Decision 4.
+
+## ADR-179 — The conversations search past the menu ignores accents, matched in Node under a read ceiling
+
+- **Date:** 2026-11-16
+- **Status:** Accepted. Closes the item ADR-177 left open ("the server search is not accent-insensitive"). No migration.
+
+- **Context.** The menu's local filter ignores case and accents ("medico" finds "Médico amanhã"); `searchConversations` used `ilike`, which ignores case only. The same text found different conversations inside and outside the 100 the menu holds. Accent-insensitivity in SQL needs `unaccent` (or a stored normalized column), and either is a migration this change was not authorized to write.
+
+- **Decision 1 — One rule, in Node.** `matchesConversationSearch(title, query)` in `chat/conversation-groups.ts` (NFD, diacritics removed, lower case) is used by both `filterGroups` and `searchConversations`. The server reads the owner's `id,title` rows newest first (RLS-scoped, after `requireUser` and the unchanged Zod input), matches them with that function, and returns at most `CONVERSATION_SEARCH_LIMIT` (30) in `updated_at desc` order. `%`, `_` and `\` are plain characters, so the `escapeLike` helper is gone.
+- **Decision 2 — A read ceiling.** `CONVERSATION_SEARCH_SCAN_LIMIT = 1000` bounds the read. It equals the project's PostgREST `max_rows`, which would truncate a longer read anyway, and keeps one search to about a thousand short rows.
+
+- **Consequences.** The same text finds the same conversations everywhere. Left open: a conversation older than the owner's 1,000 most recent is not found by the search. If that ever matters, `unaccent` (or a normalized title column) and a migration move the match back into SQL.

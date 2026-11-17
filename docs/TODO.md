@@ -1,4 +1,6 @@
-Last updated: 2026-11-16 (**LIFE BRAIN E.8 IMPLEMENTED ON ITS BRANCH — ADR-178. NO MIGRATION.** The owner decided LB-OD-7 the other way: nothing in the app is private or restricted. Every sensitivity level now shows on every surface, enters the chat, and is found by a default search; the controls that set a level are gone. RLS between accounts is untouched; notifications still carry no content. Left in the database, inert: the health/finance `private` stamp and two suggestion RPCs skipping `highly_sensitive` — changing them is an optional migration.)
+Last updated: 2026-11-16 (**Server conversation search is accent-insensitive — ADR-179. NO MIGRATION.** Closes ADR-177's "the server search is not accent-insensitive". Left open by it: the search reads the owner's 1,000 most recent conversations, so an older one is not found; matching in SQL would need `unaccent` and a migration, the owner's call.)
+
+Previously: Last updated: 2026-11-16 (**LIFE BRAIN E.8 IMPLEMENTED ON ITS BRANCH — ADR-178. NO MIGRATION.** The owner decided LB-OD-7 the other way: nothing in the app is private or restricted. Every sensitivity level now shows on every surface, enters the chat, and is found by a default search; the controls that set a level are gone. RLS between accounts is untouched; notifications still carry no content. Left in the database, inert: the health/finance `private` stamp and two suggestion RPCs skipping `highly_sensitive` — changing them is an optional migration.)
 
 Previously: Last updated: 2026-11-16 (**LIFE BRAIN E.7 IMPLEMENTED ON ITS BRANCH — ADR-177. NO MIGRATION; parity unchanged at 109 = 109.** Conversar finishing: a question answered through the action lands in place too (the redirect replaces); the menu's search reaches every conversation, listing the ones past the 100 it holds under "Mais antigas"; the sources under an answer are chips, "Registro · 5 nov.", that open them. The owner ratified LB-OD-4 and the `LB-B-008` rule as shipped, and reversed LB-OD-7: nothing should be private or restricted — the next slice.)
 
@@ -118,6 +120,8 @@ Successor status: **the roadmap successor — the phase after Phase 2S — is NO
 
 Governing: `docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md`. Order: A.0 → A.1 → B.0 → A.2 → B.1 → C.0 → A.3 → B.2 → C.1(M1) → A.4 → B.3(M3) → C.2 → C.3(M2) → A.5 → C.4 → B.4 → C.5 → A.6 → B.5.
 
+- **E.7 merged 2026-11-16** (ADR-177, no migration). Left open by it:
+  - ~~**The server search is not accent-insensitive**~~ — **done 2026-11-16 (ADR-179):** `searchConversations` matches in Node with `matchesConversationSearch`, the function the menu's filter uses, over the owner's 1,000 most recent titles (`CONVERSATION_SEARCH_SCAN_LIMIT`). Still open: a conversation older than those 1,000 is not found; matching in SQL needs `unaccent` and a migration, the owner's call.
 - **D.1 implemented 2026-11-12** (ADR-165, no migration; draft PR, not merged). Left open by it:
   - The week and the reminder card **with content** were proved in a fixture lane only; the test account has no reminders and nothing this week. Look at both on the owner's account (iPhone and desktop).
   - An hour axis for the week (Google Calendar's) was deferred; multi-day events are still one line per day until D.3.
