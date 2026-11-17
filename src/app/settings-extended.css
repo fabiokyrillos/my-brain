@@ -1253,7 +1253,7 @@
   margin: 0;
   padding: 6px;
   list-style: none;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--background-surface);
   box-shadow: 0 10px 30px rgb(0 0 0 / 12%);
@@ -1284,8 +1284,9 @@
   background: none;
   padding: 0 10px;
   text-align: left;
+  /* Regular weight: six bold lines in a box read as six headlines, and the
+     menu outweighed the row it belongs to. */
   font: var(--type-body);
-  font-weight: 600;
   color: var(--text-primary);
   /* 2S-MOBILE-006: a thumb target, not a text link. */
   min-height: 44px;
@@ -1412,10 +1413,11 @@
     flex-basis: 100%;
   }
 
+  /* In the flow, but still the width of a menu rather than of the page. */
   .notification-verb-menu-list {
     position: static;
     min-width: 0;
-    max-width: none;
+    max-width: 300px;
     box-shadow: none;
   }
 
