@@ -288,7 +288,7 @@ Previously: 2026-08-05 (**Phase 2G — Conversational Creation is AUTHORIZED and
 
 ## Life Brain — OPENED 2026-10-30 (ADR-145); tracks A, B, C, D and E all MERGED (E.1–E.8, #380–#391, plus #392); hosted parity 109 = 109; owner decisions LB-OD-1…9 all decided; no slice planned after track E
 
-*(Heading rewritten 2026-11-16; the paragraphs below are the record in the order it was written. The heading before this one stopped at B.7, "not applied hosted yet, parity 107 = 107" — `202611060108` was applied on 2026-11-06 and B.8's `202611090109` on 2026-11-09.)*
+*(Heading rewritten 2026-11-16; the paragraphs below are the record in the order it was written. The previous heading stopped at B.7 with parity 107 = 107; B.7's migration went live on 2026-11-06 and B.8's on 2026-11-09.)*
 
 **An initiative, not a phase.** Three tracks delivered as interleaved vertical slices (`docs/initiatives/life-brain/IMPLEMENTATION_PLAN.md` §0): A design system + redesign, B chat with memory, C whole life. Record under `docs/reports/life-brain/`: `INVESTIGATION.md`, `AUDIT_UX_COMPONENTS.md`, `AUDIT_CHAT_RETRIEVAL.md`, `AUDIT_WORK_BIAS.md`, `evidence/baseline/` (86 PNG + `measurements.json`, produced by `e2e/online-life-brain-baseline.spec.ts`).
 
