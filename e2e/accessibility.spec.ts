@@ -807,11 +807,13 @@ function entityWorkspace() {
   const editDisclosure = `<details class="entity-edit-disclosure"><summary>Editar</summary>`
     + `<form><label for="ws-name">Nome</label><input id="ws-name" value="Marina"></form></details>`;
 
-  const changes = `<section class="entity-changes"><h2>O que mudou recentemente</h2>`
+  // Collapsed and last on the page, as the two workspaces render it.
+  const changes = `<section class="entity-changes" id="changes"><details class="entity-changes-disclosure">`
+    + `<summary><h2>O que mudou recentemente</h2></summary>`
     + `<p class="section-explainer">Vem do registro de alterações: edições feitas nesta pessoa.</p>`
     + `<ol class="history-list"><li class="history-event"><span class="history-dot"></span>`
     + `<div class="history-event-body"><p class="history-sentence">Você alterou o nome.</p></div></li></ol>`
-    + `</section>`;
+    + `</details></section>`;
 
   const openColumn = `<section class="entity-workspace-column" aria-labelledby="ws-open">`
     + `<h2 id="ws-open">Tarefas em aberto</h2>`
@@ -839,12 +841,12 @@ function entityWorkspace() {
     + `<h1>Marina Alexandrina Bittencourt de Albuquerque Vasconcelos</h1>`
     + `<p class="entity-relation-line"><span>Organização</span><strong>Aurora</strong></p></div></header>`
     + editDisclosure
-    + changes
     + `<div class="entity-workspace-columns">${openColumn}${knowsColumn}</div>`
     + `<section class="entity-timeline"><h2>Onde aparece</h2>`
     + `<div class="timeline-list"><article><span class="timeline-dot"></span><div>`
     + `<a href="#"><strong>Conversa com a Marina sobre o contrato</strong></a><small>12 de agosto</small>`
     + `</div></article></div></section>`
+    + changes
     + `</div>`;
 }
 
@@ -1489,7 +1491,6 @@ test.describe("the entity workspace reads as one template", () => {
 
     expect(outline).toEqual([
       "H1:Marina Alexandrina Bitte",
-      "H2:O que mudou recentemente",
       "H2:Tarefas em aberto",
       "H3:Pendências e tarefas",
       "H3:Projetos",
@@ -1498,6 +1499,7 @@ test.describe("the entity workspace reads as one template", () => {
       "H3:Memórias",
       "H3:Arquivos vinculados",
       "H2:Onde aparece",
+      "H2:O que mudou recentemente",
     ]);
   });
 

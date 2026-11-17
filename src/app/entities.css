@@ -267,19 +267,18 @@
 
 .relation-list {
   display: grid;
-  gap: 10px;
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* A row between hairlines, like every other list (Editorial calmo). */
 .relation-row {
   display: grid;
-  gap: 8px;
-  padding: 12px 14px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .relation-row-main {
@@ -462,12 +461,63 @@
  */
 .entity-decisions,
 .entity-changes {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  padding: 22px;
-  margin-top: 16px;
+  margin-top: var(--space-8);
 }
+
+/*
+ * Editorial calmo, slice 6 (ADR-180, Decision 1). A block on an entity's page
+ * is not a card holding rows — that was a box inside a column inside the page.
+ * It opens with a rule across its full width and a heading in the reading face,
+ * and its rows follow between hairlines. The rule is the stronger line and the
+ * rows' are the lighter one, which is what tells two blocks apart from two rows
+ * (owner, 2026-11-17: "parece que tudo é uma coisa só").
+ */
+.entity-columns > section,
+.entity-timeline,
+.entity-memory,
+.entity-decisions,
+.entity-changes {
+  border-top: 1px solid var(--border-strong);
+  padding-top: var(--space-4);
+}
+
+.entity-columns > section > h2,
+.entity-timeline > h2,
+.entity-memory > h2,
+.entity-decisions > h2,
+.entity-changes > h2 {
+  margin: 0 0 var(--space-2);
+  font: var(--type-reading-lg);
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.entity-timeline,
+.entity-memory {
+  margin-top: var(--space-10);
+}
+
+/* What changed recently: one quiet line at the foot of the page, opened by
+   whoever wants the detail. */
+.entity-changes-disclosure > summary {
+  min-height: var(--touch-target);
+  padding: var(--space-3) 0;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.entity-changes-disclosure > summary h2 {
+  display: inline;
+  margin: 0;
+  font: var(--type-label);
+  color: inherit;
+}
+
+.entity-changes-disclosure > summary:hover { color: var(--text-primary); }
+
+.entity-changes-disclosure[open] > summary { margin-bottom: var(--space-2); }
+
+.entity-changes-disclosure > * + * { margin-top: var(--space-3); }
 
 /*
  * The state line: status, open commitments, last activity.
@@ -543,7 +593,7 @@
  */
 .entity-workspace {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-8);
   align-content: start;
 }
 
@@ -559,13 +609,13 @@
 .entity-workspace-columns {
   display: grid;
   grid-template-columns: 1.35fr 1fr;
-  gap: var(--space-4);
+  gap: var(--space-8);
   align-items: start;
 }
 
 .entity-workspace-column {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-8);
   align-content: start;
   /* Grid items refuse to shrink below their content by default, which is what
      turns one long task title into a column that pushes the other off the
@@ -588,8 +638,9 @@
   color: var(--text-muted);
 }
 
-/* Card chrome for every block inside a column, and for the two bands outside
-   them. One rule, so a panel and a section cannot drift apart. */
+/* No chrome on any block inside a column, nor on the two bands outside them
+   (Editorial calmo). One rule, so a panel and a section cannot drift apart —
+   and it is the rule that undoes `files.css`'s box on `.entity-files`. */
 .entity-workspace .entity-tasks,
 .entity-workspace .relation-panel,
 .entity-workspace .entity-memory,
@@ -597,10 +648,18 @@
 .entity-workspace .entity-decisions,
 .entity-workspace .entity-timeline,
 .entity-workspace .entity-changes {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  padding: var(--space-5);
+  border: 0;
+  border-top: 1px solid var(--border-strong);
+  border-radius: 0;
+  background: none;
+  padding: var(--space-4) 0 0;
+  min-width: 0;
+}
+
+/* The changes band is the page's footnote, so its rule is the lighter one. */
+.entity-workspace .entity-changes {
+  border-top-color: var(--border-default);
+  padding-top: 0;
 }
 
 /*
@@ -626,7 +685,8 @@
 
 .entity-workspace h3 {
   margin: 0;
-  font: var(--type-lead);
+  font: var(--type-reading-lg);
+  line-height: 1.3;
   color: var(--text-primary);
 }
 
@@ -634,7 +694,8 @@
    column label, because nothing contains them. */
 .entity-workspace .entity-timeline > h2 {
   margin: 0 0 var(--space-3);
-  font: var(--type-lead);
+  font: var(--type-reading-lg);
+  line-height: 1.3;
   color: var(--text-primary);
 }
 

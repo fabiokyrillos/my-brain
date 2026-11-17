@@ -51,39 +51,49 @@ export function QuestionOutcomeCard({
 
   return (
     <article className="question-outcome" data-disposition={outcome.disposition}>
-      <header>
-        <span className="question-outcome-disposition">
-          <Icon aria-hidden="true" size={14} />
-          {copy.dispositions[outcome.disposition]}
-        </span>
-        {outcome.answeredAt ? (
-          <span className="question-outcome-when">{copy.answeredOn} {date(outcome.answeredAt)}</span>
-        ) : null}
-        {outcome.deferredUntil ? (
-          <span className="question-outcome-when">{copy.returnsOn} {date(outcome.deferredUntil)}</span>
-        ) : null}
-      </header>
-
-      <h3>{outcome.question}</h3>
-      <p className="question-outcome-reason">{outcome.reason}</p>
-
       {/*
-        Owner content, rendered as text. The answer is quoted so it reads as
-        theirs rather than as the product's own words.
+        Collapsed at rest (owner, 2026-11-17). A resolved question is finished
+        business: the list shows what was asked and how it ended, and the
+        answer, its consequence and the link open for whoever wants them.
+        A native `<details>`, so it works without script and from the keyboard.
       */}
-      {outcome.answer === null ? null : (
-        <p className="question-outcome-answer">
-          <span>{copy.youAnswered}</span>
-          <q>{outcome.answer}</q>
-        </p>
-      )}
+      <details className="question-outcome-details">
+        <summary>
+          <span className="question-outcome-head">
+            <span className="question-outcome-disposition">
+              <Icon aria-hidden="true" size={14} />
+              {copy.dispositions[outcome.disposition]}
+            </span>
+            {outcome.answeredAt ? (
+              <span className="question-outcome-when">{copy.answeredOn} {date(outcome.answeredAt)}</span>
+            ) : null}
+            {outcome.deferredUntil ? (
+              <span className="question-outcome-when">{copy.returnsOn} {date(outcome.deferredUntil)}</span>
+            ) : null}
+          </span>
+          <h3>{outcome.question}</h3>
+        </summary>
 
-      <p className="question-outcome-effect">{effect}</p>
+        <p className="question-outcome-reason">{outcome.reason}</p>
 
-      <Link className="question-outcome-link" href={`/${locale}/app/inbox/${outcome.entryId}`}>
-        {copy.openEntry}
-        <ArrowRight aria-hidden="true" size={14} />
-      </Link>
+        {/*
+          Owner content, rendered as text. The answer is quoted so it reads as
+          theirs rather than as the product's own words.
+        */}
+        {outcome.answer === null ? null : (
+          <p className="question-outcome-answer">
+            <span>{copy.youAnswered}</span>
+            <q>{outcome.answer}</q>
+          </p>
+        )}
+
+        <p className="question-outcome-effect">{effect}</p>
+
+        <Link className="question-outcome-link" href={`/${locale}/app/inbox/${outcome.entryId}`}>
+          {copy.openEntry}
+          <ArrowRight aria-hidden="true" size={14} />
+        </Link>
+      </details>
     </article>
   );
 }

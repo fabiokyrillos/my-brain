@@ -77,9 +77,9 @@ Measured on the preview fixture (four attention items, three priorities), the pa
 | 1 — done | Hoje (`/app`) | §3.2 |
 | 2 | Shared primitives | Move the row and the section heading out of `operations.css` into `src/components/ui` (`ListItem` exists with no call site; a `SectionHeader` does not exist), so slices 3–6 adopt components rather than copy rules |
 | 3 — box done ([record](../../reports/editorial-calmo/LISTAS.md)) | Registros (`/app/inbox`), Tarefas (`/app/work`, `/app/work/cancelled`), Lembretes (`/app/reminders`) | `.list-row` cards and `.work-row` become rows; group headings become section headings |
-| 4 | Memória (`/app/library`, `/app/memories`), Pessoas, Projetos, Contextos, Organizações, Arquivos, Relações | Same, for the entity lists |
-| 5 | Avisos (`/app/notifications`), Histórico, Perguntas, Revisões, Busca | Avisos is already a divided list (Life Brain A.5); align its heading and type. The rest adopt rows |
-| 6 | Detail pages (`inbox/[entryId]`, `work/[taskId]`, people, projects, contexts, organizations, memories, reviews) | Section headings and the two-face rule; `.mini-list` and `.timeline-list` become rows |
+| 4 — rows done, Memória's tiles left ([record](../../reports/editorial-calmo/PAGINAS.md)) | Memória (`/app/library`, `/app/memories`), Pessoas, Projetos, Contextos, Organizações, Arquivos, Relações | Same, for the entity lists |
+| 5 — Perguntas, Busca, Revisões done ([record](../../reports/editorial-calmo/PAGINAS.md)) | Avisos (`/app/notifications`), Histórico, Perguntas, Revisões, Busca | Avisos is already a divided list (Life Brain A.5); align its heading and type. The rest adopt rows |
+| 6 — entity pages done; `inbox/[entryId]` and `work/[taskId]` open ([record](../../reports/editorial-calmo/PAGINAS.md)) | Detail pages (`inbox/[entryId]`, `work/[taskId]`, people, projects, contexts, organizations, memories, reviews) | Section headings and the two-face rule; `.mini-list` and `.timeline-list` become rows |
 | 7 | Shell | Top bar balance (brand on the left on a phone), locale switch into the account menu |
 
 Not in this pass, on purpose:

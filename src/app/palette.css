@@ -141,7 +141,11 @@
   font: var(--type-body); font-weight: 500;
 }
 
-.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.search-results { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border-top: 1px solid var(--border-default); }
+/* Editorial calmo (ADR-180): a result is a row between hairlines, and the row
+   is the link. The card stays where a source is cited inside an answer. */
+.search-results .ux-source { border: 0; border-bottom: 1px solid var(--border-default); border-radius: 0; background: none; padding: var(--space-3) 0; }
+.search-results .ux-source:hover { background: var(--background-subtle); }
 .search-bounded { margin: 0; font: var(--type-caption); color: var(--text-secondary); }
 
 @media (max-width: 899px) {
