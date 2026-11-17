@@ -254,10 +254,11 @@ describe("2L-BULK-009/012: the result tells the truth", () => {
   });
 });
 
-describe("2L-PRIVACY-008: a masked item is selectable without being revealed", () => {
+describe("2L-PRIVACY-008 / E.8: a highly sensitive item is selectable by its own title", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("names the checkbox by the protected stub rather than by the withheld title", async () => {
+  it("names the checkbox by the task's own title, not a protected stub", async () => {
+    // Life Brain E.8 (ADR-178): nothing is withheld, so the title names the row.
     const user = userEvent.setup();
     renderList({
       tasks: [workItem({
@@ -266,12 +267,13 @@ describe("2L-PRIVACY-008: a masked item is selectable without being revealed", (
       })],
     });
 
+    expect(screen.queryByRole("checkbox", { name: COPY.bulk.selectRow(COPY.protected.label) })).toBeNull();
     const checkbox = screen.getByRole("checkbox", {
-      name: COPY.bulk.selectRow(COPY.protected.label),
+      name: COPY.bulk.selectRow("Contrato Aurora"),
     });
     await user.click(checkbox);
 
     expect(screen.getAllByText(COPY.bulk.selected(1)).length).toBeGreaterThan(0);
-    expect(screen.queryByText("Contrato Aurora")).toBeNull();
+    expect(screen.getByText("Contrato Aurora")).toBeVisible();
   });
 });

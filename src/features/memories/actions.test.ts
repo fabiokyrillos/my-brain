@@ -86,7 +86,6 @@ const editForm = (overrides: Record<string, string> = {}) => form({
   locale: "pt-BR",
   content: "prefiro reuniões pela manhã",
   kind: "preference",
-  sensitivity: "normal",
   personId: "",
   projectId: "",
   ...overrides,
@@ -422,15 +421,15 @@ describe("Life Brain C.2: a memory confirmed from a record names it and inherits
     sourceEntryId: ENTRY_ID,
   });
 
-  it("stores the record as the source and keeps the record's sensitivity", async () => {
-    const stub = recordClient({ data: { id: ENTRY_ID, sensitivity: "private" }, error: null });
+  it("stores the record as the source, and no sensitivity of its own (ADR-178)", async () => {
+    const stub = recordClient({ data: { id: ENTRY_ID }, error: null });
     vi.mocked(requireUser).mockResolvedValue({ supabase: stub.value, user: { id: USER_ID } } as never);
 
     const result = await createProposedMemory(idleMemoryProposalState, recordForm());
 
     expect(result.status).toBe("success");
     expect(stub.inserted!.source_entry_id).toBe(ENTRY_ID);
-    expect(stub.inserted!.sensitivity).toBe("private");
+    expect(stub.inserted).not.toHaveProperty("sensitivity");
     expect(stub.entryEq).toEqual([["id", ENTRY_ID], ["user_id", USER_ID]]);
     expect(stub.audit.mock.calls[0]![0].reason).toBe("Owner confirmed a memory proposed from a record");
   });

@@ -42,12 +42,13 @@ describe("2J-PRIVACY-001: one contract governs every surface it names", () => {
     }
   });
 
-  it("masks highly_sensitive on every in-app surface, and offers a reveal", () => {
+  it("shows highly_sensitive on every in-app surface, with no reveal control", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     const inApp = GOVERNED_SURFACES.filter((surface) => surface !== "notification");
     for (const surface of inApp) {
       const presentation = presentationFor(surface, "highly_sensitive");
-      expect(presentation.outcome, surface).toBe("mask");
-      expect(presentation.revealable, surface).toBe(true);
+      expect(presentation.outcome, surface).toBe("show");
+      expect(presentation.revealable, surface).toBe(false);
     }
   });
 
@@ -62,7 +63,8 @@ describe("2J-PRIVACY-001: one contract governs every surface it names", () => {
     expect(GOVERNED_SURFACES).toContain("chat");
     expect(presentationFor("chat", "normal").outcome).toBe("show");
     expect(presentationFor("chat", "private").outcome).toBe("show");
-    expect(presentationFor("chat", "highly_sensitive")).toEqual({ outcome: "mask", revealable: true });
+    // ADR-178: highly_sensitive is shown on chat too.
+    expect(presentationFor("chat", "highly_sensitive")).toEqual({ outcome: "show", revealable: false });
   });
 });
 
@@ -114,24 +116,28 @@ describe("2J-PRIVACY-004: masking never leaks a count", () => {
     expect(visibleCount(items)).toBe(items.length);
   });
 
-  it("masks in place rather than excluding, so the row still exists", () => {
+  it("shows a highly_sensitive row in the clear rather than excluding it", () => {
+    // ADR-178: the row exists and its content is shown.
     const resolved = resolveContent("attention", "highly_sensitive", "entry-1");
-    expect(resolved.masked).toBe(true);
-    expect(resolved.show).toBe(false);
-    expect(resolved.revealable).toBe(true);
+    expect(resolved.masked).toBe(false);
+    expect(resolved.show).toBe(true);
+    expect(resolved.revealable).toBe(false);
   });
 });
 
 describe("2J-PRIVACY-002: the reveal is local, explicit and transient", () => {
-  it("hides by default", () => {
+  it("reveals nothing by default, and needs no reveal to show highly_sensitive", () => {
     expect(isRevealed(NO_REVEALS, "anything")).toBe(false);
-    expect(resolveContent("hoje", "highly_sensitive", "a").show).toBe(false);
+    // ADR-178: shown without any reveal.
+    expect(resolveContent("hoje", "highly_sensitive", "a").show).toBe(true);
   });
 
-  it("reveals only the key that was asked for", () => {
+  it("tracks revealed keys individually, though no key is needed to show content", () => {
     const state = { revealed: new Set(["a"]) };
+    expect(isRevealed(state, "a")).toBe(true);
+    expect(isRevealed(state, "b")).toBe(false);
     expect(resolveContent("hoje", "highly_sensitive", "a", state).show).toBe(true);
-    expect(resolveContent("hoje", "highly_sensitive", "b", state).show).toBe(false);
+    expect(resolveContent("hoje", "highly_sensitive", "b", state).show).toBe(true);
   });
 
   it("has no persisted form", async () => {

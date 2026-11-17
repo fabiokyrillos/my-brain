@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { TaskSensitivity } from "@/features/sensitivity/task-derivation";
@@ -46,68 +46,36 @@ describe("ProtectedContent", () => {
     expect(screen.getByText("Revisar o contrato")).toBeVisible();
   });
 
-  it("withholds a highly sensitive task's content and says something is there", () => {
+  it("shows a highly sensitive task's content in the clear, with no reveal control", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     renderProtected(masked);
-    expect(screen.queryByText("Revisar o contrato")).toBeNull();
-    // `2L-PRIVACY-003`: the *existence* is not hidden. A row that vanished would
-    // make the count a lie; a row that says nothing is honest.
-    expect(screen.getByText(getWorkCopy("en").protected.label)).toBeVisible();
-  });
-
-  it("reveals in place, on an explicit local action", () => {
-    renderProtected(masked);
-    fireEvent.click(screen.getByRole("button", { name: getWorkCopy("en").protected.reveal }));
     expect(screen.getByText("Revisar o contrato")).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("en").protected.label)).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("hides again on a second explicit action", () => {
-    renderProtected(masked);
-    const copy = getWorkCopy("en").protected;
-    fireEvent.click(screen.getByRole("button", { name: copy.reveal }));
-    fireEvent.click(screen.getByRole("button", { name: copy.hide }));
-    expect(screen.queryByText("Revisar o contrato")).toBeNull();
-  });
-
-  it("reveals only itself: two masked items do not share a reveal", () => {
-    render(
-      <>
-        <ProtectedContent locale="en" revealKey="task-1" sensitivity={masked}>
-          <span>First secret</span>
-        </ProtectedContent>
-        <ProtectedContent locale="en" revealKey="task-2" sensitivity={masked}>
-          <span>Second secret</span>
-        </ProtectedContent>
-      </>,
-    );
-    fireEvent.click(screen.getAllByRole("button", { name: getWorkCopy("en").protected.reveal })[0]);
-    expect(screen.getByText("First secret")).toBeVisible();
-    expect(screen.queryByText("Second secret")).toBeNull();
-  });
-
-  it("names what the control does to which object, in both locales", () => {
-    // `2L-ACCESS-003`: controls that differ only by row must be distinguishable,
-    // so the accessible name carries the row's own label rather than a bare verb.
+  it("shows two highly sensitive items side by side, in both locales", () => {
+    // ADR-178: no per-item reveal exists to share or not share.
     for (const locale of ["pt-BR", "en"] as const) {
       cleanup();
       render(
-        <ProtectedContent
-          locale={locale}
-          revealKey="task-1"
-          sensitivity={masked}
-          describedAs="Revisar o contrato"
-        >
-          <span>Revisar o contrato</span>
-        </ProtectedContent>,
+        <>
+          <ProtectedContent locale={locale} revealKey="task-1" sensitivity={masked} describedAs="First">
+            <span>First secret</span>
+          </ProtectedContent>
+          <ProtectedContent locale={locale} revealKey="task-2" sensitivity={masked} describedAs="Second">
+            <span>Second secret</span>
+          </ProtectedContent>
+        </>,
       );
-      const copy = getWorkCopy(locale).protected;
-      expect(screen.getByRole("button", { name: copy.revealFor("Revisar o contrato") })).toBeVisible();
+      expect(screen.getByText("First secret")).toBeVisible();
+      expect(screen.getByText("Second secret")).toBeVisible();
+      expect(screen.queryByRole("button")).toBeNull();
     }
   });
 
-  it("keeps a masked row openable, without putting the withheld text in the link", () => {
-    // The Work list's title is both the content and the way in. Masking it
-    // naively would leave a row nobody can open, which `2L-PRIVACY-003` never
-    // asked for: the content is withheld, the row stays truthful and reachable.
+  it("renders a highly sensitive row's own content rather than a protected stub link", () => {
+    // ADR-178: the stub link is never drawn; the caller's children are the way in.
     render(
       <ProtectedContent
         href="/en/app/work/task-1"
@@ -118,9 +86,8 @@ describe("ProtectedContent", () => {
         <span>Revisar o contrato</span>
       </ProtectedContent>,
     );
-    const link = screen.getByRole("link", { name: getWorkCopy("en").protected.label });
-    expect(link).toHaveAttribute("href", "/en/app/work/task-1");
-    expect(link).not.toHaveTextContent("Revisar o contrato");
+    expect(screen.getByText("Revisar o contrato")).toBeVisible();
+    expect(screen.queryByRole("link", { name: getWorkCopy("en").protected.label })).toBeNull();
   });
 
   it("persists nothing — the reveal is local and transient (OD-2J-1)", () => {

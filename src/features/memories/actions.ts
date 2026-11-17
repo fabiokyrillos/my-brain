@@ -213,7 +213,7 @@ export async function updateMemory(
   const fields = submittedFields(formData);
   const parsed = memoryUpdateSchema.safeParse(fields);
   if (!parsed.success) return failed(locale, "invalidInput", fields);
-  const { memoryId, content, kind, sensitivity, important, personId, projectId } = parsed.data;
+  const { memoryId, content, kind, important, personId, projectId } = parsed.data;
 
   const { supabase, user } = await requireUser(parsed.data.locale);
 
@@ -238,7 +238,6 @@ export async function updateMemory(
     .update({
       content,
       kind,
-      sensitivity,
       important,
       person_id: personId,
       project_id: projectId,
@@ -376,14 +375,14 @@ export async function createProposedMemory(
 
   /*
    * Life Brain C.2 (ADR-151). A memory proposed from a record names that
-   * record and inherits its sensitivity, so a health record's memory is as
-   * private as the record — never less protected than its source.
+   * record. It no longer inherits the record's sensitivity (Life Brain E.8,
+   * ADR-178): the owner wants nothing in the app private or restricted.
    */
-  let source: { id: string; sensitivity: string } | null = null;
+  let source: { id: string } | null = null;
   if (parsed.data.sourceEntryId) {
     const entry = await supabase
       .from("entries")
-      .select("id,sensitivity")
+      .select("id")
       .eq("id", parsed.data.sourceEntryId)
       .eq("user_id", user.id)
       .maybeSingle();
@@ -399,7 +398,7 @@ export async function createProposedMemory(
       user_id: user.id,
       content,
       kind,
-      ...(source ? { source_entry_id: source.id, sensitivity: source.sensitivity } : {}),
+      ...(source ? { source_entry_id: source.id } : {}),
       // `confidence` is not offered to the owner and is not rendered anywhere
       // this slice touches (UX-10): a hand-written memory is not a probabilistic
       // claim, and showing "100%" beside it invited a reading the number could

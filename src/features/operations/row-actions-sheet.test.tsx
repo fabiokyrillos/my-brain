@@ -123,15 +123,16 @@ describe("the row's actions in a sheet", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("never names a withheld task — not on the button, not in the sheet", async () => {
+  it("names a highly sensitive task by its own title — on the button and in the sheet", async () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     const user = userEvent.setup();
     const label = getWorkCopy("pt-BR").protected.label;
     renderRow(workItem({ title: "Resultado da biópsia", sensitivity: { kind: "derived", level: "highly_sensitive" } }));
 
-    const more = screen.getByRole("button", { name: `Mais ações para ${label}` });
+    expect(screen.queryByRole("button", { name: `Mais ações para ${label}` })).toBeNull();
+    const more = screen.getByRole("button", { name: "Mais ações para Resultado da biópsia" });
     await user.click(more);
-    const sheet = screen.getByRole("dialog", { name: label });
-    expect(sheet.textContent).not.toContain("Resultado da biópsia");
+    const sheet = screen.getByRole("dialog", { name: "Resultado da biópsia" });
     expect(within(sheet).getByRole("button", { name: "Concluir" })).toBeInTheDocument();
   });
 

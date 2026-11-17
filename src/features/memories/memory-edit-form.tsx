@@ -29,7 +29,7 @@ import type { Locale } from "@/lib/preferences";
 import { getMemoryCopy } from "./copy";
 import { idleMemoryEditState, type MemoryEditState } from "./edit-state";
 import type { MemoryLifecycleState } from "./lifecycle";
-import { MEMORY_KINDS, MEMORY_SENSITIVITIES, type MemoryKind, type MemorySensitivity } from "./schema";
+import { MEMORY_KINDS, type MemoryKind } from "./schema";
 
 export type MemoryEditAction = (
   state: MemoryEditState,
@@ -42,7 +42,6 @@ export type MemoryEditFields = {
   readonly id: string;
   readonly content: string;
   readonly kind: MemoryKind;
-  readonly sensitivity: MemorySensitivity;
   readonly important: boolean;
   readonly personId: string | null;
   readonly projectId: string | null;
@@ -218,21 +217,6 @@ export function MemoryEditForm({
           >
             {MEMORY_KINDS.map((kind) => (
               <option key={kind} value={kind}>{copy.kinds[kind]}</option>
-            ))}
-          </select>
-        </label>
-
-        <label htmlFor={`${fieldId}-sensitivity`}>
-          {copy.sensitivityLabel}
-          <select
-            defaultValue={restored("sensitivity") ?? fields.sensitivity}
-            disabled={pending}
-            id={`${fieldId}-sensitivity`}
-            key={`sensitivity-${restored("sensitivity") ?? fields.sensitivity}`}
-            name="sensitivity"
-          >
-            {MEMORY_SENSITIVITIES.map((sensitivity) => (
-              <option key={sensitivity} value={sensitivity}>{copy.sensitivities[sensitivity]}</option>
             ))}
           </select>
         </label>

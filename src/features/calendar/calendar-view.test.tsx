@@ -100,13 +100,14 @@ describe("2M-PRIVACY-001/-005: no title reaches the page unprotected", () => {
     expect(screen.getByText("Entregar o relatório")).toBeTruthy();
   });
 
-  it("withholds a highly sensitive TASK title and keeps the row", () => {
+  it("shows a highly sensitive TASK title in the clear and keeps the row", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     view({ projection: projection({
       days: [{ date: "2026-08-15", isToday: true, items: [
         item({ sensitivity: { kind: "derived", level: "highly_sensitive" } }),
       ] }],
     }) });
-    expect(screen.queryByText("Entregar o relatório")).toBeNull();
+    expect(screen.getByText("Entregar o relatório")).toBeTruthy();
     // The row survives: the item's existence, lane and instant are still there.
     expect(document.querySelectorAll(".calendar-item")).toHaveLength(1);
     // Scoped to the item list: "Prazos" is also the lane filter's own label, and
@@ -115,9 +116,8 @@ describe("2M-PRIVACY-001/-005: no title reaches the page unprotected", () => {
     expect(within(rows).getByText("Prazos")).toBeTruthy();
   });
 
-  it("withholds a highly sensitive REMINDER title by the same mechanism", () => {
-    // OD-2M-1 option A, and the divergence it exists to prevent: a calendar that
-    // masked the task and printed the reminder beside it.
+  it("shows a highly sensitive REMINDER title by the same mechanism", () => {
+    // OD-2M-1 option A: task and reminder take one posture. ADR-178: shown.
     view({ projection: projection({
       days: [{ date: "2026-08-15", isToday: true, items: [
         item({
@@ -128,7 +128,7 @@ describe("2M-PRIVACY-001/-005: no title reaches the page unprotected", () => {
         }),
       ] }],
     }) });
-    expect(screen.queryByText("Consulta médica")).toBeNull();
+    expect(screen.getByText("Consulta médica")).toBeTruthy();
     expect(document.querySelectorAll(".calendar-item")).toHaveLength(1);
   });
 
@@ -272,12 +272,13 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
       expect(grid.querySelector("form, details, input")).toBeNull();
     });
 
-    it("still masks a highly sensitive title in a compact line", () => {
+    it("shows a highly sensitive title in a compact line too", () => {
+      // ADR-178.
       view({
         projection: projection({ days: weekDays([item({ sensitivity: { kind: "derived", level: "highly_sensitive" } })]) }),
         query: query({ orientation: "week" }),
       });
-      expect(screen.queryByText("Entregar o relatório")).toBeNull();
+      expect(screen.getByText("Entregar o relatório")).toBeTruthy();
       expect(document.querySelectorAll("table.calendar-week .calendar-item")).toHaveLength(1);
     });
 
@@ -788,7 +789,8 @@ describe("Life Brain A.4: a task's own reminder is on the task's line", () => {
     expect(screen.getByText("Lembrete às 14:00")).toBeTruthy();
   });
 
-  it("keeps the reminder's time even when the title is withheld", () => {
+  it("keeps the reminder's time beside a highly sensitive title, both shown", () => {
+    // ADR-178: the title is no longer withheld.
     view({ projection: projection({
       days: [{ date: "2026-08-15", isToday: true, items: [
         item({
@@ -797,7 +799,7 @@ describe("Life Brain A.4: a task's own reminder is on the task's line", () => {
         }),
       ] }],
     }) });
-    expect(screen.queryByText("Entregar o relatório")).toBeNull();
+    expect(screen.getByText("Entregar o relatório")).toBeTruthy();
     expect(screen.getByText("Lembrete às 14:00")).toBeTruthy();
   });
 });

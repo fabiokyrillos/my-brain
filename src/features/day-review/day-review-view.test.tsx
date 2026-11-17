@@ -313,15 +313,14 @@ describe("2M-ACCESS-004 and 2M-MOBILE-004: one announcement, above every list", 
   });
 });
 
-describe("2M-PRIVACY: no title reaches the DOM unprotected", () => {
-  it("routes a classified title through the protection component", () => {
+describe("2M-PRIVACY: every title goes through the protection component", () => {
+  it("shows a highly sensitive title in the clear", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     mount({ planned: [item("t1", { sensitivity: { kind: "derived", level: "highly_sensitive" } })] });
-    // The masked case is the honest assertion: a classified title must not be
-    // readable as text on the page.
-    expect(screen.queryByText("Task t1")).toBeNull();
+    expect(screen.getByText("Task t1")).toBeTruthy();
   });
 
-  it("renders an undetermined title, so the masking is not vacuous", () => {
+  it("renders an undetermined title too", () => {
     mount({ planned: [item("t1")] });
     expect(screen.getByText("Task t1")).toBeTruthy();
   });

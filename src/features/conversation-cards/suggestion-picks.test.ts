@@ -43,13 +43,14 @@ describe("suggestionCandidates: every row the derivation could name, and nothing
     ]);
   });
 
-  it("never offers a highly sensitive row, so the model cannot choose one", () => {
+  it("offers a highly sensitive row like any other", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     const candidates = suggestionCandidates({
       people: [],
       projects: [],
       tasksDueToday: [item("t1", "Exame", "2026-11-09", SECRET), item("t2", "Mercado", "2026-11-09")],
     });
-    expect(candidates.map((candidate) => candidate.id)).toEqual(["t2"]);
+    expect(candidates.map((candidate) => candidate.id)).toEqual(["t1", "t2"]);
   });
 
   it("drops a blank name, as the derivation does", () => {

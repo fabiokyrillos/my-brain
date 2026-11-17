@@ -208,7 +208,9 @@ describe("LB-SUGG-001: urgency decides the order, and nothing scores", () => {
   });
 });
 
-describe("LB-SUGG-002: a suggestion never walks around the Home's mask", () => {
+describe("LB-SUGG-002: a suggestion takes the Home's posture, which now shows every level", () => {
+  // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them, so
+  // a highly sensitive row is offered like any other.
   /*
     The module's own header says people and projects carry no classification, so
     there is nothing to mask for them. That reasoning does NOT transfer: a task,
@@ -226,20 +228,20 @@ describe("LB-SUGG-002: a suggestion never walks around the Home's mask", () => {
     "unreviewedEntries",
   ] as const;
 
-  it("drops a highly sensitive row from every classified bucket", () => {
+  it("offers a highly sensitive row from every classified bucket", () => {
     for (const bucket of buckets) {
       expect(
         deriveConversationSuggestions({
           people: [],
           projects: [],
           [bucket]: [item("x1", "Resultado da biópsia", "2026-11-01T12:00:00Z", SECRET)],
-        }),
+        }).map((s) => s.name),
         bucket,
-      ).toEqual([]);
+      ).toEqual(["Resultado da biópsia"]);
     }
   });
 
-  it("is not vacuous: the identical row shows when its source is not sensitive", () => {
+  it("offers the identical row when its source is not sensitive", () => {
     for (const bucket of buckets) {
       expect(
         deriveConversationSuggestions({
@@ -272,25 +274,24 @@ describe("LB-SUGG-002: a suggestion never walks around the Home's mask", () => {
     }).map((s) => s.name)).toEqual(["Levar o carro"]);
   });
 
-  it("drops a sensitive row without taking its slot, so the next kind is offered", () => {
-    // Withholding must not also cost the owner a suggestion they could read.
+  it("keeps a sensitive row in its slot, beside the next kind", () => {
     expect(deriveConversationSuggestions({
       people: [],
       projects: [],
-      overdueTasks: [item("t1", "Oculto", "2026-11-01T12:00:00Z", SECRET)],
+      overdueTasks: [item("t1", "Exame da biópsia", "2026-11-01T12:00:00Z", SECRET)],
       tasksDueToday: [item("t2", "Levar o carro", "2026-11-05T12:00:00Z", NORMAL)],
-    }).map((s) => s.category)).toEqual(["due_today"]);
+    }).map((s) => s.category)).toEqual(["overdue_task", "due_today"]);
   });
 
-  it("picks the next readable row inside the same bucket", () => {
+  it("picks the first row inside a bucket even when it is sensitive", () => {
     expect(deriveConversationSuggestions({
       people: [],
       projects: [],
       overdueTasks: [
-        item("t1", "Oculto", "2026-11-01T12:00:00Z", SECRET),
+        item("t1", "Exame da biópsia", "2026-11-01T12:00:00Z", SECRET),
         item("t2", "Pagar a escola", "2026-11-02T12:00:00Z", NORMAL),
       ],
-    }).map((s) => s.name)).toEqual(["Pagar a escola"]);
+    }).map((s) => s.name)).toEqual(["Exame da biópsia"]);
   });
 });
 

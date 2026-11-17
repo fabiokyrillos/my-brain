@@ -180,7 +180,8 @@ describe("composeAgendaAnswer — the projection, said as an answer", () => {
     }
   });
 
-  it("masks a highly sensitive title in position rather than dropping it", () => {
+  it("says a highly sensitive title in position, in the clear", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     const answer = composeAgendaAnswer({
       span: TOMORROW,
       locale: "pt-BR",
@@ -197,10 +198,10 @@ describe("composeAgendaAnswer — the projection, said as an answer", () => {
       }]),
     });
 
-    expect(answer.content).not.toContain("HIV");
     expect(answer.content).toContain("Amanhã, você tem 1 item na agenda:");
-    expect(answer.content).toContain("10:00 · item protegido · prazo");
-    expect(answer.content).toContain("Itens protegidos ficam ocultos aqui");
+    expect(answer.content).toContain("10:00 · Resultado do exame de HIV · prazo");
+    expect(answer.content).not.toContain("item protegido");
+    expect(answer.content).not.toContain("Itens protegidos ficam ocultos aqui");
   });
 
   it("says plainly when the window is empty, and records no qualifying evidence", () => {

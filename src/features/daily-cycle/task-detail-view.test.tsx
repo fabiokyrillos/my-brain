@@ -265,16 +265,14 @@ describe("task history vocabulary", () => {
 describe("TaskDetailView: withheld content (OD-2L-1 option B)", () => {
   const secret = { kind: "derived", level: "highly_sensitive" } as const;
 
-  it("withholds the title, the description and the original note together", () => {
-    // The provenance blockquote is a 400-character excerpt of the very entry
-    // whose classification produced the mask, so leaving it printed would make
-    // masking the title theatre.
+  it("shows the title, the description and the original note together", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     renderDetail(detail({ task: task({ sensitivity: secret }) }), "en");
 
-    expect(screen.queryByText("Revisar o contrato da Aurora")).toBeNull();
-    expect(screen.queryByText("Conferir a cláusula de rescisão.")).toBeNull();
-    expect(screen.queryByText(/Preciso revisar o contrato/)).toBeNull();
-    expect(screen.getAllByText(getWorkCopy("en").protected.label).length).toBeGreaterThan(0);
+    expect(screen.getByText("Revisar o contrato da Aurora")).toBeVisible();
+    expect(screen.getByText("Conferir a cláusula de rescisão.")).toBeVisible();
+    expect(screen.getByText(/Preciso revisar o contrato/)).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("en").protected.label)).toBeNull();
   });
 
   it("keeps every fact about the task that is not its content", () => {

@@ -35,11 +35,12 @@ describe("2N-PRIVACY-001: the four contextual surfaces are governed", () => {
     expect(GOVERNED_SURFACES).toContain(surface);
   });
 
-  it("masks highly_sensitive and shows the other two on every one of them", () => {
+  it("shows every level on every one of them", () => {
+    // Life Brain E.8 (ADR-178): highly_sensitive is shown in the clear too.
     for (const surface of SURFACES) {
       expect(presentationFor(surface, "normal").outcome).toBe("show");
       expect(presentationFor(surface, "private").outcome).toBe("show");
-      expect(presentationFor(surface, "highly_sensitive").outcome).toBe("mask");
+      expect(presentationFor(surface, "highly_sensitive").outcome).toBe("show");
     }
   });
 
@@ -68,21 +69,21 @@ describe("2N-PRIVACY-001: the four contextual surfaces are governed", () => {
      * naming the resolver rather than by trusting the surface list.
      */
     expect(GOVERNED_SURFACES).toContain("graph");
+    // ADR-178: the free-text sentence is shown in the clear.
     expect(resolveGraphContent(deriveFreeTextSensitivity(), "k")).toEqual({
-      show: false,
-      masked: true,
-      revealable: true,
+      show: true,
+      masked: false,
+      revealable: false,
     });
   });
 
-  it("keeps `graph` masking free text by default, and revealing it only on request", () => {
-    // The whole reason `graph` needed a rule: `person_relationships.description`
-    // has no classification and no classifiable source, so it takes ADR-110
-    // Decision 4's posture — protective by default, local and explicit reveal.
+  it("shows `graph` free text whether or not it was revealed", () => {
+    // ADR-178: `person_relationships.description` is shown in the clear; a
+    // reveal changes nothing and no reveal control is offered.
     expect(resolveGraphContent(deriveFreeTextSensitivity(), "k", { revealed: new Set(["k"]) })).toEqual({
       show: true,
       masked: false,
-      revealable: true,
+      revealable: false,
     });
   });
 });
@@ -152,27 +153,26 @@ describe("2N-PRIVACY-005: removed, foreign and unreadable are indistinguishable"
       );
       expect(outcomes[0]).toEqual(outcomes[1]);
       expect(outcomes[1]).toEqual(outcomes[2]);
-      expect(outcomes[0]).toEqual({ show: false, masked: true, revealable: true });
+      // ADR-178: the fail-closed level is now shown, identically for all three.
+      expect(outcomes[0]).toEqual({ show: true, masked: false, revealable: false });
     }
   });
 });
 
-describe("2N-PRIVACY-009: people.notes is masked by default and cannot be inferred", () => {
+describe("2N-PRIVACY-009: people.notes resolves to the most protective level and cannot be inferred", () => {
   it("resolves to the most protective level", () => {
     expect(deriveFreeTextSensitivity()).toEqual({ kind: "derived", level: "highly_sensitive" });
   });
 
-  it("is NOT `undetermined`, which is the arm that renders in the clear", () => {
-    // The negative control that matters most in this file. `undetermined` and
-    // "masked by default" are both absences, and picking the wrong one publishes
-    // the note.
+  it("is NOT `undetermined`, and is still shown in the clear", () => {
+    // ADR-178: the derived level is kept, but it is shown like every level.
     const notes = deriveFreeTextSensitivity();
     expect(notes).not.toEqual({ kind: "undetermined" });
     expect(isDerivedLevel(notes)).toBe(true);
     expect(resolvePersonContent(notes, "notes")).toEqual({
-      show: false,
-      masked: true,
-      revealable: true,
+      show: true,
+      masked: false,
+      revealable: false,
     });
   });
 
@@ -187,23 +187,15 @@ describe("2N-PRIVACY-009: people.notes is masked by default and cannot be inferr
     expect(deriveFreeTextSensitivity()).toEqual(deriveFreeTextSensitivity());
   });
 
-  it("stays masked after a reveal of a DIFFERENT key", () => {
-    // One reveal must not leak into another item.
-    const revealed = { revealed: new Set(["some-other-item"]) };
-    expect(resolvePersonContent(deriveFreeTextSensitivity(), "notes", revealed)).toEqual({
-      show: false,
-      masked: true,
-      revealable: true,
-    });
-  });
-
-  it("is revealable locally by its own key, and only its own", () => {
-    const revealed = { revealed: new Set(["notes"]) };
-    expect(resolvePersonContent(deriveFreeTextSensitivity(), "notes", revealed)).toEqual({
-      show: true,
-      masked: false,
-      revealable: true,
-    });
+  it("is shown whatever the reveal state, with no reveal control", () => {
+    // ADR-178: reveal state no longer changes what a note renders.
+    for (const keys of [[], ["some-other-item"], ["notes"]]) {
+      expect(resolvePersonContent(deriveFreeTextSensitivity(), "notes", { revealed: new Set(keys) })).toEqual({
+        show: true,
+        masked: false,
+        revealable: false,
+      });
+    }
   });
 });
 
@@ -297,12 +289,14 @@ describe("mutation controls: the assertions above fail when the rule is wrong", 
     const wrong = { kind: "undetermined" } as const;
     expect(wrong).not.toEqual(deriveFreeTextSensitivity());
     // And the rendered consequence differs, which is the part that matters.
+    // ADR-178: both now render in the clear; the derivation still differs.
     expect(resolvePersonContent(wrong, "notes").show).toBe(true);
-    expect(resolvePersonContent(deriveFreeTextSensitivity(), "notes").show).toBe(false);
+    expect(resolvePersonContent(deriveFreeTextSensitivity(), "notes").show).toBe(true);
   });
 
-  it("a surface that dropped sensitive rows would produce a count the mask does not", () => {
-    // `2N-PRIVACY-004`. Masking keeps the row; excluding it changes the length.
+  it("a surface that dropped sensitive rows would produce a count the contract does not", () => {
+    // `2N-PRIVACY-004`. ADR-178: every row is shown, so filtering on `show`
+    // keeps both rows; dropping the sensitive one changes the length.
     const rows = [
       { id: "a", sensitivity: "normal" },
       { id: "b", sensitivity: "highly_sensitive" },
@@ -312,10 +306,12 @@ describe("mutation controls: the assertions above fail when the rule is wrong", 
       const answer = resolvePersonContent(deriveSubjectSensitivity(row.id, levels), row.id);
       return answer.show || answer.masked;
     });
-    const dropped = rows.filter(
+    const shown = rows.filter(
       (row) => resolvePersonContent(deriveSubjectSensitivity(row.id, levels), row.id).show,
     );
+    const dropped = rows.filter((row) => row.sensitivity !== "highly_sensitive");
     expect(masked).toHaveLength(2);
+    expect(shown).toHaveLength(2);
     expect(dropped).toHaveLength(1);
   });
 });

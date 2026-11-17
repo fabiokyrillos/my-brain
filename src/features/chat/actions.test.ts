@@ -630,7 +630,7 @@ describe("Life Brain B.2: tasks and reminders are knowledge sources (LB-B-006)",
     expect(JSON.stringify(citations)).not.toContain("Exame de sangue");
   });
 
-  it("never sends the model a task whose source entry is highly sensitive", async () => {
+  it("sends the model a task whose source entry is highly sensitive", async () => {
     supabaseWith({
       tasks: [{ id: SECRET, title: "Exame da biópsia", status: "todo", due_at: null, planned_at: null, source_entry_id: "e-secret", created_at: "2026-11-02T12:00:00Z" }],
       entries: [{ id: "e-secret", sensitivity: "highly_sensitive" }],
@@ -640,11 +640,11 @@ describe("Life Brain B.2: tasks and reminders are knowledge sources (LB-B-006)",
 
     await expect(sendChatMessage(idleState, form({ question: "Quais exames estão pendentes?" }))).rejects.toThrow("NEXT_REDIRECT");
 
-    // Withheld before the prompt is built, so with nothing else this is the
-    // fixed "não encontrei" and the provider is not asked at all.
-    expect(stub.answerFromKnowledge).not.toHaveBeenCalled();
-    expect((insertedAssistantMessage?.citations as { evidence: string }).evidence).toBe("no_qualifying_evidence");
-    expect(JSON.stringify(insertedAssistantMessage)).not.toContain("biópsia");
+    // Life Brain E.8 (ADR-178): nothing is withheld from the owner's own
+    // chat, so the task reaches the prompt like any other.
+    expect(stub.answerFromKnowledge).toHaveBeenCalledTimes(1);
+    const sent = stub.answerFromKnowledge.mock.calls[0]![0].sources;
+    expect(sent.map((source) => source.id)).toEqual([`task:${SECRET}`]);
   });
 });
 
@@ -776,7 +776,7 @@ describe("Life Brain B.3: a dated question is retrieved inside its period (LB-B-
   });
 });
 
-describe("Life Brain B.4: a highly sensitive source reaches the prompt only when asked (LB-B-010)", () => {
+describe("Life Brain B.4 / E.8: a highly sensitive source reaches the prompt like any other (ADR-178)", () => {
   const SECRET_ENTRY = "77777777-7777-4777-8777-777777777777";
   const PLAIN_ENTRY = "88888888-8888-4888-8888-888888888888";
   const HEALTH = "99999999-9999-4999-8999-999999999999";
@@ -812,42 +812,41 @@ describe("Life Brain B.4: a highly sensitive source reaches the prompt only when
     return { sent, citations: insertedAssistantMessage?.citations as Record<string, unknown> };
   }
 
-  it("withholds it from an ordinary question, silently", async () => {
+  // Life Brain E.8 (ADR-178): every level enters the prompt, with or without
+  // an ask, so no answer is marked as having read sensitive content.
+  it("admits it for an ordinary question, without marking the answer", async () => {
     const { sent, citations } = await ask("O que ficou pendente?");
-    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
+    expect(sent).toEqual([`entry:${SECRET_ENTRY}`, `entry:${PLAIN_ENTRY}`]);
     expect(citations.readSensitive).toBeUndefined();
-    // `2K-EXPL-005`: nothing about the withheld source reaches the envelope.
-    expect(JSON.stringify(citations)).not.toMatch(/sensitiv|biópsia/i);
   });
 
-  it("admits it when the owner asks for sensitive content in words, and marks the answer", async () => {
+  it("admits it when the owner asks for sensitive content in words", async () => {
     const { sent, citations } = await ask("O que ficou pendente? Pode incluir os sensíveis.");
     expect(sent).toEqual([`entry:${SECRET_ENTRY}`, `entry:${PLAIN_ENTRY}`]);
-    expect(citations.readSensitive).toBe(true);
+    expect(citations.readSensitive).toBeUndefined();
   });
 
   it("admits it when the question names the area the record is filed under", async () => {
-    const { sent, citations } = await ask("Como estão meus exames de saúde?", {
+    const { sent } = await ask("Como estão meus exames de saúde?", {
       areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: `i-${SECRET_ENTRY}`, entity_id: HEALTH }],
       contexts: [{ id: HEALTH, kind: "health" }],
     });
     expect(sent).toContain(`entry:${SECRET_ENTRY}`);
-    expect(citations.readSensitive).toBe(true);
   });
 
-  it("does not admit it for a question about another area", async () => {
+  it("admits it for a question about another area too", async () => {
     const { sent } = await ask("Quanto gastei com a viagem?", {
       areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: `i-${SECRET_ENTRY}`, entity_id: HEALTH }],
       contexts: [{ id: HEALTH, kind: "health" }],
     });
-    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
+    expect(sent).toEqual([`entry:${SECRET_ENTRY}`, `entry:${PLAIN_ENTRY}`]);
   });
 
-  it("ignores an area link from a reading that is no longer current", async () => {
+  it("admits it whatever reading its area link came from", async () => {
     const { sent } = await ask("Como estão meus exames de saúde?", {
       areaLinks: [{ entry_id: SECRET_ENTRY, interpretation_id: "an-old-reading", entity_id: HEALTH }],
       contexts: [{ id: HEALTH, kind: "health" }],
     });
-    expect(sent).toEqual([`entry:${PLAIN_ENTRY}`]);
+    expect(sent).toEqual([`entry:${SECRET_ENTRY}`, `entry:${PLAIN_ENTRY}`]);
   });
 });

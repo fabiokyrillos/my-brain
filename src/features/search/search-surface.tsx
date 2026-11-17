@@ -6,14 +6,9 @@
  *
  * ## What this component is careful about
  *
- * **The sensitive scope is visible while it is on** (OD-1). A filter that
- * silently widens what you are looking at is worse than no filter, because the
- * user attributes the extra results to the query.
- *
- * **The empty state never hints at what was excluded.** "Nothing found" reads
- * identically whether or not `highly_sensitive` matches exist. Suggesting
- * "try enabling sensitive search" would be an existence oracle with a helpful
- * tone — OD-1 forbids exactly that.
+ * **Nothing is held back.** Since Life Brain E.8 (ADR-178) a search covers
+ * every sensitivity level, so the "include highly sensitive content" toggle,
+ * its hint and its banner are gone.
  *
  * **A failed domain is named** (`2I-SEARCH-007`), and the rest still render. A
  * dropped domain is a wrong answer that looks complete.
@@ -77,7 +72,6 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
   const [query, setQuery] = useState("");
   const [domain, setDomain] = useState<SearchDomain | "">("");
   const [period, setPeriod] = useState<PeriodFilter | "">("");
-  const [sensitiveScope, setSensitiveScope] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -98,7 +92,6 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
         locale,
         domains: domain ? [domain] : undefined,
         period: period || null,
-        sensitiveScope,
       });
       setResponse(result);
       onSearched?.({
@@ -166,27 +159,8 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
               ))}
             </select>
           </label>
-
-          {/* OD-1. Off by default, never persisted, and announced while on. */}
-          <label className="search-sensitive">
-            <input
-              type="checkbox"
-              checked={sensitiveScope}
-              onChange={(event) => setSensitiveScope(event.target.checked)}
-            />
-            <span>{text.sensitiveToggle}</span>
-          </label>
         </div>
-        <p className="search-hint">{text.sensitiveHint}</p>
       </form>
-
-      {/* Visibly active while results are shown, so the user attributes the
-          extra results to the scope rather than to the query. */}
-      {sensitiveScope ? (
-        <p className="search-scope-banner tone-attention" role="status">
-          {text.sensitiveActive}
-        </p>
-      ) : null}
 
       {pending ? <UniversalSkeleton rows={5} label={text.searching} /> : null}
 

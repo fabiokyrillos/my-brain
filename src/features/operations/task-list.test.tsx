@@ -447,12 +447,13 @@ describe("TaskList: withheld content (OD-2L-1 option B)", () => {
     );
   }
 
-  it("withholds the title and the description of a task whose source is protected", () => {
+  it("shows the title and the description of a highly sensitive task in the clear", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     renderTasks([workItem({ title: "Contrato Aurora", description: "Cláusula 7", sensitivity: secret })]);
 
-    expect(screen.queryByText("Contrato Aurora")).toBeNull();
-    expect(screen.queryByText("Cláusula 7")).toBeNull();
-    expect(screen.getByText(getWorkCopy("en").protected.label)).toBeVisible();
+    expect(screen.getByText("Contrato Aurora")).toBeVisible();
+    expect(screen.getByText("Cláusula 7")).toBeVisible();
+    expect(screen.queryByText(getWorkCopy("en").protected.label)).toBeNull();
   });
 
   it("shows an ordinary and a manual task in the clear", () => {
@@ -476,20 +477,19 @@ describe("TaskList: withheld content (OD-2L-1 option B)", () => {
     expect(screen.getByText("Not started")).toBeVisible();
   });
 
-  it("reveals one masked row without revealing another", async () => {
-    const user = userEvent.setup();
+  it("shows every highly sensitive row, with no reveal control", () => {
+    // ADR-178.
     renderTasks([
       workItem({ title: "First secret", sensitivity: secret }),
       workItem({ taskId: OTHER_TASK_ID, title: "Second secret", sensitivity: secret }),
     ]);
 
-    await user.click(screen.getAllByRole("button", { name: getWorkCopy("en").protected.reveal })[0]);
-
     expect(screen.getByText("First secret")).toBeVisible();
-    expect(screen.queryByText("Second secret")).toBeNull();
+    expect(screen.getByText("Second secret")).toBeVisible();
+    expect(screen.queryByRole("button", { name: getWorkCopy("en").protected.reveal })).toBeNull();
   });
 
-  it("keeps a masked row openable", () => {
+  it("keeps a highly sensitive row openable by its own title", () => {
     renderTasks([
       workItem({
         title: "Contrato Aurora",
@@ -498,16 +498,17 @@ describe("TaskList: withheld content (OD-2L-1 option B)", () => {
       }),
     ]);
 
-    expect(screen.getByRole("link", { name: getWorkCopy("en").protected.label }))
+    // ADR-178: the title itself is the link; no protected stub is drawn.
+    expect(screen.getByRole("link", { name: "Contrato Aurora" }))
       .toHaveAttribute("href", "/en/app/work/task-1");
+    expect(screen.queryByRole("link", { name: getWorkCopy("en").protected.label })).toBeNull();
   });
 
-  it("states the partial coverage rather than implying every task is protected", () => {
-    // `2L-PRIVACY-004`. Option B covers tasks that came from a note and nothing
-    // else, and a surface that said nothing would let a user assume otherwise.
+  it("states no partial-coverage note, because nothing is withheld", () => {
+    // ADR-178: the note only explained a mask, and no row is masked any more.
     renderTasks([workItem({ title: "Contrato Aurora", sensitivity: secret })]);
 
-    expect(screen.getByText(getWorkCopy("en").protected.partialCoverage)).toBeInTheDocument();
+    expect(screen.queryByText(getWorkCopy("en").protected.partialCoverage)).toBeNull();
   });
 
   it("does not decide anything itself: the rule comes from the shared component", () => {

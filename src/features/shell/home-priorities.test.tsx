@@ -141,7 +141,7 @@ describe("2J-HOJE-003: overdue and due today are told apart in the markup", () =
   });
 });
 
-describe("2J-PRIVACY-001/004/005: Hoje masks highly_sensitive attention in place", () => {
+describe("2J-PRIVACY-001/004/005: Hoje shows highly_sensitive attention in place (ADR-178)", () => {
   it("renders the entry preview for normal and private", () => {
     for (const level of ["normal", "private"] as const) {
       cleanup();
@@ -150,16 +150,15 @@ describe("2J-PRIVACY-001/004/005: Hoje masks highly_sensitive attention in place
     }
   });
 
-  it("withholds the preview for highly_sensitive", () => {
+  it("renders the preview for highly_sensitive too", () => {
+    // Life Brain E.8 (ADR-178): nothing the owner said is withheld from them.
     renderHome({ attention: [attentionItem({ sensitivity: "highly_sensitive" })] });
-    expect(screen.queryByText("Confirmar proposta do Atlas")).toBeNull();
-    expect(screen.getByText("Conteúdo muito sensível, oculto")).toBeInTheDocument();
+    expect(screen.getByText("Confirmar proposta do Atlas")).toBeInTheDocument();
+    expect(screen.queryByText("Conteúdo muito sensível, oculto")).toBeNull();
   });
 
-  it("keeps the count truthful, because the row is masked rather than dropped", () => {
-    // `2J-PRIVACY-004`. If the sensitive item were filtered out, the header
-    // count would read 1 and the user would have no way to know a second item
-    // existed -- and comparing two renders would reveal it anyway.
+  it("keeps the count truthful, with the sensitive row shown rather than dropped", () => {
+    // `2J-PRIVACY-004`: both rows count, and neither is masked.
     const { container } = renderHome({
       attention: [
         attentionItem({ key: "k1", sensitivity: "normal" }),
@@ -167,7 +166,7 @@ describe("2J-PRIVACY-001/004/005: Hoje masks highly_sensitive attention in place
       ],
     });
     expect(screen.getByText("2")).toBeInTheDocument();
-    expect(container.querySelectorAll('[data-masked="true"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-masked="true"]')).toHaveLength(0);
   });
 
   it("does not announce how many were hidden", () => {

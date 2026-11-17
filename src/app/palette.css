@@ -134,12 +134,8 @@
   padding: var(--space-2) var(--space-3); background: var(--background-surface);
   color: var(--text-primary); font: var(--type-body);
 }
-.search-sensitive { flex-direction: row !important; align-items: center; gap: var(--space-2) !important; font-weight: 600 !important; }
-.search-sensitive input { width: 18px; height: 18px; }
-.search-hint { grid-column: 1 / -1; margin: 0; font: var(--type-caption); color: var(--text-secondary); }
-
-/* Visibly active while results are shown -- OD-1. */
-.search-scope-banner, .search-partial {
+/* A named failed domain (2I-SEARCH-007). */
+.search-partial {
   margin: 0; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md);
   border: 1px solid var(--tone-line); background: var(--tone-bg); color: var(--tone-fg);
   font: var(--type-body); font-weight: 500;

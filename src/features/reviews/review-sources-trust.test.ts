@@ -294,9 +294,11 @@ describe("2Q-TRUST-006: a row cannot disclose a classification by its shape", ()
 describe("2Q-TRUST-007: the phase adds no second sensitivity derivation", () => {
   const contracts = () => read("src/features/sensitivity/contracts.ts");
 
-  it("leaves the RULES row for review_summary byte-unchanged", () => {
+  it("pins the RULES row for review_summary", () => {
+    // Life Brain E.8 (ADR-178) moved highly_sensitive from MASK to SHOW on
+    // every in-app surface; this phase still adds no row of its own.
     expect(contracts())
-      .toContain("review_summary: { normal: SHOW, private: SHOW, highly_sensitive: MASK },");
+      .toContain("review_summary: { normal: SHOW, private: SHOW, highly_sensitive: SHOW },");
   });
 
   it("leaves GOVERNED_SURFACES byte-unchanged", () => {
@@ -331,9 +333,9 @@ describe("2Q-TRUST-007: the phase adds no second sensitivity derivation", () => 
     // `revealable: true` is the exact fact that made option C the only way to
     // honour "no reveal control" without editing the RULES table — so a variant
     // whose body changed would matter as much as one added.
+    // ADR-178 deleted `MASK`: no surface masks any more.
     expect(variants).toEqual([
       'SHOW { outcome: "show", revealable: false }',
-      'MASK { outcome: "mask", revealable: true }',
       'OMIT { outcome: "omit", revealable: false }',
     ]);
   });

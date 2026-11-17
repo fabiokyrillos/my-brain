@@ -25,9 +25,6 @@ export type SearchCopy = {
   readonly periodAny: string;
   readonly periods: Readonly<Record<PeriodFilter, string>>;
   readonly allTypes: string;
-  readonly sensitiveToggle: string;
-  readonly sensitiveActive: string;
-  readonly sensitiveHint: string;
   readonly idle: string;
   readonly idleHint: string;
   readonly tooShort: string;
@@ -61,16 +58,10 @@ const copy: Record<Locale, SearchCopy> = {
     periodAny: "Qualquer data",
     periods: { "7d": "Últimos 7 dias", "30d": "Últimos 30 dias", "12m": "Últimos 12 meses" },
     allTypes: "Todos os tipos",
-    sensitiveToggle: "Incluir conteúdo muito sensível",
-    sensitiveActive: "Busca sensível ativa",
-    sensitiveHint:
-      "Itens marcados como muito sensíveis ficam fora da busca até você pedir. Isso vale só para esta busca.",
     idle: "Busque em tudo que é seu",
     idleHint: "Tarefas, registros, memórias, pessoas, projetos, organizações e arquivos.",
     tooShort: "Digite pelo menos duas letras.",
     noResults: "Nada encontrado",
-    // Deliberately does NOT say "try enabling sensitive search" -- that would
-    // hint at what was excluded. OD-1.
     noResultsHint: "Tente outra palavra ou remova os filtros.",
     bounded: "Mostrando os primeiros resultados. Refine a busca para ver menos e melhores.",
     domainBounded: "mais resultados neste tipo",
@@ -98,10 +89,6 @@ const copy: Record<Locale, SearchCopy> = {
     periodAny: "Any date",
     periods: { "7d": "Last 7 days", "30d": "Last 30 days", "12m": "Last 12 months" },
     allTypes: "All types",
-    sensitiveToggle: "Include highly sensitive content",
-    sensitiveActive: "Sensitive search active",
-    sensitiveHint:
-      "Items marked highly sensitive stay out of search until you ask. This applies to this search only.",
     idle: "Search everything of yours",
     idleHint: "Tasks, records, memories, people, projects, organizations and files.",
     tooShort: "Type at least two letters.",
