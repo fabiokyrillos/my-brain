@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { useActionState, useMemo } from "react";
-import { CheckCheck, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 
 /**
  * Slice 2P.1 — the terminal act on an entry whose only remaining "decision" is
@@ -12,6 +12,10 @@ import { CheckCheck, RotateCcw } from "lucide-react";
  * decision to the database contract, and it renders whatever that contract
  * answered. When the contract refuses because a real decision is still open,
  * the refusal is what the owner sees — the panel has no opinion of its own.
+ *
+ * Drawn as the record page's other suggestions are (ADR-184): a question in the
+ * reading face and its answer beside it, not a boxed panel with a heading and a
+ * full-width primary button. The form and its four fields are unchanged.
  */
 export type ConfirmationActionState = {
   status: "idle" | "success" | "error";
@@ -28,18 +32,18 @@ const idleState: ConfirmationActionState = { status: "idle", message: "" };
 
 const copy = {
   "pt-BR": {
-    heading: "Nada mais a decidir",
-    hint: "Revise a interpretação e confirme para tirar esta entrada da fila.",
-    confirm: "Confirmar interpretação",
+    question: "A leitura está certa?",
+    hint: "Confirmar tira este registro da fila.",
+    confirm: "Confirmar leitura",
     confirming: "Confirmando…",
     undo: "Desfazer",
     undoing: "Desfazendo…",
     backToQueue: "Voltar para a fila",
   },
   en: {
-    heading: "Nothing left to decide",
-    hint: "Read the interpretation and confirm to take this entry out of the queue.",
-    confirm: "Confirm interpretation",
+    question: "Is the reading right?",
+    hint: "Confirming takes this record out of the queue.",
+    confirm: "Confirm reading",
     confirming: "Confirming…",
     undo: "Undo",
     undoing: "Undoing…",
@@ -78,41 +82,45 @@ export function ConfirmationPanel({
   const confirmed = confirmState.status === "success" && undoState.status !== "success";
 
   return (
-    <section className="no-action-state" aria-live="polite">
-      <h2>{text.heading}</h2>
-      <p>{text.hint}</p>
-
+    <div aria-label={text.question} className="record-question" role="group">
       {confirmed ? null : (
-        <form action={confirm} className="candidate-form">
-          <input type="hidden" name="entryId" value={entryId} />
-          <input type="hidden" name="interpretationId" value={interpretationId} />
-          <input type="hidden" name="operationKey" value={operationKey} />
-          <input type="hidden" name="locale" value={locale} />
-          <Button className="form-primary-action" icon={<CheckCheck />} loading={confirming} type="submit" variant="primary" width="full">
-            {confirming ? text.confirming : text.confirm}
-          </Button>
-        </form>
+        <>
+          <p className="record-question-text">{text.question}</p>
+          <p className="record-question-meta">{text.hint}</p>
+          <form action={confirm} className="record-question-actions">
+            <input type="hidden" name="entryId" value={entryId} />
+            <input type="hidden" name="interpretationId" value={interpretationId} />
+            <input type="hidden" name="operationKey" value={operationKey} />
+            <input type="hidden" name="locale" value={locale} />
+            <Button loading={confirming} type="submit">
+              {confirming ? text.confirming : text.confirm}
+            </Button>
+          </form>
+        </>
       )}
 
-      {confirmState.message ? <p>{confirmState.message}</p> : null}
-      {undoState.message ? <p>{undoState.message}</p> : null}
-
-      {confirmed && confirmState.undoId ? (
-        <form action={undo} className="undo-action">
-          <input type="hidden" name="entryId" value={entryId} />
-          <input type="hidden" name="undoId" value={confirmState.undoId} />
-          <input type="hidden" name="locale" value={locale} />
-          <Button icon={<RotateCcw />} loading={undoing} type="submit">
-            {undoing ? text.undoing : text.undo}
-          </Button>
-        </form>
-      ) : null}
+      {confirmState.status === "error" ? <p className="form-error" role="alert">{confirmState.message}</p> : null}
 
       {confirmed ? (
-        <p>
-          <a href={`/${locale}/app/inbox`}>{text.backToQueue}</a>
-        </p>
+        <div className="confirmation-result">
+          <p aria-live="polite" role="status">{confirmState.message}</p>
+          {confirmState.undoId ? (
+            <form action={undo} className="undo-action">
+              <input type="hidden" name="entryId" value={entryId} />
+              <input type="hidden" name="undoId" value={confirmState.undoId} />
+              <input type="hidden" name="locale" value={locale} />
+              <Button icon={<RotateCcw />} loading={undoing} type="submit">
+                {undoing ? text.undoing : text.undo}
+              </Button>
+            </form>
+          ) : null}
+          <a className="record-question-link" href={`/${locale}/app/inbox`}>{text.backToQueue}</a>
+        </div>
       ) : null}
-    </section>
+
+      {undoState.message ? (
+        <p className="record-question-meta" role={undoState.status === "error" ? "alert" : "status"}>{undoState.message}</p>
+      ) : null}
+    </div>
   );
 }

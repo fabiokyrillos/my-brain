@@ -67,15 +67,22 @@ export function ReviewIdentity({
  * *original → interpretação → ações → painel de explicação → técnico*, and a
  * heading level that disagreed with that order would make the reading order and
  * the document outline tell two different stories.
+ *
+ * `correction` is the way to correct this reading, drawn at its end: one looks
+ * here when the reading is wrong, not at the bottom of the actions. It is a
+ * slot, so this module holds no Server Action and decides nothing about who may
+ * correct — the page passes the editor only when the record allows it.
  */
 export function ReviewUnderstanding({
   view,
   locale,
   agentName,
+  correction,
 }: {
   view: InterpretationReviewView;
   locale: DailyCycleLocale;
   agentName: string;
+  correction?: ReactNode;
 }) {
   const pt = locale === "pt-BR";
   const statusCopy = getDailyCycleCopy(locale, agentName).productStates[view.productState];
@@ -106,6 +113,7 @@ export function ReviewUnderstanding({
       {view.productState === "organizing" && (
         <p className="review-organizing-note"><Sparkles size={14} aria-hidden="true" />{statusCopy.description}</p>
       )}
+      {correction}
     </section>
   );
 }
@@ -284,6 +292,8 @@ export function CandidateOutcomeHistory({
 export type EntryReviewSlots = {
   attentionAction?: ReactNode;
   attentionDetail?: string | null;
+  /** The control that corrects the reading; rendered at the end of the reading. */
+  correction?: ReactNode;
   nextActions: ReactNode;
   technicalDetails?: ReactNode;
 };
@@ -354,7 +364,7 @@ export function EntryReview({
       <div className="record-detail-columns">
         <div className="record-decision">
           <OriginalRecord original={view.original} locale={locale} />
-          <ReviewUnderstanding view={view} locale={locale} agentName={agentName} />
+          <ReviewUnderstanding view={view} locale={locale} agentName={agentName} correction={slots.correction} />
           <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
             {slots.attentionAction}
           </ReviewAttention>

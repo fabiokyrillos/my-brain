@@ -44,7 +44,7 @@ describe("InterpretationRevisionEditor", () => {
     expect(screen.getByText("Resumo original")).toBeVisible();
     expect(screen.queryByRole("textbox", { name: "Resumo" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir" }));
 
     expect(screen.getByRole("textbox", { name: "Resumo" })).toHaveValue("Resumo original");
     expect(screen.getByRole("checkbox", { name: /Nota sobre pessoa/ })).toBeChecked();
@@ -58,7 +58,7 @@ describe("InterpretationRevisionEditor", () => {
 
   it("supports dates, classifications, cancellation, undo, and bounded reprocessing controls", () => {
     render(<InterpretationRevisionEditor {...props} />);
-    fireEvent.click(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" }));
+    fireEvent.click(screen.getByRole("button", { name: "Corrigir" }));
 
     expect(screen.getByLabelText("Data identificada 1")).toHaveValue("2026-07-18");
     fireEvent.click(screen.getByRole("button", { name: "Adicionar data" }));
@@ -71,10 +71,28 @@ describe("InterpretationRevisionEditor", () => {
     expect(screen.getByRole("button", { name: "Reinterpretar entrada" })).toHaveAttribute("type", "submit");
   });
 
+  /**
+   * Closed, the editor sits at the end of the reading as quiet links. A primary
+   * button there would compete with the page's decisions, and the product
+   * allows one primary control per view.
+   */
+  it("is a line of quiet links while closed, in both locales", () => {
+    const { container, unmount } = render(<InterpretationRevisionEditor {...props} showSummary={false} />);
+    expect(container.querySelector(".ui-button--primary")).toBeNull();
+    for (const name of ["Corrigir", "Desfazer última correção", "Reinterpretar entrada"]) {
+      expect(screen.getByRole("button", { name })).toHaveClass("ui-button--link");
+    }
+    unmount();
+
+    render(<InterpretationRevisionEditor {...props} locale="en" showSummary={false} />);
+    expect(screen.getByRole("button", { name: "Correct" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Reinterpret entry" })).toHaveAttribute("type", "submit");
+  });
+
   it("omits the redundant current-summary paragraph when the caller already displays it elsewhere", () => {
     render(<InterpretationRevisionEditor {...props} showSummary={false} />);
 
     expect(screen.queryByText("Resumo original")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Ajustar o que o Brain entendeu" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Corrigir" })).toBeVisible();
   });
 });

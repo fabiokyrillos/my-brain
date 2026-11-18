@@ -58,6 +58,27 @@ Verification: `npm test` 591 files / 10,835 tests; typecheck and lint clean; sta
 
 What changed in behaviour and is not recoverable from the screen: a mixed batch (create one suggestion and reject another in one request) no longer exists, and each tap is its own undo. Not verified: a real write; `e2e/editable-candidate-confirmation.spec.ts`, rewritten for the new controls and not run; the open editor inside the new row at phone width; whether the editor drops a reference to a sibling that was ignored after it was chosen.
 
+## Third step, 2026-11-18 — events, birthdays, memory, confirmation, correction (branch `design/registro-demais-sugestoes`)
+
+Everything the page asks is now one list of questions in one shape.
+
+| Kind | Before | After | Request |
+| --- | --- | --- | --- |
+| Event | A heading, a lead, a checkbox list and one primary button | `Pôr “…” na agenda?` with *Pôr na agenda* · *Agora não*; an event already on the agenda is a statement with *Cancelar* | Same action and fields, one event per request |
+| Birthday | A heading, an icon line, small buttons | A question with *Guardar aniversário* · *Não, obrigado* | Identical (same native form) |
+| Memory | A heading, a lead and a dashed card with its fields always open | `Guardar isto como memória?` with *Guardar memória* · *Descartar* · *Ajustar* | Same action and fields |
+| Confirmation | A centred panel with a full-width primary | `A leitura está certa?` with *Confirmar leitura* | Identical |
+| Nothing to do | Standing boxes | One quiet sentence, only when nothing else is asked | — |
+| Correcting the reading | An editor at the foot of the actions | *Corrigir* · *Reinterpretar entrada* under the reading | Unchanged |
+
+*Agora não* and *Descartar* write nothing, as unchecking a box and dismissing the card did; an event declined that way returns on reload, because no server-side decline exists.
+
+Images, one fixture holding every kind, 390, light: [before](evidence/registro/v3-antes-mobile.png) · [after](evidence/registro/v3-depois-mobile.png) · [after, 1280](evidence/registro/v3-depois-desktop.png). 2,804px → 2,254px; no target under 44px at 390 (four before).
+
+Verification: `npm test` passed after one test of the new event form was made to await its result line (it had failed once under a loaded run and passed three times alone); typecheck and lint clean; static specs 387 passed, 5 skipped, including a new geometry check that all rows share edges, padding and hairline at 390 and 320.
+
+Not verified: any real write; `e2e/intelligent-capture.spec.ts`, whose two selectors were updated and which was already stale; dark, `en`, the open revision form and the open *Ajustar* fields as images.
+
 ## Left open
 
 - The event, memory and birthday candidates are still forms (tasks followed on 2026-11-18, above).

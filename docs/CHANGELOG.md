@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-18 — The record's other suggestions are questions of the same list (ADR-184, continued)
+
+- Events (`events/event-candidate-form.tsx`), birthdays (`birthdays/birthday-proposal.tsx`), the memory proposal (new `memories/record-memory-question.tsx`; the chat's `MemoryProposalCard` keeps its card) and the confirmation (`interpretations/confirmation-panel.tsx`) are rows like tasks and people: a question, a caption, the answers. Each tap sends the request the old form sent for that decision.
+- Events are one request per event: `confirm_entry_event_candidates` inserts each index independently and events never reference one another, so there is no "confirm all". The operation key is renewed after each success.
+- "Somente registro" / "Nenhuma tarefa necessária" are one quiet sentence, drawn only when the list asks nothing else. Correcting the reading (*Corrigir*, *Reinterpretar entrada*) sits under the reading, through a new `correction` slot on `EntryReviewSlots`.
+- Fixed on the way: in the event form, an undo that had succeeded hid every later confirmation's message and undo for the rest of the visit.
+- No Server Action, RPC or migration changed. 2,804px → 2,254px at 390px with a fixture holding every kind of suggestion. Record: `docs/reports/editorial-calmo/REGISTRO.md`.
+
 ## 2026-11-18 — Hoje greets by the hour and by name, and stops listing a noticed task twice
 
 - `features/shell/greeting.ts` (new, pure): the part of the day from an instant and the owner's zone; the first word of `profiles.display_name` as the name, never a placeholder or an e-mail address. `home-dashboard.tsx` reads the name in its own settled slot and greets without it when the read fails; an unsupported zone greets "Olá".

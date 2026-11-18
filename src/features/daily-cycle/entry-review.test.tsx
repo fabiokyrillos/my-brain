@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import type { AttentionItemView, EntryOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
@@ -82,6 +82,55 @@ describe("ReviewUnderstanding", () => {
 
     rerender(<ReviewUnderstanding agentName="Brain" view={baseView({ productState: "ready" })} locale="pt-BR" />);
     expect(screen.queryByText("O Brain está organizando este registro.")).not.toBeInTheDocument();
+  });
+
+  /**
+   * "Corrigir" sits where one looks when the reading is wrong. It arrives as a
+   * slot, so this module holds no Server Action and no opinion about who may
+   * correct: with nothing passed, nothing is offered.
+   */
+  it("renders the correction control inside the reading, after the reading itself", () => {
+    render(
+      <ReviewUnderstanding
+        agentName="Brain"
+        correction={<button type="button">Corrigir</button>}
+        locale="pt-BR"
+        view={baseView()}
+      />,
+    );
+
+    const reading = screen.getByRole("region", { name: "O que o Brain entendeu" });
+    const control = within(reading).getByRole("button", { name: "Corrigir" });
+    const body = screen.getByText("Ligar para a Marina sobre o contrato do Atlas");
+    expect(body.compareDocumentPosition(control) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("offers no correction when the page passes none", () => {
+    render(<ReviewUnderstanding agentName="Brain" locale="pt-BR" view={baseView()} />);
+    expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("EntryReview — the correction slot", () => {
+  it("places the slot under the reading and before the decisions, once", () => {
+    render(
+      <EntryReview
+        agentName="Brain"
+        locale="pt-BR"
+        occurredAtLabel="18 de julho de 2026, 09:00"
+        slots={{
+          correction: <button type="button">Corrigir</button>,
+          nextActions: <button type="button">Criar tarefa</button>,
+        }}
+        timeZone={OWNER_TIME_ZONE}
+        view={baseView()}
+      />,
+    );
+
+    const controls = screen.getAllByRole("button").map((button) => button.textContent);
+    expect(controls).toEqual(["Corrigir", "Criar tarefa"]);
+    expect(within(screen.getByRole("region", { name: "O que o Brain entendeu" })).getByRole("button", { name: "Corrigir" })).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Próximas ações" })).queryByRole("button", { name: "Corrigir" })).toBeNull();
   });
 });
 
