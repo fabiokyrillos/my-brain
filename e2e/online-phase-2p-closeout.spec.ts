@@ -399,7 +399,7 @@ test.describe("Phase 2P closeout — access and phone evidence", () => {
       list to grow — which is how an inherited residual quietly becomes a pass.
     */
     const scopes = [
-      { route: "/pt-BR/app/reminders", selector: ".reminder-compose-open, .reminder-button" },
+      { route: "/pt-BR/app/reminders", selector: ".reminder-compose-open, .reminder-verb, .reminder-row-title, .reminder-view" },
       { route: "/pt-BR/app/settings", selector: ".settings-nav a" },
       { route: "/pt-BR/app/relations?view=list", selector: ".relations-tabs a" },
       { route: "/pt-BR/app/calendar?orientation=month", selector: ".agenda-lenses a" },

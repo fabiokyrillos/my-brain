@@ -215,6 +215,19 @@ describe("2M-CAL-011: every state is distinguishable from every other", () => {
     expect(screen.getByText("Nada marcado para este período com os filtros atuais.")).toBeTruthy();
   });
 
+  it("says an empty period once: the count caption holds nothing above the line that says it", () => {
+    // ADR-180. "0 itens neste período" directly over "Nada marcado para este
+    // período." was one fact twice. The live region stays, so the next period's
+    // count is still a change to announce.
+    view({ projection: projection({ days: [{ date: "2026-08-15", isToday: true, items: [] }] }) });
+    const summary = document.querySelector(".calendar-summary") as HTMLElement;
+    expect(summary).not.toBeNull();
+    expect(summary).toHaveAttribute("aria-live", "polite");
+    expect(summary.textContent).toBe("");
+    expect(screen.queryByText(/0 itens/)).toBeNull();
+    expect(document.querySelectorAll(".calendar-empty")).toHaveLength(1);
+  });
+
   it("names the lanes that failed instead of showing a day that looks empty", () => {
     view({ projection: projection({
       days: [{ date: "2026-08-15", isToday: true, items: [item()] }],

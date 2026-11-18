@@ -1,186 +1,572 @@
 /*
- * Reminders (UX-12).
+ * Reminders (UX-12; recomposed under ADR-180).
  *
- * The page reuses `.content-page`, `.list-header`, `.list-stack`, `.list-row`,
- * `.list-meta`, `.status-badge` and `.empty-list` from the shared styles — a
- * reminder is a list row, and the slice that gave it a lifecycle should not also
- * give it a private layout. What is here is the part that did not exist before:
- * the view selector, the schedule/subject lines inside a row, and the lifecycle
- * controls with their three disclosure panels.
+ * Lembretes is the Agenda's third lens, so it is drawn in the Agenda's grammar
+ * (`calendar.css`): the masthead with the page's subject in the reading face, a
+ * section as a heading over a hairline, and an item as a row — when · what ·
+ * one caption · one verb — whose title is the link. The reminder's own page is
+ * the task page's shape: the text as the subject and its facts as one list of
+ * rows, each opened in place.
  *
- * Two rules shape the whole file:
+ * Three rules shape the whole file:
  *
- * 1. **Every interactive target is at least 44 px tall on the narrow layout.**
- *    The controls sit inside a list row that already carries text, so without a
- *    floor the buttons collapse to their line height at 375 px.
- * 2. **The controls wrap rather than scroll.** A row can carry four of them plus
- *    a select; at 375 px they stack, and nothing is reachable only by dragging.
+ * 1. **Every interactive target is at least 44 px tall**, at every width.
+ * 2. **Nothing is wider than the screen**: every grid has a track that can
+ *    shrink and every title can break.
+ * 3. **Tokens only**, so the dark theme is the same file.
  */
 
+/* ------------------------------------------------------------------------- */
+/* The masthead's subject                                                    */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * What Calendário and Planejar do with their period: the subject on a line of
+ * its own, then the count with the page's one action ending its line.
+ */
+.reminders-subject {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-width: 0;
+}
+
+.reminders-subject-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font: var(--type-title-1);
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.reminders-subject-caption {
+  margin: 0;
+  min-width: 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* ------------------------------------------------------------------------- */
+/* The list                                                                  */
+/* ------------------------------------------------------------------------- */
+
+/*
+ * The page-level outcome. Always in the DOM, even when empty: a live region has
+ * to exist before its text arrives, or the change that fills it is not a change
+ * to announce. It takes no room until it has something to say.
+ */
+.reminder-page-feedback .reminder-feedback {
+  margin: 0 0 var(--space-3);
+}
+
+.reminder-groups {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  min-width: 0;
+  margin-top: var(--space-5);
+}
+
+.reminder-empty {
+  margin-top: var(--space-5);
+}
+
+.reminder-group {
+  min-width: 0;
+}
+
+/* A section is a heading over a hairline. */
+.reminder-group-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  margin: 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  font: var(--type-section);
+}
+
+.reminder-group[data-group="today"] .reminder-group-heading {
+  border-bottom-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.reminder-group-count {
+  color: var(--text-muted);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* What is true of every row of the section, said once. */
+.reminder-group-note {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* Amber says one thing — this needs you — and it comes with words. */
+.reminder-group[data-group="late"] .reminder-group-heading,
+.reminder-group[data-group="late"] .reminder-group-note {
+  color: var(--tone-attention-fg);
+}
+
+.reminder-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * One row: when · what · one caption · one verb.
+ *
+ * The hour has its own column in tabular figures, so a section is read down
+ * its left edge. The words are the reading face at full ink; the caption is
+ * the interface's. The title's link covers the row, so the row is the link;
+ * the verb sits above that cover and stays its own target.
+ */
+.reminder-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: var(--space-3);
+  min-width: 0;
+  min-height: var(--row-comfortable);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+/* A section of one day needs room for the hour only. */
+.reminder-group[data-group="today"] .reminder-row,
+.reminder-group[data-group="tomorrow"] .reminder-row {
+  grid-template-columns: 3.75rem minmax(0, 1fr) auto;
+}
+
+.reminder-row-when {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding-top: 3px;
+  min-width: 0;
+  color: var(--text-primary);
+  font: var(--type-label);
+  font-variant-numeric: tabular-nums;
+}
+
+.reminder-row-day {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.reminder-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The link is a full target by itself, and its cover makes the row one. */
+.reminder-row-title {
+  display: block;
+  margin-block: -11px;
+  padding-block: 11px;
+  color: var(--text-primary);
+  font: var(--type-reading);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+
+.reminder-row-title::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.reminder-row-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.reminder-row-title:focus-visible { outline: none; }
+.reminder-row-title:focus-visible::after { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
+/* What will not fire again steps back, so what is still ahead is what is read. */
+.reminder-row.sent .reminder-row-title,
+.reminder-row.cancelled .reminder-row-title,
+.reminder-row.snoozed .reminder-row-title { color: var(--text-secondary); }
+.reminder-row.sent .reminder-row-when,
+.reminder-row.cancelled .reminder-row-when,
+.reminder-row.snoozed .reminder-row-when { color: var(--text-muted); }
+
+.reminder-row-caption {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+/* The point follows a part rather than leading the next, so a caption that
+   wraps never opens a line with one. */
+.reminder-row-caption > span:not(.sr-only):not(:last-child)::after {
+  content: "·";
+  margin-inline-start: var(--space-2);
+}
+
+.reminder-important {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* The row's one verb: words, not a box. */
+.reminder-row-verb {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  margin-block: -11px 0;
+  padding-top: 8px;
+}
+
+.reminder-verb {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: var(--type-label);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.reminder-verb:hover:not(:disabled) { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+.reminder-verb:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+.reminder-verb:disabled { cursor: progress; }
+
+.reminder-row > .reminder-feedback {
+  grid-column: 2 / -1;
+  margin: var(--space-1) 0 0;
+}
+
+/*
+ * The other views: one quiet line under the list.
+ *
+ * Selection is carried by `aria-current`, not by a class: the attribute is what
+ * a screen reader announces, and styling from it keeps the visual state and the
+ * announced state from ever disagreeing.
+ */
 .reminder-views {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 0 var(--space-3);
+  margin-top: var(--space-6);
+  color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 .reminder-view {
   display: inline-flex;
   align-items: center;
-  min-height: 40px;
-  padding: 0 14px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  background: var(--background-surface);
-  color: var(--text-secondary);
-  font: 650 13px var(--font-ui);
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
   text-decoration: none;
 }
 
-.reminder-view:hover {
-  border-color: var(--link);
-  color: var(--link);
-}
+.reminder-view:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-/*
- * Selection is carried by `aria-current`, not by the class alone: the attribute
- * is what a screen reader announces, and styling from it keeps the visual state
- * and the announced state from ever disagreeing.
- */
 .reminder-view[aria-current="page"] {
-  border-color: var(--link);
-  background: var(--tone-information-bg);
-  color: var(--link);
+  color: var(--text-primary);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
 }
 
-/*
- * The page-level outcome. Always in the DOM, even when empty: a live region has
- * to exist before its text arrives, or the change that fills it is not a change
- * to announce. `min-height` keeps the list from jumping when it fills.
- */
-.reminder-page-feedback {
-  min-height: 22px;
-  margin-bottom: 12px;
+/* ------------------------------------------------------------------------- */
+/* One reminder                                                              */
+/* ------------------------------------------------------------------------- */
+
+.reminder-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  min-width: 0;
+  max-width: 44rem;
 }
 
-.reminder-page-feedback .reminder-feedback {
-  margin-top: 0;
+.reminder-detail-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  min-width: 0;
 }
 
-.reminder-row {
-  align-items: flex-start;
+.reminder-detail-back {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-1);
+  min-height: var(--touch-target);
+  color: var(--text-muted);
+  font: var(--type-label);
+  text-decoration: none;
 }
 
-/* A long, unbroken reminder title must wrap rather than widen the page. */
-.reminder-row .list-row-main strong {
+.reminder-detail-back:hover { color: var(--text-primary); }
+
+/* The reminder's own words: the page's subject. They may wrap; never cut. */
+.reminder-detail-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-title-1);
+  letter-spacing: -0.01em;
   overflow-wrap: anywhere;
+  text-wrap: balance;
 }
 
-.reminder-schedule,
-.reminder-subject {
+.reminder-detail-state {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.reminder-detail-state > span:not(:last-child)::after {
+  content: "·";
+  margin-inline-start: var(--space-2);
+  font-weight: 400;
+}
+
+.reminder-detail-note {
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.reminder-detail-note[data-tone="attention"] { color: var(--tone-attention-fg); }
+
+.reminder-detail-verbs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 6px;
-  color: var(--text-secondary);
+  gap: var(--space-2) var(--space-5);
+  margin-top: var(--space-2);
+}
+
+.reminder-detail-verbs .reminder-row-verb {
+  margin: 0;
+  padding: 0;
+}
+
+/*
+ * The facts: label · value · one quiet verb, the task page's row. The label
+ * sits above the value on a phone and beside it once there is room; `<dd>` is
+ * the grid, so the verb and the opened editor stay inside the definition they
+ * belong to.
+ */
+.reminder-facts { margin: 0; }
+
+.reminder-fact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--space-2) 0 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.reminder-fact dt {
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.reminder-fact dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: var(--touch-target);
+  margin: 0;
+  color: var(--text-primary);
   font: var(--type-body);
 }
 
-.reminder-status-hint {
-  margin-top: 4px;
-  color: var(--text-secondary);
-  font: var(--type-caption);
-}
+.reminder-fact-value { min-width: 0; overflow-wrap: anywhere; }
+.reminder-fact-value[data-empty] { color: var(--text-muted); }
 
-.reminder-overdue {
-  margin-top: 4px;
-  color: var(--tone-attention-fg);
-  font: 650 12.5px var(--font-ui);
-}
-
-.reminder-subject-link,
-.reminder-history-link {
+.reminder-fact-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  min-width: 0;
+  min-height: var(--touch-target);
   color: var(--link);
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
-.reminder-subject-link:hover,
-.reminder-history-link:hover {
-  text-decoration: underline;
-}
+.reminder-fact-link:hover { text-decoration: underline; }
 
-.reminder-subject-kind {
-  font: 700 11px var(--font-mono, inherit);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.reminder-subject-none {
-  font: var(--type-caption);
-  color: var(--text-secondary);
-}
-
-/* ------------------------------------------------------------------------- */
-/* Lifecycle controls                                                        */
-/* ------------------------------------------------------------------------- */
-
-.reminder-actions {
-  margin-top: 12px;
-}
-
-.reminder-action-row {
-  display: flex;
-  flex-wrap: wrap;
+.reminder-fact-verb {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: var(--type-label);
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.reminder-snooze {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+.reminder-fact-verb:hover { text-decoration: underline; }
+.reminder-fact-verb:focus-visible,
+.reminder-risk-verb:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
+@media (min-width: 601px) {
+  .reminder-fact {
+    grid-template-columns: 9rem minmax(0, 1fr);
+    column-gap: var(--space-4);
+    padding-top: 0;
+  }
+  /* Pinned to the value's line, so it does not drift down when the row opens. */
+  .reminder-fact dt {
+    display: flex;
+    align-items: center;
+    align-self: start;
+    min-height: var(--touch-target);
+  }
 }
 
 /*
- * The snooze select's own label. Visible rather than `sr-only`: the control sits
- * next to a button carrying the same word, and hiding the label would leave a
- * sighted user with an unlabelled dropdown while a screen-reader user heard one.
+ * The opened row. Set beside its subject by a rule rather than boxed: it is
+ * the form the surface always had, under the value it changes. Fields are 16px
+ * so a phone does not zoom the page to focus one.
  */
-.reminder-inline-label {
-  font: 700 11px var(--font-mono, inherit);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+.reminder-fact-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+  margin: var(--space-1) 0 var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--border-strong);
 }
 
+.reminder-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.reminder-fact-editor > .reminder-panel { margin: 0; }
+
+.reminder-panel.danger {
+  margin: var(--space-1) 0 var(--space-3);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--tone-risk-line);
+}
+
+.reminder-panel label {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.reminder-panel input[type="text"],
+.reminder-panel input[type="time"],
+.reminder-panel input[type="datetime-local"],
 .reminder-select {
-  min-height: 44px;
-  padding: 0 10px;
-  border: 1px solid var(--border-default);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
+  font: var(--type-lead);
+}
+
+.reminder-panel input:focus-visible,
+.reminder-select:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+
+.reminder-panel .reminder-checkbox,
+.reminder-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  color: var(--text-primary);
   font: var(--type-body);
+}
+
+.reminder-checkbox input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+
+.reminder-panel-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+
+.reminder-panel-body {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+.reminder-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Moving it by a duration: the label, the choice and its verb on one line. */
+.reminder-snooze {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.reminder-inline-label {
+  grid-column: 1 / -1;
+  color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 .reminder-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--border-default);
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
   background: var(--background-surface);
   color: var(--text-primary);
-  font: 650 13px var(--font-ui);
+  font: var(--type-label);
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -189,26 +575,28 @@
   color: var(--link);
 }
 
+.reminder-button:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+
 .reminder-button:disabled {
   opacity: 0.6;
   cursor: progress;
 }
 
 .reminder-button.primary {
-  border-color: var(--link);
-  background: var(--link);
-  color: var(--background-surface);
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
 }
 
 .reminder-button.primary:hover:not(:disabled) {
-  color: var(--background-surface);
-  filter: brightness(1.06);
+  border-color: var(--action-primary-hover);
+  background: var(--action-primary-hover);
+  color: var(--action-primary-text);
 }
 
 /*
- * Cancel is styled apart from the other three because it is the only one that
- * ends a pending delivery — the same reason it is the only one behind a
- * confirmation step.
+ * Cancel is styled apart because it is the only one that ends a pending
+ * delivery — the same reason it is the only one behind a confirmation step.
  */
 .reminder-button.danger {
   border-color: var(--tone-risk-line);
@@ -221,152 +609,46 @@
 }
 
 /*
- * Life Brain D.1 — "Mais": everything past the card's three visible controls.
- *
- * A `<details>` whose panel floats under the trigger, right-aligned; its items
- * are full-width rows, 44px tall, so the menu reads as a list rather than as a
- * second row of buttons.
+ * The foot: where it was recorded, and what ends something. Last on the page,
+ * in the risk tone, and each still asks before it does anything.
  */
-.reminder-snooze-quick { display: flex; }
-.reminder-action-row .reminder-button { white-space: nowrap; }
-
-.reminder-more {
-  position: relative;
-  flex: none;
+.reminder-detail-foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  min-width: 0;
 }
 
-.reminder-more-trigger { list-style: none; }
-/* The panel's own `display` would otherwise lay it out while the menu is closed. */
-.reminder-more:not([open]) > .reminder-more-panel { display: none; }
-.reminder-more-trigger::-webkit-details-marker { display: none; }
-.reminder-more[open] > .reminder-more-trigger { background: var(--background-subtle-strong); }
-
-.reminder-more-panel {
-  position: absolute;
-  z-index: var(--z-sheet);
-  top: calc(100% + 4px);
-  inset-inline-end: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  width: min(20rem, calc(100vw - 2 * var(--gutter, 16px)));
-  padding: 8px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  box-shadow: var(--elevation-2);
-}
-
-.reminder-more-panel .reminder-snooze {
-  padding: 4px 4px 8px;
-  border-bottom: 1px solid var(--border-divider);
-  margin-bottom: 4px;
-}
-
-.reminder-menu-item {
-  display: flex;
+.reminder-history-link {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--text-primary);
-  font: var(--type-body);
-  text-align: start;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
   text-decoration: none;
+}
+
+.reminder-history-link:hover { text-decoration: underline; }
+
+.reminder-risk-verb {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tone-risk-fg);
+  font: var(--type-label);
   cursor: pointer;
 }
 
-.reminder-menu-item:hover { background: var(--background-subtle); }
-.reminder-menu-item.danger { color: var(--tone-risk-fg); }
+.reminder-risk-verb:hover { text-decoration: underline; }
 
-/* The rule's controls inside the menu: rows, not a second button bar. */
-.reminder-more-panel .reminder-series { margin: 0; padding: 4px 0; border-top: 1px solid var(--border-divider); }
-.reminder-more-panel .reminder-series .reminder-action-row { flex-direction: column; align-items: stretch; gap: 2px; }
-.reminder-more-panel .reminder-series .reminder-button { justify-content: flex-start; border: 0; background: none; font: var(--type-body); }
-.reminder-more-panel .reminder-series-hint { margin: 4px 10px; font: var(--type-caption); color: var(--text-muted); }
-
-.reminder-subject-text { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
-
-.reminder-panel {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 14px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-subtle);
-}
-
-.reminder-panel.danger {
-  border-color: var(--tone-risk-line);
-  background: var(--tone-risk-bg);
-}
-
-.reminder-panel label {
-  display: grid;
-  gap: 6px;
-  font: 700 11px var(--font-mono, inherit);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
-}
-
-.reminder-panel input[type="text"],
-.reminder-panel input[type="datetime-local"] {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--background-surface);
-  color: var(--text-primary);
-  font: 400 14px var(--font-ui);
-}
-
-.reminder-checkbox {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-  text-transform: none;
-  letter-spacing: 0;
-  font: 400 13px var(--font-ui);
-  color: var(--text-primary);
-}
-
-.reminder-checkbox input {
-  width: 18px;
-  height: 18px;
-}
-
-/* Current vs proposed, stated together — the distinction UX-12 asks for. */
-.reminder-panel-current {
-  font: var(--type-body);
-  color: var(--text-secondary);
-}
-
-.reminder-panel-title {
-  font: 700 14px var(--font-ui);
-  color: var(--text-primary);
-}
-
-.reminder-panel-body {
-  font: var(--type-body);
-  color: var(--text-secondary);
-}
-
-.reminder-panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
+.reminder-detail-foot .reminder-panel { justify-self: stretch; }
 
 .reminder-feedback {
-  margin-top: 10px;
-  font: 650 13px var(--font-ui);
+  margin: var(--space-2) 0 0;
+  font: var(--type-label);
 }
 
 .reminder-feedback.success {
@@ -377,11 +659,6 @@
   color: var(--tone-risk-fg);
 }
 
-/*
- * The narrow layout. Below 480 px the action row's buttons take the full width
- * so the labels never truncate, and the snooze select and its button share a
- * line rather than each taking one.
- */
 /*
  * `2P-REMINDER-001`/`-002` — the creation action and its dialog.
  *
@@ -418,6 +695,30 @@
 .reminder-compose-open:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 2px;
+}
+
+/*
+ * ADR-180 — in the masthead it is the page's one action and a quiet one: words
+ * and its mark on the caption's line, not a box above the list. What the
+ * dialog leaves behind (its result) takes the full line under it.
+ */
+.reminders-subject .reminder-compose {
+  display: contents;
+}
+
+.reminders-subject .reminder-compose-open {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--link);
+  font: var(--type-label);
+}
+
+.reminders-subject .reminder-compose-open:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.reminders-subject .reminder-compose > :not(.reminder-compose-open) {
+  grid-column: 1 / -1;
 }
 
 /*
@@ -612,72 +913,54 @@
 }
 
 /*
- * Slice 2R.2 — the rule behind a row, the scope question, and the undo.
+ * Slice 2R.2 — the rule behind a reminder, the scope question, and the undo.
  *
- * Every rule below sits ABOVE the one media query in this file, which is not
- * arrangement. `@media (max-width: 480px)` adds no specificity, so a base rule
- * written after it wins at every width and the narrow layout silently stops
- * applying. The narrow overrides for these classes are inside that block, at
- * the end, with the others.
+ * On the reminder's page the rule is a row of the facts list (`data-part="fact"`)
+ * and its ending is a line of the foot (`data-part="end"`). In both the wrapper
+ * dissolves, so its parts are laid out by the row or the foot they sit in.
  */
-.reminder-series {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border-default);
+.reminder-series[data-part="fact"],
+.reminder-series[data-part="end"] {
+  display: contents;
 }
 
 .reminder-series-facts {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
   margin: 0;
 }
 
-.reminder-series-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /*
- * The detached badge reads as a *state*, not as a risk and not as a demand.
- *
- * `information`, deliberately, and the two it is not are the reasoning.
- * `risk` would colour a choice the owner made on purpose as a problem.
- * `attention` is the amber `experience.css:31` reserves **exclusively** for
- * "precisa de você", and a badge that merely reports a fact is not asking for
- * anything — spending that tone here would blunt it where it does mean that.
- *
- * The pair is the token set's own: `#3a6ea5` on `#ecf1f7` measures 4.74:1,
- * which passes AA for the 11px text a `.status-badge` renders.
- */
-.reminder-series-detached {
-  border: 1px solid var(--tone-information-line);
-  background: var(--tone-information-bg);
-  color: var(--tone-information-fg);
-}
-
-/*
- * The rule in words, beside the badge — `2R-SURFACE-003`, slice 2R.3.
- *
- * Not a `.status-badge`: the badge says *that* it repeats and is a chip; this
- * says *how* and is a phrase, sometimes a long one ("Toda última sexta-feira do
- * mês"). Chip styling would either truncate it or stretch a pill across the row.
+ * The rule in words — `2R-SURFACE-003`, slice 2R.3. A phrase, sometimes a long
+ * one ("Toda última sexta-feira do mês"), so it may break.
  */
 .reminder-series-rule {
-  font: var(--type-body);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.reminder-series-rule:not(:last-child)::after {
+  content: "·";
+  margin-inline-start: var(--space-2);
+  color: var(--text-muted);
+}
+
+/*
+ * Detached reads as a *state*, not as a risk and not as a demand: it is a
+ * choice the owner made on purpose, so it is said in the caption's own ink.
+ */
+.reminder-series-detached {
   color: var(--text-secondary);
 }
 
 .reminder-series-hint {
-  margin: 0;
-  font: var(--type-body);
-  color: var(--text-secondary);
-  text-transform: none;
-  letter-spacing: 0;
+  grid-column: 1 / -1;
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 /*
@@ -685,60 +968,44 @@
  *
  * A real `fieldset`/`legend` pair, so the two radios are announced as one group
  * with its question — the accessible shape a `<p>` plus two loose radios does
- * not have. The default browser fieldset border is replaced rather than removed:
- * the grouping has to be visible as well as announced.
+ * not have.
  */
 .reminder-scope {
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--background-surface);
+  padding: 0;
+  border: 0;
 }
 
 .reminder-scope legend {
-  padding: 0 4px;
-  font: 700 11px var(--font-mono, inherit);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  padding: 0;
+  color: var(--text-primary);
+  font: var(--type-label);
 }
 
-/* The time field the series panel adds, matched to the panel's other inputs
-   rather than left to the user-agent default. */
-.reminder-panel input[type="time"] {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--background-surface);
-  color: var(--text-primary);
-  font: 400 14px var(--font-ui);
-}
+.reminder-scope .reminder-series-hint { margin: var(--space-1) 0; }
 
 /*
- * The banner, above the list.
+ * The banner, above the page.
  *
- * `min-height` rather than a conditional render: the live region exists from
- * first paint so its first sentence is a *change* to announce, and reserving its
- * height stops the list jumping when that sentence arrives.
+ * The live region exists from first paint so its first sentence is a *change*
+ * to announce.
  */
 .reminder-series-feedback {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .reminder-series-live {
-  min-height: 20px;
   flex: 1 1 200px;
 }
 
 .reminder-series-live .reminder-feedback {
-  margin-top: 0;
+  margin: 0 0 var(--space-3);
 }
 
 .reminder-series-undo {
@@ -746,37 +1013,21 @@
 }
 
 @media (max-width: 480px) {
-  /* Life Brain D.1: three controls on one row — the two verbs share the width,
-     "Mais" keeps its own. Stacking each at full width was most of the card's
-     height. */
-  .reminder-action-row { flex-wrap: nowrap; }
-  .reminder-action-row > form,
-  .reminder-action-row > button {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .reminder-action-row .reminder-button { padding: 0 10px; }
-  .reminder-action-row > form > .reminder-button { width: 100%; }
-  .reminder-more-panel { inset-inline-end: 0; }
-
-  .reminder-snooze {
-    width: 100%;
-  }
-
-  .reminder-snooze .reminder-select {
-    flex: 1 1 auto;
-  }
-
   .reminder-panel-actions > .reminder-button {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
   }
 
   /* Slice 2R.2. The banner stacks so the undo button keeps a full-width target
-     rather than being squeezed beside the sentence it belongs to, and the live
-     region keeps its reserved height at every width. */
+     rather than being squeezed beside the sentence it belongs to. */
   .reminder-series-feedback {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  /* In a column the row layout's 200px basis is a height: it opened a blank
+     200px band above the list on every phone. */
+  .reminder-series-live {
+    flex: none;
   }
 
   .reminder-series-undo > .reminder-button {
@@ -784,3 +1035,14 @@
     justify-content: center;
   }
 }
+
+/*
+ * The parts of a row and of the page that only need to be allowed to shrink
+ * and break: a grid or flex child keeps its content's width unless told so.
+ */
+.reminder-row-time { white-space: nowrap; }
+.reminder-row-repeats,
+.reminder-row-subject { min-width: 0; overflow-wrap: anywhere; }
+.reminder-detail-section { min-width: 0; }
+.reminder-state { color: var(--text-primary); }
+.reminder-views-label { margin-inline-end: var(--space-1); }

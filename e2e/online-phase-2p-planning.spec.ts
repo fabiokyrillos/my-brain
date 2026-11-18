@@ -331,8 +331,8 @@ test.describe("a reminder is created through a dialog", () => {
      * it resolved the value in the host's zone, so a 09:30 reminder was stored
      * three hours early and rendered as 06:30 to its owner.
      */
-    const schedule = await row.locator(".reminder-schedule").textContent();
-    expect(schedule).toContain("09:30");
+    const schedule = await row.locator(".reminder-row-time").textContent();
+    expect(schedule).toBe("09:30");
 
     /*
      * And it claims **no origin**, because it has none.
@@ -344,8 +344,13 @@ test.describe("a reminder is created through a dialog", () => {
      * Asserted positively and negatively, because a row that rendered nothing at
      * all would pass a check for the absence of a link.
      */
-    await expect(row.locator(".reminder-subject-none")).toHaveText("Sem vínculo");
-    await expect(row.locator(".reminder-subject-link")).toHaveCount(0);
+    // ADR-180: the row names a subject only when there is one; the reminder's
+    // own page says which absence it is.
+    await expect(row.locator(".reminder-row-subject")).toHaveCount(0);
+    await row.getByRole("link", { name: title }).click();
+    const detail = page.locator(".reminder-detail");
+    await expect(detail.locator(".reminder-fact-value[data-empty]").filter({ hasText: "Sem vínculo" })).toHaveCount(1);
+    await expect(detail.locator(".reminder-fact-link")).toHaveCount(0);
   });
 
   test("shows the same month and dialog on a phone", async ({ page }) => {

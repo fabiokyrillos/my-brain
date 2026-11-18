@@ -12,12 +12,20 @@
  *
  * **A failed domain is named** (`2I-SEARCH-007`), and the rest still render. A
  * dropped domain is a wrong answer that looks complete.
+ *
+ * ## Editorial calmo (ADR-180)
+ *
+ * The field is the page: one line to write in, with its verb at the end of it.
+ * The page's name is still its `<h1>`, and is not drawn — the field says it. The
+ * two filters are one closed line that states what it holds when it holds
+ * something. Results are rows under the kind they belong to, the row is the
+ * link, and the words that matched are marked. Before a search there is nothing
+ * but the field and one caption saying what it covers.
  */
 
 import { useId, useState, useTransition } from "react";
 
 import { PageHeader } from "@/components/ui";
-import { SourceCard } from "@/features/experience/trust-components";
 import { UniversalStateView, UniversalSkeleton } from "@/features/experience/universal-state";
 import type { Locale } from "@/lib/preferences";
 
@@ -30,6 +38,7 @@ import {
 } from "./contracts";
 import { formatInstant } from "@/lib/time/instant-format";
 import { getSearchCopy } from "./copy";
+import { groupResults, rowSnippet, splitMatches } from "./presentation";
 
 export type SearchSurfaceProps = {
   readonly locale: Locale;
@@ -105,6 +114,12 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
   }
 
   const failed = (response?.outcomes ?? []).filter((outcome) => outcome.status === "failed");
+  // What the closed filter line holds, in words — so a filter that is narrowing
+  // the next search is never invisible.
+  const activeFilters = [domain ? text.domains[domain] : null, period ? text.periods[period] : null].filter(
+    (value): value is string => value !== null,
+  );
+  const matched = response?.query ?? "";
 
   return (
     <section className="search-surface">
@@ -114,68 +129,76 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
         <label className="sr-only" htmlFor={inputId}>
           {text.inputLabel}
         </label>
-        <input
-          id={inputId}
-          className="search-input"
-          type="search"
-          value={query}
-          placeholder={text.placeholder}
-          onChange={(event) => setQuery(event.target.value)}
-          autoComplete="off"
-        />
-        <button type="submit" className="ux-action ux-action-primary">
-          {text.submit}
-        </button>
-
-        <div className="search-filters">
-          <label htmlFor={typeId}>
-            <span>{text.filterType}</span>
-            <select
-              id={typeId}
-              value={domain}
-              onChange={(event) => setDomain(event.target.value as SearchDomain | "")}
-            >
-              <option value="">{text.allTypes}</option>
-              {SEARCH_DOMAINS.map((key) => (
-                <option key={key} value={key}>
-                  {text.domains[key]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label htmlFor={periodId}>
-            <span>{text.filterPeriod}</span>
-            <select
-              id={periodId}
-              value={period}
-              onChange={(event) => setPeriod(event.target.value as PeriodFilter | "")}
-            >
-              <option value="">{text.periodAny}</option>
-              {PERIOD_FILTERS.map((key) => (
-                <option key={key} value={key}>
-                  {text.periods[key]}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="search-field">
+          <input
+            id={inputId}
+            className="search-input"
+            type="search"
+            value={query}
+            placeholder={text.placeholder}
+            onChange={(event) => setQuery(event.target.value)}
+            autoComplete="off"
+          />
+          <button type="submit" className="search-submit">
+            {text.submit}
+          </button>
         </div>
+
+        <details className="search-filters-disclosure">
+          <summary className="search-filters-summary">
+            <span>{text.filters}</span>
+            {activeFilters.length > 0 ? (
+              <span className="search-filters-active">{activeFilters.join(" · ")}</span>
+            ) : null}
+          </summary>
+          <div className="search-filters">
+            <label htmlFor={typeId}>
+              <span>{text.filterType}</span>
+              <select
+                id={typeId}
+                value={domain}
+                onChange={(event) => setDomain(event.target.value as SearchDomain | "")}
+              >
+                <option value="">{text.allTypes}</option>
+                {SEARCH_DOMAINS.map((key) => (
+                  <option key={key} value={key}>
+                    {text.domains[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label htmlFor={periodId}>
+              <span>{text.filterPeriod}</span>
+              <select
+                id={periodId}
+                value={period}
+                onChange={(event) => setPeriod(event.target.value as PeriodFilter | "")}
+              >
+                <option value="">{text.periodAny}</option>
+                {PERIOD_FILTERS.map((key) => (
+                  <option key={key} value={key}>
+                    {text.periods[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </details>
       </form>
 
       {pending ? <UniversalSkeleton rows={5} label={text.searching} /> : null}
 
-      {!pending && response === null ? (
-        <UniversalStateView
-          state="empty"
-          locale={locale}
-          title={text.idle}
-          description={text.idleHint}
-        />
-      ) : null}
+      {/* Before a search: the field, and one caption saying what it covers. */}
+      {!pending && response === null ? <p className="search-hint">{text.idleHint}</p> : null}
 
       {!pending && response !== null ? (
         <>
-          <p className="sr-only" role="status" aria-live="polite">
+          <p
+            className={response.results.length === 0 ? "sr-only" : "search-count"}
+            role="status"
+            aria-live="polite"
+          >
             {text.resultCount(response.results.length)}
           </p>
 
@@ -187,6 +210,7 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
 
           {response.results.length === 0 ? (
             <UniversalStateView
+              className="ux-state-quiet"
               state="empty"
               locale={locale}
               title={text.noResults}
@@ -194,20 +218,45 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
             />
           ) : (
             <>
-              <ul className="search-results">
-                {response.results.map((result) => (
-                  <li key={`${result.domain}:${result.id}`}>
-                    <SourceCard
-                      kind={result.domain === "entries" ? "entry" : sourceKindFor(result.domain)}
-                      typeLabel={text.domains[result.domain]}
-                      title={result.title}
-                      snippet={result.snippet ?? undefined}
-                      href={result.href}
-                      meta={result.occurredAt ? formatDate(result.occurredAt, locale, timeZone) : undefined}
-                    />
-                  </li>
-                ))}
-              </ul>
+              {groupResults(response.results).map((group) => (
+                <section
+                  aria-labelledby={`${inputId}-${group.domain}`}
+                  className="search-group"
+                  key={group.domain}
+                >
+                  <h2 className="search-group-title" id={`${inputId}-${group.domain}`}>
+                    <span>{text.domainGroups[group.domain]}</span>
+                    <small>{group.results.length}</small>
+                  </h2>
+                  <ul className="search-results">
+                    {group.results.map((result) => {
+                      const snippet = rowSnippet(result);
+                      const date = result.occurredAt ? formatDate(result.occurredAt, locale, timeZone) : "";
+                      return (
+                        <li className="search-result" key={`${result.domain}:${result.id}`}>
+                          {/* A real anchor, so a result survives a middle-click,
+                              the back button and a screen reader's link list. */}
+                          <a className="search-row" href={result.href}>
+                            <span className="search-row-title">
+                              <Marked query={matched} text={result.title} />
+                            </span>
+                            {snippet || date ? (
+                              <span className="search-row-caption">
+                                {date ? <span className="search-row-date">{date}</span> : null}
+                                {snippet ? (
+                                  <span className="search-row-snippet">
+                                    <Marked query={matched} text={snippet} />
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
               {response.totalBounded ? <p className="search-bounded">{text.bounded}</p> : null}
             </>
           )}
@@ -217,23 +266,15 @@ export function SearchSurface({ locale, runSearch, onSearched, timeZone }: Searc
   );
 }
 
-function sourceKindFor(domain: SearchDomain) {
-  switch (domain) {
-    case "tasks":
-      return "task" as const;
-    case "memories":
-      return "memory" as const;
-    case "people":
-      return "person" as const;
-    case "projects":
-      return "project" as const;
-    case "organizations":
-      return "organization" as const;
-    case "files":
-      return "file" as const;
-    default:
-      return "entry" as const;
-  }
+/** A title or a snippet with the matched words marked. Text nodes only. */
+function Marked({ text, query }: { text: string; query: string }) {
+  return (
+    <>
+      {splitMatches(text, query).map((segment, index) =>
+        segment.match ? <mark key={index}>{segment.text}</mark> : <span key={index}>{segment.text}</span>,
+      )}
+    </>
+  );
 }
 
 function formatDate(iso: string, locale: Locale, timeZone: string): string {

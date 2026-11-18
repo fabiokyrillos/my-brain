@@ -109,7 +109,19 @@ async function seedSeries(accessToken: string, title: string) {
 }
 
 const row = (page: Page, title: string) =>
-  page.locator("article.reminder-row").filter({ hasText: title });
+  page.locator(".reminder-row").filter({ hasText: title });
+
+/**
+ * The reminder's own page (ADR-180). A row of the list is the link and one
+ * verb; the rule's controls, cancel and the audit link live on the page the
+ * row opens, so that is where these journeys act.
+ */
+async function openReminder(page: Page, title: string) {
+  await page.locator(".reminder-row").filter({ hasText: title }).getByRole("link", { name: title }).first().click();
+  const detail = page.locator(".reminder-detail");
+  await expect(detail.getByRole("heading", { level: 1 })).toContainText(title);
+  return detail;
+}
 
 test.describe("slice 2R.2 — this one, or all of them", () => {
   test.skip(!onlineConfigured, "needs the ONLINE_SUPABASE_* environment");
@@ -145,8 +157,8 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
-    await expect(reminder.getByText("Repete")).toBeVisible();
+    const reminder = await openReminder(page, title);
+    await expect(reminder.getByText("Repete", { exact: true })).toBeAttached();
 
     // `2R-SERIES-001`. The question is not on screen until the owner opens it,
     // and opening it writes nothing.
@@ -168,7 +180,7 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await reminder.getByRole("button", { name: "Alterar repetição" }).click();
     await reminder.getByRole("radio", { name: "Somente esta ocorrência" }).check();
     await reminder.getByRole("button", { name: "Salvar alteração" }).click();
@@ -200,7 +212,7 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await reminder.getByRole("button", { name: "Alterar repetição" }).click();
     await reminder.getByRole("radio", { name: "Esta e as futuras" }).check();
     await reminder.getByLabel("Novo horário").fill("07:30");
@@ -223,7 +235,7 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await reminder.getByRole("button", { name: "Alterar repetição" }).click();
     await reminder.getByRole("button", { name: "Salvar alteração" }).click();
     await expect(page.getByText("Alterei somente esta ocorrência.", { exact: false })).toBeVisible();
@@ -256,7 +268,7 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await reminder.getByRole("button", { name: "Encerrar repetição" }).click();
 
     // The first press asks. Nothing has ended.
@@ -282,7 +294,7 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await expect(
       reminder.getByText("Cancelar esta ocorrência não encerra a repetição."),
     ).toBeVisible();
@@ -373,9 +385,9 @@ test.describe("slice 2R.2 — this one, or all of them", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto("/pt-BR/app/reminders");
 
-    const reminder = row(page, title);
+    const reminder = await openReminder(page, title);
     await expect(reminder).toBeVisible();
-    await expect(reminder.getByText("Repete")).toHaveCount(0);
+    await expect(reminder.getByText("Repete", { exact: true })).toHaveCount(0);
     await expect(reminder.getByRole("button", { name: "Alterar repetição" })).toHaveCount(0);
     await expect(reminder.getByRole("button", { name: "Encerrar repetição" })).toHaveCount(0);
     await expect(reminder.getByRole("button", { name: "Cancelar lembrete" })).toBeVisible();

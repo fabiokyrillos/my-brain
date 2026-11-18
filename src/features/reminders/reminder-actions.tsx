@@ -1,23 +1,21 @@
 "use client";
 
-import { CalendarClock, Clock, LoaderCircle, MoreHorizontal, Pencil, RotateCcw, X } from "lucide-react";
-import { useId, useRef, useState, type ReactNode } from "react";
+import { LoaderCircle } from "lucide-react";
 
 import type { Locale } from "@/lib/preferences";
 
-import type { ReminderActionState } from "./action-state";
 import { getReminderCopy } from "./copy";
 import { useReminderCommand } from "./feedback";
-import { SNOOZE_PRESET_MINUTES, type ReminderAction } from "./lifecycle";
+import type { ReminderAction } from "./lifecycle";
 import { reminderOperationKey } from "./operation-key";
 import type { ReminderViewModel } from "./projection";
 
 /**
- * The row's lifecycle controls (UX-12).
+ * A reminder's lifecycle commands, as the pieces two surfaces share (UX-12).
  *
  * ## Only what the state accepts
  *
- * Every control below is rendered from `reminder.actions`, which the projection
+ * Every control is rendered from `reminder.actions`, which the projection
  * derived from the same state machine the RPC enforces. UX-12 asks for two
  * things that are easy to conflate and are not the same: *do not render actions
  * the current state cannot accept*, and *do not render disabled placeholders for
@@ -26,104 +24,37 @@ import type { ReminderViewModel } from "./projection";
  * does not exist and gives the owner nothing to do about it. So an unavailable
  * action is simply absent, and the status hint says why in a sentence.
  *
- * ## Cancellation is the only two-step transition
+ * ## One verb on the row, the rest on the reminder's page (ADR-180)
  *
- * `requiresConfirmation` in `lifecycle.ts` says so, and this is the whole of the
- * implementation of that rule. Snooze, reschedule, restore and edit apply
- * directly after validation: each is reversible through the same boundary
- * (restore undoes cancel, reschedule undoes snooze), so a confirmation step on
- * them would be friction without a fact behind it. Cancel ends a pending
- * delivery, so it asks first — and the confirmation body says the row survives
- * and can be reactivated, because "cancel" is the one word here an owner could
- * reasonably read as "delete".
+ * Life Brain D.1 cut the card from ~18 controls to three and a menu. The list
+ * is now rows, and a row has **one** verb — the state's most likely one: an
+ * hour's snooze in one tap, or Reactivate. The row's title is the link to the
+ * reminder's own page, where its facts are one list and each is changed in
+ * place (`reminder-detail.tsx`): reschedule, the other snooze durations, edit,
+ * cancel and the rule's controls all live there. Which actions exist is still
+ * `reminder.actions` alone — the page moves controls, it never adds one.
  *
- * ## The disclosure state is derived, not held
+ * ## No live region here
  *
- * `useActionState` returns a fresh object per round, so comparing *which state
- * object* is current closes a panel on success with no effect resetting it —
- * the reasoning `entity-edit-form.tsx` records in full and `memory-edit-form.tsx`
- * reuses. An `open` boolean plus a `useEffect` that clears it is the version
- * that flickers.
- *
- * ## Three visible controls, the rest behind "Mais" (Life Brain D.1)
- *
- * The owner's card had up to ~18 controls (T2: "está tão grande esse cartão").
- * Now at most three are visible: the state's main verb (an hour's snooze in one
- * tap, or Reactivate), Reschedule, and "Mais". The menu holds every other
- * duration, Edit, Cancel, the rule's controls and the two links (`more`). It is
- * a `<details>`: no script needed to open it, keyboard-operable, no gesture.
- * Which actions exist is still `reminder.actions` alone — the menu moves
- * controls, it never adds or removes one.
+ * There is exactly one on the page, in `ReminderFeedbackBanner`. A second one
+ * carrying the same sentence would make a screen reader announce every outcome
+ * twice, and — since rows unmount on cancel and restore — a row's copy would
+ * sometimes be torn down mid-announcement while the page's finished.
+ * `ReminderInlineFeedback` is the visual echo beside the control, already
+ * announced elsewhere.
  */
-export function ReminderActions({
-  reminder,
+
+/** The hidden half of every command form: who, what, and the state it was read in. */
+export function ReminderCommandFields({
+  action,
   locale,
-  currentScheduleLabel,
-  more,
-  remindAtLocalValue,
+  reminder,
 }: {
-  reminder: ReminderViewModel;
+  action: ReminderAction;
   locale: Locale;
-  /**
-   * What else goes in the "Mais" menu, rendered by the server: the rule's
-   * controls and the subject and history links. Elements cross the RSC
-   * boundary; functions do not.
-   */
-  more?: ReactNode;
-  /**
-   * The current schedule, **already formatted by the server**.
-   *
-   * A `(iso: string) => string` formatter would be the obvious prop here, and it
-   * is the one thing that cannot cross this boundary: `reminder-list.tsx` is a
-   * Server Component, and React refuses to serialize a function into a Client
-   * Component. Shipping that threw at request time and rendered the page's error
-   * boundary — invisible to the jsdom component tests, which render both halves
-   * as ordinary components with no RSC boundary between them.
-   *
-   * Passing the finished string also keeps one formatter, bound to one timezone,
-   * for the whole page, which is what the route already builds.
-   */
-  currentScheduleLabel: string;
-  /**
-   * The same instant as `YYYY-MM-DDTHH:mm` in the owner's timezone, for the
-   * `datetime-local` input — **also computed by the server**.
-   *
-   * The obvious client-side call is `formatInstantForDateTimeLocal`. It used to
-   * throw for most real reminders — its parser demanded seconds of literally
-   * `:00` with no fractional part, while every instant this surface writes or
-   * reads carries whatever `now()` had, `2026-07-31T14:37:12.345678+00:00`. So
-   * opening the reschedule panel on a just-snoozed reminder threw inside render
-   * and took the page to its error boundary. That parser now accepts the whole
-   * `z.string().datetime({ offset: true })` grammar, but the formatting stays
-   * server-side: it keeps a throwing parser out of client render entirely,
-   * which is the property this panel actually wants.
-   */
-  remindAtLocalValue: string;
+  reminder: ReminderViewModel;
 }) {
-  // The action state is owned above the list, not here: `cancel` and `restore`
-  // unmount this component in the same commit that would have delivered their
-  // outcome. See `feedback.tsx` for the whole reasoning.
-  const { state, formAction, pending } = useReminderCommand();
-  const copy = getReminderCopy(locale);
-  const fieldId = useId();
-  const menu = useRef<HTMLDetailsElement | null>(null);
-
-  /** Opening a panel from the menu closes the menu, so the panel is what is read. */
-  function openFromMenu(next: "reschedule" | "edit" | "cancel") {
-    setDismissed(state);
-    setPanel(openPanel === next ? null : next);
-    if (menu.current) menu.current.open = false;
-  }
-
-  const [panel, setPanel] = useState<"reschedule" | "edit" | "cancel" | null>(null);
-  const [dismissed, setDismissed] = useState<ReminderActionState | null>(null);
-
-  // A success for *this* row closes whatever was open; an error keeps it open so
-  // the sentence sits next to the control that produced it.
-  const mine = state.reminderId === reminder.id;
-  const openPanel = mine && state.status === "success" && dismissed !== state ? null : panel;
-
-  const hidden = (action: ReminderAction) => (
+  return (
     <>
       <input name="locale" type="hidden" value={locale} />
       <input name="reminderId" type="hidden" value={reminder.id} />
@@ -136,230 +67,59 @@ export function ReminderActions({
       />
     </>
   );
+}
 
-  const has = (action: ReminderAction) => reminder.actions.includes(action);
+/**
+ * The one verb a reminder offers without opening anything.
+ *
+ * `scheduled` → an hour's snooze; `cancelled` → Reactivate; anything else has
+ * none, and the component renders nothing rather than a dead control.
+ */
+export function ReminderRowVerb({
+  locale,
+  reminder,
+  tone = "quiet",
+}: {
+  locale: Locale;
+  reminder: ReminderViewModel;
+  /** `quiet` is the list's text verb; `button` is the page's bordered one. */
+  tone?: "quiet" | "button";
+}) {
+  // The action state is owned above the list, not here: `cancel` and `restore`
+  // unmount this component in the same commit that would have delivered their
+  // outcome. See `feedback.tsx` for the whole reasoning.
+  const { formAction, pending } = useReminderCommand();
+  const copy = getReminderCopy(locale);
+  const action: ReminderAction | null = reminder.actions.includes("snooze")
+    ? "snooze"
+    : reminder.actions.includes("restore")
+      ? "restore"
+      : null;
+  if (action === null) return null;
 
   return (
-    <div className="reminder-actions">
-      {/*
-        No live region here.
+    <form action={formAction} className="reminder-row-verb">
+      <ReminderCommandFields action={action} locale={locale} reminder={reminder} />
+      {action === "snooze" ? <input name="snoozeMinutes" type="hidden" value={60} /> : null}
+      <button
+        className={tone === "button" ? "reminder-button" : "reminder-verb"}
+        disabled={pending}
+        type="submit"
+      >
+        {pending ? <LoaderCircle aria-hidden="true" className="spin" size={14} /> : null}
+        {action === "snooze" ? copy.card.snoozeQuick : copy.actionLabel.restore}
+      </button>
+    </form>
+  );
+}
 
-        There is exactly one on the page, in `ReminderFeedbackBanner`. A second
-        one carrying the same sentence would make a screen reader announce every
-        outcome twice, and — since these rows unmount on cancel and restore — the
-        row's copy would sometimes be torn down mid-announcement while the page's
-        finished. One region, above the list, is both the accessible answer and
-        the only one that survives a transition.
-
-        The inline paragraph below is deliberately *not* live: it is the visual
-        echo next to the control, already announced elsewhere.
-      */}
-      <div className="reminder-action-row">
-        {has("snooze") ? (
-          <form action={formAction} className="reminder-snooze-quick">
-            {hidden("snooze")}
-            <input name="snoozeMinutes" type="hidden" value={60} />
-            <button className="reminder-button" disabled={pending} type="submit">
-              {pending ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={14} />
-              ) : (
-                <Clock aria-hidden="true" size={14} />
-              )}
-              {copy.card.snoozeQuick}
-            </button>
-          </form>
-        ) : null}
-
-        {has("restore") ? (
-          <form action={formAction}>
-            {hidden("restore")}
-            <button className="reminder-button primary" disabled={pending} type="submit">
-              {pending ? (
-                <LoaderCircle aria-hidden="true" className="spin" size={14} />
-              ) : (
-                <RotateCcw aria-hidden="true" size={14} />
-              )}
-              {copy.actionLabel.restore}
-            </button>
-          </form>
-        ) : null}
-
-        {has("reschedule") ? (
-          <button
-            aria-expanded={openPanel === "reschedule"}
-            className="reminder-button"
-            onClick={() => openFromMenu("reschedule")}
-            type="button"
-          >
-            <CalendarClock aria-hidden="true" size={14} />
-            {copy.actionLabel.reschedule}
-          </button>
-        ) : null}
-
-        {has("snooze") || has("edit") || has("cancel") || more ? (
-          <details className="reminder-more" ref={menu}>
-            <summary aria-label={copy.card.moreLabel} className="reminder-button reminder-more-trigger">
-              <MoreHorizontal aria-hidden="true" size={14} />
-              <span aria-hidden="true">{copy.card.more}</span>
-            </summary>
-            <div className="reminder-more-panel">
-              {has("snooze") ? (
-                <form action={formAction} className="reminder-snooze">
-                  {hidden("snooze")}
-                  <label className="reminder-inline-label" htmlFor={`${fieldId}-snooze`}>
-                    {copy.card.snoozeFor}
-                  </label>
-                  <select
-                    className="reminder-select"
-                    defaultValue={180}
-                    disabled={pending}
-                    id={`${fieldId}-snooze`}
-                    name="snoozeMinutes"
-                  >
-                    {SNOOZE_PRESET_MINUTES.map((minutes) => (
-                      <option key={minutes} value={minutes}>
-                        {copy.snoozePreset[minutes]}
-                      </option>
-                    ))}
-                  </select>
-                  <button className="reminder-button" disabled={pending} type="submit">
-                    {copy.actionLabel.snooze}
-                  </button>
-                </form>
-              ) : null}
-
-              {has("edit") ? (
-                <button
-                  aria-expanded={openPanel === "edit"}
-                  className="reminder-menu-item"
-                  onClick={() => openFromMenu("edit")}
-                  type="button"
-                >
-                  <Pencil aria-hidden="true" size={14} />
-                  {copy.actionLabel.edit}
-                </button>
-              ) : null}
-
-              {has("cancel") ? (
-                <button
-                  aria-expanded={openPanel === "cancel"}
-                  className="reminder-menu-item danger"
-                  onClick={() => openFromMenu("cancel")}
-                  type="button"
-                >
-                  <X aria-hidden="true" size={14} />
-                  {copy.actionLabel.cancel}
-                </button>
-              ) : null}
-
-              {more}
-            </div>
-          </details>
-        ) : null}
-      </div>
-
-      {openPanel === "reschedule" ? (
-        <form action={formAction} className="reminder-panel">
-          {hidden("reschedule")}
-          {/* Current and proposed are stated side by side, because "what it is
-              now" is the fact the owner needs to decide the new value. */}
-          <p className="reminder-panel-current">
-            {copy.currentSchedule}: <strong>{currentScheduleLabel}</strong>
-          </p>
-          <label htmlFor={`${fieldId}-remind-at`}>
-            {copy.proposedSchedule}
-            <input
-              defaultValue={remindAtLocalValue}
-              disabled={pending}
-              id={`${fieldId}-remind-at`}
-              name="remindAtLocal"
-              required
-              type="datetime-local"
-            />
-          </label>
-          <div className="reminder-panel-actions">
-            <button className="reminder-button primary" disabled={pending} type="submit">
-              {pending ? copy.working : copy.submit}
-            </button>
-            <button className="reminder-button" onClick={() => setPanel(null)} type="button">
-              {copy.close}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {openPanel === "edit" ? (
-        <form action={formAction} className="reminder-panel">
-          {hidden("edit")}
-          <label htmlFor={`${fieldId}-title`}>
-            {copy.editTitleLabel}
-            <input
-              defaultValue={reminder.title}
-              disabled={pending}
-              id={`${fieldId}-title`}
-              maxLength={500}
-              name="title"
-              required
-              type="text"
-            />
-          </label>
-          <label className="reminder-checkbox" htmlFor={`${fieldId}-important`}>
-            <input
-              defaultChecked={reminder.important}
-              disabled={pending}
-              id={`${fieldId}-important`}
-              name="important"
-              type="checkbox"
-            />
-            {copy.editImportantLabel}
-          </label>
-          <div className="reminder-panel-actions">
-            <button className="reminder-button primary" disabled={pending} type="submit">
-              {pending ? copy.working : copy.submit}
-            </button>
-            <button className="reminder-button" onClick={() => setPanel(null)} type="button">
-              {copy.close}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {openPanel === "cancel" ? (
-        <form action={formAction} className="reminder-panel danger">
-          {hidden("cancel")}
-          <p className="reminder-panel-title">{copy.cancelConfirmTitle}</p>
-          {/*
-            Two bodies, chosen by a fact rather than hedged into one sentence —
-            slice 2R.2, `2R-SERIES-008`.
-
-            For an attached occurrence of an active rule, cancelling materialises
-            the replacement, the replacement takes the one live slot
-            `reminders_one_live_occurrence_per_series` allows, and `restore` is
-            then refused by that index. So `cancelConfirmBody`'s promise that the
-            row "can be reactivated later" is false for exactly this shape, and
-            the operation has to name itself before it asks.
-          */}
-          <p className="reminder-panel-body">
-            {reminder.series !== null && reminder.series.active && !reminder.series.detached
-              ? copy.cancelConfirmBodySeries
-              : copy.cancelConfirmBody}
-          </p>
-          <div className="reminder-panel-actions">
-            <button className="reminder-button danger" disabled={pending} type="submit">
-              {pending ? copy.working : copy.cancelConfirmAccept}
-            </button>
-            <button className="reminder-button" onClick={() => setPanel(null)} type="button">
-              {copy.cancelConfirmDismiss}
-            </button>
-          </div>
-        </form>
-      ) : null}
-
-      {mine && state.status !== "idle" && !pending ? (
-        <p className={`reminder-feedback ${state.status === "error" ? "error" : "success"}`}>
-          {state.message}
-        </p>
-      ) : null}
-    </div>
+/** The outcome of this reminder's last command, beside the control that sent it. */
+export function ReminderInlineFeedback({ reminderId }: { reminderId: string }) {
+  const { state, pending } = useReminderCommand();
+  if (state.reminderId !== reminderId || state.status === "idle" || pending) return null;
+  return (
+    <p className={`reminder-feedback ${state.status === "error" ? "error" : "success"}`}>
+      {state.message}
+    </p>
   );
 }

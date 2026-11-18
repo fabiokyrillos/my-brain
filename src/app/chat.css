@@ -195,6 +195,93 @@ body .side-rail { overflow-y: auto }
 .chat-outcome .assistant-composer-notice[data-route="invalid"] h3 { color: var(--tone-attention-fg) }
 
 /*
+ * A command's result in the thread (`TaskCommandResult`, portalled here with
+ * the rest of the turn's outcome). In the console it is a ruled-off block with
+ * a tinted preview card; here it is the agent's turn like any other: the
+ * question in the reading face, what would change as a quiet list set off by a
+ * rule, then the one verb and the way out beside it.
+ *
+ * The buttons are sized here and not by `.assistant-composer button`
+ * (`task-commands.css`): the portal takes this result **out** of the composer,
+ * so that rule never reached it and "Aplicar" was a 23px target in the thread.
+ */
+.chat-outcome .task-command-result {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-5);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+}
+.chat-outcome .task-command-result > h3,
+.chat-outcome .task-command-result > p,
+.chat-outcome .task-command-result > .task-command-preview,
+.chat-outcome .task-command-result > .task-command-clarify,
+.chat-outcome .task-command-result > .task-command-edit,
+.chat-outcome .task-command-result > form:has(.task-command-candidates) { flex: 0 0 100%; min-width: 0 }
+.chat-outcome .task-command-result > h3 { margin: 0; font: var(--type-reading-lg); letter-spacing: 0; color: var(--text-primary) }
+.chat-outcome .task-command-result > p { max-width: var(--width-reading); margin: 0; font: var(--type-body); color: var(--text-secondary) }
+.chat-outcome .task-command-result > .task-command-reason { color: var(--text-primary); font-weight: 400 }
+.chat-outcome .task-command-result .task-command-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  max-width: var(--width-reading);
+  margin: var(--space-2) 0;
+  padding: 0 0 0 var(--space-4);
+  border: 0;
+  border-inline-start: 2px solid var(--border-strong);
+  border-radius: 0;
+  background: none;
+}
+.chat-outcome .task-command-result .task-command-preview > p { margin: 0; font: var(--type-caption); color: var(--text-muted) }
+.chat-outcome .task-command-result .task-command-preview > .task-command-notice { text-transform: none; letter-spacing: 0 }
+.chat-outcome .task-command-result .task-command-preview > .task-command-task-title { font: var(--type-reading); color: var(--text-primary); overflow-wrap: anywhere }
+.chat-outcome .task-command-result .task-command-preview > .task-command-gravity { color: var(--tone-risk-fg); font-weight: 600 }
+.chat-outcome .task-command-result .task-command-deltas { gap: 0; margin: var(--space-1) 0 }
+.chat-outcome .task-command-result .task-command-delta { grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-3); padding: var(--space-1) 0; font: var(--type-body) }
+.chat-outcome .task-command-result .task-command-delta dt { color: var(--text-muted); font: var(--type-caption); padding-top: 2px }
+.chat-outcome .task-command-result .task-command-delta dd { min-width: 0; color: var(--text-secondary); overflow-wrap: anywhere }
+.chat-outcome .task-command-result .task-command-delta[data-changed="true"] dd { color: var(--text-primary) }
+.chat-outcome .task-command-result .task-command-delta[data-changed="true"] .task-command-delta-after { font-weight: 600 }
+.chat-outcome .task-command-result .task-command-effects { margin: 0; padding: 0; list-style: none; font: var(--type-caption); color: var(--text-secondary) }
+.chat-outcome .task-command-result button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: auto;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: var(--type-label);
+  cursor: pointer;
+}
+/* The way out, and undo: words beside the verb, not a second box. */
+.chat-outcome .task-command-result .task-command-secondary { padding: 0; border: 0; background: none; color: var(--text-secondary) }
+.chat-outcome .task-command-result .task-command-secondary:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px }
+.chat-outcome .task-command-result > form { margin: 0 }
+.chat-outcome .task-command-result .task-command-clarify,
+.chat-outcome .task-command-result .task-command-edit { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-2) }
+.chat-outcome .task-command-result .task-command-clarify > label,
+.chat-outcome .task-command-result .task-command-edit > label { flex: 0 0 100%; margin: 0; font: var(--type-caption); color: var(--text-muted) }
+.chat-outcome .task-command-result .task-command-clarify > input,
+.chat-outcome .task-command-result .task-command-edit > input,
+.chat-outcome .task-command-result .task-command-edit > select {
+  flex: 1 1 12rem;
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  font: var(--type-lead);
+}
+
+/*
  * The proposal inside it: one question, its two answers side by side. The
  * dashed card and the tinted state card inside it are gone; "nothing is saved
  * yet" is the sentence above, in words.

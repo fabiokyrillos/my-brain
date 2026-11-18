@@ -33,8 +33,8 @@ export type OnboardingCopy = Readonly<{
   /** `2O-ACTIVATION-003` surfacing in the UI: a read that failed says so. */
   unreadableNotice: string;
   dismiss: Readonly<{ action: string; hint: string }>;
-  /** Life Brain A.1: the panel leads with the next step and folds the rest. */
-  next: Readonly<{ label: string; allSteps: string; done: string }>;
+  /** What the section says when no step is left to offer (the rest are blocked). */
+  next: Readonly<{ done: string }>;
   /** `2O-ONBOARD-010`'s reversal, mounted on the preferences surface. */
   restore: Readonly<{ title: string; body: string; action: string }>;
 }>;
@@ -44,7 +44,7 @@ const PT: OnboardingCopy = {
   title: "Um caminho até o primeiro resultado",
   intro:
     "Sugestão, não exigência. A captura continua disponível o tempo todo, e você pode fazer estes passos em qualquer ordem — ou nenhum.",
-  progress: (done, total) => `${done} de ${total} concluídos`,
+  progress: (done, total) => `${done} de ${total} passos`,
   steps: {
     locale_and_timezone: {
       title: "Idioma e fuso horário",
@@ -100,8 +100,6 @@ const PT: OnboardingCopy = {
     hint: "Você pode trazê-lo de volta em Ajustes.",
   },
   next: {
-    label: "Próximo passo",
-    allSteps: "Ver todos os passos",
     done: "Todos os passos concluídos.",
   },
   restore: {
@@ -116,7 +114,7 @@ const EN: OnboardingCopy = {
   title: "A path to your first real result",
   intro:
     "A suggestion, not a requirement. Capture stays available throughout, and you can take these in any order — or none of them.",
-  progress: (done, total) => `${done} of ${total} done`,
+  progress: (done, total) => `${done} of ${total} steps`,
   steps: {
     locale_and_timezone: {
       title: "Language and time zone",
@@ -172,8 +170,6 @@ const EN: OnboardingCopy = {
     hint: "You can bring it back from Settings.",
   },
   next: {
-    label: "Next step",
-    allSteps: "Show every step",
     done: "Every step is done.",
   },
   restore: {

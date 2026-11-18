@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { updatePassword } from "@/features/auth/actions";
-import { getAuthSubmitCopy } from "@/features/auth/copy";
+import { getAuthPagesCopy, getAuthSubmitCopy } from "@/features/auth/copy";
 import { authErrorMessage } from "@/features/auth/flow";
+import { PasswordHint } from "@/features/auth/password-hint";
 import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { isLocale } from "@/lib/preferences";
 
@@ -17,33 +18,30 @@ export default async function ResetPasswordPage({
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const { error } = await searchParams;
-  const pt = locale === "pt-BR";
+  const pages = getAuthPagesCopy(locale);
+  const copy = pages.reset;
   const submit = getAuthSubmitCopy("reset", locale);
 
   return (
-    <div className="auth-card">
-      <p className="eyebrow">{pt ? "ACESSO SEGURO" : "SECURE ACCESS"}</p>
-      <h1>{pt ? "Defina uma nova senha" : "Set a new password"}</h1>
-      <p>{pt ? "A nova senha encerrará esta sessão de recuperação." : "The new password will close this recovery session."}</p>
-      {error && <div className="form-alert">{authErrorMessage(error, locale)}</div>}
+    <div className="auth-column">
+      <h1>{copy.title}</h1>
+      {error && <p className="form-alert" role="alert">{authErrorMessage(error, locale)}</p>}
       <form action={updatePassword} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
         <label>
-          {pt ? "Nova senha" : "New password"}
-          <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+          {copy.passwordLabel}
+          <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" aria-describedby="reset-password-hint" />
         </label>
-        <small>
-          {pt
-            ? "Use 12 ou mais caracteres, com maiúscula, minúscula, número e símbolo."
-            : "Use 12 or more characters with uppercase, lowercase, number, and symbol."}
-        </small>
+        <PasswordHint copy={pages.passwordHint} id="reset-password-hint" locale={locale} />
         <label>
-          {pt ? "Confirme a nova senha" : "Confirm new password"}
+          {copy.confirmLabel}
           <input name="passwordConfirmation" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
         </label>
         <AuthSubmitButton label={submit.submit} pendingLabel={submit.submitPending} />
       </form>
-      <Link href={`/${locale}/auth/recover`}>{pt ? "Solicitar outro link" : "Request another link"}</Link>
+      <nav aria-label={pages.linksLabel} className="auth-links">
+        <Link href={`/${locale}/auth/recover`}>{copy.requestAnother}</Link>
+      </nav>
     </div>
   );
 }

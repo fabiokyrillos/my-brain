@@ -155,6 +155,30 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     page.locator(".reminder-row").filter({ hasText: title });
 
   /**
+   * The reminder's own page (ADR-180).
+   *
+   * A row of the list keeps one verb — an hour's snooze, or Reactivate — and
+   * its title is the link here, where the reminder's facts are one list and
+   * every other command lives: reschedule and the other snooze durations under
+   * "Reagendar", edit, the audit link, and cancel at the foot.
+   */
+  const detail = (page: Page) => page.locator(".reminder-detail");
+
+  async function openReminder(page: Page, title: string) {
+    await row(page, title).getByRole("link", { name: title }).click();
+    await expect(detail(page).getByRole("heading", { level: 1 })).toContainText(title);
+    return detail(page);
+  }
+
+  /** The other durations: under the "when" fact, beside the absolute reschedule. */
+  async function snoozeFor(page: Page, minutes: string, labels = { open: "Reagendar", field: "Adiar por", submit: "Adiar" }) {
+    const reschedule = detail(page).getByRole("button", { name: labels.open });
+    if ((await reschedule.getAttribute("aria-expanded")) !== "true") await reschedule.click();
+    await detail(page).getByLabel(labels.field).selectOption(minutes);
+    await detail(page).getByRole("button", { name: labels.submit, exact: true }).click();
+  }
+
+  /**
    * The page-level outcome region.
    *
    * A completed transition is announced in up to three places: the row's own
@@ -257,36 +281,37 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await page.reload();
 
     // UX-21: the localized label, never the raw `scheduled` enum.
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
     await expect(page.locator("body")).not.toContainText("scheduled");
 
-    // Snooze — a bounded relative preset. The row stays scheduled (DEC-7): the
-    // schedule moves, the dormant `snoozed` status is never written.
-    await row(page, title).getByLabel("Adiar").selectOption("60");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    // Snooze — a bounded relative preset, on the reminder's own page. It stays
+    // scheduled (DEC-7): the schedule moves, the dormant `snoozed` status is
+    // never written.
+    const reminder = await openReminder(page, title);
+    await snoozeFor(page, "60");
     await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
     await page.reload();
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(reminder.getByText("Agendado", { exact: true })).toBeVisible();
 
-    // Reschedule — an explicit absolute instant, with the current schedule
-    // stated next to the new one.
-    await row(page, title).getByRole("button", { name: "Reagendar" }).click();
-    await expect(row(page, title).getByText(/Horário atual/)).toBeVisible();
-    await row(page, title).getByLabel("Novo horário").fill(futureLocal(9, 14));
-    await row(page, title).getByRole("button", { name: "Salvar" }).click();
+    // Reschedule — an explicit absolute instant, opened under the fact it
+    // changes, so the current schedule is the row right above the field.
+    await reminder.getByRole("button", { name: "Reagendar" }).click();
+    await expect(reminder.getByText("Próximo aviso")).toBeVisible();
+    await reminder.getByLabel("Novo horário").fill(futureLocal(9, 14));
+    await reminder.getByRole("button", { name: "Salvar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete reagendado.", { timeout: 30_000 });
 
     // Edit — allowed here because this reminder is standalone.
     await page.reload();
     const renamed = `${title} (revisado)`;
-    await row(page, title).getByRole("button", { name: "Editar" }).click();
-    await row(page, title).getByLabel("Título do lembrete").fill(renamed);
-    await row(page, title).getByLabel("Marcar como importante").check();
-    await row(page, title).getByRole("button", { name: "Salvar" }).click();
+    await reminder.getByRole("button", { name: "Editar" }).click();
+    await reminder.getByLabel("Título do lembrete").fill(renamed);
+    await reminder.getByLabel("Marcar como importante").check();
+    await reminder.getByRole("button", { name: "Salvar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete atualizado.", { timeout: 30_000 });
 
-    await page.reload();
-    await expect(row(page, renamed).getByText("importante")).toBeVisible();
+    await page.goto("/pt-BR/app/reminders");
+    await expect(row(page, renamed).getByText("Importante")).toBeVisible();
   });
 
   test("cancellation asks first, and the cancelled reminder can be reactivated", async ({ page }) => {
@@ -295,18 +320,20 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await page.reload();
 
     // The confirmation is a step, not a styling choice: clicking Cancel must
-    // not cancel anything on its own.
-    await row(page, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    // not cancel anything on its own. Cancel is at the foot of the reminder's
+    // own page, after its facts.
+    const reminder = await openReminder(page, title);
+    await reminder.getByRole("button", { name: "Cancelar lembrete" }).click();
     await expect(page.getByText("Cancelar este lembrete?")).toBeVisible();
     await expect(page.getByText(/pode ser reativado depois/)).toBeVisible();
 
     // Dismissing leaves it scheduled.
     await page.getByRole("button", { name: "Manter agendado" }).click();
     await page.reload();
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(reminder.getByText("Agendado", { exact: true })).toBeVisible();
 
     // Confirming cancels it, and it leaves the pending view.
-    await row(page, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    await reminder.getByRole("button", { name: "Cancelar lembrete" }).click();
     await page.getByRole("button", { name: "Sim, cancelar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete cancelado.", { timeout: 30_000 });
 
@@ -316,12 +343,12 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     // Restore is reachable from the cancelled view — which is the reason that
     // view exists, since the old page filtered cancelled rows out entirely.
     await page.goto("/pt-BR/app/reminders?view=cancelled");
-    await expect(row(page, title).getByText("Cancelado")).toBeVisible();
+    await expect(row(page, title).getByText("Cancelado", { exact: true })).toBeAttached();
     await row(page, title).getByRole("button", { name: "Reativar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete reativado.", { timeout: 30_000 });
 
     await page.goto("/pt-BR/app/reminders?view=pending");
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
   });
 
   /**
@@ -371,19 +398,20 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     // list. Every assertion after it must hold without another.
     await page.reload();
 
-    const schedule = () => row(page, title).locator(".reminder-schedule");
-    const before = await schedule().innerText();
+    // The row's "when", including the full instant it carries for a screen reader.
+    const schedule = () => row(page, title).locator(".reminder-row-when");
+    const before = (await schedule().textContent()) ?? "";
 
     // ---- the row stays in view: the update must be visible in place ----
-    await row(page, title).getByLabel("Adiar").selectOption("60");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    // The row's one verb: an hour's snooze in one tap.
+    await row(page, title).getByRole("button", { name: "Adiar 1h" }).click();
 
     // 1 — the response arrived.
     await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
     // 2 — `pending` ended: the shared action re-enables every control it
     //     disabled. A stuck transition would leave this button disabled
     //     forever, which is the freeze half and is not what is happening.
-    await expect(row(page, title).getByRole("button", { name: "Adiar" })).toBeEnabled({
+    await expect(row(page, title).getByRole("button", { name: "Adiar 1h" })).toBeEnabled({
       timeout: 30_000,
     });
     // 5 — the defect. Snoozing by an hour moves a reminder five days out to
@@ -392,26 +420,33 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
 
     // 3 — and what was rendered in place is what the database actually holds,
     //     so this is a real re-render rather than an optimistic guess.
-    const inPlace = await schedule().innerText();
+    const inPlace = await schedule().textContent();
     await page.reload();
-    expect(await schedule().innerText()).toBe(inPlace);
+    expect(await schedule().textContent()).toBe(inPlace);
 
-    // ---- the row leaves the view: the removal must be visible in place ----
-    await row(page, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    // ---- on the reminder's own page: the new state must be visible in place ----
+    // The actions revalidate the list's path, so this page asks the router to
+    // re-read itself after a command; without that it would keep saying
+    // "Agendado" and offering a cancel that can only be refused as stale.
+    const reminder = await openReminder(page, title);
+    await reminder.getByRole("button", { name: "Cancelar lembrete" }).click();
     await page.getByRole("button", { name: "Sim, cancelar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete cancelado.", { timeout: 30_000 });
-    await expect(row(page, title)).toHaveCount(0, { timeout: 30_000 });
+    await expect(reminder.getByText("Cancelado", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(reminder.getByRole("button", { name: "Cancelar lembrete" })).toHaveCount(0);
+    await page.goto("/pt-BR/app/reminders?view=pending");
+    await expect(row(page, title)).toHaveCount(0);
 
     // ---- undo: restore leaves the cancelled view, also in place ----
     await page.goto("/pt-BR/app/reminders?view=cancelled");
-    await expect(row(page, title).getByText("Cancelado")).toBeVisible();
+    await expect(row(page, title).getByText("Cancelado", { exact: true })).toBeAttached();
     await row(page, title).getByRole("button", { name: "Reativar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete reativado.", { timeout: 30_000 });
     await expect(row(page, title)).toHaveCount(0, { timeout: 30_000 });
 
     // And the undo really landed: it is back in the pending view.
     await page.goto("/pt-BR/app/reminders?view=pending");
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
   });
 
   /**
@@ -438,26 +473,24 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await signIn(page);
     const title = await createReminder(page);
     await page.goto("/pt-BR/app/reminders");
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
 
     // A second view of the same list, holding the same pre-state. Both tabs
     // therefore derive the SAME operation key, which is the whole point.
     const stale = await context.newPage();
     await stale.goto("/pt-BR/app/reminders");
-    await expect(row(stale, title).getByText("Agendado")).toBeVisible();
+    await expect(row(stale, title).getByText("Agendado", { exact: true })).toBeAttached();
 
     const preState = (target: Page) =>
       row(target, title).locator("input[name='expectedState']").first().inputValue();
     expect(await preState(stale)).toBe(await preState(page));
 
     // ---- 1. the same action twice: a replay, not a second write ----
-    await row(page, title).getByLabel("Adiar").selectOption("60");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    await row(page, title).getByRole("button", { name: "Adiar 1h" }).click();
     await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
     const applied = await preState(page);
 
-    await row(stale, title).getByLabel("Adiar").selectOption("60");
-    await row(stale, title).getByRole("button", { name: "Adiar" }).click();
+    await row(stale, title).getByRole("button", { name: "Adiar 1h" }).click();
     await expect(outcome(stale)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
 
     /*
@@ -479,17 +512,18 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     // acting from a view that has not seen the snooze.
     const diverging = await context.newPage();
     await diverging.goto("/pt-BR/app/reminders");
-    await expect(row(diverging, title).getByText("Agendado")).toBeVisible();
+    await expect(row(diverging, title).getByText("Agendado", { exact: true })).toBeAttached();
+    // Cancel lives on the reminder's own page, so that is the view left behind.
+    const behind = await openReminder(diverging, title);
 
     // Move it again from the first tab, so `diverging` is now behind.
     await page.reload();
-    await row(page, title).getByLabel("Adiar").selectOption("180");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    await row(page, title).getByRole("button", { name: "Adiar 1h" }).click();
     await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
 
     // `diverging` attempts a DIFFERENT action, so its operation key is not the
     // replay of anything — the pre-state comparison is what answers.
-    await row(diverging, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    await behind.getByRole("button", { name: "Cancelar lembrete" }).click();
     await diverging.getByRole("button", { name: "Sim, cancelar" }).click();
 
     await expect(outcome(diverging)).toHaveText(
@@ -501,12 +535,12 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     // `pending` still ends on the failure path: a refused write must not leave
     // the surface disabled with no way forward.
     await expect(
-      row(diverging, title).getByRole("button", { name: "Cancelar lembrete" }),
+      behind.getByRole("button", { name: "Cancelar lembrete" }),
     ).toBeEnabled({ timeout: 30_000 });
 
     // And the refusal really refused: it is still scheduled, not cancelled.
     await page.reload();
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
 
     await stale.close();
     await diverging.close();
@@ -518,7 +552,8 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await signIn(page);
     const title = await createReminder(page);
     await page.reload();
-    await row(page, title).getByRole("button", { name: "Cancelar lembrete" }).click();
+    const reminder = await openReminder(page, title);
+    await reminder.getByRole("button", { name: "Cancelar lembrete" }).click();
     await page.getByRole("button", { name: "Sim, cancelar" }).click();
     await expect(outcome(page)).toHaveText("Lembrete cancelado.", { timeout: 30_000 });
 
@@ -526,10 +561,13 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     const cancelled = row(page, title);
     await expect(cancelled.getByRole("button", { name: "Reativar" })).toBeVisible();
     // Absent, not disabled: a disabled control advertises a capability that does
-    // not exist.
-    await expect(cancelled.getByRole("button", { name: "Adiar" })).toHaveCount(0);
-    await expect(cancelled.getByRole("button", { name: "Reagendar" })).toHaveCount(0);
-    await expect(cancelled.getByRole("button", { name: "Cancelar lembrete" })).toHaveCount(0);
+    // not exist. On the row, and on the reminder's own page.
+    await expect(cancelled.getByRole("button", { name: /Adiar/ })).toHaveCount(0);
+    const cancelledPage = await openReminder(page, title);
+    await expect(cancelledPage.getByRole("button", { name: "Reativar" })).toBeVisible();
+    await expect(cancelledPage.getByRole("button", { name: /Adiar/ })).toHaveCount(0);
+    await expect(cancelledPage.getByRole("button", { name: "Reagendar" })).toHaveCount(0);
+    await expect(cancelledPage.getByRole("button", { name: "Cancelar lembrete" })).toHaveCount(0);
 
     // Only the hourly heartbeat can produce a `sent` row, so this one is
     // seeded — a fixture, explicitly, not a product write.
@@ -547,10 +585,15 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
 
     await page.goto("/pt-BR/app/reminders?view=delivered");
     const delivered = row(page, deliveredTitle);
-    await expect(delivered.locator(".status-badge.reminder-sent")).toHaveText("Entregue");
-    await expect(delivered.getByText(/Entregue em/)).toBeVisible();
+    // The section says the state on screen; the row carries it for a screen reader.
+    await expect(page.locator('.reminder-group[data-group="delivered"] h2')).toContainText("Entregues");
+    await expect(delivered.getByText("Entregue", { exact: true })).toBeAttached();
+    await expect(delivered.getByText(/Entregue em/)).toBeAttached();
     // Terminal in every direction: its notification dedupe key is spent.
     await expect(delivered.getByRole("button")).toHaveCount(0);
+    const deliveredPage = await openReminder(page, deliveredTitle);
+    await expect(deliveredPage.getByText("Entregue em")).toBeVisible();
+    await expect(deliveredPage.getByRole("button")).toHaveCount(0);
   });
 
   test("the surface is the only way in — a direct update is still refused", async ({ page }) => {
@@ -590,21 +633,21 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
 
     // And the row is untouched by either attempt.
     await page.reload();
-    await expect(row(page, title).getByText("Agendado")).toBeVisible();
+    await expect(row(page, title).getByText("Agendado", { exact: true })).toBeAttached();
   });
 
   test("every transition writes an audit row the History surface can read", async ({ page }) => {
     await signIn(page);
     const title = await createReminder(page);
     await page.reload();
-    await row(page, title).getByLabel("Adiar").selectOption("15");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
+    const reminder = await openReminder(page, title);
+    await snoozeFor(page, "15");
     await expect(outcome(page)).toHaveText("Lembrete adiado.", { timeout: 30_000 });
 
     // The per-reminder audit trail — UX-12's "history where practical", reached
-    // through the filter surface Slice G4 already shipped.
-    await page.goto("/pt-BR/app/reminders");
-    await row(page, title).getByRole("link", { name: "Ver no histórico" }).click();
+    // through the filter surface Slice G4 already shipped. The link is on the
+    // reminder's own page.
+    await reminder.getByRole("link", { name: "Ver no histórico" }).click();
     await expect(page).toHaveURL(/\/app\/history\?entity=reminder&subject=/);
 
     // UX-21/UX-28: a localized sentence, not `reminder_snoozed`, and not the
@@ -622,11 +665,14 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     const title = await createReminder(page, "en");
     await page.goto("/en/app/reminders");
 
-    await expect(row(page, title).getByText("Scheduled")).toBeVisible();
-    await expect(row(page, title).getByText(/Next reminder/)).toBeVisible();
-    await expect(row(page, title).getByText("Not linked")).toBeVisible();
+    await expect(row(page, title).getByText("Scheduled", { exact: true })).toBeAttached();
+    await expect(row(page, title).getByText(/Next reminder/)).toBeAttached();
+    await expect(row(page, title).getByRole("button", { name: "Snooze 1h" })).toBeVisible();
 
-    await row(page, title).getByRole("button", { name: "Cancel reminder" }).click();
+    await row(page, title).getByRole("link", { name: title }).click();
+    await expect(detail(page).getByText("Next reminder")).toBeVisible();
+    await expect(detail(page).getByText("Not linked")).toBeVisible();
+    await detail(page).getByRole("button", { name: "Cancel reminder" }).click();
     await expect(page.getByText("Cancel this reminder?")).toBeVisible();
     await page.getByRole("button", { name: "Yes, cancel it" }).click();
     await expect(outcome(page)).toHaveText("Reminder cancelled.", { timeout: 30_000 });
@@ -642,7 +688,8 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
 
     // Reach the cancel control by tabbing, open the confirmation with the
     // keyboard, and confirm the same way. No pointer is used at any point.
-    const cancel = row(page, title).getByRole("button", { name: "Cancelar lembrete" });
+    const reminder = await openReminder(page, title);
+    const cancel = reminder.getByRole("button", { name: "Cancelar lembrete" });
     await cancel.focus();
     await expect(cancel).toBeFocused();
     await expect(cancel).toHaveAttribute("aria-expanded", "false");
@@ -667,9 +714,8 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
     await expect(live).toHaveCount(1);
     await expect(row(page, title).locator("[aria-live]")).toHaveCount(0);
 
-    await row(page, title).getByLabel("Adiar").selectOption("60");
-    await row(page, title).getByRole("button", { name: "Adiar" }).click();
-    // The same sentence the sighted reader gets, in the row's own live region.
+    await row(page, title).getByRole("button", { name: "Adiar 1h" }).click();
+    // The same sentence the sighted reader gets, in the page's one live region.
     await expect(live).toContainText("Lembrete adiado.", { timeout: 30_000 });
   });
 
@@ -859,7 +905,7 @@ test.describe("the reminder lifecycle is reachable, confirmed, audited and local
       await page.setViewportSize({ width, height: width === 375 ? 667 : 915 });
       await page.goto("/pt-BR/app/reminders");
 
-      await expect(row(page, title).getByRole("button", { name: "Reagendar" })).toBeVisible();
+      await expect(row(page, title).getByRole("button", { name: "Adiar 1h" })).toBeVisible();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
       );

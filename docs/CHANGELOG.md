@@ -1,5 +1,17 @@
 # Technical Changelog
 
+## 2026-11-18 — The remaining pages, recomposed (ADR-180, ADR-188)
+
+- **Signed-out pages** (`auth/{login,register,recover,resend,reset}`, the entry page, and the consent, account-state and account-deletion gates; new `signed-out-frame.tsx`, `signed-out-header.tsx`, `password-hint.tsx`, `password-rules.ts`; `entry.css`): one column, no card — mark and language, one sentence, the fields, one button, text links. The password rule is a caption that updates as it is typed. On the entry page the way in sits under the tagline. `.auth-stage`, `.auth-card` and `.secondary-button` are removed from `globals.css`. No field, attribute, hidden input, confirmation step, Server Action or redirect changed.
+- **Custos** (`costs/page.tsx`, new `features/costs/`, `costs.css`): the month's amount is the subject; the split by function is rows with a proportional rule; per-model, last calls and prices are folded. Nothing scrolls sideways on a phone. The `<` bound is locale-aware.
+- **Processamento** (`jobs/page.tsx`, new `features/processing/`): one sentence states the queue; failures first, in-flight next, finished folded; the raw error and job id sit behind *Detalhe técnico*. A failed file analysis links to Arquivos.
+- **Busca** (`search-surface.tsx`, new `search/presentation.ts`, `palette.css`): the field first, filters on one closed line, results grouped by kind.
+- **Lembretes** (`reminders/page.tsx`, `reminders/[reminderId]/page.tsx`, `reminder-list.tsx`, new `reminder-detail.tsx`, `grouping.ts`, `reminders.css`): the Agenda masthead; rows grouped by when, with one verb; every other command is on the reminder's own page, which is a list of facts each changed in place (ADR-188).
+- **Hoje, onboarding** (`onboarding-panel.tsx`, `onboarding.css`): a section of rows that shows every step, not a card showing one.
+- Leftovers: the planner draws *O que vale notar* only for observations no row carries; an empty Agenda period has no count line; a command result in the Conversar thread is flat.
+- Fixed in passing: a 200px blank band above the reminders list on phones (`.reminder-series-live` flex basis); a 23px *Aplicar* button in the Conversar thread; the reminder page now calls `router.refresh()` after a command, since the actions revalidate the list's path only.
+- `RECORDED_UNSTYLED` stays 24. No Server Action, RPC, query or migration changed. Record: `docs/reports/editorial-calmo/PAGINAS-RESTANTES.md`.
+
 ## 2026-11-18 — Conversar and Ajustes, recomposed (ADR-180, ADR-187)
 
 - **Conversar** (`chat/page.tsx`, `chat/[conversationId]/page.tsx`, `chat-frame.tsx`, new `chat/prose.tsx`, `source-list.tsx`, `chat.css`, `conversation-cards.css`, `assistant.css`): a conversation reads as correspondence — the day once as a heading, the question with an ink rule and its hour, the answer as prose (paragraphs and lists from the text's own lines), and one closed line under it: sources, *Onde procurei*, *Como cheguei aqui*. A turn's outcome (proposal, failure, command result) is drawn in the thread, not under the field. The list of conversations is rows with one caption; the field is one line that grows.

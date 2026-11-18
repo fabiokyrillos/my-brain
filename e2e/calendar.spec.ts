@@ -214,7 +214,7 @@ function agendaHead(
         <span aria-live="polite" class="sr-only">${range}</span>
         <div class="agenda-stepper-caption"><div class="calendar-status">
           ${status.today ? '<span class="calendar-today">Hoje</span>' : ""}
-          <p aria-live="polite" class="calendar-summary">${status.count ?? 0} itens neste período</p>
+          <p aria-live="polite" class="calendar-summary">${status.count ? `${status.count} itens neste período` : ""}</p>
         </div></div>
         <a aria-label="Período anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=prev" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
         <a aria-label="Próximo período" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=next" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>

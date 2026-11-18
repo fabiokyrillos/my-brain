@@ -22,6 +22,17 @@ export type ReminderFormatters = {
   readonly formatLocalInput: (iso: string) => string;
   /** The wall clock alone, `HH:MM`, for slice 2R.2's series time field. */
   readonly formatLocalTime: (iso: string) => string;
+  /**
+   * The owner's calendar day the instant falls on, `YYYY-MM-DD` — what the
+   * list groups by (ADR-180). A key, never shown.
+   */
+  readonly formatLocalDay: (iso: string) => string;
+  /**
+   * That day as the row's short stamp: weekday, day and month, and the year
+   * only when it is not `now`'s. Short on purpose — it shares a column with
+   * the hour.
+   */
+  readonly formatDayLabel: (iso: string, now: Date) => string;
 };
 
 export function reminderFormatters(locale: Locale, timezone: string): ReminderFormatters {
@@ -60,7 +71,28 @@ export function reminderFormatters(locale: Locale, timezone: string): ReminderFo
       parts.find((candidate) => candidate.type === type)?.value ?? "";
   };
 
+  const nearDay = new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+  const farDay = new Intl.DateTimeFormat(locale, {
+    timeZone: timezone,
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
   return {
+    formatLocalDay: (iso: string) => {
+      const part = localParts(iso);
+      return `${part("year")}-${part("month")}-${part("day")}`;
+    },
+    formatDayLabel: (iso: string, now: Date) =>
+      localParts(iso)("year") === localParts(now.toISOString())("year")
+        ? nearDay.format(new Date(iso))
+        : farDay.format(new Date(iso)),
     formatInstant: (iso: string) => formatter.format(new Date(iso)),
     formatLocalInput: (iso: string) => {
       const part = localParts(iso);

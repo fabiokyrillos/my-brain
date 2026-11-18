@@ -1,3 +1,4 @@
+import type { ReminderGroupKey } from "./grouping";
 import type { Locale } from "@/lib/preferences";
 
 import type { ReminderAction, ReminderStatus, SnoozePresetMinutes } from "./lifecycle";
@@ -49,16 +50,33 @@ type ReminderCopy = {
   /**
    * The one-reminder surface a notification tap opens.
    *
-   * The heading is the kind, not the reminder's own title: the title is
-   * governed content and the row below already renders it, under the masking
-   * rules that apply to it. Repeating it in an `h1` would be a second
-   * rendering of the same sentence, outside those rules.
+   * ADR-180: the page's `h1` is the reminder's own text, rendered once (the
+   * list's card, which used to render it a second time under a generic
+   * heading, is gone from this page). `heading` names the page's live region.
    */
   readonly detail: {
-    readonly eyebrow: string;
+    /** The banner's label on the one-reminder page. */
     readonly heading: string;
-    readonly intro: string;
     readonly backToList: string;
+    /** ADR-180: the reminder's facts are one list, each changed in place. */
+    readonly factsHeading: string;
+    readonly repeat: string;
+    readonly noRepeat: string;
+    readonly subject: string;
+  };
+
+  /**
+   * ADR-180 — the list as the Agenda's third lens: the subject line of each
+   * view, the count under it, the sections the rows are grouped into, and the
+   * words a row's one caption is built from.
+   */
+  readonly list: {
+    readonly subject: Readonly<Record<ReminderView, string>>;
+    readonly count: (shown: number, hasMore: boolean) => string;
+    readonly group: Readonly<Record<ReminderGroupKey, string>>;
+    readonly viewsLabel: string;
+    readonly important: string;
+    readonly linked: Readonly<Record<"task" | "entry", (label: string) => string>>;
   };
 
   readonly statusLabel: Readonly<Record<ReminderStatus, string>>;
@@ -102,9 +120,6 @@ type ReminderCopy = {
   readonly card: {
     readonly snoozeQuick: string;
     readonly snoozeFor: string;
-    readonly more: string;
-    readonly moreLabel: string;
-    readonly openSubject: (label: string) => string;
   };
 
   /**
@@ -335,13 +350,44 @@ const COPY = {
     heading: "Lembretes",
     emptyTitle: "Nenhum lembrete",
     emptyBody: (agentName: string) =>
-      `Crie um lembrete acima ou peça ao ${agentName} durante uma captura.`,
+      `Crie um em “Novo lembrete” ou peça ao ${agentName} durante uma captura.`,
 
     detail: {
-      eyebrow: "NÃO ESQUECER",
       heading: "Lembrete",
-      intro: "Este lembrete e o que acontece com ele.",
-      backToList: "Ver todos os lembretes",
+      backToList: "Lembretes",
+      factsHeading: "Detalhes",
+      repeat: "Repetição",
+      noRepeat: "Não repete",
+      subject: "Ligado a",
+    },
+
+    list: {
+      subject: {
+        pending: "Próximos lembretes",
+        delivered: "Lembretes entregues",
+        cancelled: "Lembretes cancelados",
+        all: "Todos os lembretes",
+      },
+      count: (shown, hasMore) =>
+        hasMore
+          ? `${shown} nesta página`
+          : shown === 1 ? "1 lembrete" : `${shown} lembretes`,
+      group: {
+        late: "Passou do horário",
+        today: "Hoje",
+        tomorrow: "Amanhã",
+        week: "Nos próximos dias",
+        later: "Mais adiante",
+        inactive: "Inativos",
+        delivered: "Entregues",
+        cancelled: "Cancelados",
+      },
+      viewsLabel: "Mostrar",
+      important: "Importante",
+      linked: {
+        task: (label) => `Tarefa: ${label}`,
+        entry: (label) => `Registro: ${label}`,
+      },
     },
 
     statusLabel: {
@@ -391,11 +437,8 @@ const COPY = {
     independent: "Sem vínculo",
     historyLink: "Ver no histórico",
     card: {
-      snoozeQuick: "Adiar 1 hora",
+      snoozeQuick: "Adiar 1h",
       snoozeFor: "Adiar por",
-      more: "Mais",
-      moreLabel: "Mais ações deste lembrete",
-      openSubject: (label) => `Abrir: ${label}`,
     },
 
     creation: {
@@ -582,13 +625,44 @@ const COPY = {
   en: {
     heading: "Reminders",
     emptyTitle: "No reminders",
-    emptyBody: (agentName: string) => `Create one above or ask ${agentName} during capture.`,
+    emptyBody: (agentName: string) => `Create one with “New reminder” or ask ${agentName} during capture.`,
 
     detail: {
-      eyebrow: "DON'T FORGET",
       heading: "Reminder",
-      intro: "This reminder and what happens to it.",
-      backToList: "See all reminders",
+      backToList: "Reminders",
+      factsHeading: "Details",
+      repeat: "Repeats",
+      noRepeat: "Does not repeat",
+      subject: "Linked to",
+    },
+
+    list: {
+      subject: {
+        pending: "Upcoming reminders",
+        delivered: "Delivered reminders",
+        cancelled: "Cancelled reminders",
+        all: "All reminders",
+      },
+      count: (shown, hasMore) =>
+        hasMore
+          ? `${shown} on this page`
+          : shown === 1 ? "1 reminder" : `${shown} reminders`,
+      group: {
+        late: "Past its time",
+        today: "Today",
+        tomorrow: "Tomorrow",
+        week: "In the next days",
+        later: "Further out",
+        inactive: "Inactive",
+        delivered: "Delivered",
+        cancelled: "Cancelled",
+      },
+      viewsLabel: "Show",
+      important: "Important",
+      linked: {
+        task: (label) => `Task: ${label}`,
+        entry: (label) => `Record: ${label}`,
+      },
     },
 
     statusLabel: {
@@ -764,11 +838,8 @@ const COPY = {
     },
     historyLink: "See in history",
     card: {
-      snoozeQuick: "Snooze 1 hour",
+      snoozeQuick: "Snooze 1h",
       snoozeFor: "Snooze for",
-      more: "More",
-      moreLabel: "More actions for this reminder",
-      openSubject: (label) => `Open: ${label}`,
     },
 
     cancelConfirmTitle: "Cancel this reminder?",

@@ -1424,6 +1424,28 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   font: var(--type-body);
 }
 
+/*
+ * Every observation is already on the row of its task: what is left is one
+ * caption — how many, and that nothing was changed — not a block with a rule.
+ */
+.planner-page .planner-conflicts[data-on-rows="true"] {
+  margin-top: var(--space-4);
+  padding-inline-start: 0;
+  border-inline-start: 0;
+}
+
+.planner-conflicts[data-on-rows="true"] .planner-conflict-count {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  margin: 0;
+}
+
+.planner-conflicts[data-on-rows="true"] .planner-conflict-count > span:not(:last-child)::after {
+  content: "·";
+  margin-inline-start: var(--space-2);
+}
+
 .planner-conflicts h2 {
   margin: 0;
   color: var(--text-primary);

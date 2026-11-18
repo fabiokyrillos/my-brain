@@ -2,19 +2,25 @@ import { mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
+import { reminderDetailBody, reminderGroup, reminderRow } from "./support/reminder-fixtures";
+
 /**
  * Life Brain D.1 — the Agenda with content in it, in a real browser.
  *
  * The test account on the linked project has no reminders and nothing on this
  * week's calendar, so the signed-in screenshots show the redesigned **empty**
  * surfaces. This lane renders the two shapes that only show with content — the
- * reminder card and the week grid with lines in it — with the product's own
+ * reminder and the week grid with lines in it — with the product's own
  * stylesheets, and asserts what the owner complained about (T2) as geometry.
  *
- * The markup mirrors `reminder-list.tsx` + `reminder-actions.tsx` +
- * `series-controls.tsx` (part `facts` and `controls`) and `calendar-view.tsx`'s
- * week. With `LIFE_BRAIN_EVIDENCE` set it also writes the screenshots that go
- * into `docs/reports/life-brain/evidence/slice-d1/after/`.
+ * The reminder was a card with three controls and a "Mais" menu when D.1
+ * shipped. Since ADR-180 it is a **row** (the link and one verb) and the rest
+ * of its controls are on its own page, so D.1's requirement — at most three
+ * visible controls, everything else one tap away — is asserted on those two
+ * shapes. The markup is `support/reminder-fixtures.ts` (mirroring
+ * `reminder-list.tsx`, `reminder-detail.tsx` and `series-controls.tsx`) and
+ * `calendar-view.tsx`'s week. With `LIFE_BRAIN_EVIDENCE` set it also writes the
+ * screenshots that go into `docs/reports/life-brain/evidence/slice-d1/after/`.
  */
 
 const ROOT = join(__dirname, "..");
@@ -34,46 +40,11 @@ function shell(body: string): string {
   <style>${FONT_STUB}${css}</style></head><body><main><div class="content-page">${body}</div></main></body></html>`;
 }
 
-/** The busiest card the owner can have: scheduled, linked, repeating, every action. */
+/** The busiest reminder the owner can have: scheduled, linked, repeating, every action. */
 function reminderCard(): string {
-  return `<article class="list-row reminder-row scheduled" id="reminder-r1">
-    <div class="list-row-main">
-      <strong>Aniversário de Ana</strong>
-      <p class="reminder-schedule"><span>Próximo aviso: <strong>5 de jun. de 2027, 09:00</strong></span></p>
-      <p class="reminder-subject"><span class="reminder-subject-text"><span class="reminder-subject-kind">Tarefa vinculada</span><span>Comprar o presente da Ana</span></span></p>
-      <div class="reminder-series">
-        <p class="reminder-series-facts"><span class="status-badge reminder-series-badge">Repete</span><span class="reminder-series-rule">Todo ano em 5 de junho</span></p>
-      </div>
-      <div class="reminder-actions">
-        <div class="reminder-action-row">
-          <form class="reminder-snooze-quick"><button class="reminder-button" type="submit">Adiar 1 hora</button></form>
-          <button aria-expanded="false" class="reminder-button" type="button">Reagendar</button>
-          <details class="reminder-more">
-            <summary aria-label="Mais ações deste lembrete" class="reminder-button reminder-more-trigger"><span aria-hidden="true">Mais</span></summary>
-            <div class="reminder-more-panel">
-              <form class="reminder-snooze">
-                <label class="reminder-inline-label" for="snooze">Adiar por</label>
-                <select class="reminder-select" id="snooze" name="snoozeMinutes"><option>3 horas</option></select>
-                <button class="reminder-button" type="submit">Adiar</button>
-              </form>
-              <button class="reminder-menu-item" type="button">Editar</button>
-              <button class="reminder-menu-item danger" type="button">Cancelar lembrete</button>
-              <div class="reminder-series reminder-series-controls">
-                <div class="reminder-action-row">
-                  <button class="reminder-button" type="button">Alterar repetição</button>
-                  <button class="reminder-button danger" type="button">Encerrar repetição</button>
-                </div>
-                <p class="reminder-series-hint">Cancelar esta ocorrência não encerra a repetição.</p>
-              </div>
-              <a class="reminder-menu-item reminder-subject-link" href="#">Abrir: Comprar o presente da Ana</a>
-              <a class="reminder-menu-item reminder-history-link" href="#">Ver no histórico</a>
-            </div>
-          </details>
-        </div>
-      </div>
-    </div>
-    <div class="list-meta"><span class="status-badge reminder-scheduled">Agendado</span></div>
-  </article>`;
+  return `<div class="reminder-groups">${reminderGroup("later", "Mais adiante", [
+    reminderRow({ id: "r1", time: "09:00", day: "05/06/2027", title: "Aniversário de Ana", caption: ["Todo ano em 5 de junho", "Tarefa: Comprar o presente da Ana"] }),
+  ])}</div>`;
 }
 
 /** The week with lines in three columns, mirroring `calendar-view.tsx`. */
@@ -104,7 +75,7 @@ const VIEWPORTS = [
 
 /** Interactive elements a sighted owner sees without opening anything. */
 async function visibleControls(page: Page): Promise<string[]> {
-  return page.evaluate(() => [...document.querySelectorAll<HTMLElement>("article a[href], article button, article select, article summary")]
+  return page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".reminder-row a[href], .reminder-row button, .reminder-row select, .reminder-row summary")]
     .filter((node) => {
       const closed = node.closest("details:not([open])");
       return closed === null || (node.tagName === "SUMMARY" && node.parentElement === closed);
@@ -113,41 +84,48 @@ async function visibleControls(page: Page): Promise<string[]> {
     .map((node) => (node.textContent ?? "").trim()));
 }
 
-test.describe("Life Brain D.1: the reminder card", () => {
+test.describe("Life Brain D.1: the reminder", () => {
   for (const viewport of VIEWPORTS) {
-    test(`shows three controls and fits the row at ${viewport.name}`, async ({ page }) => {
+    test(`shows the link and one verb, and fits the row at ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await page.setContent(shell(reminderCard()), { waitUntil: "load" });
-      expect(await visibleControls(page)).toEqual(["Adiar 1 hora", "Reagendar", "Mais"]);
+      const shown = await visibleControls(page);
+      expect(shown.length, "D.1: at most three visible controls").toBeLessThanOrEqual(3);
+      expect(shown).toEqual(["Aniversário de Ana", "Adiar 1h"]);
 
-      // On a phone the three share one row instead of stacking at full width.
-      const centres = await page.locator(".reminder-actions > .reminder-action-row > *").evaluateAll((nodes) =>
-        nodes.map((node) => { const box = node.getBoundingClientRect(); return box.top + box.height / 2; }));
-      expect(centres).toHaveLength(3);
-      expect(Math.max(...centres) - Math.min(...centres), "the three controls are not on one row").toBeLessThanOrEqual(2);
-      // A closed menu lays nothing out: its panel has no box at all.
-      expect(await page.locator(".reminder-more-panel").evaluate((node) => node.getBoundingClientRect().height)).toBe(0);
-      // And no label breaks inside its button ("Adiar 1 / hora").
-      const lines = await page.locator(".reminder-actions > .reminder-action-row .reminder-button").evaluateAll((nodes) =>
-        nodes.map((node) => node.getBoundingClientRect().height));
-      expect(Math.max(...lines), "a button label wrapped").toBeLessThanOrEqual(46);
-
-      const heights = await page.locator(".reminder-actions > .reminder-action-row > form > button, .reminder-actions > .reminder-action-row > button, .reminder-more-trigger").evaluateAll((nodes) =>
-        nodes.map((node) => node.getBoundingClientRect().height));
-      expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+      // The verb ends the row, on the title's line, and its label does not wrap.
+      const [row, title, verb] = await Promise.all([
+        page.locator(".reminder-row").boundingBox(),
+        page.locator(".reminder-row-title").boundingBox(),
+        page.locator(".reminder-verb").boundingBox(),
+      ]);
+      expect(verb!.x).toBeGreaterThanOrEqual(title!.x + title!.width - 1);
+      expect(verb!.x + verb!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
+      expect(verb!.height, "the verb's label wrapped").toBeLessThanOrEqual(46);
+      expect(verb!.height).toBeGreaterThanOrEqual(44);
+      expect(title!.height).toBeGreaterThanOrEqual(44);
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       expect(overflow).toBeLessThanOrEqual(1);
     });
 
-    test(`opens "Mais" inside the viewport at ${viewport.name}`, async ({ page }) => {
+    test(`keeps the rest one tap away, on the reminder's page, inside the viewport at ${viewport.name}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.setContent(shell(reminderCard()), { waitUntil: "load" });
-      await page.locator(".reminder-more-trigger").click();
-      const panel = await page.locator(".reminder-more-panel").boundingBox();
-      expect(panel!.x).toBeGreaterThanOrEqual(0);
-      expect(panel!.x + panel!.width).toBeLessThanOrEqual(viewport.width + 1);
-      const items = await page.locator(".reminder-menu-item").evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
-      expect(Math.min(...items)).toBeGreaterThanOrEqual(44);
+      for (const open of [undefined, "reschedule", "series"] as const) {
+        await page.setContent(shell(reminderDetailBody({ open, title: "Aniversário de Ana" })), { waitUntil: "load" });
+        const controls = await page.locator(".reminder-detail a, .reminder-detail button, .reminder-detail select, .reminder-detail input:not([type=hidden]):not([type=radio]):not([type=checkbox])")
+          .evaluateAll((nodes) => nodes.map((node) => {
+            const box = node.getBoundingClientRect();
+            return { label: (node.textContent ?? "").trim(), left: box.left, right: box.right, height: box.height };
+          }));
+        for (const name of ["Reagendar", "Editar", "Alterar repetição", "Encerrar repetição", "Cancelar lembrete", "Ver no histórico"]) {
+          expect(controls.map((control) => control.label), `open=${open}`).toContain(name);
+        }
+        for (const control of controls) {
+          expect(control.left, `${control.label} starts off screen`).toBeGreaterThanOrEqual(0);
+          expect(control.right, `${control.label} ends off screen`).toBeLessThanOrEqual(viewport.width + 1);
+          expect(control.height, `${control.label} is a short target`).toBeGreaterThanOrEqual(44);
+        }
+      }
     });
   }
 });
@@ -163,8 +141,8 @@ test.describe("Life Brain D.1: evidence with content", () => {
         const suffix = theme === "dark" ? "-dark" : "";
 
         await page.setContent(shell(reminderCard()), { waitUntil: "load" });
-        await page.locator("article").screenshot({ path: `${EVIDENCE}/fixture-reminder-card-${viewport.name}${suffix}.png` });
-        await page.locator(".reminder-more-trigger").click();
+        await page.locator(".reminder-row").screenshot({ path: `${EVIDENCE}/fixture-reminder-card-${viewport.name}${suffix}.png` });
+        await page.setContent(shell(reminderDetailBody({ open: "reschedule", title: "Aniversário de Ana" })), { waitUntil: "load" });
         await page.screenshot({ path: `${EVIDENCE}/fixture-reminder-card-menu-${viewport.name}${suffix}.png` });
 
         await page.setContent(shell(week()), { waitUntil: "load" });

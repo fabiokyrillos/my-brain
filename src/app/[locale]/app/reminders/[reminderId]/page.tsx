@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { getReminderCopy } from "@/features/reminders/copy";
@@ -8,7 +7,7 @@ import {
 } from "@/features/reminders/feedback";
 import { reminderFormatters } from "@/features/reminders/formatters";
 import { loadReminder } from "@/features/reminders/projection";
-import { ReminderList } from "@/features/reminders/reminder-list";
+import { ReminderDetail } from "@/features/reminders/reminder-detail";
 import {
   ReminderSeriesBanner,
   ReminderSeriesProvider,
@@ -26,14 +25,14 @@ import { requireSupabaseData } from "@/lib/supabase/result";
  * own notification opened. The owner reported it exactly that way: tapping
  * "não dá impressão de ser um clique com sucesso".
  *
- * ## Why this page renders a list of one
+ * ## The reminder is the page (ADR-180)
  *
- * `ReminderList` already decides how a reminder reads — its status sentence,
- * the label that changes with state, the linked subject, which controls are
- * offered. A detail layout of its own would be a second presentation of the
- * same row and the two would drift, so this page supplies the surroundings and
- * hands the row to the component that already owns it. The same reason
- * `loadReminder` narrows the list's query instead of writing its own.
+ * This page used to render a list of one: the list's card under a heading that
+ * said "Lembrete". The list is rows now, and a row keeps one verb, so this is
+ * where a reminder is read whole and changed — `ReminderDetail`: its text as
+ * the subject, its state, and its facts as one list, each edited in place. The
+ * view model is still the list's (`loadReminder` narrows the list's query
+ * instead of writing its own), so what a reminder may do is decided once.
  *
  * ## Why a bad id is `notFound` and not an error
  *
@@ -83,39 +82,30 @@ export default async function ReminderDetailPage({
 
   return (
     <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{copy.detail.eyebrow}</p>
-          <h1>{copy.detail.heading}</h1>
-          <p>{copy.detail.intro}</p>
-        </div>
-      </header>
-
       {/*
-        The same two providers the list mounts. The row's controls are the
-        list's controls — snooze, reschedule, cancel, restore — and they report
-        through these contexts, so a page that rendered the row without them
-        would offer buttons that could not say what they did.
+        The same two providers the list mounts. The page's controls are the
+        list's commands — snooze, reschedule, edit, cancel, restore, and the
+        rule's own — and they report through these contexts, so a page that
+        rendered them without the providers would offer buttons that could not
+        say what they did.
       */}
       <ReminderFeedbackProvider>
         <ReminderSeriesProvider>
           <ReminderFeedbackBanner label={copy.detail.heading} working={copy.working} />
           <ReminderSeriesBanner locale={locale} />
-          <ReminderList
-            formatInstant={formatInstant}
-            formatLocalInput={formatLocalInput}
-            formatLocalTime={formatLocalTime}
+          <ReminderDetail
+            anchorTimeValue={formatLocalTime(reminder.remindAt)}
             locale={locale}
-            reminders={[reminder]}
+            remindAtLocalValue={formatLocalInput(reminder.remindAt)}
+            reminder={reminder}
+            whenValue={formatInstant(
+              reminder.status === "sent" && reminder.sentAt !== null
+                ? reminder.sentAt
+                : reminder.remindAt,
+            )}
           />
         </ReminderSeriesProvider>
       </ReminderFeedbackProvider>
-
-      {/*
-        The way out, and it matters more here than on most pages: someone who
-        arrived by tapping a notification has no history to go back through.
-      */}
-      <Link href={`/${locale}/app/reminders`}>{copy.detail.backToList}</Link>
     </div>
   );
 }

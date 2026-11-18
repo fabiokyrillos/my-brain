@@ -13,6 +13,7 @@
  */
 
 import { notFound, redirect } from "next/navigation";
+import { SignedOutFrame } from "@/features/auth/signed-out-frame";
 import { ConsentSurface } from "@/features/legal/consent-surface";
 import { missingPolicyAcceptances } from "@/features/legal/acceptance";
 import { isLocale } from "@/lib/preferences";
@@ -56,11 +57,11 @@ export default async function ConsentPage({
     .maybeSingle();
 
   return (
-    <main className="auth-stage">
+    <SignedOutFrame locale={locale}>
       <ConsentSurface
         hasAcceptedBefore={!priorAcceptance.error && priorAcceptance.data !== null}
         locale={locale}
       />
-    </main>
+    </SignedOutFrame>
   );
 }

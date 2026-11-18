@@ -102,6 +102,17 @@ export function useReminderSeriesCommand(): ReminderSeriesContext {
   return context;
 }
 
+/**
+ * The two outcomes a page may need to react to — the last series command and
+ * the last undo — as the state objects themselves, so a consumer can tell a new
+ * round from the one it already handled by identity.
+ */
+export function useReminderSeriesOutcomes(): readonly [ReminderSeriesActionState, ReminderSeriesActionState] {
+  const { state } = useReminderSeriesCommand();
+  const { undoState } = useReminderSeriesUndo();
+  return [state, undoState];
+}
+
 function useReminderSeriesUndo(): UndoContext {
   const context = useContext(UndoBridge);
   if (context === null) {

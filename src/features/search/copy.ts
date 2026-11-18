@@ -20,6 +20,10 @@ export type SearchCopy = {
   readonly submit: string;
   readonly clear: string;
   readonly domains: Readonly<Record<SearchDomain, string>>;
+  /** The same kinds as the heading over a group of results: plural. */
+  readonly domainGroups: Readonly<Record<SearchDomain, string>>;
+  /** The closed line the two filters sit behind. */
+  readonly filters: string;
   readonly filterType: string;
   readonly filterPeriod: string;
   readonly periodAny: string;
@@ -41,7 +45,7 @@ const copy: Record<Locale, SearchCopy> = {
   "pt-BR": {
     title: "Buscar",
     inputLabel: "Buscar em tudo que é seu",
-    placeholder: "Digite uma palavra…",
+    placeholder: "Buscar em tudo que é seu",
     submit: "Buscar",
     clear: "Limpar",
     domains: {
@@ -53,6 +57,16 @@ const copy: Record<Locale, SearchCopy> = {
       organizations: "Organização",
       files: "Arquivo",
     },
+    domainGroups: {
+      tasks: "Tarefas",
+      entries: "Registros",
+      memories: "Memórias",
+      people: "Pessoas",
+      projects: "Projetos",
+      organizations: "Organizações",
+      files: "Arquivos",
+    },
+    filters: "Filtros",
     filterType: "Tipo",
     filterPeriod: "Período",
     periodAny: "Qualquer data",
@@ -72,7 +86,7 @@ const copy: Record<Locale, SearchCopy> = {
   en: {
     title: "Search",
     inputLabel: "Search everything of yours",
-    placeholder: "Type a word…",
+    placeholder: "Search everything of yours",
     submit: "Search",
     clear: "Clear",
     domains: {
@@ -84,6 +98,16 @@ const copy: Record<Locale, SearchCopy> = {
       organizations: "Organization",
       files: "File",
     },
+    domainGroups: {
+      tasks: "Tasks",
+      entries: "Records",
+      memories: "Memories",
+      people: "People",
+      projects: "Projects",
+      organizations: "Organizations",
+      files: "Files",
+    },
+    filters: "Filters",
     filterType: "Type",
     filterPeriod: "Period",
     periodAny: "Any date",

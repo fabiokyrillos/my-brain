@@ -378,9 +378,12 @@ test.describe("converged daily journey — capture, review, and confirmation", (
 
     await page.goto("/pt-BR/app/costs");
     await expect(page.getByRole("heading", { name: "Custos de IA" })).toBeVisible();
-    await expect(page.getByText("Calculado pelos tokens da API")).toBeVisible();
-    await expect(page.locator(".recent-costs tbody tr")).toHaveCount(usage.length);
-    await expect(page.locator(".trace-bar span")).not.toHaveCount(0);
+    // Editorial calmo (ADR-180): the estimate is one caption under the figure,
+    // the last calls are rows behind a closed line, and each function's share
+    // is the rule under its row.
+    await expect(page.locator(".cost-zone")).toContainText("Estimativa pelos tokens da API");
+    await expect(page.locator(".recent-costs .cost-row")).toHaveCount(usage.length);
+    await expect(page.locator(".cost-section .cost-row-rule")).not.toHaveCount(0);
   });
 
   test("Settings persists AI routing preferences when the profile changes", async () => {

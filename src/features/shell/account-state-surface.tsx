@@ -45,29 +45,32 @@ export function AccountStateSurface({
   const [formState, formAction, pending] = useActionState(signOut, idleSignOutState);
 
   return (
-    // `auth-stage`, not `auth-page`: SH.1 wrote a class name that exists in no
-    // stylesheet, so this surface rendered its card without the centred
-    // full-height stage. Found while building the sibling surfaces of SH.4.
-    <main className="auth-stage">
-      <div className="auth-card">
-        <h1>{stateCopy.title}</h1>
-        <p>{stateCopy.body}</p>
-        {state === "suspended" ? <p>{getSuspensionReasonLabel(locale, reasonCode)}</p> : null}
-        {state === "suspended" ? <p>{copy.suspendedReminders}</p> : null}
-        <p>{stateCopy.nextStep}</p>
+    // Editorial calmo (ADR-180). The column only: the route mounts the frame
+    // (`SignedOutFrame`, a server component) around it, as the consent and
+    // deletion routes do. What the state is, then what is true while it lasts
+    // as rows, then what to do about it, then the one action there is.
+    <div className="auth-column">
+      <h1>{stateCopy.title}</h1>
+      <p className="auth-caption">{stateCopy.body}</p>
+      {state === "suspended" ? (
+        <ul className="auth-facts">
+          <li>{getSuspensionReasonLabel(locale, reasonCode)}</li>
+          <li>{copy.suspendedReminders}</li>
+        </ul>
+      ) : null}
+      <p>{stateCopy.nextStep}</p>
 
-        <form action={formAction}>
-          <input type="hidden" name="locale" value={locale} />
-          <Button className="auth-primary-action" icon={<LogOut />} loading={pending} type="submit" variant="primary" width="full">
-            {pending ? copy.signingOut : copy.signOut}
-          </Button>
-        </form>
+      <form action={formAction}>
+        <input type="hidden" name="locale" value={locale} />
+        <Button className="auth-primary-action" icon={<LogOut />} loading={pending} type="submit" variant="primary" width="full">
+          {pending ? copy.signingOut : copy.signOut}
+        </Button>
+      </form>
 
-        <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-          {pending ? copy.signingOut : formState.status === "failed" ? formState.message : ""}
-        </div>
-        {formState.status === "failed" ? <p role="alert">{formState.message}</p> : null}
+      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
+        {pending ? copy.signingOut : formState.status === "failed" ? formState.message : ""}
       </div>
-    </main>
+      {formState.status === "failed" ? <p className="form-alert" role="alert">{formState.message}</p> : null}
+    </div>
   );
 }

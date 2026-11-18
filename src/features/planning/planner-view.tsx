@@ -273,21 +273,39 @@ export function PlannerView({
    * drawn in one of two places: above the lists when there is something to
    * notice, and inside "how planning works" when there is not — a quiet day
    * still says it is quiet, without a section of its own saying so first.
+   *
+   * ADR-180: a conflict whose task is a row on this page is stated **on that
+   * row**, in amber, where the decision is made. Saying it a second time in a
+   * block above the lists was the same sentence twice, so the block lists only
+   * what no row carries — and when every observation is on a row it is one
+   * quiet caption: how many there are, and that nothing was changed.
    */
+  const rowIds = new Set([...projection.planned, ...projection.available].map((item) => item.taskId));
+  const looseConflicts = projection.conflicts.filter(
+    (conflict) => !conflict.taskIds.some((taskId) => rowIds.has(taskId)),
+  );
+  const allOnRows = projection.conflicts.length > 0 && looseConflicts.length === 0;
   const conflicts = (
     <section
       aria-label={copy.conflicts.heading}
       className="planner-conflicts"
       data-has-conflicts={projection.conflicts.length > 0 ? "true" : "false"}
+      data-on-rows={allOnRows ? "true" : undefined}
     >
-      <h2>{copy.conflicts.heading}</h2>
+      {allOnRows ? null : <h2>{copy.conflicts.heading}</h2>}
       {projection.conflicts.length === 0 ? (
         <UniversalStateLine description={copy.conflicts.none} locale={locale} state="empty" />
+      ) : allOnRows ? (
+        <p className="planner-conflict-count">
+          <span>{copy.conflicts.count(projection.conflicts.length)}</span>
+          {/* `2M-PLAN-008`: stated as a fact, with nothing already applied. */}
+          <span>{copy.conflicts.notResolved}</span>
+        </p>
       ) : (
         <>
-          <p className="planner-conflict-count">{copy.conflicts.count(projection.conflicts.length)}</p>
+          <p className="planner-conflict-count">{copy.conflicts.count(looseConflicts.length)}</p>
           <ul className="planner-conflict-list">
-            {projection.conflicts.map((conflict) => (
+            {looseConflicts.map((conflict) => (
               <li key={`${conflict.kind}:${conflict.taskIds.join("-")}`}>
                 {copy.conflicts.statement[conflict.kind]}
               </li>

@@ -1,96 +1,533 @@
-/* ---- The public entry page (2O-ENTRY-001 … -003) --------------------------
-   The one surface a stranger reads before they can verify anything, so it is
-   deliberately plain: a statement, four claims, two documents and one way in.
+/* ---- The pages outside the shell -------------------------------------------
+   The public entry page (2O-ENTRY-001 … -003), the five pages under `/auth`,
+   and the three an account is sent to instead of the product — consent,
+   account-state and account deletion.
+
+   Editorial calmo (ADR-180) recomposed them as one calm column. The product's
+   mark and the other language at the top, as on the phone top bar inside; one
+   sentence in the reading face saying what the page is for; then what it asks,
+   one action, and its ways out as quiet links. No card, no panel, no wash
+   behind it — the page is the canvas, exactly as the pages inside are.
 
    Tokens only — an undefined var() voids the whole declaration in silence — and
    at most one `font:` shorthand per block, because the shorthand resets every
    property it does not name. Both rules are the redesign's, and both have cost
-   this repository a defect before. */
+   this repository a defect before.
+
+   `.auth-stage` and `.auth-card`, the shadowed card on a tinted wash these
+   pages used to be, are gone from `globals.css`: nothing draws them. */
+
+/* ---- the frame ----------------------------------------------------------- */
+
+.auth-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  justify-items: center;
+  /* `vh` first: a browser without the dynamic unit keeps it. */
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0 var(--space-4);
+  background: var(--background-canvas);
+}
+
+.auth-top,
+.auth-main {
+  width: 100%;
+  max-width: var(--panel-width-entry);
+  /* A grid child is as wide as its widest word unless told otherwise. */
+  min-width: 0;
+}
+
+.auth-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: var(--row-comfortable);
+  padding-top: var(--space-2);
+}
+
+.auth-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+/* The size the phone top bar draws it at, so it is the same mark. */
+.auth-brand .brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  font-size: 19px;
+}
+
+.auth-language {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.auth-language:hover {
+  color: var(--text-primary);
+}
+
+/*
+ * The page starts at the same place whatever it asks, so moving from sign-in
+ * to recovery changes the sentence and not where it is. The offset follows the
+ * height of the screen: on a phone it puts the fields and the button in the
+ * lower half, where the thumb is, and on a short screen it gives the space back.
+ */
+.auth-main {
+  padding: clamp(var(--space-8), 13vh, var(--space-16) * 2) 0 var(--space-12);
+}
+
+/* ---- a page: its sentence, what it asks, one action, its ways out --------- */
+
+.auth-column {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.auth-column > h1 {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-title-1);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+/* A sentence of the page that is not its caption: what to do next, the body
+   of the way to say no. */
+.auth-column > p,
+.auth-aside > p {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-body);
+}
+
+/* The one explanatory sentence a page may keep: what its button does. */
+.auth-column > .auth-caption {
+  margin-top: calc(var(--space-2) * -1);
+}
+
+/*
+ * What happened last, as a sentence with a rule beside it — not a tinted box.
+ * Risk and success each come with their words, so the colour is never the only
+ * thing saying which it is.
+ */
+.auth-column .form-alert,
+.auth-column .form-success,
+.auth-column > .auth-warning {
+  margin: 0;
+  padding: 0 0 0 var(--space-3);
+  border: 0;
+  border-left: 2px solid var(--tone-risk-fg);
+  border-radius: 0;
+  background: none;
+  color: var(--tone-risk-fg);
+  font: var(--type-body);
+}
+
+.auth-column .form-success {
+  border-left-color: var(--tone-success-fg);
+  color: var(--tone-success-fg);
+}
+
+/* The closed door is a fact about the page, not a failure: its caption. */
+.auth-column .form-alert[role="status"] {
+  margin-top: calc(var(--space-2) * -1);
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+}
+
+.auth-column .auth-form {
+  gap: var(--space-5);
+  margin: var(--space-3) 0 0;
+}
+
+.auth-column .auth-form label {
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.auth-column .auth-form input:not([type="checkbox"]) {
+  width: 100%;
+  min-height: var(--control-lg);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--background-surface);
+  color: var(--text-primary);
+  /* 16px in every theme and at every width: iOS zooms into anything smaller. */
+  font: var(--type-lead);
+}
+
+/* The rule under the password field. One caption; it follows what is typed. */
+.auth-hint {
+  margin: calc(var(--space-3) * -1) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.auth-hint[data-state="met"] {
+  color: var(--tone-success-fg);
+}
+
+/*
+ * Consent: the box and its sentence on one line, the whole line the target.
+ * `.auth-form input` gives every input a field's box, which drew this one as a
+ * 44px square centred over its own label.
+ */
+.auth-column .auth-form .auth-consent {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-body);
+  cursor: pointer;
+}
+
+/*
+ * The box is drawn at 20px and pressed at 44px. The input itself is the 44px
+ * square (2O-MOBILE-002 measures the control, not its label): a transparent
+ * border holds the room, and the face is what is left inside it. Still a real
+ * checkbox — `appearance: none`, never hidden — so focus, the tab order and
+ * the checked state are the browser's.
+ */
+.auth-column .auth-form .auth-consent input {
+  flex: none;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--touch-target);
+  height: var(--touch-target);
+  min-height: 0;
+  margin: 0 calc(var(--space-2) * -1) 0 calc(var(--space-3) * -1);
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: var(--space-3) solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--background-surface) padding-box;
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  cursor: pointer;
+}
+
+.auth-column .auth-form .auth-consent input::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--action-primary-text);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 10%, 37% 72%);
+  transform: scale(0);
+}
+
+.auth-column .auth-form .auth-consent input:checked {
+  background: var(--action-primary) padding-box;
+  box-shadow: inset 0 0 0 1px var(--action-primary);
+}
+
+.auth-column .auth-form .auth-consent input:checked::before {
+  transform: scale(1);
+}
+
+.auth-column .auth-form .auth-consent input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: calc(var(--space-2) * -1);
+}
+
+/* The two documents, inside the sentence. Inline, so the padding widens what
+   can be pressed without moving the line. */
+.auth-consent a {
+  padding-block: var(--space-4);
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.auth-column .auth-form button {
+  width: 100%;
+  min-height: var(--control-lg);
+  margin-top: var(--space-2);
+  font: var(--type-heading);
+  transition: background var(--motion-fast) ease-out;
+}
+
+.auth-column .auth-form button:hover:not(:disabled) {
+  background: var(--action-primary-hover);
+}
+
+.auth-column .auth-form button:disabled {
+  opacity: 0.72;
+}
+
+/* The ways out: words, one target tall, on as few lines as they need. */
+.auth-column .auth-links {
+  justify-content: flex-start;
+  gap: 0 var(--space-6);
+  margin: 0;
+}
+
+/* ---- the three gates: consent, account-state, account deletion ------------ */
+
+/*
+ * What cannot be taken back, said before anything else on the page. The rule
+ * and the tone of a refusal, on the page's own ink: it is a consequence, not
+ * an error, and it has to be as readable as the heading.
+ */
+.auth-column > .auth-warning {
+  color: var(--text-primary);
+}
+
+/* What is true while this lasts, as rows between hairlines — never a box. */
+.auth-facts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border-default);
+  list-style: none;
+}
+
+.auth-facts > li {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-divider);
+  color: var(--text-secondary);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+/* A row that is a document to read: the whole row is the link. */
+.auth-facts > li:has(> a) {
+  padding: 0;
+}
+
+.auth-facts > li > a {
+  display: flex;
+  align-items: center;
+  min-height: var(--control-lg);
+  color: var(--link);
+  font: var(--type-lead);
+}
+
+/* A heading over the hairline its rows start with. */
+.auth-section {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.auth-section > .auth-section-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-heading);
+}
+
+/* The one action of a gate, on the Button primitive: the size and the weight
+   of the sign-in button, so the family has one primary button. */
+.auth-column .auth-primary-action {
+  min-height: var(--control-lg);
+  margin-top: var(--space-2);
+  font: var(--type-heading);
+}
+
+/* The way to say no, under a rule: a second, quieter part of the same page. */
+.auth-aside {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border-default);
+}
+
+.auth-aside > h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-heading);
+}
+
+/* A way out that has to be a form (sign-out is a POST), drawn as the link
+   beside it. */
+.auth-link-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: var(--type-label);
+}
+
+.auth-link-button:disabled {
+  opacity: 0.72;
+}
+
+.auth-column .auth-links .auth-risk-link {
+  color: var(--tone-risk-fg);
+}
+
+/*
+ * Deleting the account. The one filled risk button in the product: the page's
+ * action is the one that cannot be undone, so it does not look like "Entrar".
+ */
+.auth-column .auth-form button.auth-danger-action,
+.auth-column .auth-form button.auth-danger-action:hover:not(:disabled) {
+  background: var(--tone-risk-fg);
+  color: var(--background-surface);
+}
+
+/* "Voltar para Ajustes", above the deletion page's sentence. */
+.auth-main > .data-ai-tabs {
+  margin-bottom: var(--space-6);
+}
+
+.auth-main > .data-ai-tabs .data-ai-up {
+  min-height: var(--touch-target);
+}
+
+/* The strip is already something between the mark and the sentence, so the
+   page gives back the offset the other pages open with. */
+.auth-main:has(> .data-ai-tabs) {
+  padding-top: var(--space-8);
+}
+
+@media (min-width: 900px) {
+  .auth-column > h1 {
+    font: var(--type-display);
+    letter-spacing: -0.01em;
+  }
+}
+
+/* ---- the public entry page ------------------------------------------------
+   The one surface a stranger reads before they can verify anything: what this
+   is, the one way in, then the four claims as rows and the two documents. */
 
 .entry-page {
   display: grid;
-  gap: var(--space-8);
-  max-width: 72ch;
+  align-content: start;
+  gap: var(--space-12);
+  max-width: var(--width-reading);
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: var(--space-8) var(--space-5) var(--space-12);
+  padding: 0 var(--space-4) var(--space-16);
+}
+
+.entry-page .auth-top {
+  max-width: none;
 }
 
 .entry-header {
   display: grid;
-  gap: var(--space-3);
+  justify-items: start;
+  gap: var(--space-5);
+  padding-top: var(--space-8);
 }
 
 .entry-header > h1 {
+  max-width: 22ch;
   margin: 0;
-  font: var(--type-title-1);
   color: var(--text-primary);
+  font: var(--type-title-1);
+  letter-spacing: -0.01em;
 }
 
+/* The page's one action. */
+.entry-sign-in {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-lg);
+  margin-top: var(--space-3);
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-md);
+  background: var(--action-primary);
+  color: var(--action-primary-text);
+  font: var(--type-heading);
+  transition: background var(--motion-fast) ease-out;
+}
+
+.entry-sign-in:hover {
+  background: var(--action-primary-hover);
+}
+
+.entry-closed {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+/* A section is a heading over a hairline; a claim is a row. */
 .entry-claims {
   display: grid;
-  gap: var(--space-4);
+  min-width: 0;
 }
 
 .entry-claims > h2 {
   margin: 0;
-  font: var(--type-title-2);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-default);
   color: var(--text-primary);
+  font: var(--type-heading);
 }
 
 .entry-claims > ul {
-  list-style: none;
+  display: grid;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: var(--space-3);
+  list-style: none;
 }
 
 .entry-claims li {
-  padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  font: var(--type-body);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border-divider);
   color: var(--text-secondary);
-  line-height: 1.6;
+  font: var(--type-body);
+  overflow-wrap: anywhere;
 }
 
 .entry-documents {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: 0 var(--space-6);
 }
 
-.entry-documents a,
-.entry-sign-in {
-  /* WCAG 2.2 AA 2.5.8. This page is reached on a phone as often as anywhere,
-     and these are its only controls. */
+.entry-documents a {
+  /* WCAG 2.2 AA 2.5.8. This page is reached on a phone as often as anywhere. */
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target);
   color: var(--link);
-  font: var(--type-body);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.entry-footer {
-  display: grid;
-  gap: var(--space-3);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--border-divider);
-}
-
-.entry-closed {
-  margin: 0;
-  max-width: 68ch;
-  font: var(--type-body);
-  color: var(--text-secondary);
+  font: var(--type-label);
 }
 
 @media (max-width: 600px) {
   .entry-page {
-    gap: var(--space-6);
-    padding: var(--space-6) var(--space-4) var(--space-10);
+    gap: var(--space-10);
+    padding-bottom: var(--space-12);
+  }
+
+  .entry-header {
+    justify-items: stretch;
+  }
+}
+
+@media (min-width: 900px) {
+  .entry-header {
+    padding-top: var(--space-16);
+  }
+
+  .entry-header > h1 {
+    font: var(--type-display);
+    letter-spacing: -0.01em;
   }
 }

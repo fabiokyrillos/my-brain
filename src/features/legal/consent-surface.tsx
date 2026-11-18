@@ -45,20 +45,29 @@ export function ConsentSurface({
   const [signOutState, signOutAction, signingOut] = useActionState(signOut, idleSignOutState);
 
   return (
-    <div className="auth-card">
+    <div className="auth-column">
+      {/*
+        Editorial calmo (ADR-180). What is asked, the two documents as rows
+        under their heading, the one action — and then, under a rule, the way
+        to say no. Nothing was removed: the two documents were bare text that
+        did not look like links, and "Excluir a conta" was a grey line under a
+        full-width button.
+      */}
       <h1>{copy.title}</h1>
-      <p>{hasAcceptedBefore ? copy.updatedBody : copy.firstSessionBody}</p>
+      <p className="auth-caption">{hasAcceptedBefore ? copy.updatedBody : copy.firstSessionBody}</p>
 
-      <p>{copy.readFirst}</p>
-      <ul>
-        {POLICY_DOCUMENTS.map((document) => (
-          <li key={document}>
-            <Link href={legalDocumentPath(locale, document)}>
-              {getLegalDocument(locale, document).title}
-            </Link>
-          </li>
-        ))}
-      </ul>
+      <div className="auth-section">
+        <p className="auth-section-title">{copy.readFirst}</p>
+        <ul className="auth-facts">
+          {POLICY_DOCUMENTS.map((document) => (
+            <li key={document}>
+              <Link href={legalDocumentPath(locale, document)}>
+                {getLegalDocument(locale, document).title}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
 
       <form action={formAction}>
         <input type="hidden" name="locale" value={locale} />
@@ -70,18 +79,18 @@ export function ConsentSurface({
       <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
         {pending ? copy.accepting : state.status === "failed" ? state.message : ""}
       </div>
-      {state.status === "failed" ? <p role="alert">{state.message}</p> : null}
+      {state.status === "failed" ? <p className="form-alert" role="alert">{state.message}</p> : null}
 
-      <h2>{copy.declineTitle}</h2>
-      <p>{copy.declineBody}</p>
-      <form action={signOutAction}>
-        <input type="hidden" name="locale" value={locale} />
-        <button className="secondary-button" disabled={signingOut} type="submit">
-          {copy.declineSignOut}
-        </button>
-      </form>
-      {signOutState.status === "failed" ? <p role="alert">{signOutState.message}</p> : null}
-      <p>
+      <section aria-labelledby="consent-decline-title" className="auth-aside">
+        <h2 id="consent-decline-title">{copy.declineTitle}</h2>
+        <p>{copy.declineBody}</p>
+        <div className="auth-links">
+          <form action={signOutAction}>
+            <input type="hidden" name="locale" value={locale} />
+            <button className="auth-link-button" disabled={signingOut} type="submit">
+              {copy.declineSignOut}
+            </button>
+          </form>
         {/*
           `/account/delete`, NOT `/app/settings` — SH-LEGAL-010.
 
@@ -91,8 +100,10 @@ export function ConsentSurface({
           outside `app/` for exactly this caller; this link is what makes that
           placement do anything.
         */}
-        <Link href={`/${locale}/account/delete`}>{copy.declineDelete}</Link>
-      </p>
+          <Link className="auth-risk-link" href={`/${locale}/account/delete`}>{copy.declineDelete}</Link>
+        </div>
+        {signOutState.status === "failed" ? <p className="form-alert" role="alert">{signOutState.message}</p> : null}
+      </section>
     </div>
   );
 }

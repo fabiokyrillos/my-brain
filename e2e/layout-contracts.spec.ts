@@ -2304,8 +2304,9 @@ function plannerBody(options: { aboutOpen?: boolean } = {}) {
       navClass: "planner-day-nav",
     })
     + `<p class="planner-overloaded" role="status">Há mais itens do que horas declaradas, contando um item por hora.</p>`
-    + `<section aria-label="O que vale notar" class="planner-conflicts" data-has-conflicts="true"><h2>O que vale notar</h2><p class="planner-conflict-count">1 observação</p>`
-    + `<ul class="planner-conflict-list"><li>A intenção é para depois do prazo da tarefa.</li></ul><p class="quiet-state">Nada foi alterado. Você decide o que fazer com cada uma.</p></section>`
+    // The one observation is on its task's row below, so the region is one caption (ADR-180).
+    + `<section aria-label="O que vale notar" class="planner-conflicts" data-has-conflicts="true" data-on-rows="true">`
+    + `<p class="planner-conflict-count"><span>1 observação</span><span>Nada foi alterado. Você decide o que fazer com cada uma.</span></p></section>`
     + list("Planejado para este dia", [
       plannerRowBody({ title: LONG_TITLE, pool: false, due: "17 de nov. de 2026", noted: "A intenção é para depois do prazo da tarefa." }),
       plannerRowBody({ title: "Pagar o condomínio", pool: false, due: "18 de nov. de 2026" }),
@@ -3047,5 +3048,628 @@ test.describe("Ajustes as rows of facts (Editorial calmo)", () => {
     expect(read("features", "privacy", "privacy-section.tsx")).not.toContain("/account/delete`");
     const content = read("features", "settings", "settings-section-content.tsx");
     expect(content.lastIndexOf("<AccountDataSection")).toBeGreaterThan(content.lastIndexOf("<DataAiSection"));
+  });
+});
+
+/*
+ * ============================================================================
+ * The signed-out pages (Editorial calmo, ADR-180): the five under `/auth` and
+ * the public entry page.
+ *
+ * They are not inside the app shell, so they are composed on their own
+ * document here — the frame `src/app/[locale]/auth/layout.tsx` emits, with
+ * `entry.css`, the sheet that draws them, after the shared ones. The markup
+ * mirrors the pages; the last test fails when the two stop agreeing.
+ * ============================================================================
+ */
+
+// `history.css` draws the "Voltar para Ajustes" strip the deletion page wears.
+const signedOutCss = [css, ...["history.css", "entry.css"].map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))].join("\n");
+
+const signedOutHeader = `<header class="auth-top"><a href="/" class="auth-brand" aria-label="My Brain"><span class="brand-mark">B</span><span class="brand-name">My Brain</span></a><a class="auth-language" href="/en/auth/login" aria-label="Mudar para English" hreflang="en"><span lang="en">English</span></a></header>`;
+
+const signedOutField = (label: string, name: string, type: string, extra = "") =>
+  `<label>${label}<input name="${name}" type="${type}" required${extra}></label>`;
+
+const signedOutLinks = (labels: readonly string[]) =>
+  `<nav aria-label="Outros caminhos" class="auth-links">${labels.map((label) => `<a href="#">${label}</a>`).join("")}</nav>`;
+
+const SIGNED_OUT_SUBMIT = (label: string) =>
+  `<button type="submit">${label}</button><p aria-atomic="true" aria-live="polite" class="sr-only" role="status"></p>`;
+
+/** The longest sentences these pages can say, so the worst case is what is measured. */
+const SIGNED_OUT_ALERT = `<p class="form-alert" role="alert">Este ambiente ainda não está configurado para enviar e-mails de autenticação. Avise o responsável pelo produto.</p>`;
+const SIGNED_OUT_SUCCESS = `<p class="form-success" role="status">Se a conta existir, o link de recuperação chegará em instantes.</p>`;
+const SIGNED_OUT_HINT = `<p aria-live="polite" class="auth-hint" data-state="missing" id="hint">Ainda falta: 12 caracteres, uma maiúscula, uma minúscula, um número e um símbolo.</p>`;
+
+const SIGNED_OUT_PAGES: Readonly<Record<string, string>> = {
+  login: `<h1>Entre no seu Brain.</h1><form class="auth-form">${signedOutField("E-mail", "email", "email")}${signedOutField("Senha", "password", "password")}${SIGNED_OUT_SUBMIT("Entrar")}</form>${signedOutLinks(["Esqueci minha senha", "Criar conta", "Reenviar confirmação"])}`,
+  "login, refused": `<h1>Entre no seu Brain.</h1>${SIGNED_OUT_ALERT}<form class="auth-form">${signedOutField("E-mail", "email", "email")}${signedOutField("Senha", "password", "password")}${SIGNED_OUT_SUBMIT("Entrar")}</form>${signedOutLinks(["Esqueci minha senha", "Criar conta", "Reenviar confirmação"])}`,
+  "login, link sent": `<h1>Entre no seu Brain.</h1>${SIGNED_OUT_SUCCESS}<form class="auth-form">${signedOutField("E-mail", "email", "email")}${signedOutField("Senha", "password", "password")}${SIGNED_OUT_SUBMIT("Entrar")}</form>${signedOutLinks(["Esqueci minha senha", "Criar conta", "Reenviar confirmação"])}`,
+  "register, door shut, refused": `<h1>Cadastro fechado.</h1><p class="form-alert" role="status">O cadastro está fechado no momento. Esta página não recolhe e-mails e não existe lista de espera.</p>${SIGNED_OUT_ALERT}<form class="auth-form">${signedOutField("Nome", "displayName", "text")}${signedOutField("E-mail", "email", "email")}${signedOutField("Senha", "password", "password", ' aria-describedby="hint"')}${SIGNED_OUT_HINT}${signedOutField("Confirme a senha", "passwordConfirmation", "password")}<label class="auth-consent"><input name="acceptedPolicies" required type="checkbox" value="on"><span>Li e aceito os <a href="#">Termos de Uso</a> e a <a href="#">Política de Privacidade</a>.</span></label><div class="cf-turnstile" style="height:65px"></div>${SIGNED_OUT_SUBMIT("Criar conta")}</form>${signedOutLinks(["Já tenho conta", "O que é o My Brain"])}`,
+  recover: `<h1>Recupere sua senha.</h1><p class="auth-caption">Enviaremos um link seguro para seu e-mail.</p><form class="auth-form">${signedOutField("E-mail", "email", "email")}${SIGNED_OUT_SUBMIT("Enviar link")}</form>${signedOutLinks(["Voltar ao login"])}`,
+  resend: `<h1>Reenvie a confirmação.</h1><p class="auth-caption">Se houver uma conta aguardando confirmação para este e-mail, enviaremos um novo link.</p><form class="auth-form">${signedOutField("E-mail", "email", "email")}${SIGNED_OUT_SUBMIT("Reenviar link")}</form>${signedOutLinks(["Voltar ao login"])}`,
+  reset: `<h1>Defina uma nova senha.</h1><form class="auth-form">${signedOutField("Nova senha", "password", "password", ' aria-describedby="hint"')}${SIGNED_OUT_HINT}${signedOutField("Confirme a nova senha", "passwordConfirmation", "password")}${SIGNED_OUT_SUBMIT("Atualizar senha")}</form>${signedOutLinks(["Solicitar outro link"])}`,
+};
+
+const signedOutAuth = (page: string) =>
+  `<div class="auth-shell" lang="pt-BR">${signedOutHeader}<main class="auth-main"><div class="auth-column">${SIGNED_OUT_PAGES[page]}</div></main></div>`;
+
+const SIGNED_OUT_ENTRY = `<div class="entry-page" lang="pt-BR">${signedOutHeader}<header class="entry-header"><h1>Um lugar para escrever o que você precisa lembrar, e recuperar depois com contexto.</h1><a class="entry-sign-in" href="#">Já tenho conta</a><p class="entry-closed">O cadastro está fechado no momento. Esta página não recolhe e-mails e não existe lista de espera.</p></header><section class="entry-claims" aria-labelledby="c"><h2 id="c">O que este produto faz</h2><ul>${["Você escreve em texto livre. O produto lê, separa tarefas, pessoas, datas e o que é só para lembrar, e pergunta quando não tem certeza.", "Suas palavras são gravadas antes de qualquer modelo rodar.", "A IA usa uma credencial sua, que você fornece e pode remover.", "A política de privacidade e os termos de uso ficam abaixo."].map((claim) => `<li>${claim}</li>`).join("")}</ul></section><section class="entry-documents" aria-label="Documentos"><a href="#">Termos de Uso</a><a href="#">Política de Privacidade</a></section></div>`;
+
+/*
+ * The three gates an account is sent to instead of the product — consent,
+ * account-state and account deletion — in the same frame and column. Mirrors
+ * `consent-surface.tsx`, `account-state-surface.tsx`, `deletion-surface.tsx`
+ * and the strip `account/delete/page.tsx` mounts above the last.
+ */
+const GATE_BUTTON = (label: string) =>
+  `<form><input type="hidden" name="locale" value="pt-BR"><button type="submit" class="ui-button ui-button--primary ui-button--md ui-button--full auth-primary-action"><span class="ui-button__label">${label}</span></button></form>`;
+
+const SIGNED_OUT_GATES: Readonly<Record<string, string>> = {
+  "consent, sign-out refused": `<div class="auth-column"><h1>Antes de continuar</h1><p class="auth-caption">Os documentos mudaram desde o seu último aceite. Leia a versão atual e aceite para continuar; o acesso ao produto volta assim que o novo aceite é registrado.</p><div class="auth-section"><p class="auth-section-title">Leia antes de aceitar:</p><ul class="auth-facts"><li><a href="#">Termos de Uso</a></li><li><a href="#">Política de Privacidade</a></li></ul></div>${GATE_BUTTON("Aceitar e continuar")}<p class="form-alert" role="alert">Não foi possível registrar o aceite agora. Tente novamente.</p><section aria-labelledby="d" class="auth-aside"><h2 id="d">Se você não quiser aceitar</h2><p>Aceitar não é obrigatório. Você pode encerrar a sessão e voltar depois, ou excluir a conta — a exclusão apaga o seu conteúdo e é irreversível.</p><div class="auth-links"><form><input type="hidden" name="locale" value="pt-BR"><button class="auth-link-button" type="submit">Sair da conta</button></form><a class="auth-risk-link" href="#">Excluir a conta</a></div><p class="form-alert" role="alert">Não foi possível sair agora. Tente novamente.</p></section></div>`,
+  "account-state, suspended": `<div class="auth-column"><h1>Conta suspensa</h1><p class="auth-caption">Sua conta está suspensa e o produto está indisponível por enquanto. Seus dados permanecem guardados e intactos.</p><ul class="auth-facts"><li>Motivo: a conta está em análise.</li><li>Lembretes que vencerem durante a suspensão não serão enviados depois; eles continuam na sua lista de lembretes.</li></ul><p>Se você acredita que isso é um engano, entre em contato com o operador do serviço.</p>${GATE_BUTTON("Sair da conta")}</div>`,
+  "account deletion, refused": `<nav aria-label="Conta e dados" class="data-ai-tabs"><a class="data-ai-up" href="#">${ICON}Voltar para Ajustes</a><div class="data-ai-lenses"><span aria-current="page" class="data-ai-lens">Apagar a conta</span></div></nav><div class="auth-column"><h1>Excluir a conta</h1><p class="auth-warning">A exclusão é definitiva. Depois que ela começa, não há como desfazer nem recuperar o que foi apagado.</p><ul class="auth-facts"><li>Serão apagados todos os seus registros, interpretações, tarefas, pessoas, projetos, lembretes, conversas, memórias, arquivos enviados e o histórico de uso da sua conta.</li><li>Fica guardado apenas um registro sem identificação da própria exclusão.</li><li>A exclusão começa assim que você confirma e costuma terminar em alguns instantes.</li></ul><form class="auth-form"><input type="hidden" name="locale" value="pt-BR"><label>Para confirmar, digite EXCLUIR<input autocomplete="off" maxlength="64" name="confirmation" required></label><label>Confirme sua senha<input autocomplete="current-password" maxlength="256" name="password" required type="password"></label><div class="cf-turnstile" style="height:65px"></div><button class="auth-danger-action" type="submit">Excluir minha conta definitivamente</button></form><p class="form-alert" role="alert">A verificação de segurança não foi aceita. Recarregue a página e tente de novo.</p><p class="form-hint">Recarregue a página antes de tentar novamente: a verificação de segurança só vale uma vez.</p></div>`,
+};
+
+const signedOutGate = (page: string) =>
+  `<div class="auth-shell" lang="pt-BR">${signedOutHeader}<main class="auth-main">${SIGNED_OUT_GATES[page]}</main></div>`;
+
+async function renderSignedOut(page: Page, body: string, width: number, height: number, theme?: "dark") {
+  await page.setViewportSize({ width, height });
+  await page.setContent(`<!doctype html><html lang="pt-BR"${theme ? ` data-theme="${theme}"` : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+:root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}
+${signedOutCss}
+</style></head><body>${body}</body></html>`);
+  await page.waitForTimeout(60);
+}
+
+/**
+ * Every control under 44px. A checkbox is measured by the label that carries
+ * it, which is its target; nothing else is excused — the two documents inside
+ * the consent sentence included.
+ */
+async function signedOutShortTargets(page: Page) {
+  return page.evaluate((minimum) => {
+    const targets = [...document.querySelectorAll<HTMLElement>("a, button, input:not([type=hidden])")].map((node) =>
+      node instanceof HTMLInputElement && node.type === "checkbox" ? node.closest<HTMLElement>("label") ?? node : node,
+    );
+    return targets.filter((node) => node.getClientRects().length > 0)
+      .map((node) => ({ label: (node.textContent ?? "").trim().slice(0, 24) || node.getAttribute("name") || node.tagName, height: Math.round(node.getBoundingClientRect().height) }))
+      .filter((entry) => entry.height < minimum)
+      .map((entry) => `${entry.label}:${entry.height}`);
+  }, TOUCH_TARGET);
+}
+
+test.describe("the signed-out pages as one calm column (Editorial calmo)", () => {
+  for (const [width, height] of [[390, 844], [320, 568]] as const) {
+    test(`no sideways scroll, no target under 44px and no field under 16px at ${width} CSS px`, async ({ page }) => {
+      const bodies = [
+        ...Object.keys(SIGNED_OUT_PAGES).map((name) => [name, signedOutAuth(name)] as const),
+        ...Object.keys(SIGNED_OUT_GATES).map((name) => [name, signedOutGate(name)] as const),
+        ["the entry page", SIGNED_OUT_ENTRY] as const,
+      ];
+      for (const [name, body] of bodies) {
+        await renderSignedOut(page, body, width, height);
+        expect(await sidewaysOverflow(page), name).toBeLessThanOrEqual(1);
+        expect(await signedOutShortTargets(page), name).toEqual([]);
+        const fields = await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLInputElement>("input:not([type=hidden]):not([type=checkbox])")]
+            .map((field) => parseFloat(getComputedStyle(field).fontSize)));
+        // 16px, so iOS does not zoom the page when a field takes focus.
+        for (const size of fields) expect(size, name).toBeGreaterThanOrEqual(16);
+        if (name in SIGNED_OUT_PAGES || name.startsWith("account deletion")) expect(fields.length, name).toBeGreaterThan(0);
+      }
+    });
+  }
+
+  test("the sentence starts at the same place on every page, and the one action is the column's width", async ({ page }) => {
+    const tops = new Set<number>();
+    for (const name of Object.keys(SIGNED_OUT_PAGES)) {
+      await renderSignedOut(page, signedOutAuth(name), 390, 844);
+      const measured = await page.evaluate(() => {
+        const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+        const column = box(".auth-column");
+        const button = box(".auth-form button");
+        return {
+          heading: Math.round(box("h1").top),
+          brandLeft: Math.round(box(".auth-brand").left),
+          columnLeft: Math.round(column.left),
+          full: Math.abs(button.left - column.left) <= 1 && Math.abs(button.right - column.right) <= 1,
+          buttons: document.querySelectorAll(".auth-shell button").length,
+        };
+      });
+      tops.add(measured.heading);
+      // The mark, the sentence and the fields share one left edge.
+      expect(measured.brandLeft, name).toBe(measured.columnLeft);
+      expect(measured.full, name).toBe(true);
+      expect(measured.buttons, name).toBe(1);
+    }
+    expect([...tops]).toHaveLength(1);
+  });
+
+  test("on a phone, sign-in fits one screen with its button in the lower half", async ({ page }) => {
+    await renderSignedOut(page, signedOutAuth("login"), 390, 844);
+    const measured = await page.evaluate(() => ({
+      scroll: document.documentElement.scrollHeight,
+      button: document.querySelector(".auth-form button")!.getBoundingClientRect(),
+    }));
+    expect(measured.scroll).toBeLessThanOrEqual(844);
+    expect(measured.button.top + measured.button.height / 2).toBeGreaterThan(844 / 2);
+  });
+
+  test("there is no card: the column has no border, no fill and no shadow, in light and in dark", async ({ page }) => {
+    for (const theme of [undefined, "dark"] as const) {
+      await renderSignedOut(page, signedOutAuth("login, refused"), 390, 844, theme);
+      const drawn = await page.evaluate(() => {
+        const column = getComputedStyle(document.querySelector(".auth-column")!);
+        const alert = getComputedStyle(document.querySelector(".form-alert")!);
+        return {
+          border: column.borderTopWidth, shadow: column.boxShadow, fill: column.backgroundColor,
+          alertFill: alert.backgroundColor, alertRule: alert.borderLeftWidth, alertTop: alert.borderTopWidth,
+          page: getComputedStyle(document.querySelector(".auth-shell")!).backgroundImage,
+        };
+      });
+      expect(drawn, theme ?? "light").toEqual({
+        border: "0px", shadow: "none", fill: "rgba(0, 0, 0, 0)",
+        alertFill: "rgba(0, 0, 0, 0)", alertRule: "2px", alertTop: "0px", page: "none",
+      });
+    }
+  });
+
+  test("the consent box sits on the line of its sentence, not above it", async ({ page }) => {
+    await renderSignedOut(page, signedOutAuth("register, door shut, refused"), 390, 844);
+    const measured = await page.evaluate(() => {
+      const box = document.querySelector<HTMLElement>(".auth-consent input")!.getBoundingClientRect();
+      const text = document.querySelector<HTMLElement>(".auth-consent span")!.getBoundingClientRect();
+      return { size: Math.round(box.width), beside: box.right <= text.left, overlap: box.top < text.bottom && box.bottom > text.top };
+    });
+    // The control itself is the 44px target (2O-MOBILE-002 measures the input,
+    // not its label); the face drawn inside it is 20px.
+    expect(measured).toEqual({ size: 44, beside: true, overlap: true });
+  });
+
+  test("on desktop the column stays a reading measure, centred, and is not stretched to fill", async ({ page }) => {
+    await renderSignedOut(page, signedOutAuth("login"), 1280, 900);
+    const column = (await page.locator(".auth-column").boundingBox())!;
+    expect(column.width).toBeLessThanOrEqual(400);
+    expect(Math.abs(column.x + column.width / 2 - 640)).toBeLessThanOrEqual(1);
+    expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(1);
+  });
+
+  test("the entry page offers its one way in before its claims, and the claims are rows", async ({ page }) => {
+    await renderSignedOut(page, SIGNED_OUT_ENTRY, 390, 844);
+    const measured = await page.evaluate(() => {
+      const top = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().top;
+      const claim = getComputedStyle(document.querySelector(".entry-claims li")!);
+      return {
+        order: top("h1") < top(".entry-sign-in") && top(".entry-sign-in") < top(".entry-claims"),
+        firstScreen: document.querySelector(".entry-sign-in")!.getBoundingClientRect().bottom <= 844,
+        box: claim.borderTopWidth, radius: claim.borderTopLeftRadius, rule: claim.borderBottomWidth, fill: claim.backgroundColor,
+      };
+    });
+    expect(measured).toEqual({ order: true, firstScreen: true, box: "0px", radius: "0px", rule: "1px", fill: "rgba(0, 0, 0, 0)" });
+  });
+
+  test("the three gates are the same column: no card, their facts as rows, the way to say no under a rule", async ({ page }) => {
+    for (const name of Object.keys(SIGNED_OUT_GATES)) {
+      await renderSignedOut(page, signedOutGate(name), 390, 844);
+      const drawn = await page.evaluate(() => {
+        const column = document.querySelector(".auth-column")!;
+        const style = getComputedStyle(column);
+        const fact = getComputedStyle(document.querySelector(".auth-facts > li")!);
+        const shell = document.querySelector(".auth-shell")!;
+        return {
+          border: style.borderTopWidth, shadow: style.boxShadow, fill: style.backgroundColor,
+          wash: getComputedStyle(shell).backgroundImage,
+          factBox: fact.borderTopWidth, factRule: fact.borderBottomWidth, factFill: fact.backgroundColor,
+          sameEdge: Math.round(column.getBoundingClientRect().left) === Math.round(document.querySelector(".auth-brand")!.getBoundingClientRect().left),
+          primary: document.querySelectorAll(".auth-primary-action, .auth-form button").length,
+        };
+      });
+      expect(drawn, name).toEqual({
+        border: "0px", shadow: "none", fill: "rgba(0, 0, 0, 0)", wash: "none",
+        factBox: "0px", factRule: "1px", factFill: "rgba(0, 0, 0, 0)", sameEdge: true, primary: 1,
+      });
+    }
+
+    await renderSignedOut(page, signedOutGate("consent, sign-out refused"), 390, 844);
+    const consent = await page.evaluate(() => {
+      const top = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().top;
+      const out = document.querySelector<HTMLElement>(".auth-link-button")!;
+      const link = document.querySelector<HTMLElement>(".auth-risk-link")!;
+      return {
+        order: top(".auth-facts") < top(".auth-primary-action") && top(".auth-primary-action") < top(".auth-aside"),
+        rule: getComputedStyle(document.querySelector(".auth-aside")!).borderTopWidth,
+        // Sign-out is a form and "Excluir a conta" a link; they are drawn as one line of words.
+        oneLine: Math.abs(out.getBoundingClientRect().top - link.getBoundingClientRect().top) <= 1,
+        quiet: getComputedStyle(out).backgroundColor,
+        rowIsLink: Math.round(document.querySelector(".auth-facts a")!.getBoundingClientRect().width) === Math.round(document.querySelector(".auth-facts li")!.getBoundingClientRect().width),
+      };
+    });
+    expect(consent).toEqual({ order: true, rule: "1px", oneLine: true, quiet: "rgba(0, 0, 0, 0)", rowIsLink: true });
+  });
+
+  test("deleting the account: every consequence is above the first field, and the action is the one filled risk button", async ({ page }) => {
+    for (const theme of [undefined, "dark"] as const) {
+      await renderSignedOut(page, signedOutGate("account deletion, refused"), 390, 844, theme);
+      const drawn = await page.evaluate(() => {
+        const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+        const colour = (selector: string, property: "backgroundColor" | "color" | "borderLeftColor") =>
+          getComputedStyle(document.querySelector(selector)!)[property];
+        return {
+          before: box(".auth-warning").bottom <= box(".auth-facts").top && box(".auth-facts").bottom <= box(".auth-form input:not([type=hidden])").top,
+          facts: document.querySelectorAll(".auth-facts > li").length,
+          warningRule: getComputedStyle(document.querySelector(".auth-warning")!).borderLeftWidth,
+          // The button is filled with the tone the warning's rule and the refusal's words are in.
+          filled: colour(".auth-danger-action", "backgroundColor") === colour(".auth-warning", "borderLeftColor")
+            && colour(".auth-danger-action", "backgroundColor") === colour(".form-alert", "color"),
+          notInk: colour(".auth-danger-action", "backgroundColor") !== colour(".auth-column > h1", "color"),
+          full: Math.abs(box(".auth-danger-action").width - box(".auth-column").width) <= 1,
+          captchaInside: document.querySelector("form.auth-form .cf-turnstile") !== null,
+          stripAbove: box(".data-ai-tabs").bottom <= box("h1").top,
+        };
+      });
+      expect(drawn, theme ?? "light").toEqual({
+        before: true, facts: 3, warningRule: "2px", filled: true, notInk: true, full: true, captchaInside: true, stripAbove: true,
+      });
+    }
+  });
+
+  test("the fixture still mirrors the markup the pages emit", () => {
+    const read = (...path: string[]) => readFileSync(join(ROOT, "src", ...path), "utf8");
+    const frame = read("features", "auth", "signed-out-frame.tsx");
+    for (const name of ["auth-shell", "auth-main"]) expect(frame).toContain(`className="${name}"`);
+    expect(read("app", "[locale]", "auth", "layout.tsx")).toContain("<SignedOutFrame");
+    for (const route of [["consent"], ["account-state"], ["account", "delete"]]) {
+      const source = read("app", "[locale]", ...route, "page.tsx");
+      expect(source, `${route.join("/")} left the frame`).toContain("<SignedOutFrame");
+      expect(source, `${route.join("/")} is on the old stage`).not.toContain("auth-stage");
+    }
+    const consent = read("features", "legal", "consent-surface.tsx");
+    for (const name of ["auth-column", "auth-caption", "auth-section", "auth-section-title", "auth-facts", "auth-aside", "auth-links", "auth-link-button", "auth-risk-link"]) {
+      expect(consent, `consent lost ${name}`).toContain(`className="${name}"`);
+    }
+    const state = read("features", "shell", "account-state-surface.tsx");
+    for (const name of ["auth-column", "auth-caption", "auth-facts"]) expect(state, `account-state lost ${name}`).toContain(`className="${name}"`);
+    const deletion = read("features", "account", "deletion-surface.tsx");
+    for (const name of ["auth-column", "auth-warning", "auth-facts", "auth-form", "auth-danger-action", "form-alert", "form-hint"]) {
+      expect(deletion, `deletion lost ${name}`).toContain(`className="${name}"`);
+    }
+    for (const source of [consent, state, deletion]) expect(source).not.toContain("auth-card");
+    // The drawing itself is gone, not just unused.
+    const globals = read("app", "globals.css");
+    for (const rule of [".auth-stage{", ".auth-card{", ".secondary-button{"]) expect(globals).not.toContain(rule);
+    const header = read("features", "auth", "signed-out-header.tsx");
+    for (const name of ["auth-top", "auth-brand", "brand-mark", "brand-name", "auth-language"]) {
+      expect(header, `the header lost ${name}`).toContain(`className="${name}"`);
+    }
+    for (const route of ["login", "register", "recover", "resend", "reset"]) {
+      const source = read("app", "[locale]", "auth", route, "page.tsx");
+      for (const uses of ['className="auth-column"', 'className="auth-form"', 'className="auth-links"', 'className="form-alert" role="alert"']) {
+        expect(source, `${route} lost ${uses}`).toContain(uses);
+      }
+      expect(source, `${route} is a card again`).not.toContain("auth-card");
+    }
+    expect(read("app", "[locale]", "auth", "register", "page.tsx")).toContain('className="auth-consent"');
+    expect(read("features", "auth", "password-hint.tsx")).toContain('className="auth-hint"');
+    const entry = read("features", "entry", "entry-page.tsx");
+    for (const name of ["entry-page", "entry-header", "entry-sign-in", "entry-closed", "entry-claims", "entry-documents"]) {
+      expect(entry, `the entry page lost ${name}`).toContain(`className="${name}"`);
+    }
+    expect(entry.indexOf('className="entry-sign-in"')).toBeLessThan(entry.indexOf('className="entry-claims"'));
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Custos, Processamento and Busca, recomposed (Editorial calmo, ADR-180).     */
+/* -------------------------------------------------------------------------- */
+
+const DADOS_UNBREAKABLE = "extraction_failed:worker_lease_7c1e44aa_pdf_encrypted_after_three_attempts_no_retry_left";
+
+const dadosStrip = (current: string) =>
+  `<nav aria-label="Dados e IA" class="data-ai-tabs"><a class="data-ai-up" href="#">${ICON}Ajustes</a><div class="data-ai-lenses">`
+  + ["Atividade", "Custos", "Processamento"].map((lens) => `<a class="data-ai-lens"${lens === current ? ' aria-current="page"' : ""} href="#">${lens}</a>`).join("")
+  + `</div></nav>`;
+
+const dadosHeader = (title: string) =>
+  `<header class="ui-page-header ui-page-header--compact"><div class="ui-page-header__text"><h1 class="ui-page-header__title">${title}</h1></div></header>`;
+
+const costRow = (label: string, caption: string, amount: string, width?: number) =>
+  `<li class="cost-row"><span class="cost-row-main"><span class="cost-row-label">${label}</span><span class="cost-row-caption">${caption}</span></span>`
+  + `<span class="cost-row-amount">${amount}</span>`
+  + (width === undefined ? "" : `<span aria-hidden="true" class="cost-row-rule"><span style="width:${width}%"></span></span>`)
+  + `</li>`;
+
+/** Mirrors `costs/page.tsx` with `CostsView` and `QuotaSection`. */
+function custosBody(options: { open?: boolean } = {}) {
+  const open = options.open ? " open" : "";
+  const quota = (title: string, window: string, figure: string) =>
+    `<li class="quota-item"><span class="quota-item-copy"><strong>${title}</strong><small class="quota-window">${window}</small></span><span class="quota-figure">${figure}</span></li>`;
+  return `<div class="content-page cost-page">${dadosStrip("Custos")}${dadosHeader("Custos de IA")}`
+    + `<section aria-label="Resumo de custos" class="cost-figure"><p class="cost-figure-period">Este mês</p><p class="cost-figure-value">US$ 1.284.312,84</p>`
+    + `<dl class="cost-figure-others"><div><dt>Hoje</dt><dd>US$ 0,42</dd></div><div><dt>Desde o início</dt><dd>US$ 3.812.940,17</dd></div></dl>`
+    + `<p class="cost-zone">Estimativa pelos tokens da API; a fatura da OpenAI é a referência. Períodos no fuso da sua conta (America/Argentina/ComodRivadavia).</p>`
+    + `<p class="cost-warning">2 chamadas sem preço: o modelo ainda não está no catálogo, e o total não as inclui.</p></section>`
+    + `<section aria-labelledby="cost-by-operation" class="cost-section"><h2 class="cost-section-title" id="cost-by-operation"><span>Por função</span><small>desde o início</small></h2><ul class="cost-rows">`
+    + costRow("Chat principal", "52% · 640 chamadas", "US$ 1.984.019,75", 52)
+    + costRow(DADOS_UNBREAKABLE, "24% · 1.980 chamadas", "US$ 9,31", 24)
+    + costRow("Busca semântica", "<1% · 220 chamadas", "< US$ 0,0001", 1)
+    + `</ul></section>`
+    + `<section class="quota-section" aria-labelledby="quota-heading"><h2 class="quota-title" id="quota-heading">Limites da conta</h2><ul class="quota-list" aria-label="Limites e uso">`
+    + quota("Registros por dia", "Zera à meia-noite UTC", "14 de 300")
+    + quota("Espaço de arquivos", "Libera quando você remove arquivos", "131 MiB de 500 MiB")
+    + `<li class="quota-item"><span class="quota-item-copy"><strong>Arquivos guardados</strong><small class="quota-window">Libera quando você remove arquivos</small></span><span class="quota-figure unreadable">Não foi possível ler este número agora.</span></li>`
+    + `</ul><p class="quota-intro">Os mesmos números que aparecem quando uma ação é recusada. As janelas diárias viram à meia-noite UTC, e não no seu fuso.</p></section>`
+    + `<details class="cost-fold"${open}><summary class="cost-fold-summary"><span>Por modelo</span><small>2</small></summary><ul class="cost-rows">`
+    + costRow("GPT-5.6 Terra", "73% · 1.310 chamadas · 14.200.000 tokens de entrada, 1.950.000 de saída", "US$ 27,90", 73)
+    + costRow("text-embedding-3-small-with-a-very-long-unbroken-model-identifier-2026-11-18", "27% · 220 chamadas · 2.300.000 tokens de entrada, 0 de saída", "US$ 10,27", 27)
+    + `</ul></details>`
+    + `<details class="cost-fold recent-costs"${open}><summary class="cost-fold-summary"><span>Últimas chamadas</span><small>2</small></summary><ul class="cost-rows">`
+    + costRow("Captura e organização", "18/11/2026, 11:12 · GPT-5.6 Terra · 4.510 tokens · 2.048 em cache", "US$ 0,0123")
+    + costRow("Revisões e resumos", "18/11/2026, 10:25 · GPT-5.6 Luna · 5.470 tokens", "Sem preço")
+    + `</ul></details>`
+    + `<details class="cost-fold pricing-catalog"${open}><summary class="cost-fold-summary"><span>Preços aplicados</span><small>openai-2026-10-01</small></summary>`
+    + `<p class="cost-fold-note">O custo é calculado com os tokens retornados pela API e o preço padrão congelado em cada chamada.</p><p class="cost-fold-note">Por 1 milhão de tokens</p>`
+    + `<ul class="cost-rows"><li class="cost-row"><a class="cost-row-link" href="#" rel="noreferrer" target="_blank"><span class="cost-row-main"><span class="cost-row-label">GPT-5.6 Terra</span><span class="cost-row-caption">entrada $2.5 · cache $0.25 · saída $15</span></span>${ICON}</a></li></ul></details>`
+    + `<a class="cost-profile" href="#"><span class="cost-row-label">Perfil de IA</span><span class="cost-profile-value">Qualidade máxima</span>${ICON}</a></div>`;
+}
+
+function jobRow(options: { title: string; status: string; word: string; attempt?: string; error?: string; files?: boolean }) {
+  return `<li class="jobs-row" data-status="${options.status}"><span class="jobs-row-main"><span class="jobs-row-title">${options.title}</span><time class="jobs-row-caption" datetime="2026-11-18T14:12:00.000Z">18 de nov. de 2026, 11:12</time></span>`
+    + `<span class="jobs-row-state"><span class="jobs-row-status">${options.word}</span>${options.attempt ? `<span class="jobs-row-caption">${options.attempt}</span>` : ""}</span>`
+    + (options.error || options.files
+      ? `<span class="jobs-row-more">`
+        + (options.error ? `<details class="jobs-row-detail"${options.error.startsWith("open:") ? " open" : ""}><summary class="jobs-row-detail-summary">Detalhe técnico</summary><p class="jobs-row-error">${options.error.replace(/^open:/, "")}</p><p class="jobs-row-id">Identificador: 0b6f1c2e-7a41-4c5d-9e01-3f2a9d1c5e71</p></details>` : "")
+        + (options.files ? `<a class="jobs-row-verb" href="#">Ver em Arquivos</a>` : "")
+        + `</span>`
+      : "")
+    + `</li>`;
+}
+
+/** Mirrors `jobs/page.tsx` with `ProcessingView`. */
+function processamentoBody(options: { open?: boolean } = {}) {
+  const error = `${options.open ? "open:" : ""}${DADOS_UNBREAKABLE}`;
+  return `<div class="content-page jobs-page">${dadosStrip("Processamento")}${dadosHeader("Processamento")}`
+    + `<div class="jobs-lead"><p class="jobs-lead-sentence" role="status">2 itens em processamento, 2 com falha.</p><p class="jobs-lead-caption">Entre os 50 mais recentes.</p></div>`
+    + `<section aria-labelledby="jobs-failed" class="jobs-section"><h2 class="jobs-section-title" id="jobs-failed"><span>Com falha</span><small>2</small></h2><ul class="jobs-rows">`
+    + jobRow({ title: "Processar arquivo", status: "failed", word: "Falhou", attempt: "tentativa 3 de 3", error, files: true })
+    + jobRow({ title: "Interpretar registro", status: "failed", word: "Falhou", attempt: "tentativa 3 de 3", error })
+    + `</ul></section>`
+    + `<section aria-labelledby="jobs-active" class="jobs-section"><h2 class="jobs-section-title" id="jobs-active"><span>Em andamento</span><small>2</small></h2><ul class="jobs-rows">`
+    + jobRow({ title: "reindex_embeddings_for_every_record_of_the_account_2026", status: "running", word: "Em execução", attempt: "tentativa 1 de 3" })
+    + jobRow({ title: "Processar arquivo", status: "pending", word: "Na fila" })
+    + `</ul></section>`
+    + `<details class="jobs-fold"${options.open ? " open" : ""}><summary class="jobs-fold-summary"><span>Finalizados</span><small>2</small></summary><ul class="jobs-rows">`
+    + jobRow({ title: "Interpretar registro", status: "completed", word: "Concluído", attempt: "tentativa 1 de 3" })
+    + jobRow({ title: "Interpretar registro", status: "archived", word: "Situação desconhecida" })
+    + `</ul></details>`
+    + `<nav class="pagination-links" aria-label="Paginação"><a href="#">Próxima</a></nav></div>`;
+}
+
+function searchRow(title: string, date: string, snippet: string) {
+  return `<li class="search-result"><a class="search-row" href="#"><span class="search-row-title">${title}</span>`
+    + (date || snippet ? `<span class="search-row-caption">${date ? `<span class="search-row-date">${date}</span>` : ""}${snippet ? `<span class="search-row-snippet">${snippet}</span>` : ""}</span>` : "")
+    + `</a></li>`;
+}
+
+const searchGroup = (label: string, rows: string[]) =>
+  `<section aria-labelledby="g-${label}" class="search-group"><h2 class="search-group-title" id="g-${label}"><span>${label}</span><small>${rows.length}</small></h2><ul class="search-results">${rows.join("")}</ul></section>`;
+
+/** Mirrors `search/page.tsx` with `SearchSurface`. */
+function buscaBody(options: { state: "idle" | "results"; filtersOpen?: boolean }) {
+  const form = `<form class="search-form" role="search"><label class="sr-only" for="busca-q">Buscar em tudo que é seu</label>`
+    + `<div class="search-field"><input id="busca-q" class="search-input" type="search" placeholder="Buscar em tudo que é seu" autocomplete="off" value="${options.state === "results" ? "carro" : ""}"><button type="submit" class="search-submit">Buscar</button></div>`
+    + `<details class="search-filters-disclosure"${options.filtersOpen ? " open" : ""}><summary class="search-filters-summary"><span>Filtros</span><span class="search-filters-active">Organização · Últimos 12 meses</span></summary>`
+    + `<div class="search-filters"><label for="busca-type"><span>Tipo</span><select id="busca-type"><option>Todos os tipos</option></select></label><label for="busca-period"><span>Período</span><select id="busca-period"><option>Qualquer data</option></select></label></div></details></form>`;
+  const results = `<p class="search-count" role="status" aria-live="polite">4 resultados</p>`
+    + `<p class="search-partial tone-attention" role="status">Não consegui buscar em: Organização. Os outros resultados estão completos.</p>`
+    + searchGroup("Tarefas", [
+      searchRow(`Renovar o seguro do <mark>carro</mark>`, "17 de nov. de 2026", `…a apólice vence dia 30; pedir cotação do seguro do <mark>carro</mark> com a corretora antes de renovar, e comparar com a proposta do ano passado…`),
+      searchRow(`Ligar para a oficina sobre a revisão do <mark>carro</mark>`, "", ""),
+    ])
+    + searchGroup("Arquivos", [
+      searchRow(`apolice_seguro_<mark>carro</mark>_2026_porto_renovacao_final_assinada_versao_definitiva_3.pdf`, "14 de jun. de 2026", `…${"SEGURO_AUTO_".repeat(12)}…`),
+      searchRow(`Zé (Oficina do Zé)`, "", `Mecânico de confiança do <mark>carro</mark> desde 2021.`),
+    ])
+    + `<p class="search-bounded">Mostrando os primeiros resultados. Refine a busca para ver menos e melhores.</p>`;
+  return `<div class="page-shell"><section class="search-surface">`
+    + `<header class="ui-page-header ui-page-header--compact search-header"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Buscar</h1></div></header>`
+    + form
+    + (options.state === "idle" ? `<p class="search-hint">Tarefas, registros, memórias, pessoas, projetos, organizações e arquivos.</p>` : results)
+    + `</section></div>`;
+}
+
+test.describe("Custos as a figure over rows (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px, folds closed and open`, async ({ page }) => {
+      for (const open of [false, true]) {
+        await renderLogbook(page, custosBody({ open }), width, 800);
+        expect(await sidewaysOverflow(page), `folds ${open ? "open" : "closed"}`).toBeLessThanOrEqual(1);
+        expect(await shortTargets(page, ".cost-page"), `folds ${open ? "open" : "closed"}`).toEqual([]);
+        // Nothing scrolls sideways inside the page either: the old table did.
+        const inner = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".cost-page *")]
+          .filter((node) => node.scrollWidth > node.clientWidth + 1 && getComputedStyle(node).overflowX !== "visible" && !node.closest(".data-ai-lenses"))
+          .map((node) => node.className));
+        expect(inner, `folds ${open ? "open" : "closed"}`).toEqual([]);
+      }
+    });
+  }
+
+  test("the month's figure is the largest thing on the page and comes before every row", async ({ page }) => {
+    await renderLogbook(page, custosBody(), 390, 844);
+    const measured = await page.evaluate(() => {
+      const size = (selector: string) => parseFloat(getComputedStyle(document.querySelector(selector)!).fontSize);
+      const top = (selector: string) => document.querySelector(selector)!.getBoundingClientRect().top;
+      return {
+        largest: size(".cost-figure-value") > size(".ui-page-header__title") && size(".cost-figure-value") > size(".cost-row-amount"),
+        first: top(".cost-figure-value") < top(".cost-row"),
+        firstScreen: document.querySelector(".cost-figure-value")!.getBoundingClientRect().bottom <= 420,
+      };
+    });
+    expect(measured).toEqual({ largest: true, first: true, firstScreen: true });
+  });
+
+  test("a row is a line between hairlines, its amount on the right and its rule as long as its share", async ({ page }) => {
+    await renderLogbook(page, custosBody(), 390, 844);
+    const row = page.locator(".cost-section .cost-row").first();
+    expect(await row.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.borderTopWidth, style.borderLeftWidth, style.borderBottomWidth, style.borderTopLeftRadius, style.backgroundColor];
+    })).toEqual(["0px", "0px", "1px", "0px", "rgba(0, 0, 0, 0)"]);
+    const box = (await row.boundingBox())!;
+    const amount = (await row.locator(".cost-row-amount").boundingBox())!;
+    expect(Math.abs(amount.x + amount.width - (box.x + box.width))).toBeLessThanOrEqual(1);
+    const track = (await row.locator(".cost-row-rule").boundingBox())!;
+    const rule = (await row.locator(".cost-row-rule > span").boundingBox())!;
+    expect(rule.width / track.width).toBeCloseTo(0.52, 1);
+  });
+
+  test("what is consulted is three closed lines, on a phone and on a desktop", async ({ page }) => {
+    for (const [width, height] of [[390, 844], [1280, 900]] as const) {
+      await renderLogbook(page, custosBody(), width, height);
+      for (const fold of await page.locator(".cost-fold").all()) {
+        expect((await fold.boundingBox())!.height, `at ${width}`).toBeLessThanOrEqual(48);
+      }
+      await expect(page.locator(".cost-fold .cost-row").first()).toBeHidden();
+      await expect(page.locator(".cost-page table")).toHaveCount(0);
+    }
+  });
+
+  test("the fixture still mirrors the markup the page emits", () => {
+    const read = (...path: string[]) => readFileSync(join(ROOT, "src", ...path), "utf8");
+    const view = read("features", "costs", "cost-view.tsx");
+    for (const name of ["cost-figure", "cost-figure-period", "cost-figure-value", "cost-figure-others", "cost-zone", "cost-warning", "cost-section", "cost-section-title", "cost-rows", "cost-row", "cost-row-main", "cost-row-label", "cost-row-caption", "cost-row-amount", "cost-row-rule", "cost-fold-summary", "cost-fold-note", "cost-row-link", "cost-profile", "cost-profile-value"]) {
+      expect(view, `the view lost ${name}`).toContain(`"${name}"`);
+    }
+    for (const name of ["cost-fold", "cost-fold recent-costs", "cost-fold pricing-catalog"]) expect(view).toContain(`className="${name}"`);
+    expect(view).not.toContain("<table");
+    const quota = read("features", "quotas", "quota-section.tsx");
+    for (const name of ["quota-section", "quota-title", "quota-list", "quota-item", "quota-item-copy", "quota-window", "quota-figure", "quota-intro"]) {
+      expect(quota, `the limits lost ${name}`).toContain(`"${name}`);
+    }
+    expect(read("app", "[locale]", "app", "costs", "page.tsx")).toContain('className="content-page cost-page"');
+  });
+});
+
+test.describe("Processamento as an answer over rows (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px, folds closed and open`, async ({ page }) => {
+      for (const open of [false, true]) {
+        await renderLogbook(page, processamentoBody({ open }), width, 800);
+        expect(await sidewaysOverflow(page), `folds ${open ? "open" : "closed"}`).toBeLessThanOrEqual(1);
+        expect(await shortTargets(page, ".jobs-page"), `folds ${open ? "open" : "closed"}`).toEqual([]);
+      }
+    });
+  }
+
+  test("the answer comes first, in the reading face, above the first row", async ({ page }) => {
+    await renderLogbook(page, processamentoBody(), 390, 844);
+    const measured = await page.evaluate(() => {
+      const lead = document.querySelector(".jobs-lead-sentence")!;
+      const style = getComputedStyle(lead);
+      return {
+        face: style.fontFamily.includes("Georgia"),
+        larger: parseFloat(style.fontSize) > parseFloat(getComputedStyle(document.querySelector(".ui-page-header__title")!).fontSize),
+        first: lead.getBoundingClientRect().bottom <= document.querySelector(".jobs-row")!.getBoundingClientRect().top,
+      };
+    });
+    expect(measured).toEqual({ face: true, larger: true, first: true });
+  });
+
+  test("failures come before what is in flight, and the finished rows are one closed line", async ({ page }) => {
+    await renderLogbook(page, processamentoBody(), 390, 844);
+    const failed = (await page.locator("#jobs-failed").boundingBox())!;
+    const active = (await page.locator("#jobs-active").boundingBox())!;
+    const fold = (await page.locator(".jobs-fold").boundingBox())!;
+    expect(failed.y).toBeLessThan(active.y);
+    expect(active.y).toBeLessThan(fold.y);
+    expect(fold.height).toBeLessThanOrEqual(48);
+    await expect(page.locator(".jobs-fold .jobs-row").first()).toBeHidden();
+    await expect(page.locator(".jobs-row-error").first()).toBeHidden();
+  });
+
+  test("the state is a word, never a pill", async ({ page }) => {
+    await renderLogbook(page, processamentoBody(), 390, 844);
+    const status = page.locator('.jobs-row[data-status="failed"] .jobs-row-status').first();
+    expect(await status.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.backgroundColor, style.borderTopWidth, style.paddingLeft, style.textTransform];
+    })).toEqual(["rgba(0, 0, 0, 0)", "0px", "0px", "none"]);
+    await expect(status).toHaveText("Falhou");
+  });
+
+  test("the fixture still mirrors the markup the page emits", () => {
+    const read = (...path: string[]) => readFileSync(join(ROOT, "src", ...path), "utf8");
+    const view = read("features", "processing", "processing-view.tsx");
+    for (const name of ["jobs-lead", "jobs-lead-sentence", "jobs-lead-caption", "jobs-section", "jobs-section-title", "jobs-rows", "jobs-fold", "jobs-fold-summary", "jobs-row", "jobs-row-main", "jobs-row-title", "jobs-row-caption", "jobs-row-state", "jobs-row-status", "jobs-row-more", "jobs-row-detail", "jobs-row-detail-summary", "jobs-row-error", "jobs-row-id", "jobs-row-verb"]) {
+      expect(view, `the view lost ${name}`).toContain(`className="${name}"`);
+    }
+    expect(view).not.toContain("status-badge");
+    expect(read("app", "[locale]", "app", "jobs", "page.tsx")).toContain('className="content-page jobs-page"');
+  });
+});
+
+test.describe("Busca as a field over rows (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px, idle and with results, filters closed and open`, async ({ page }) => {
+      for (const state of ["idle", "results"] as const) {
+        for (const filtersOpen of [false, true]) {
+          await render(page, buscaBody({ state, filtersOpen }), width, 800);
+          const label = `${state}, filters ${filtersOpen ? "open" : "closed"}`;
+          expect(await sidewaysOverflow(page), label).toBeLessThanOrEqual(1);
+          expect(await shortTargets(page, ".search-surface"), label).toEqual([]);
+        }
+      }
+    });
+  }
+
+  test("before a search the page is its field: nothing else but one caption", async ({ page }) => {
+    await render(page, buscaBody({ state: "idle" }), 390, 844);
+    const field = (await page.locator(".search-field").boundingBox())!;
+    const surface = (await page.locator(".search-surface").boundingBox())!;
+    // The field opens the surface: the page's name is its heading, and is not drawn.
+    expect(field.y - surface.y).toBeLessThanOrEqual(40);
+    await expect(page.locator(".search-surface h1")).toHaveCount(1);
+    expect((await page.locator(".search-header").boundingBox())!.height).toBeLessThanOrEqual(1);
+    await expect(page.locator(".search-filters")).toBeHidden();
+    await expect(page.locator(".search-group")).toHaveCount(0);
+    const hint = (await page.locator(".search-hint").boundingBox())!;
+    expect(hint.y + hint.height - field.y).toBeLessThanOrEqual(180);
+  });
+
+  test("the field is a line to write in, not a box, and never under 16px", async ({ page }) => {
+    await render(page, buscaBody({ state: "idle" }), 390, 844);
+    expect(await page.locator(".search-input").evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.borderTopWidth, style.borderBottomWidth, style.backgroundColor, parseFloat(style.fontSize) >= 16];
+    })).toEqual(["0px", "0px", "rgba(0, 0, 0, 0)", true]);
+    expect(await page.locator(".search-field").evaluate((node) => getComputedStyle(node).borderBottomWidth)).toBe("1px");
+  });
+
+  test("a result is a row that is a link, under the heading of its kind", async ({ page }) => {
+    await render(page, buscaBody({ state: "results" }), 390, 844);
+    const group = page.locator(".search-group").first();
+    expect(await group.locator(".search-group-title").evaluate((node) => getComputedStyle(node).borderBottomWidth)).toBe("1px");
+    const row = group.locator(".search-row").first();
+    expect(await row.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [node.tagName, style.borderTopWidth, style.borderTopLeftRadius, style.backgroundColor];
+    })).toEqual(["A", "0px", "0px", "rgba(0, 0, 0, 0)"]);
+    expect(await row.locator(".search-row-title").evaluate((node) => getComputedStyle(node).fontFamily)).toContain("Georgia");
+    // A long snippet is two lines of caption at most.
+    const caption = (await row.locator(".search-row-caption").boundingBox())!;
+    expect(caption.height).toBeLessThanOrEqual(40);
+    // The matched word is marked without a highlighter's colour.
+    expect(await row.locator("mark").first().evaluate((node) => getComputedStyle(node).backgroundColor)).toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("the fixture still mirrors the markup the surface emits", () => {
+    const surface = readFileSync(join(ROOT, "src", "features", "search", "search-surface.tsx"), "utf8");
+    for (const name of ["search-surface", "search-form", "search-field", "search-input", "search-submit", "search-filters-disclosure", "search-filters-summary", "search-filters-active", "search-filters", "search-hint", "search-partial tone-attention", "search-group", "search-group-title", "search-results", "search-result", "search-row", "search-row-title", "search-row-caption", "search-row-date", "search-row-snippet", "search-bounded"]) {
+      expect(surface, `the surface lost ${name}`).toContain(`className="${name}"`);
+    }
+    expect(surface).toContain('"search-count"');
+    expect(surface).toContain('className="search-header"');
   });
 });

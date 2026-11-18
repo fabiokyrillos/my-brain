@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resendConfirmation } from "@/features/auth/actions";
-import { getResendCopy } from "@/features/auth/copy";
+import { getAuthPagesCopy, getResendCopy } from "@/features/auth/copy";
 import { authErrorMessage } from "@/features/auth/flow";
 import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
@@ -36,11 +36,10 @@ export default async function ResendPage({
   const copy = getResendCopy(locale);
 
   return (
-    <div className="auth-card">
-      <p className="eyebrow">{copy.eyebrow}</p>
+    <div className="auth-column">
       <h1>{copy.title}</h1>
-      <p>{copy.lead}</p>
-      {error && <div className="form-alert">{authErrorMessage(error, locale)}</div>}
+      <p className="auth-caption">{copy.lead}</p>
+      {error && <p className="form-alert" role="alert">{authErrorMessage(error, locale)}</p>}
       <form action={resendConfirmation} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
         <label>
@@ -50,7 +49,9 @@ export default async function ResendPage({
         <TurnstileWidget />
         <AuthSubmitButton label={copy.submit} pendingLabel={copy.submitPending} />
       </form>
-      <Link href={`/${locale}/auth/login`}>{copy.backToLogin}</Link>
+      <nav aria-label={getAuthPagesCopy(locale).linksLabel} className="auth-links">
+        <Link href={`/${locale}/auth/login`}>{copy.backToLogin}</Link>
+      </nav>
     </div>
   );
 }
