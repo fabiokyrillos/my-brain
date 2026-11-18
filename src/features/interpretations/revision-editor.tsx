@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui";
 import { useActionState, useState } from "react";
-import { Plus, RotateCcw, Sparkles, X } from "lucide-react";
+import { Plus, Sparkles, X } from "lucide-react";
 import type { InterpretationPatch } from "./schema";
 import { entityTypeLabel } from "@/features/vocabulary/copy";
 import {
@@ -102,7 +102,7 @@ function SecondaryActions({
           <input type="hidden" name="entryId" value={entryId} />
           <input type="hidden" name="undoId" value={undoId} />
           <input type="hidden" name="locale" value={locale} />
-          <Button icon={<RotateCcw />} loading={undoPending} type="submit">
+          <Button loading={undoPending} type="submit" variant="link">
             {undoPending ? labels.undoing : labels.undo}
           </Button>
           <ActionFeedback state={undoState} />
@@ -112,7 +112,7 @@ function SecondaryActions({
         <input type="hidden" name="entryId" value={entryId} />
         <input type="hidden" name="locale" value={locale} />
         <input type="hidden" name="operationKey" value={reprocessOperationKey} />
-        <Button icon={<Sparkles />} loading={reprocessPending} type="submit">
+        <Button loading={reprocessPending} type="submit" variant="link">
           {reprocessPending ? labels.reprocessing : labels.reprocess}
         </Button>
         <ActionFeedback state={reprocessState} />
@@ -162,12 +162,19 @@ export function InterpretationRevisionEditor({
     setEditing(true);
   }
 
+  /*
+    Closed, the editor is a line of quiet links: it sits at the end of the
+    reading it corrects (the `correction` slot of `EntryReview`), which is where
+    one looks when the reading is wrong. It was a boxed panel with a primary
+    button at the bottom of the page's actions. Re-reading the record stays
+    beside it, so the two ways of getting a different reading are together.
+  */
   if (!editing) {
     return (
       <section className="interpretation-editor" aria-label={locale === "pt-BR" ? "Revisão da interpretação" : "Interpretation review"}>
         {showSummary && <p className="interpretation-current-summary">{current.summary}</p>}
         <div className="interpretation-editor-actions">
-          <Button onClick={startCorrection} variant="primary">{labels.correct}</Button>
+          <Button onClick={startCorrection} variant="link">{labels.correct}</Button>
           <SecondaryActions
             canUndo={canUndo}
             entryId={entryId}

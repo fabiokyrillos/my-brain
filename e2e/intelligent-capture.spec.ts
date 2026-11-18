@@ -204,8 +204,9 @@ test.describe("converged daily journey — capture, review, and confirmation", (
   });
 
   test("corrects the interpretation, supports record-only, and can be undone", async () => {
-    await expect(page.getByRole("button", { name: "Corrigir interpretação" })).toBeVisible();
-    await page.getByRole("button", { name: "Corrigir interpretação" }).click();
+    // NOT RUN (2026-11-18): the control is now "Corrigir", at the end of the reading.
+    await expect(page.getByRole("button", { name: "Corrigir", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Corrigir", exact: true }).click();
     await page.getByRole("textbox", { name: "Resumo" }).fill("Resumo confirmado: conversa com Marina sobre o Atlas");
     await page.getByLabel("Data e hora do acontecimento (ISO)").fill("2026-07-17T14:00:00.000Z");
     await page.getByRole("button", { name: "Adicionar data" }).click();
@@ -220,7 +221,8 @@ test.describe("converged daily journey — capture, review, and confirmation", (
     await expect(page.locator(".revision-timeline").getByText("v3 · Correção do usuário", { exact: true })).toBeVisible();
 
     await page.goto(page.url().replace("/pt-BR/", "/en/"));
-    await expect(page.getByRole("button", { name: "Correct interpretation" })).toBeVisible();
+    // NOT RUN (2026-11-18): "Correct", at the end of the reading.
+    await expect(page.getByRole("button", { name: "Correct", exact: true })).toBeVisible();
     await page.getByText("View technical details").click();
     await expect(page.getByRole("heading", { name: "Immutable history" })).toBeVisible();
     await page.goto(page.url().replace("/en/", "/pt-BR/"));

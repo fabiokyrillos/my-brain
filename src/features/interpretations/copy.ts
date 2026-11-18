@@ -25,7 +25,7 @@ export const conceptOptions = [
 
 const copy = {
   "pt-BR": {
-    correct: "Ajustar o que o {agent} entendeu",
+    correct: "Corrigir",
     cancel: "Cancelar correção",
     save: "Salvar nova versão",
     saving: "Salvando…",
@@ -47,9 +47,11 @@ const copy = {
     reprocess: "Reinterpretar entrada",
     reprocessing: "Enfileirando…",
     noEntities: "Nenhum vínculo disponível.",
+    recordOnlyNote: "Somente registro: nenhuma ação derivada foi criada.",
+    nothingToDecide: "Nenhuma tarefa necessária. Ficou salvo como referência e contexto.",
   },
   en: {
-    correct: "Adjust what {agent} understood",
+    correct: "Correct",
     cancel: "Cancel correction",
     save: "Save new version",
     saving: "Saving…",
@@ -71,6 +73,8 @@ const copy = {
     reprocess: "Reinterpret entry",
     reprocessing: "Queueing…",
     noEntities: "No links available.",
+    recordOnlyNote: "Record only: no derived action was created.",
+    nothingToDecide: "No task needed. It was saved as reference and context.",
   },
 } as const;
 

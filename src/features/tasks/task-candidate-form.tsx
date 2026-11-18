@@ -431,15 +431,9 @@ export function TaskCandidateForm({
   ) : null;
 
   if (visibleCandidates.length === 0) {
-    return (
-      <>
-        {successResult}
-        <div className="no-action-state">
-          <Check size={22} />
-          <strong>{localized.noPending}</strong>
-        </div>
-      </>
-    );
+    // One quiet sentence, and only when the result line above has not already
+    // said what became of the suggestions. It was a boxed panel with an icon.
+    return successResult ?? <p className="record-quiet-note">{localized.noPending}</p>;
   }
 
   return (

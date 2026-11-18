@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { ReturnToConversation } from "@/features/conversation-cards/return-to-conversation";
 import { universalStateForProductState } from "@/features/daily-cycle/universal-state-projection";
 import { UniversalStateView } from "@/features/experience/universal-state";
@@ -25,8 +25,7 @@ import { resolveEntryTaskCandidates, undoAgentAction } from "@/features/tasks/ac
 import { TaskCandidateForm } from "@/features/tasks/task-candidate-form";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { createProposedMemory, undoProposedMemory } from "@/features/memories/actions";
-import { getMemoryCopy } from "@/features/memories/copy";
-import { MemoryProposalCard } from "@/features/memories/memory-proposal-card";
+import { RecordMemoryQuestion } from "@/features/memories/record-memory-question";
 import { recordMemoryProposal } from "@/features/memories/record-memory-proposal";
 import { cancelEvent, confirmEventCandidates, undoEventCandidates } from "@/features/events/actions";
 import { loadEntryEvents } from "@/features/events/entry-events";
@@ -172,7 +171,6 @@ export default async function EntryDetailPage({
       alreadyKept: (keptMemoryCount ?? 0) > 0,
     })
     : null;
-  const memoryCopy = getMemoryCopy(locale);
   // Life Brain C.3 (ADR-152): what the reading proposes for the agenda, and
   // what of this record is already on it.
   const entryEvents = editableCurrent && !editableCurrent.isRecordOnly
@@ -184,11 +182,41 @@ export default async function EntryDetailPage({
     ? await loadEntryBirthdayProposals(supabase, { userId: user.id, entryId, interpretationId: editableCurrent.interpretationId })
     : [];
 
+  const interpretationCopy = getInterpretationCopy(locale, agentName);
+  const showsTaskForm = Boolean(editableCurrent && !editableCurrent.isRecordOnly && (canConfirmCandidates || taskInitialState));
+  const showsPersonForm = Boolean(editableCurrent && !editableCurrent.isRecordOnly && (pendingPersonCandidates.length > 0 || personInitialState));
+  const showsConfirmation = Boolean(editableCurrent)
+    && !editableCurrent?.isRecordOnly
+    && attentionReason === "review_interpretation"
+    && !canConfirmCandidates
+    && pendingPersonCandidates.length === 0
+    && (openQuestionCount ?? 0) === 0;
+  /*
+   * Whether the list below asks or reports anything. "Nothing needs doing" used
+   * to be a boxed panel at the head of the list even when four questions
+   * followed it; it is now one quiet sentence, said only when it is the whole
+   * answer — so the section is never empty, and never contradicts itself.
+   */
+  const asksSomething = showsTaskForm
+    || showsPersonForm
+    || Boolean(entryEvents && (entryEvents.pending.length > 0 || entryEvents.onAgenda.some((event) => event.status === "confirmed")))
+    || birthdayProposals.length > 0
+    || memoryProposal !== null
+    || showsConfirmation;
+
+  /*
+   * One list of questions, in this order: tasks, people, events, birthdays,
+   * memory, and last the confirmation of the reading itself. DOM order is the
+   * visual order (no CSS reordering), so focus follows what is seen.
+   */
   const nextActions = editableCurrent ? (
     <>
-      {editableCurrent.isRecordOnly ? (
-        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Somente registro" : "Record only"}</strong><p>{getInterpretationCopy(locale, agentName).recordOnly}</p></div>
-      ) : canConfirmCandidates || taskInitialState ? (
+      {asksSomething ? null : (
+        <p className="record-quiet-note">
+          {editableCurrent.isRecordOnly ? interpretationCopy.recordOnlyNote : interpretationCopy.nothingToDecide}
+        </p>
+      )}
+      {showsTaskForm && (
         <TaskCandidateForm
           action={resolveEntryTaskCandidates}
           candidates={view.actionableCandidates}
@@ -201,10 +229,8 @@ export default async function EntryDetailPage({
           timezone={timezone}
           undoAction={undoAgentAction}
         />
-      ) : (
-        <div className="no-action-state"><CheckCircle2 size={22} /><strong>{pt ? "Nenhuma tarefa necessária" : "No task needed"}</strong><p>{pt ? "Esta versão ficou salva como referência e contexto." : "This version was saved as reference and context."}</p></div>
       )}
-      {!editableCurrent.isRecordOnly && (pendingPersonCandidates.length > 0 || personInitialState) && (
+      {showsPersonForm && (
         <PersonCandidateForm
           action={resolvePersonCandidates}
           candidates={pendingPersonCandidates}
@@ -232,55 +258,22 @@ export default async function EntryDetailPage({
       ) : null}
       <BirthdayProposals action={setPersonBirthday} declineAction={declineBirthdayOffer} locale={locale} proposals={birthdayProposals} />
       {memoryProposal ? (
-        <section aria-label={memoryCopy.recordProposalHeading} className="record-memory-proposal">
-          <h3>{memoryCopy.recordProposalHeading}</h3>
-          <p>{memoryCopy.recordProposalLead}</p>
-          <MemoryProposalCard
-            action={createProposedMemory}
-            content={memoryProposal.content}
-            kind={memoryProposal.kind}
-            locale={locale}
-            sourceEntryId={entryId}
-            undoAction={undoProposedMemory}
-          />
-        </section>
+        <RecordMemoryQuestion
+          action={createProposedMemory}
+          content={memoryProposal.content}
+          kind={memoryProposal.kind}
+          locale={locale}
+          sourceEntryId={entryId}
+          undoAction={undoProposedMemory}
+        />
       ) : null}
-      {!editableCurrent.isRecordOnly
-        && attentionReason === "review_interpretation"
-        && !canConfirmCandidates
-        && pendingPersonCandidates.length === 0
-        && (openQuestionCount ?? 0) === 0 && (
+      {showsConfirmation && (
         <ConfirmationPanel
           confirmAction={confirmInterpretation}
           entryId={entryId}
           interpretationId={editableCurrent.interpretationId}
           locale={locale}
           undoAction={undoInterpretationConfirmation}
-        />
-      )}
-      {canCorrect && (
-        <InterpretationRevisionEditor agentName={agentName}
-          canUndo={canUndoCorrection}
-          correctionAction={correctInterpretation}
-          current={{
-            version: editableCurrent.version,
-            summary: editableCurrent.summary,
-            concepts: editableCurrent.concepts,
-            occurredAt: editableCurrent.occurredAt,
-            extractedDates: editableCurrent.extractedDates,
-            entityLinks: editableCurrent.entityLinks.map(({ entityType, entityId, mention, confidence }) => ({ entityType, entityId, mention, confidence })),
-            classifications: editableCurrent.classifications,
-            pendingQuestions: editableCurrent.pendingQuestions,
-          }}
-          entityOptions={entityOptions}
-          entryId={entryId}
-          locale={locale}
-          operationKey={randomUUID()}
-          reprocessAction={reprocessEntry}
-          reprocessOperationKey={randomUUID()}
-          showSummary={false}
-          undoAction={undoInterpretationCorrection}
-          undoId={correctionUndoId ?? undefined}
         />
       )}
     </>
@@ -331,6 +324,32 @@ export default async function EntryDetailPage({
             ? <EntryReprocessButton action={reprocessEntry} agentName={agentName} entryId={entryId} locale={locale} operationKey={randomUUID()} />
             : undefined,
           attentionDetail,
+          // Beside the reading, and only when this record can be corrected.
+          correction: editableCurrent && canCorrect ? (
+            <InterpretationRevisionEditor agentName={agentName}
+              canUndo={canUndoCorrection}
+              correctionAction={correctInterpretation}
+              current={{
+                version: editableCurrent.version,
+                summary: editableCurrent.summary,
+                concepts: editableCurrent.concepts,
+                occurredAt: editableCurrent.occurredAt,
+                extractedDates: editableCurrent.extractedDates,
+                entityLinks: editableCurrent.entityLinks.map(({ entityType, entityId, mention, confidence }) => ({ entityType, entityId, mention, confidence })),
+                classifications: editableCurrent.classifications,
+                pendingQuestions: editableCurrent.pendingQuestions,
+              }}
+              entityOptions={entityOptions}
+              entryId={entryId}
+              locale={locale}
+              operationKey={randomUUID()}
+              reprocessAction={reprocessEntry}
+              reprocessOperationKey={randomUUID()}
+              showSummary={false}
+              undoAction={undoInterpretationCorrection}
+              undoId={correctionUndoId ?? undefined}
+            />
+          ) : undefined,
           nextActions,
           technicalDetails: (
             <TechnicalDetails

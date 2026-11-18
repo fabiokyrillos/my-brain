@@ -1212,6 +1212,239 @@ test.describe("the person-candidate row stays usable at every width", () => {
 });
 
 /*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Everything else a record can ask — an event, a birthday, keeping it as a
+ * memory, confirming the reading — is the same row as the person one above.
+ *
+ * On 2026-11-18 these stopped being four differently-drawn widgets (a checkbox
+ * list under a primary button, a heading with small buttons, a dashed card, a
+ * centred panel) and became `.record-question` rows. What is measured here is
+ * that they are answerable on a phone AND that, beside a person row, they read
+ * as one list: same edges, same padding, same question size.
+ */
+
+const questionButton = (variant: string, label: string, extra = "") =>
+  `<button class="ui-button ui-button--${variant} ui-button--md" type="button"${extra}>${label}</button>`;
+
+/** Mirrors a pending row of `event-candidate-form.tsx`. */
+function eventQuestion(title: string, meta: string) {
+  return `<li><div class="record-question" role="group" aria-label="Evento sugerido: ${title}">`
+    + `<p class="record-question-text">Pôr “${title}” na agenda?</p>`
+    + `<p class="record-question-meta">${meta}</p>`
+    + `<div class="record-question-actions">${questionButton("secondary", "Pôr na agenda")}${questionButton("ghost", "Agora não")}</div>`
+    + `</div></li>`;
+}
+
+/** Mirrors an on-agenda row of `event-candidate-form.tsx`. */
+function agendaStatement(title: string, meta: string) {
+  return `<li class="record-question"><p class="record-question-text">“${title}” está na agenda.</p>`
+    + `<p class="record-question-meta">${meta}</p>`
+    + `<form class="record-question-actions">${questionButton("ghost", "Cancelar", ` aria-label="Cancelar ${title}"`)}</form></li>`;
+}
+
+/** Mirrors `birthday-proposal.tsx`. */
+function birthdayQuestion(name: string) {
+  return `<li><div class="record-question" role="group" aria-label="Aniversário de ${name}">`
+    + `<p class="record-question-text">Guardar o aniversário de ${name}: 5 de maio?</p>`
+    + `<form class="record-question-actions">${questionButton("secondary", "Guardar aniversário")}${questionButton("ghost", "Não, obrigado")}`
+    + `<a class="record-question-link" href="#">Outra data? Ajuste na página de ${name}.</a></form>`
+    + `<p class="birthday-status" role="status" aria-live="polite" data-status="idle"></p></div></li>`;
+}
+
+/** Mirrors `record-memory-question.tsx`, with *Ajustar* open or closed. */
+function memoryQuestion(adjusting: boolean) {
+  return `<div class="record-question" role="group" aria-label="Guardar isto como memória?">`
+    + `<p class="record-question-text">Guardar isto como memória?</p>`
+    + `<p class="record-question-meta">Tipo: Relacionamento</p>`
+    + `<div class="record-question-actions">${questionButton("secondary", "Guardar memória")}${questionButton("ghost", "Descartar")}`
+    + `${questionButton("link", "Ajustar", ` aria-controls="memory-adjust" aria-expanded="${adjusting}"`)}</div>`
+    + `<div class="record-question-more" id="memory-adjust"${adjusting ? "" : " hidden"}>`
+    + `<label for="memory-content">Memória</label><textarea id="memory-content" rows="3">Ana faz aniversário em 5 de maio.</textarea>`
+    + `<label for="memory-kind">Tipo</label><select id="memory-kind"><option>Relacionamento</option></select></div></div>`;
+}
+
+/** Mirrors `confirmation-panel.tsx`. */
+const CONFIRMATION_QUESTION = `<div class="record-question" role="group" aria-label="A leitura está certa?">`
+  + `<p class="record-question-text">A leitura está certa?</p>`
+  + `<p class="record-question-meta">Confirmar tira este registro da fila.</p>`
+  + `<form class="record-question-actions">${questionButton("secondary", "Confirmar leitura")}</form></div>`;
+
+function recordQuestionsBody({ title = "Revisão do carro", person = "Ana", adjusting = false } = {}) {
+  return `<div class="content-page entry-detail-page"><div class="entry-review record-detail">
+    <div class="record-detail-columns">
+      <div class="record-decision">
+        <section class="review-next-actions interpretation-actions phase-2b-task-actions" aria-label="Próximas ações">
+          <div class="person-candidate-section">
+            <ul class="person-candidate-list" aria-label="Pessoas mencionadas">${personCandidate({ index: 0, name: PERSON_NAME, evidence: PERSON_EVIDENCE })}</ul>
+          </div>
+          <div>
+            <ul class="record-question-list" aria-label="Eventos sugeridos">${eventQuestion(title, "20 de nov. de 2026, 09:00 · Oficina do Zé")}</ul>
+            <ul class="record-question-list" aria-label="Na agenda">${agendaStatement("Dentista", "12 de dez. de 2026, 15:00")}</ul>
+          </div>
+          <ul class="record-question-list" aria-label="Aniversário no registro">${birthdayQuestion(person)}</ul>
+          ${memoryQuestion(adjusting)}
+          ${CONFIRMATION_QUESTION}
+        </section>
+      </div>
+      <aside class="record-explanation"></aside>
+    </div>
+  </div></div>`;
+}
+
+type QuestionGeometry = {
+  label: string;
+  left: number;
+  right: number;
+  paddingTop: string;
+  paddingBottom: string;
+  borderBottom: string;
+  questionFont: string;
+  targetHeights: number[];
+  targetsWithinRow: boolean;
+  anyOverlap: boolean;
+  fieldWidths: number[];
+};
+
+async function questionGeometry(page: Page): Promise<QuestionGeometry[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll(".record-question, .person-candidate-item")].map((row) => {
+      const rowBox = row.getBoundingClientRect();
+      const rowStyle = getComputedStyle(row);
+      const question = row.querySelector(".record-question-text, .person-candidate-question") as HTMLElement;
+      const shown = (el: Element) => {
+        const box = el.getBoundingClientRect();
+        return getComputedStyle(el).display !== "none" && box.width > 0 && box.height > 0;
+      };
+      const targets = ([...row.querySelectorAll("button, a")] as HTMLElement[]).filter(shown);
+      const fields = ([...row.querySelectorAll("textarea, select")] as HTMLElement[]).filter(shown);
+      const parts = ([...row.querySelectorAll("p, button, a, textarea, select, label")] as HTMLElement[])
+        .filter(shown)
+        .map((el) => el.getBoundingClientRect());
+      return {
+        label: (question.textContent ?? "").trim(),
+        left: Math.round(rowBox.left),
+        right: Math.round(rowBox.right),
+        paddingTop: rowStyle.paddingTop,
+        paddingBottom: rowStyle.paddingBottom,
+        borderBottom: `${rowStyle.borderBottomWidth} ${rowStyle.borderBottomStyle}`,
+        questionFont: `${getComputedStyle(question).fontFamily} ${getComputedStyle(question).fontSize} ${getComputedStyle(question).lineHeight}`,
+        targetHeights: targets.map((target) => Math.round(target.getBoundingClientRect().height)),
+        targetsWithinRow: targets.every((target) => {
+          const box = target.getBoundingClientRect();
+          return box.left >= rowBox.left - 0.5 && box.right <= rowBox.right + 0.5;
+        }),
+        anyOverlap: parts.some((one, i) => parts.some((two, j) => i < j
+          && one.left < two.right - 0.5 && two.left < one.right - 0.5
+          && one.top < two.bottom - 0.5 && two.top < one.bottom - 0.5)),
+        fieldWidths: fields.map((field) => Math.round(field.getBoundingClientRect().width)),
+      };
+    }),
+  );
+}
+
+const QUESTION_VIEWPORTS = [
+  { name: "390x844", width: 390, height: 844 },
+  { name: "320x700", width: 320, height: 700 },
+] as const;
+
+test.describe("the record's other questions are rows of the same list", () => {
+  for (const viewport of QUESTION_VIEWPORTS) {
+    test(`every question can be answered at ${viewport.name}`, async ({ page }) => {
+      await render(page, recordQuestionsBody(), viewport.width, viewport.height);
+      const rows = await questionGeometry(page);
+      expect(rows, `${viewport.name}: person, event, agenda, birthday, memory, confirmation`).toHaveLength(6);
+
+      for (const row of rows) {
+        expect(row.targetHeights.length, `${viewport.name}: “${row.label}” has no answer`).toBeGreaterThan(0);
+        for (const height of row.targetHeights) {
+          expect(height, `${viewport.name}: “${row.label}” has a ${height}px target`).toBeGreaterThanOrEqual(TOUCH_TARGET);
+        }
+        expect(row.targetsWithinRow, `${viewport.name}: an answer of “${row.label}” leaves the row`).toBe(true);
+        expect(row.anyOverlap, `${viewport.name}: parts of “${row.label}” overlap`).toBe(false);
+      }
+
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${viewport.name}: the page scrolls sideways`).toBeLessThanOrEqual(0);
+    });
+
+    test(`the kinds read as one list at ${viewport.name}`, async ({ page }) => {
+      await render(page, recordQuestionsBody(), viewport.width, viewport.height);
+      const rows = await questionGeometry(page);
+      const [first] = rows;
+      for (const row of rows) {
+        expect([row.left, row.right], `${viewport.name}: “${row.label}” has its own edges`).toEqual([first.left, first.right]);
+        expect([row.paddingTop, row.paddingBottom], `${viewport.name}: “${row.label}” has its own padding`)
+          .toEqual([first.paddingTop, first.paddingBottom]);
+        expect(row.borderBottom, `${viewport.name}: “${row.label}” has its own rule`).toBe(first.borderBottom);
+        expect(row.questionFont, `${viewport.name}: “${row.label}” is set in its own type`).toBe(first.questionFont);
+      }
+      // Rows touch: no kind opens with a gap of its own.
+      const gaps = await page.evaluate(() => {
+        const boxes = [...document.querySelectorAll(".record-question, .person-candidate-item")].map((row) => row.getBoundingClientRect());
+        return boxes.slice(1).map((box, index) => Math.round(box.top - boxes[index].bottom));
+      });
+      expect(gaps, `${viewport.name}: a gap between two rows`).toEqual([0, 0, 0, 0, 0]);
+    });
+
+    test(`holds a long title, a long name and the open adjust fields at ${viewport.name}`, async ({ page }) => {
+      await render(
+        page,
+        recordQuestionsBody({ title: "Reuniãodeacompanhamentotrimestralcomofornecedor de peças", person: LONG_NAME, adjusting: true }),
+        viewport.width,
+        viewport.height,
+      );
+      const rows = await questionGeometry(page);
+      for (const row of rows) {
+        expect(row.targetsWithinRow, `${viewport.name}: an answer of “${row.label}” leaves the row`).toBe(true);
+        expect(row.anyOverlap, `${viewport.name}: parts of “${row.label}” overlap`).toBe(false);
+      }
+      const memory = rows.find((row) => row.label === "Guardar isto como memória?");
+      expect(memory?.fieldWidths, `${viewport.name}: the text and the kind are drawn`).toHaveLength(2);
+      for (const width of memory?.fieldWidths ?? []) {
+        expect(width, `${viewport.name}: an adjust field is ${width}px`).toBeGreaterThanOrEqual((memory?.right ?? 0) - (memory?.left ?? 0) - 2);
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `${viewport.name}: a long title scrolls the page sideways`).toBeLessThanOrEqual(0);
+    });
+  }
+
+  test("the adjust fields are not drawn at rest", async ({ page }) => {
+    await render(page, recordQuestionsBody(), 390, 844);
+    const rows = await questionGeometry(page);
+    expect(rows.flatMap((row) => row.fieldWidths)).toEqual([]);
+  });
+
+  test("the fixture still mirrors the markup the components emit", () => {
+    const sources: Record<string, string[]> = {
+      "src/features/events/event-candidate-form.tsx": [
+        'className="record-question-list"', 'className="record-question"', 'className="record-question-text"',
+        'className="record-question-meta"', 'className="record-question-actions"',
+      ],
+      "src/features/birthdays/birthday-proposal.tsx": [
+        'className="record-question-list"', 'className="record-question"', 'className="record-question-text"',
+        'className="record-question-actions"', 'className="record-question-link"', 'className="birthday-status"',
+      ],
+      "src/features/memories/record-memory-question.tsx": [
+        'className="record-question"', 'className="record-question-text"', 'className="record-question-meta"',
+        'className="record-question-actions"', 'className="record-question-more"',
+      ],
+      "src/features/interpretations/confirmation-panel.tsx": [
+        'className="record-question"', 'className="record-question-text"', 'className="record-question-meta"',
+        'className="record-question-actions"',
+      ],
+    };
+    for (const [file, tokens] of Object.entries(sources)) {
+      const component = readFileSync(join(ROOT, ...file.split("/")), "utf8");
+      for (const token of tokens) {
+        expect(component, `${file} no longer emits ${token}`).toContain(token);
+      }
+      // One primary control per view: none of these rows may claim it.
+      expect(component, `${file} draws a primary button`).not.toContain('variant="primary"');
+    }
+  });
+});
+
+/*
  * Life Brain A.3 (`LB-A-006`) — the compact Tarefas page, mirroring what
  * `WorkView` renders: `PageHeader compact` with the quick add as its action,
  * (since Life Brain A.4, no Lista · Calendário · Planejar strip), the `SegmentedControl` for the

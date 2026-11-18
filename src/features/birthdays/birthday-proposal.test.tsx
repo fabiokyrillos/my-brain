@@ -52,6 +52,20 @@ describe("BirthdayProposals — ADR-158", () => {
     expect(screen.getByRole("button", { name: copy.accept })).toBeInTheDocument();
   });
 
+  it("draws each proposal as one row of answers, none of them primary, and writes nothing before a tap", () => {
+    const action = vi.fn();
+    const decline = vi.fn();
+    const { container } = render(
+      <BirthdayProposals action={action} declineAction={decline} locale="pt-BR" proposals={[ana, { ...ana, personId: "p-rui", name: "Rui", day: 9 }]} />,
+    );
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: copy.accept })).toHaveLength(2);
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(container.querySelector(".ui-button--primary")).toBeNull();
+    expect(action).not.toHaveBeenCalled();
+    expect(decline).not.toHaveBeenCalled();
+  });
+
   it("renders nothing with nothing to offer, and speaks English", () => {
     const { container } = render(<BirthdayProposals action={vi.fn()} declineAction={vi.fn()} locale="en" proposals={[]} />);
     expect(container).toBeEmptyDOMElement();

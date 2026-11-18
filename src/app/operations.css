@@ -1,5 +1,5 @@
 .content-page{max-width:var(--width-productivity);margin:auto;padding:58px var(--gutter) 130px}.content-page>h1,.entry-heading h1{font:500 clamp(38px,5vw,62px)/1.02 var(--font-reading);letter-spacing:-.045em;margin:9px 0 12px}.content-page>p:not(.eyebrow),.entry-heading p{color:var(--text-secondary);line-height:1.65;max-width:700px}.capture-page{max-width:920px}.capture-page .capture-card{margin-top:38px}.capture-error{margin:0;padding:10px 22px;border-top:1px solid var(--tone-risk-line);background:var(--tone-risk-bg);color:var(--tone-risk-fg);font: var(--type-caption)}.back-link{display:inline-flex;align-items:center;gap:7px;color:var(--text-secondary);font: var(--type-caption);font-weight:700;margin-bottom:35px}.back-link:hover{color:var(--link)}
-.entry-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:30px;padding-bottom:30px}.entry-heading h1{max-width:780px}.entry-confidence{display:flex;align-items:center;gap:7px;white-space:nowrap;background:var(--tone-information-bg);color:var(--link);border-radius: var(--radius-full);padding:9px 12px;font:var(--type-eyebrow)}.original-entry{border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);margin:8px 0 20px;overflow:hidden}.original-entry summary{display:flex;align-items:center;gap:9px;padding:16px 18px;cursor:pointer;font: var(--type-caption);font-weight:750;user-select:none}.original-entry>p{white-space:pre-wrap;border-top:1px solid var(--border-default);margin:0;padding:22px;color:var(--text-primary);font:var(--type-reading-lg)}.interpretation-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:18px}.interpretation-main,.interpretation-actions{border:1px solid var(--border-default);border-radius: var(--radius-sheet);background:var(--background-surface);padding:25px}.section-heading{display:grid;grid-template-columns:35px 1fr;gap:12px;align-items:start}.section-heading>span{display:grid;place-items:center;width:30px;height:30px;border-radius: var(--radius-full);background:var(--tone-information-bg);color:var(--link);font:var(--type-eyebrow)}.section-heading h2{font-size:17px;margin:1px 0 4px}.section-heading p{font: var(--type-caption);color:var(--text-secondary);margin:0;line-height:1.55}.tag-cloud{display:flex;flex-wrap:wrap;gap:7px;margin:25px 0}.tag-cloud span,.confidence-pill{border:1px solid var(--border-strong);border-radius: var(--radius-full);padding:6px 9px;font:var(--type-eyebrow);color:var(--text-secondary);background:var(--background-subtle)}.entity-list{display:grid;border-top:1px solid var(--border-default)}.entity-list article{display:grid;grid-template-columns:1fr 1.6fr auto;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-default);align-items:center}.entity-list strong{font: var(--type-body)}.entity-list span,.entity-list small{font: var(--type-caption);color:var(--text-secondary)}.question-block{margin-top:22px;padding:18px;background:var(--tone-attention-bg);border-left:3px solid var(--tone-attention-fg)}.question-block h3{font: var(--type-caption);margin:0 0 8px}.question-block p{font:var(--type-reading);margin:0}.candidate-form{margin-top:24px}.candidate-list{display:grid;gap:9px}.candidate-copy{display:grid;gap:4px}.candidate-copy strong{font: var(--type-body);line-height:1.35}.candidate-copy small{font: var(--type-caption);color:var(--text-secondary);line-height:1.45}.confidence-pill{padding:4px 6px;font: var(--type-caption)}.form-error{color:var(--tone-risk-fg);font: var(--type-caption)}.confirmation-result{display:grid;gap:14px;margin-top:25px;padding:18px;border-radius: var(--radius-lg);background:var(--tone-success-bg)}.confirmation-result>p{display:flex;align-items:center;gap:8px;color:var(--tone-success-fg);font: var(--type-body);font-weight:500;margin:0}.undo-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.undo-action span{font: var(--type-caption);color:var(--text-secondary)}.no-action-state{display:grid;place-items:center;text-align:center;gap:6px;padding:45px 15px;color:var(--tone-success-fg)}.no-action-state p{font: var(--type-caption);color:var(--text-secondary);max-width:260px}.notice-card{display:flex;align-items:flex-start;gap:12px;border-radius: var(--radius-lg);padding:16px;margin-bottom:16px}.error-notice{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.notice-card p{margin:4px 0 0;font: var(--type-caption)}.model-note{display:flex;align-items:center;gap:7px;color:var(--text-muted);font:var(--type-eyebrow);margin-top:16px}
+.entry-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:30px;padding-bottom:30px}.entry-heading h1{max-width:780px}.entry-confidence{display:flex;align-items:center;gap:7px;white-space:nowrap;background:var(--tone-information-bg);color:var(--link);border-radius: var(--radius-full);padding:9px 12px;font:var(--type-eyebrow)}.original-entry{border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);margin:8px 0 20px;overflow:hidden}.original-entry summary{display:flex;align-items:center;gap:9px;padding:16px 18px;cursor:pointer;font: var(--type-caption);font-weight:750;user-select:none}.original-entry>p{white-space:pre-wrap;border-top:1px solid var(--border-default);margin:0;padding:22px;color:var(--text-primary);font:var(--type-reading-lg)}.interpretation-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);gap:18px}.interpretation-main,.interpretation-actions{border:1px solid var(--border-default);border-radius: var(--radius-sheet);background:var(--background-surface);padding:25px}.section-heading{display:grid;grid-template-columns:35px 1fr;gap:12px;align-items:start}.section-heading>span{display:grid;place-items:center;width:30px;height:30px;border-radius: var(--radius-full);background:var(--tone-information-bg);color:var(--link);font:var(--type-eyebrow)}.section-heading h2{font-size:17px;margin:1px 0 4px}.section-heading p{font: var(--type-caption);color:var(--text-secondary);margin:0;line-height:1.55}.tag-cloud{display:flex;flex-wrap:wrap;gap:7px;margin:25px 0}.tag-cloud span,.confidence-pill{border:1px solid var(--border-strong);border-radius: var(--radius-full);padding:6px 9px;font:var(--type-eyebrow);color:var(--text-secondary);background:var(--background-subtle)}.entity-list{display:grid;border-top:1px solid var(--border-default)}.entity-list article{display:grid;grid-template-columns:1fr 1.6fr auto;gap:12px;padding:14px 0;border-bottom:1px solid var(--border-default);align-items:center}.entity-list strong{font: var(--type-body)}.entity-list span,.entity-list small{font: var(--type-caption);color:var(--text-secondary)}.question-block{margin-top:22px;padding:18px;background:var(--tone-attention-bg);border-left:3px solid var(--tone-attention-fg)}.question-block h3{font: var(--type-caption);margin:0 0 8px}.question-block p{font:var(--type-reading);margin:0}.candidate-form{margin-top:24px}.candidate-list{display:grid;gap:9px}.candidate-copy{display:grid;gap:4px}.candidate-copy strong{font: var(--type-body);line-height:1.35}.candidate-copy small{font: var(--type-caption);color:var(--text-secondary);line-height:1.45}.confidence-pill{padding:4px 6px;font: var(--type-caption)}.form-error{color:var(--tone-risk-fg);font: var(--type-caption)}.confirmation-result{display:grid;gap:14px;margin-top:25px;padding:18px;border-radius: var(--radius-lg);background:var(--tone-success-bg)}.confirmation-result>p{display:flex;align-items:center;gap:8px;color:var(--tone-success-fg);font: var(--type-body);font-weight:500;margin:0}.undo-action{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.undo-action span{font: var(--type-caption);color:var(--text-secondary)}.notice-card{display:flex;align-items:flex-start;gap:12px;border-radius: var(--radius-lg);padding:16px;margin-bottom:16px}.error-notice{background:var(--tone-risk-bg);color:var(--tone-risk-fg)}.notice-card p{margin:4px 0 0;font: var(--type-caption)}.model-note{display:flex;align-items:center;gap:7px;color:var(--text-muted);font:var(--type-eyebrow);margin-top:16px}
 .list-header{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:28px}.list-header h1{font:500 clamp(38px,5vw,60px)/1 var(--font-reading);letter-spacing:-.04em;margin:8px 0 0}.list-header p{color:var(--text-secondary);font: var(--type-body)}.list-stack{display:grid;gap:9px}.list-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;padding:17px 18px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);transition:var(--motion-standard) var(--ease-enter)}
 /* Only rows that actually navigate get the lift. `.list-row` is also rendered as
    an inert `<article>` on Memórias, Lembretes and Work, where the hover promised
@@ -564,6 +564,33 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .task-candidate-decision-card>.candidate-editor:not(:has([aria-expanded="true"])) button[aria-expanded]{border:0;background:none;padding:0;color:var(--link);font:var(--type-label)}
 .task-candidate-batch{margin-top:var(--space-4)}
 
+/* Every other thing a record can ask — an event, a birthday, keeping it as a
+   memory, confirming the reading — is the same row as the two above: a question
+   in the reading face, one line of what is known, the answers in one wrapping
+   row. One set of classes, because it is one shape; the person and task rows
+   keep their own names and the same numbers. Events were a checkbox list under
+   a heading and a primary button, the memory a dashed card, the confirmation a
+   centred panel. */
+.record-question-list{margin:0;padding:0;list-style:none}
+.record-question{display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-2);align-items:start;margin:0;border-bottom:1px solid var(--border-default);padding:var(--space-4) 0}
+.record-question>*{grid-column:1;min-width:0}
+.record-question-text{margin:0;font:var(--type-reading);line-height:1.3;color:var(--text-primary);overflow-wrap:anywhere}
+.record-question-meta{margin:0;color:var(--text-secondary);font:var(--type-caption);line-height:1.55;overflow-wrap:break-word}
+.record-question-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-top:var(--space-1)}
+.record-question-actions .ui-button,.record-question .confirmation-result .ui-button{min-height:var(--touch-target)}
+.record-question-actions [role="alert"]{color:var(--tone-risk-fg);font:var(--type-caption)}
+.record-question-link{display:inline-flex;align-items:center;min-height:var(--touch-target);color:var(--link);font:var(--type-label);overflow-wrap:anywhere}
+/* `display:grid` would otherwise defeat the `hidden` attribute. */
+.record-question-more{display:grid;gap:var(--space-2)}.record-question-more[hidden]{display:none}
+.record-question-more label{color:var(--text-secondary);font:var(--type-caption)}
+.record-question-more textarea,.record-question-more select{width:100%;min-width:0;box-sizing:border-box;min-height:var(--touch-target);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:10px 12px;background:var(--background-surface);color:var(--text-primary);font:var(--type-body);font-family:inherit}
+.record-question-more textarea{resize:vertical}
+.record-question-more textarea:focus-visible,.record-question-more select:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+/* An empty live region is still a grid item; it must not cost the row a gap. */
+.record-question>.birthday-status:empty{margin-top:calc(var(--space-2) * -1)}
+/* "Nothing needs doing", as a sentence. It was a centred panel with an icon. */
+.record-quiet-note{margin:0;padding:var(--space-4) 0;color:var(--text-muted);font:var(--type-body)}
+
 /*
  * Registros as a decision queue — Papel e Console, mockup 03 frame 03.
  *
@@ -970,67 +997,6 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
   color: var(--text-secondary);
 }
 
-/*
- * Life Brain C.3 (ADR-152) — a record's proposed events and the ones it put on
- * the agenda. The task candidates' rhythm: a heading, one sentence, a list of
- * checkable rows, one primary button.
- */
-.event-candidates {
-  display: grid;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-}
-
-.event-candidates-form,
-.event-agenda {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.event-candidates h3 {
-  margin: 0;
-  font: var(--type-heading);
-}
-
-.event-candidates-lead {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-.event-candidates-list {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.event-candidate,
-.event-agenda-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--touch-target);
-}
-
-.event-candidate input {
-  width: 20px;
-  height: 20px;
-  flex: none;
-}
-
-.event-candidate-text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-
-.event-candidate-text small {
-  color: var(--text-secondary);
-  overflow-wrap: anywhere;
-}
-
 /* Life Brain A.5: a list lens whose header action is the inline create form
    (Pessoas, Projetos, Organizações, Áreas). Beside the title on a wide screen;
    under it, at full width, on a phone, so the field never squeezes the title. */
@@ -1226,9 +1192,9 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
  *   4. what it created — rows;
  *   5. earlier decisions and the technical detail — two collapsed lines.
  *
- * What KEEPS a box is an error-shaped notice and the forms that are still
- * forms (task, event and memory candidates). Scoped to `.record-detail`, so the blocks inside the
- * technical disclosure are not reached.
+ * What KEEPS a box is an error-shaped notice and a result line with its undo.
+ * Scoped to `.record-detail`, so the blocks inside the technical disclosure
+ * are not reached.
  */
 .record-detail .record-detail-head{align-items:center;padding-bottom:var(--space-2)}
 .record-detail .record-detail-head>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-1);min-width:0}
@@ -1257,6 +1223,20 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .record-detail .notice-card{margin-bottom:0}
 .record-detail .review-next-actions{border:0;border-radius:0;background:none;margin:0;padding:0}
 .record-detail .review-attention+.review-next-actions{margin-top:calc(var(--space-4) * -1)}
+/* The decisions are ONE list, whatever kinds it holds: no kind opens with a gap
+   of its own, and a result line sits in the rows' rhythm. */
+.record-detail .review-next-actions .person-candidate-section{margin-top:0}
+.record-detail .review-next-actions .confirmation-result{margin:var(--space-4) 0}
+.record-detail .record-question>.confirmation-result{margin:0}
+
+/* Correcting the reading, at the end of the reading: closed, a line of quiet
+   links; open, the form under a hairline. It was a boxed panel with a primary
+   button at the bottom of the actions. */
+.review-understanding .interpretation-editor{margin:var(--space-1) 0 0;border:0;border-radius:0;background:none;padding:0}
+.review-understanding .interpretation-editor-actions,.review-understanding .interpretation-secondary-actions{display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--space-4);margin-left:0}
+.review-understanding .interpretation-editor-actions .ui-button,.review-understanding .interpretation-secondary-actions .ui-button{width:auto;min-height:var(--touch-target)}
+.review-understanding .interpretation-secondary-actions form{width:auto}
+.review-understanding .interpretation-editor-editing{margin-top:var(--space-4);border-top:1px solid var(--border-default);padding-top:var(--space-4)}
 
 .record-detail .entry-outcomes{border:0;border-radius:0;background:none;margin:0;padding:0}
 .record-detail .entry-outcome-group{margin-top:var(--space-4)}

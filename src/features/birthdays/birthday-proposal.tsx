@@ -8,9 +8,14 @@
  * (`setPersonBirthday` → `set_person_birthday`), which creates the yearly
  * reminder; not accepting leaves everything as it was. A different date is
  * the person page's job, linked here. The result is announced politely.
+ *
+ * Drawn as the record page's other suggestions are (ADR-184): the question in
+ * the reading face, its answers in one row beside it, no heading of its own and
+ * no primary button — a record can ask several things, and the product allows
+ * one primary control per view. The form and its fields are the ones it always
+ * had; each answer was already one tap.
  */
 
-import { CalendarHeart } from "lucide-react";
 import Link from "next/link";
 import { useActionState } from "react";
 
@@ -36,12 +41,13 @@ export function BirthdayProposals({
   const copy = getBirthdayCopy(locale);
   if (proposals.length === 0) return null;
   return (
-    <section aria-label={copy.proposalHeading} className="birthday-proposals">
-      <h3>{copy.proposalHeading}</h3>
+    <ul aria-label={copy.proposalHeading} className="record-question-list">
       {proposals.map((proposal) => (
-        <BirthdayProposalRow action={action} declineAction={declineAction} key={proposal.personId} locale={locale} proposal={proposal} />
+        <li key={proposal.personId}>
+          <BirthdayProposalRow action={action} declineAction={declineAction} locale={locale} proposal={proposal} />
+        </li>
       ))}
-    </section>
+    </ul>
   );
 }
 
@@ -55,24 +61,26 @@ function BirthdayProposalRow({ action, declineAction, locale, proposal }: { acti
   );
   const done = state.status === "success";
   return (
-    <div className="birthday-proposal">
-      <p className="birthday-line">
-        <CalendarHeart aria-hidden="true" size={16} />
-        <span>{copy.proposal(proposal.name, copy.format(proposal.day, proposal.month, proposal.year))}</span>
-      </p>
+    <div aria-label={copy.reminderTitle(proposal.name)} className="record-question" role="group">
       {done ? null : (
-        <form action={formAction} className="birthday-proposal-form">
-          <input name="personId" type="hidden" value={proposal.personId} />
-          <input name="locale" type="hidden" value={locale} />
-          <input name="intent" type="hidden" value="set" />
-          <input name="day" type="hidden" value={proposal.day} />
-          <input name="month" type="hidden" value={proposal.month} />
-          <input name="year" type="hidden" value={proposal.year ?? ""} />
-          <Button loading={pending} name="answer" size="sm" type="submit" value="accept" variant="primary">{pending ? copy.saving : copy.accept}</Button>
-          <Button disabled={pending} name="answer" size="sm" type="submit" value="decline" variant="ghost">{copy.decline}</Button>
-          <Link href={`/${locale}/app/people/${proposal.personId}`}>{copy.adjust(proposal.name)}</Link>
-        </form>
+        <>
+          <p className="record-question-text">
+            {copy.proposal(proposal.name, copy.format(proposal.day, proposal.month, proposal.year))}
+          </p>
+          <form action={formAction} className="record-question-actions">
+            <input name="personId" type="hidden" value={proposal.personId} />
+            <input name="locale" type="hidden" value={locale} />
+            <input name="intent" type="hidden" value="set" />
+            <input name="day" type="hidden" value={proposal.day} />
+            <input name="month" type="hidden" value={proposal.month} />
+            <input name="year" type="hidden" value={proposal.year ?? ""} />
+            <Button loading={pending} name="answer" type="submit" value="accept">{pending ? copy.saving : copy.accept}</Button>
+            <Button disabled={pending} name="answer" type="submit" value="decline" variant="ghost">{copy.decline}</Button>
+            <Link className="record-question-link" href={`/${locale}/app/people/${proposal.personId}`}>{copy.adjust(proposal.name)}</Link>
+          </form>
+        </>
       )}
+      {/* Always in the document, so the answer is announced when it arrives. */}
       <p aria-live="polite" className="birthday-status" data-status={state.status} role="status">
         {state.status === "idle" ? "" : state.message}
       </p>

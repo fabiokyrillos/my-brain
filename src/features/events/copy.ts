@@ -5,8 +5,12 @@
 import type { Locale } from "@/lib/preferences";
 
 export type EventCopy = {
+  /** Names the list for a screen reader; the rows are the questions. */
   readonly heading: string;
-  readonly lead: string;
+  readonly decision: (title: string) => string;
+  readonly question: (title: string) => string;
+  /** Sets the suggestion aside for this visit. Nothing is written. */
+  readonly notNow: string;
   readonly allDay: string;
   readonly until: (end: string) => string;
   readonly confirm: string;
@@ -14,6 +18,8 @@ export type EventCopy = {
   readonly nothingSelected: string;
   readonly confirmed: (count: number) => string;
   readonly onAgendaHeading: string;
+  readonly onAgenda: (title: string) => string;
+  readonly cancelShort: string;
   readonly cancel: (title: string) => string;
   readonly cancelled: string;
   readonly undo: string;
@@ -26,8 +32,10 @@ export type EventCopy = {
 
 const EVENT_COPY = {
   "pt-BR": {
-    heading: "Pôr na agenda?",
-    lead: "O Brain encontrou isto com data. Nada entra na agenda sem a sua confirmação.",
+    heading: "Eventos sugeridos",
+    decision: (title) => `Evento sugerido: ${title}`,
+    question: (title) => `Pôr “${title}” na agenda?`,
+    notNow: "Agora não",
     allDay: "dia todo",
     until: (end) => `até ${end}`,
     confirm: "Pôr na agenda",
@@ -35,6 +43,8 @@ const EVENT_COPY = {
     nothingSelected: "Escolha pelo menos um evento.",
     confirmed: (count) => (count === 1 ? "1 evento na agenda." : `${count} eventos na agenda.`),
     onAgendaHeading: "Na agenda",
+    onAgenda: (title) => `“${title}” está na agenda.`,
+    cancelShort: "Cancelar",
     cancel: (title) => `Cancelar ${title}`,
     cancelled: "Evento cancelado.",
     undo: "Desfazer",
@@ -45,8 +55,10 @@ const EVENT_COPY = {
     unauthenticated: "Sua sessão expirou. Entre novamente.",
   },
   en: {
-    heading: "Put on the agenda?",
-    lead: "Brain found these with a date. Nothing goes on the agenda until you confirm.",
+    heading: "Suggested events",
+    decision: (title) => `Suggested event: ${title}`,
+    question: (title) => `Put “${title}” on the agenda?`,
+    notNow: "Not now",
     allDay: "all day",
     until: (end) => `until ${end}`,
     confirm: "Put on the agenda",
@@ -54,6 +66,8 @@ const EVENT_COPY = {
     nothingSelected: "Choose at least one event.",
     confirmed: (count) => (count === 1 ? "1 event on the agenda." : `${count} events on the agenda.`),
     onAgendaHeading: "On the agenda",
+    onAgenda: (title) => `“${title}” is on the agenda.`,
+    cancelShort: "Cancel",
     cancel: (title) => `Cancel ${title}`,
     cancelled: "Event cancelled.",
     undo: "Undo",
