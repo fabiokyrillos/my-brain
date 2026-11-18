@@ -1,3 +1,4 @@
+import { AgentSpeaker } from "@/features/chat/agent-speaker";
 import { pendingTurn } from "@/features/chat/pending-turn";
 import { PendingTurnIndicator } from "@/features/chat/pending-turn-indicator";
 import { ChatFrame } from "@/features/chat/chat-frame";
@@ -83,17 +84,19 @@ function ThreadMessage({
     && (sources.length > 0 || citations.evidence !== "unknown" || citations.legacy);
 
   /*
-    Correspondence, not a messenger (Editorial calmo, ADR-180).
+    Two sides, as in every conversation with an assistant (Editorial calmo,
+    ADR-180; the owner's direction of 18 November 2026).
 
-    Both halves are **sentences somebody wrote**, so both are set in the reading
-    face in one column. The question is the owner's: an ink rule on its leading
-    edge, and the hour it was asked. The answer is prose at the reading measure
-    with nothing around it — no bubble, no name, no stamp — and one quiet closed
-    line beneath: its sources, and where it looked.
+    The owner's question sits on the right: a quiet filled shape in the UI face,
+    the hour it was asked under it. The answer sits on the left with no shape
+    around it: the Brain's name beside the product's mark, then prose in the
+    reading face at the reading measure, then the sources it cites as cards, and
+    one quiet closed line — where it looked, how it got there.
 
     The speaker and the instant stay in the document for assistive technology
-    on every turn; the stylesheet draws only the question's hour, because the
-    day is said once above the first turn of that day (`ThreadDay`).
+    on every turn, in that order, ahead of what was said: the question's hour is
+    the one instant drawn, so it is a line of its own after the question, and
+    the day is said once above the first turn of that day (`ThreadDay`).
 
     The model that answered is bookkeeping: it is filed behind "Onde procurei"
     with the reach sentence, and an answer that recorded no sources at all
@@ -103,14 +106,17 @@ function ThreadMessage({
     are kept because three Playwright lanes address messages by them.
   */
   const copy = getAssistantCopy(locale);
+  const asked = role === "user";
+  const stamp = <time dateTime={createdAt}>{formatInstant(createdAt, "time", locale, timeZone)}</time>;
   return (
     <article className={`chat-message ${role}`} data-role={role} id={messageAnchorId(messageId)}>
       <p className="chat-message-meta">
-        <span className="chat-message-speaker">{role === "user" ? copy.speakerYou : agentName}</span>
-        <time dateTime={createdAt}>{formatInstant(createdAt, "time", locale, timeZone)}</time>
+        {asked ? <span className="chat-message-speaker">{copy.speakerYou}</span> : <AgentSpeaker agentName={agentName} />}
+        {asked ? null : stamp}
       </p>
       {/* Owner content and model output, rendered as text — never markup. */}
       <Prose className="chat-message-body" text={content} />
+      {asked ? <p className="chat-message-when">{stamp}</p> : null}
       {hasSourceBlock && (
         <div className="message-sources">
           <SourceList
@@ -218,7 +224,8 @@ export default async function ConversationPage({
         conversation's, and the field stays at the bottom.
       */}
       <ChatFrame activeId={conversationId} groups={menu.groups} limited={menu.limited} locale={locale} title={conversation.title}>
-      <div className="chat-stage">
+      {/* `data-thread`: a conversation starts at the top, under the header, however short it is. */}
+      <div className="chat-stage" data-thread="">
       {resumed === null ? null : <ResumedCard locale={locale} resumption={resumed} />}
 
       <div className="message-stream">

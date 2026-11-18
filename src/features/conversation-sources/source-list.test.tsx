@@ -12,6 +12,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { readOnlyPreviewCard, unavailableCard } from "@/features/conversation-cards/contracts";
+import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
 
 import type { ParsedCitations } from "./contracts";
 import { getConversationSourcesCopy } from "./copy";
@@ -29,8 +30,22 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
   ConversationAnswerShown: () => null,
 }));
 vi.mock("next/link", () => ({
-  default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
+  default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => <a href={href} {...rest}>{children}</a>,
 }));
+/*
+ * Chat shows every level today (ADR-178), so a masked card cannot be produced
+ * through the real rule. The contract is wrapped so one test can make it mask,
+ * and prove the card follows whatever the contract decides.
+ */
+const contract = vi.hoisted(() => ({ masks: false }));
+vi.mock("@/features/sensitivity/contracts", async (original) => {
+  const actual = await original<typeof import("@/features/sensitivity/contracts")>();
+  return {
+    ...actual,
+    resolveContent: (...args: Parameters<typeof actual.resolveContent>) =>
+      contract.masks ? { show: false, masked: true, revealable: true } : actual.resolveContent(...args),
+  };
+});
 
 const copy = getConversationSourcesCopy("pt-BR");
 const ENTRY = "33333333-3333-4333-8333-333333333333";
@@ -56,18 +71,161 @@ const evidenced: ParsedCitations = {
   legacy: false,
 };
 
-describe("2K-SRC-001/003: every rendered source names what it is and links to it", () => {
-  it("is one chip — type and date — that names its support kind and opens the source (ADR-177)", () => {
-    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]} />);
-    const chip = screen.getByRole("link");
-    expect(chip).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY}`);
-    expect(chip.textContent).toMatch(/^Você escreveu isto: Registro · De \d/);
-    // A chip carries no content: the answer says what the source says.
-    expect(screen.queryByText("conversa com a Ana")).not.toBeInTheDocument();
+const source = (index: number, over: Partial<ResolvedSource> = {}): ResolvedSource => ({
+  ...entrySource,
+  key: `entry:${index}`,
+  card: readOnlyPreviewCard({
+    cardType: "entry",
+    objectId: `${index}`,
+    snippet: `registro ${index}`,
+    sensitivity: "normal",
+    href: `/pt-BR/app/inbox/${index}`,
+  }),
+  ...over,
+});
+
+describe("2K-SRC-001/003: every rendered source is a card that says what it is and opens it", () => {
+  it("is a card — what the source says, its kind and date — whose whole is the link (owner, 18 Nov 2026)", () => {
+    const { container } = render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]} />);
+    const card = screen.getByRole("link");
+    expect(card).toHaveAttribute("href", `/pt-BR/app/inbox/${ENTRY}`);
+    expect(card).toHaveClass("conversation-source-card");
+    expect(card.querySelector(".conversation-source-title")?.textContent).toBe("conversa com a Ana");
+    expect(card.textContent).toMatch(/^conversa com a AnaVocê escreveu isto: Registro · De \d/);
+    // Visible by default: no disclosure stands between the answer and its sources.
+    expect(card.closest("details")).toBeNull();
+    expect(container.querySelector(".conversation-sources-used")).toBeNull();
   });
 
-  it("renders a source the user can no longer read as unavailable, with no link", () => {
-    render(
+  it("titles a source that carries no content by its kind, and dates it", () => {
+    const task: ResolvedSource = {
+      key: "task:t1",
+      support: "product_state",
+      card: readOnlyPreviewCard({ cardType: "task", objectId: "t1", href: "/pt-BR/app/work/t1" }),
+      occurredAt: "2026-07-20T10:00:00.000Z",
+    };
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[task]} />);
+    const card = screen.getByRole("link");
+    expect(card.querySelector(".conversation-source-title")?.textContent).toBe("Tarefa");
+    expect(card.querySelector(".conversation-source-caption")?.textContent).toMatch(/^O que eu guardo como verdadeiro: De \d/);
+  });
+
+  it("names a cited task by its title and says a passed deadline in the accent (ADR-190)", () => {
+    const task: ResolvedSource = {
+      key: "task:t2",
+      support: "product_state",
+      card: readOnlyPreviewCard({
+        cardType: "task",
+        objectId: "t2",
+        snippet: "Responder a Ana sobre o orçamento",
+        sensitivity: "normal",
+        href: "/pt-BR/app/work/t2",
+      }),
+      occurredAt: "2026-07-01T10:00:00.000Z",
+      when: { kind: "overdue", at: "2026-07-20T15:00:00.000Z" },
+    };
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[task]} />);
+    const card = screen.getByRole("link");
+    expect(card.querySelector(".conversation-source-title")?.textContent).toBe("Responder a Ana sobre o orçamento");
+    const when = card.querySelector('[data-when="overdue"]');
+    expect(when?.textContent).toMatch(/atrasada desde \d/);
+    expect(card.querySelector("button, input, select")).toBeNull();
+  });
+
+  it("says a cited reminder's day and hour, and a done task without a date", () => {
+    const reminder: ResolvedSource = {
+      key: "reminder:r1",
+      support: "product_state",
+      card: readOnlyPreviewCard({ cardType: "reminder", objectId: "r1", snippet: "Comprar o presente da Ana", sensitivity: "normal", href: "/pt-BR/app/reminders/r1" }),
+      occurredAt: null,
+      when: { kind: "remind", at: "2027-04-28T12:00:00.000Z" },
+    };
+    const done: ResolvedSource = {
+      key: "task:t3",
+      support: "product_state",
+      card: readOnlyPreviewCard({ cardType: "task", objectId: "t3", snippet: "Pagar o condomínio", sensitivity: "normal", href: "/pt-BR/app/work/t3" }),
+      occurredAt: null,
+      when: { kind: "done" },
+    };
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[reminder, done]} />);
+    const [first, second] = screen.getAllByRole("link");
+    expect(first?.querySelector('[data-when="remind"]')?.textContent).toMatch(/· .*09:00/);
+    expect(second?.querySelector(".conversation-source-caption")?.textContent).toMatch(/concluída$/);
+  });
+
+  it("does not print the time beside a masked task title", () => {
+    contract.masks = true;
+    try {
+      const task: ResolvedSource = {
+        key: "task:t4",
+        support: "product_state",
+        card: readOnlyPreviewCard({ cardType: "task", objectId: "t4", snippet: "Exame", sensitivity: "highly_sensitive", href: "/pt-BR/app/work/t4" }),
+        occurredAt: null,
+        when: { kind: "due", at: "2026-07-20T15:00:00.000Z" },
+      };
+      render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[task]} />);
+      const card = screen.getByRole("link");
+      expect(card.textContent).not.toContain("Exame");
+      expect(card.querySelector("[data-when]")).toBeNull();
+    } finally {
+      contract.masks = false;
+    }
+  });
+
+  it("draws at most three cards, and the rest behind one quiet \"Mais N fontes\" line", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[1, 2, 3, 4, 5].map((index) => source(index))} />,
+    );
+    const shown = container.querySelectorAll(".conversation-sources > .conversation-sources-list > li > a.conversation-source-card");
+    expect(shown).toHaveLength(3);
+    expect([...shown].map((node) => node.getAttribute("href"))).toEqual(["/pt-BR/app/inbox/1", "/pt-BR/app/inbox/2", "/pt-BR/app/inbox/3"]);
+    const more = container.querySelector("details.conversation-sources-more");
+    expect(more).not.toHaveAttribute("open");
+    expect(more?.querySelector("summary")?.textContent).toBe(copy.moreSources(2));
+    expect(more?.querySelectorAll("a.conversation-source-card")).toHaveLength(2);
+  });
+
+  it("draws no \"Mais\" line for three sources or fewer", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[1, 2, 3].map((index) => source(index))} />,
+    );
+    expect(container.querySelectorAll("a.conversation-source-card")).toHaveLength(3);
+    expect(container.querySelector(".conversation-sources-more")).toBeNull();
+  });
+
+  it("says the rest in the singular, in both locales", () => {
+    expect(copy.moreSources(1)).toBe("Mais 1 fonte");
+    expect(copy.moreSources(4)).toBe("Mais 4 fontes");
+    expect(getConversationSourcesCopy("en").moreSources(1)).toBe("1 more source");
+    expect(getConversationSourcesCopy("en").moreSources(3)).toBe("3 more sources");
+  });
+
+  it("keeps masked content masked on a card: the contract's sentence, never the text", () => {
+    contract.masks = true;
+    try {
+      render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]} />);
+      const title = screen.getByRole("link").querySelector(".conversation-source-title");
+      expect(title).toHaveAttribute("data-masked", "true");
+      expect(title?.textContent).toBe(getConversationCardsCopy("pt-BR").masked);
+      expect(screen.queryByText(/conversa com a Ana/)).not.toBeInTheDocument();
+    } finally {
+      contract.masks = false;
+    }
+  });
+
+  it("puts no control on a source card: one link, no button, no form (2K-CARD-008)", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[1, 2, 3].map((index) => source(index))} />,
+    );
+    for (const card of container.querySelectorAll(".conversation-source-card")) {
+      expect(card.querySelector("button, form, input, select, textarea")).toBeNull();
+      expect(card.querySelectorAll("a")).toHaveLength(0);
+    }
+    expect(container.querySelector("button, form")).toBeNull();
+  });
+
+  it("renders a source the user can no longer read as one quiet line, not a card, with no link", () => {
+    const { container } = render(
       <SourceList timeZone={OWNER_TIME_ZONE}
         citations={evidenced}
         locale="pt-BR"
@@ -76,28 +234,13 @@ describe("2K-SRC-001/003: every rendered source names what it is and links to it
     );
     expect(screen.queryByText("conversa com a Ana")).not.toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    expect(container.querySelector(".conversation-source-card")).toBeNull();
+    expect(container.querySelector(".conversation-source-chip[data-unavailable]")?.textContent)
+      .toContain(getConversationCardsCopy("pt-BR").states.unavailable);
   });
 });
 
-describe("Editorial calmo: the block is one quiet line of closed disclosures", () => {
-  it("files the sources behind a closed line that says how many there are", () => {
-    const { container } = render(
-      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource, { ...entrySource, key: "entry:2" }]} />,
-    );
-    const used = container.querySelector("details.conversation-sources-used");
-    expect(used).not.toBeNull();
-    expect(used).not.toHaveAttribute("open");
-    expect(used?.querySelector("summary")?.textContent).toBe(`${copy.title}: ${copy.sourcesSummary(2)}`);
-    // Each source is a row of that list, and the row is the link.
-    expect(used?.querySelectorAll(".conversation-sources-list > li > a")).toHaveLength(2);
-  });
-
-  it("says one source in the singular, in both locales", () => {
-    expect(copy.sourcesSummary(1)).toBe("1 fonte");
-    expect(getConversationSourcesCopy("en").sourcesSummary(1)).toBe("1 source");
-    expect(getConversationSourcesCopy("en").sourcesSummary(3)).toBe("3 sources");
-  });
-
+describe("Editorial calmo: under the cards, one quiet line of closed disclosures", () => {
   it("files the reach sentence, and what the host adds, behind a closed line of its own", () => {
     const { container } = render(
       <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]}>
@@ -115,7 +258,7 @@ describe("Editorial calmo: the block is one quiet line of closed disclosures", (
     const { container } = render(
       <SourceList timeZone={OWNER_TIME_ZONE} citations={{ ...evidenced, sources: [] }} locale="pt-BR" sources={[]} />,
     );
-    expect(container.querySelector(".conversation-sources-used")).toBeNull();
+    expect(container.querySelector(".conversation-source-card")).toBeNull();
     expect(container.querySelector(".conversation-sources-where")).not.toBeNull();
   });
 

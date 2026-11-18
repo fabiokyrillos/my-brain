@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { getAssistantCopy } from "@/features/assistant/copy";
 import type { Locale } from "@/lib/preferences";
 
+import { AgentSpeaker } from "./agent-speaker";
 import { getPendingTurnCopy } from "./pending-turn";
 import { Prose } from "./prose";
 import { useChatStream, type ChatDraft } from "./use-chat-stream";
@@ -130,7 +131,7 @@ export function StreamedDraft({ agentName, draft, locale }: { agentName: string;
       </article>
       <article aria-busy="true" className="chat-message" data-draft-role="assistant">
         <p className="chat-message-meta">
-          <span className="chat-message-speaker">{agentName}</span>
+          <AgentSpeaker agentName={agentName} />
         </p>
         {draft.text === "" ? (
           <p className="chat-message-waiting" role="status">

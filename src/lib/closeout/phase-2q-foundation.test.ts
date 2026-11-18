@@ -401,16 +401,16 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
   });
 
   /*
-   * INVERTED by Life Brain B.1 (ADR-146). This used to assert that chat's
-   * resolver refused every task and never read `tasks`, on the premise that no
-   * chat envelope could contain one. The deterministic agenda answer
-   * (`LB-B-005`) now cites tasks, so the premise is gone — and what replaces the
-   * refusal keeps everything the refusal protected: the title never reaches a
-   * chat card, the source entry is never read, and the wrong table is never
-   * asked. The columns are asserted, not just the table, because "reads tasks"
-   * is harmless and "reads a task's title" is the defect.
+   * INVERTED by Life Brain B.1 (ADR-146), and again by ADR-190. B.1 replaced the
+   * refusal with a content-free read. ADR-190 — authorized by the owner on
+   * 2026-11-18, so a card under an answer can say *which* task it is — reads
+   * the task's title, state and time, and derives its classification from its
+   * source entry through `deriveTaskSensitivity`, the function Tarefas uses.
+   * What is asserted now: the title reaches the card with the derived level
+   * (so the conversation surface masks what it would mask), the source entry is
+   * read for that level only, and the wrong table is still never asked.
    */
-  it("resolves a task reference content-free, and never searches memories for it", async () => {
+  it("resolves a task reference with its title and its derived level, and never searches memories for it", async () => {
     const selected: Record<string, string> = {};
     const asked: string[] = [];
     const supabase = {
@@ -423,7 +423,19 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
         };
         stub.eq = () => stub;
         stub.in = () => Promise.resolve({
-          data: table === "tasks" ? [{ id: TASK, created_at: "2026-08-20T10:00:00Z" }] : [],
+          data: table === "tasks"
+            ? [{
+              id: TASK,
+              title: "Responder a Ana",
+              status: "todo",
+              due_at: "2026-08-20T10:00:00Z",
+              planned_at: null,
+              source_entry_id: ENTRY,
+              created_at: "2026-08-19T10:00:00Z",
+            }]
+            : table === "entries"
+              ? [{ id: ENTRY, sensitivity: "private" }]
+              : [],
           error: null,
         });
         return stub;
@@ -437,8 +449,11 @@ describe("2Q-FOUNDATION-003: the mislabel is removed at its producer — INVERTE
       NOW,
     );
     expect(source?.card.state).toBe("previewed");
-    expect(source?.card.snippet, "a task's title reached a chat card").toBeNull();
-    expect(selected.tasks, "the chat resolver started reading a task's content").toBe("id,created_at");
+    expect(source?.card.snippet, "the task's title no longer reaches its card").toBe("Responder a Ana");
+    expect(source?.card.sensitivity, "the card is not carrying the level derived from its source entry").toBe("private");
+    expect(source?.when, "a passed deadline is not said").toEqual({ kind: "overdue", at: "2026-08-20T10:00:00Z" });
+    expect(selected.tasks).toBe("id,title,status,due_at,planned_at,source_entry_id,created_at");
+    expect(selected.entries, "the source entry is read for more than its level").toBe("id,sensitivity");
     // And it does NOT go looking in the wrong table, which was the whole defect.
     expect(asked, "a task reference is being looked up in memories again")
       .not.toContain("memories");

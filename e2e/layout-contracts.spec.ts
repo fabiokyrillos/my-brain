@@ -2511,8 +2511,9 @@ test.describe("Planejar as two lists of rows (Editorial calmo)", () => {
  * `src/features/capture/chat-composer.tsx`, `conversation-sources/source-list.tsx`
  * and `conversation-cards/suggestion-row.tsx`. What is under test is geometry
  * jsdom cannot see: nothing wider than the screen with a title that cannot
- * break, no target under 44px, the field clear of the bottom bar, and the
- * question marked by an edge rather than a fill.
+ * break, no target under 44px, the field clear of the bottom bar, the
+ * question on the right and the answer on the left, and the sources the answer
+ * cites drawn as cards (the owner's direction of 18 November 2026).
  */
 const CHAT_CSS = ["conversation-cards.css", "assistant.css", "memories.css"]
   .map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
@@ -2522,15 +2523,19 @@ const CHAT_UNBREAKABLE = "dev_digital_bi.test_schema.nc_booking_population_2026_
 
 function chatSources(options: { open: boolean; sources: number; explained?: boolean }) {
   const open = options.open ? " open" : "";
-  const row = (index: number) => `<li data-support="direct_record"><a class="conversation-source-chip" href="#">`
-    + `<span class="conversation-source-support sr-only">Você escreveu isto: </span><span class="conversation-source-type">Registro</span>`
-    + `<span class="conversation-source-freshness"> · <span class="sr-only">De </span><time datetime="2026-11-1${index}T12:00:00Z">1${index} de nov. de 2026</time></span></a></li>`;
+  const card = (index: number) => `<li data-support="direct_record"><a class="conversation-source-card" data-card-type="entry" href="#">`
+    + `<span aria-hidden="true" class="conversation-source-icon">${ICON}</span><span class="conversation-source-text">`
+    + `<span class="conversation-source-title">${index === 0 ? `Confirmar o valor em ${CHAT_UNBREAKABLE} com o Daniel antes de sexta, como combinado na reunião de orçamento` : `Registro número ${index}`}</span>`
+    + `<span class="conversation-source-caption"><span class="conversation-source-support sr-only">Você escreveu isto: </span><span class="conversation-source-type">Registro</span>`
+    + `<span class="conversation-source-freshness"> · <span class="sr-only">De </span><time datetime="2026-11-1${index}T12:00:00Z">1${index} de nov. de 2026</time></span></span></span>`
+    + `${ICON.replace("<svg", '<svg class="conversation-source-chevron"')}</a></li>`;
   const unavailable = `<li data-support="product_state"><span class="conversation-source-chip" data-unavailable="">`
     + `<span class="conversation-source-support sr-only">O que eu guardo como verdadeiro: </span>`
     + `<span class="conversation-source-type">Memória · Isto não está mais disponível para você</span></span></li>`;
-  const used = options.sources === 0 ? "" : `<details class="conversation-sources-used"${open}><summary>`
-    + `<span class="conversation-sources-title sr-only">O que eu usei: </span>${options.sources + 1} fontes</summary>`
-    + `<ul class="conversation-sources-list">${Array.from({ length: options.sources }, (_unused, index) => row(index)).join("")}${unavailable}</ul></details>`;
+  const items = [...Array.from({ length: options.sources }, (_unused, index) => card(index)), ...(options.sources === 0 ? [] : [unavailable])];
+  const list = (rows: string[]) => `<ul class="conversation-sources-list">${rows.join("")}</ul>`;
+  const used = items.length === 0 ? "" : `<p class="conversation-sources-title sr-only">O que eu usei</p>${list(items.slice(0, 3))}`
+    + (items.length > 3 ? `<details class="conversation-sources-more"${open}><summary>Mais ${items.length - 3} fontes</summary>${list(items.slice(3))}</details>` : "");
   const insufficient = options.sources === 0
     ? `<p class="conversation-sources-insufficient">Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros, memórias, tarefas nem lembretes.</p>`
     : "";
@@ -2547,10 +2552,12 @@ function chatSources(options: { open: boolean; sources: number; explained?: bool
 }
 
 function chatTurn(role: "user" | "assistant", id: string, body: string, extra = "") {
+  const stamp = `<time datetime="2026-11-18T13:02:00.000Z">10:02</time>`;
   return `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
-    + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
-    + `<time datetime="2026-11-18T13:02:00.000Z">10:02</time></p>`
-    + `<div class="chat-message-body">${body}</div>${extra}</article>`;
+    + (role === "user"
+      ? `<p class="chat-message-meta"><span class="chat-message-speaker">Você</span></p><div class="chat-message-body">${body}</div><p class="chat-message-when">${stamp}</p>`
+      : `<p class="chat-message-meta"><span class="chat-message-speaker"><span aria-hidden="true" class="brand-mark">B</span>Brain</span>${stamp}</p><div class="chat-message-body">${body}</div>`)
+    + `${extra}</article>`;
 }
 
 function chatComposer() {
@@ -2596,12 +2603,12 @@ function chatThread(open: boolean) {
   return `<div class="message-stream">`
     + `<p class="chat-day"><time datetime="2026-11-18T13:02:00.000Z">18 de nov. de 2026</time></p>`
     + chatTurn("user", "message-1", `<p>O que falta eu fazer antes de assinar ${CHAT_UNBREAKABLE}?</p>`)
-    + chatTurn("assistant", "message-2", answer, chatSources({ open, sources: 3, explained: true }))
+    + chatTurn("assistant", "message-2", answer, chatSources({ open, sources: 4, explained: true }))
     + chatTurn("user", "message-3", `<p>Tem algo sobre o seguro do carro nesse contrato?</p>`)
     + chatTurn("assistant", "message-4", `<p>Não há nada nos seus registros que ligue o seguro do carro ao contrato.</p>`, chatSources({ open, sources: 0 }))
     + `<div class="chat-draft" data-chat-draft=""><article class="chat-message" data-draft-role="user"><p class="chat-message-meta"><span class="chat-message-speaker">Você</span></p>`
     + `<div class="chat-message-body"><p>E o Daniel?</p></div></article><article aria-busy="true" class="chat-message" data-draft-role="assistant">`
-    + `<p class="chat-message-meta"><span class="chat-message-speaker">Brain</span></p><p class="chat-message-waiting" role="status">${ICON} Brain está pensando…</p></article></div>`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker"><span aria-hidden="true" class="brand-mark">B</span>Brain</span></p><p class="chat-message-waiting" role="status">${ICON} Brain está pensando…</p></article></div>`
     + `<div class="chat-outcome" data-chat-outcome=""></div></div>`;
 }
 
@@ -2688,66 +2695,70 @@ test.describe("Conversar as correspondence (Editorial calmo)", () => {
     });
   }
 
-  test("the question is marked by an edge and its hour; the answer has nothing drawn around it", async ({ page }) => {
+  test("the question sits on the right in a filled shape with its hour; the answer on the left, named, with nothing around it", async ({ page }) => {
     await renderChat(page, chatSurface(chatThread(false)), 390, 800);
     const turns = await page.evaluate(() => {
-      const read = (selector: string) => {
-        const node = document.querySelector<HTMLElement>(selector)!;
-        const style = getComputedStyle(node);
-        const meta = node.querySelector<HTMLElement>(".chat-message-meta")!.getBoundingClientRect();
-        const speaker = node.querySelector<HTMLElement>(".chat-message-speaker")!.getBoundingClientRect();
-        return {
-          left: node.getBoundingClientRect().left,
-          width: node.getBoundingClientRect().width,
-          background: style.backgroundColor,
-          radius: style.borderTopLeftRadius,
-          edge: parseFloat(style.borderInlineStartWidth),
-          metaHeight: meta.height,
-          speakerWidth: speaker.width,
-        };
+      const stream = document.querySelector(".message-stream")!.getBoundingClientRect();
+      const user = document.querySelector<HTMLElement>('.chat-message[data-role="user"]')!;
+      const assistant = document.querySelector<HTMLElement>('.chat-message[data-role="assistant"]')!;
+      const shape = user.querySelector<HTMLElement>(".chat-message-body")!;
+      const prose = assistant.querySelector<HTMLElement>(".chat-message-body")!;
+      return {
+        stream: { left: stream.left, right: stream.right, width: stream.width },
+        shape: { bottom: shape.getBoundingClientRect().bottom, left: shape.getBoundingClientRect().left, right: shape.getBoundingClientRect().right, width: shape.getBoundingClientRect().width, background: getComputedStyle(shape).backgroundColor, family: getComputedStyle(shape).fontFamily },
+        when: user.querySelector<HTMLElement>(".chat-message-when")!.getBoundingClientRect(),
+        userMeta: user.querySelector<HTMLElement>(".chat-message-meta")!.getBoundingClientRect().height,
+        userEdge: parseFloat(getComputedStyle(user).borderInlineStartWidth),
+        prose: { left: prose.getBoundingClientRect().left, background: getComputedStyle(prose).backgroundColor, family: getComputedStyle(prose).fontFamily, size: parseFloat(getComputedStyle(prose).fontSize) },
+        answer: { background: getComputedStyle(assistant).backgroundColor, edge: parseFloat(getComputedStyle(assistant).borderInlineStartWidth) },
+        speaker: assistant.querySelector<HTMLElement>(".chat-message-speaker")!.getBoundingClientRect(),
+        mark: assistant.querySelector<HTMLElement>(".chat-message-speaker > .brand-mark")!.getBoundingClientRect(),
+        answerTime: assistant.querySelector<HTMLElement>(".chat-message-meta > time")!.getBoundingClientRect().width,
       };
-      return { user: read('.chat-message[data-role="user"]'), assistant: read('.chat-message[data-role="assistant"]'), stream: document.querySelector(".message-stream")!.getBoundingClientRect().width };
     });
-    // One column: both turns start at the same edge and run the full measure.
-    expect(Math.abs(turns.user.left - turns.assistant.left)).toBeLessThanOrEqual(1);
-    expect(turns.user.width).toBeGreaterThan(turns.stream * 0.95);
-    // No bubble on either.
-    for (const turn of [turns.user, turns.assistant]) {
-      expect(turn.background).toBe("rgba(0, 0, 0, 0)");
-      expect(turn.radius).toBe("0px");
-    }
-    expect(turns.user.edge).toBeGreaterThan(0);
-    expect(turns.assistant.edge).toBe(0);
-    // The question shows its hour and not the word "Você"; the answer shows neither.
-    expect(turns.user.metaHeight).toBeGreaterThan(10);
-    expect(turns.user.speakerWidth).toBeLessThanOrEqual(1);
-    expect(turns.assistant.metaHeight).toBeLessThanOrEqual(1);
+    // The question: its right edge is the column's, it does not run the full width, and it is filled.
+    expect(Math.abs(turns.shape.right - turns.stream.right)).toBeLessThanOrEqual(1);
+    expect(turns.shape.left).toBeGreaterThan(turns.stream.left + 1);
+    expect(turns.shape.width).toBeLessThanOrEqual(turns.stream.width * 0.83);
+    expect(turns.shape.background).not.toBe("rgba(0, 0, 0, 0)");
+    expect(turns.userEdge).toBe(0);
+    // Its hour under it, at the same right edge; "Você" is not drawn.
+    expect(turns.when.top).toBeGreaterThanOrEqual(turns.shape.bottom - 1);
+    expect(Math.abs(turns.when.right - turns.stream.right)).toBeLessThanOrEqual(1);
+    expect(turns.userMeta).toBeLessThanOrEqual(1);
+    // The answer: at the column's left edge, no shape, no rule, in the reading face and larger than the question.
+    expect(Math.abs(turns.prose.left - turns.stream.left)).toBeLessThanOrEqual(1);
+    expect(turns.prose.background).toBe("rgba(0, 0, 0, 0)");
+    expect(turns.answer.background).toBe("rgba(0, 0, 0, 0)");
+    expect(turns.answer.edge).toBe(0);
+    expect(turns.prose.family).not.toBe(turns.shape.family);
+    expect(turns.prose.size).toBeGreaterThanOrEqual(19);
+    // Named, beside the product's mark; its hour stays in the document only.
+    expect(turns.speaker.height).toBeGreaterThan(10);
+    expect(turns.mark.width).toBeGreaterThan(10);
+    expect(Math.abs(turns.speaker.left - turns.stream.left)).toBeLessThanOrEqual(1);
+    expect(turns.answerTime).toBeLessThanOrEqual(1);
   });
 
-  test("under an answer there is one quiet line of closed disclosures, and an opened one takes the row", async ({ page }) => {
+  test("under an answer its sources are cards in sight; the rest, where it looked and how it got here are closed lines", async ({ page }) => {
     await renderChat(page, chatSurface(chatThread(false)), 390, 800);
     const block = page.locator(".chat-message.assistant").first().locator(".conversation-sources");
-    const tops = await block.locator("> details > summary").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)));
-    expect(tops).toHaveLength(3);
-    expect(new Set(tops).size, "the three summaries share one line").toBe(1);
-    await expect(block.locator(".conversation-sources-list")).toBeHidden();
+    // Three drawn, the fourth and the unavailable one behind "Mais 2 fontes".
+    await expect(block.locator("> .conversation-sources-list > li")).toHaveCount(3);
+    await expect(block.locator("> .conversation-sources-list .conversation-source-card").first()).toBeVisible();
+    await expect(block.locator("> .conversation-sources-more > summary")).toHaveText("Mais 2 fontes");
+    await expect(block.locator("> .conversation-sources-more .conversation-sources-list")).toBeHidden();
+    const tops = await block.locator("> details:not(.conversation-sources-more) > summary").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)));
+    expect(tops).toHaveLength(2);
+    expect(new Set(tops).size, "where it looked and how it got here share one line").toBe(1);
     await expect(block.locator(".conversation-sources-reach")).toBeHidden();
     await expect(block.locator(".chat-message-model")).toBeHidden();
 
-    await block.locator(".conversation-sources-used > summary").click();
-    const rows = await block.locator(".conversation-sources-list > li").evaluateAll((nodes) => nodes.map((node) => {
-      const box = node.getBoundingClientRect();
-      const link = node.querySelector("a")?.getBoundingClientRect();
-      return { width: box.width, height: box.height, linkWidth: link?.width ?? null };
-    }));
-    const measure = (await block.boundingBox())!.width;
-    expect(rows).toHaveLength(4);
-    for (const row of rows) {
-      expect(row.width).toBeGreaterThan(measure - 1);
-      expect(row.height).toBeGreaterThanOrEqual(44);
-      // The row is the link: where there is one, it spans the row.
-      if (row.linkWidth !== null) expect(row.linkWidth).toBeGreaterThan(measure - 1);
-    }
+    await block.locator("> .conversation-sources-more > summary").click();
+    const unavailable = block.locator(".conversation-source-chip[data-unavailable]");
+    await expect(unavailable).toBeVisible();
+    // An unavailable source is one quiet line, not a card, and not a link.
+    expect(await unavailable.evaluate((node) => node.closest("a") === null && node.closest(".conversation-source-card") === null)).toBe(true);
     // The honest "I found nothing" is in the open on the answer that has it.
     await expect(page.locator(".conversation-sources-insufficient")).toBeVisible();
   });
@@ -2806,6 +2817,60 @@ test.describe("Conversar as correspondence (Editorial calmo)", () => {
         expect(row.captionInside).toBe(true);
         expect(row.captionBelowTitle).toBe(true);
       }
+    }
+  });
+
+  for (const width of [390, 320]) {
+    test(`two sides and source cards at ${width} CSS px: the question's right edge is the column's, every card at least 64px and the whole card the link, nothing wider than the screen`, async ({ page }) => {
+      for (const open of [false, true]) {
+        await renderChat(page, chatSurface(chatThread(open)), width, 800);
+        expect(await chatOverflow(page), `sideways overflow, open=${open}`).toBeLessThanOrEqual(0);
+        expect(await chatShortTargets(page), `short targets, open=${open}`).toEqual([]);
+        const geometry = await page.evaluate(() => {
+          const stream = document.querySelector(".message-stream")!.getBoundingClientRect();
+          const questions = [...document.querySelectorAll<HTMLElement>('.chat-message[data-role="user"] > .chat-message-body')].map((node) => node.getBoundingClientRect());
+          const cards = [...document.querySelectorAll<HTMLElement>(".conversation-source-card")]
+            .filter((node) => node.getClientRects().length > 0)
+            .map((node) => {
+              const box = node.getBoundingClientRect();
+              const item = node.parentElement!.getBoundingClientRect();
+              const title = node.querySelector<HTMLElement>(".conversation-source-title")!;
+              const lineHeight = parseFloat(getComputedStyle(title).lineHeight);
+              return {
+                height: box.height,
+                coversItem: Math.abs(box.width - item.width) <= 1,
+                right: box.right,
+                titleLines: Math.round(title.getBoundingClientRect().height / lineHeight),
+                controls: node.querySelectorAll("button, form, input, select, textarea, a").length,
+              };
+            });
+          return { streamRight: stream.right, streamLeft: stream.left, questions, cards, viewport: innerWidth };
+        });
+        expect(geometry.questions.length).toBeGreaterThan(0);
+        for (const question of geometry.questions) {
+          expect(Math.abs(question.right - geometry.streamRight), "the question's right edge").toBeLessThanOrEqual(1);
+        }
+        expect(geometry.cards.length).toBeGreaterThanOrEqual(3);
+        for (const card of geometry.cards) {
+          expect(card.height).toBeGreaterThanOrEqual(64);
+          expect(card.coversItem).toBe(true);
+          expect(card.right).toBeLessThanOrEqual(geometry.viewport);
+          // Two lines at most, however long the source is.
+          expect(card.titleLines).toBeLessThanOrEqual(2);
+          // No control inside the card: the card itself is the one link.
+          expect(card.controls).toBe(0);
+        }
+      }
+    });
+  }
+
+  test("a short conversation starts at the top of the screen, under the header, not on the field", async ({ page }) => {
+    const short = `<div class="message-stream"><p class="chat-day"><time datetime="2026-11-18T13:02:00.000Z">18 de nov. de 2026</time></p>`
+      + chatTurn("user", "message-1", "<p>Oi</p>") + chatTurn("assistant", "message-2", "<p>Olá.</p>") + `</div>`;
+    for (const [width, height] of [[390, 844], [1280, 900]]) {
+      await renderChat(page, chatSurface(short).replace('<div class="chat-stage">', '<div class="chat-stage" data-thread="">'), width, height);
+      const gap = await page.evaluate(() => document.querySelector(".chat-day")!.getBoundingClientRect().top - document.querySelector(".chat-header")!.getBoundingClientRect().bottom);
+      expect(gap, `at ${width}`).toBeLessThanOrEqual(48);
     }
   });
 

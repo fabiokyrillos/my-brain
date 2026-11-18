@@ -6,6 +6,7 @@ import { useEffect } from "react";
 
 import type { Locale } from "@/lib/preferences";
 
+import { AgentSpeaker } from "./agent-speaker";
 import { getPendingTurnCopy, type PendingTurn } from "./pending-turn";
 
 /** How often a thread with a turn in flight asks the server for the answer. */
@@ -45,6 +46,9 @@ export function PendingTurnIndicator({
 
   return (
     <article aria-live="polite" className="chat-message assistant" data-pending-turn={turn.state}>
+      <p className="chat-message-meta">
+        <AgentSpeaker agentName={agentName} />
+      </p>
       <div className="chat-message-body">
         {thinking ? (
           <p role="status">

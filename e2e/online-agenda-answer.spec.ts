@@ -142,6 +142,8 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       // — still cited after A.4 joined it to the task's line.
       await expect(answer.locator(`a[href^="/${locale}/app/work/"]`)).toHaveCount(1);
       await expect(answer.locator(`a[href^="/${locale}/app/reminders/"]`)).toHaveCount(1);
+      // Drawn as cards in sight under the answer, not folded behind a disclosure.
+      await expect(answer.locator(`a.conversation-source-card[href^="/${locale}/app/work/"]`)).toBeVisible();
       // No model answered, so no model id is printed under the message.
       await expect(answer.locator(".chat-message-model")).toHaveCount(0);
 
