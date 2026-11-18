@@ -270,6 +270,7 @@ async function axeViolations(page: Page) {
 /** Mirrors the trigger branch of `src/features/palette/command-palette.tsx:170-181`. */
 function paletteTrigger() {
   return `<button type="button" class="palette-trigger" aria-haspopup="dialog" data-palette-trigger="true">`
+    + `<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"></svg>`
     + `<span>Buscar ou navegar</span><kbd aria-hidden="true">Ctrl K</kbd></button>`;
 }
 

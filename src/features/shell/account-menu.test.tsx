@@ -10,12 +10,28 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { idleSignOutState, type SignOutState } from "@/features/auth/sign-out-state";
 import { AccountMenu } from "./account-menu";
-import { accountCopy } from "./account-copy";
+import { accountCopy, languageRowLabel } from "./account-copy";
 
-afterEach(cleanup);
+/*
+ * The route is chosen rather than left to fall through, since the menu carries
+ * the language row (Editorial calmo, slice 7): what that row must preserve is
+ * the page the owner is standing on, so the tests have to be able to stand
+ * somewhere.
+ */
+vi.mock("next/navigation", () => ({
+  usePathname: vi.fn(() => "/pt-BR/app"),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
+}));
+
+afterEach(() => {
+  cleanup();
+  vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as never);
+});
 
 const ptBR = accountCopy["pt-BR"];
 const en = accountCopy.en;
@@ -38,7 +54,7 @@ function renderMenu(options: {
   readonly locale?: "pt-BR" | "en";
   readonly displayName?: string | null;
   readonly answer?: SignOutState;
-  readonly variant?: "rail" | "overflow";
+  readonly variant?: "rail" | "overflow" | "header";
   readonly action?: ReturnType<typeof handler>["action"];
 } = {}) {
   const built = handler(options.answer);
@@ -149,7 +165,124 @@ describe("what the panel offers", () => {
   });
 });
 
+/**
+ * Editorial calmo, slice 7. The panel is rows between hairlines, in one order,
+ * and the locale switch is one of them — it was a bare "EN" in the top bar of
+ * every page.
+ */
+describe("the panel's rows", () => {
+  const VARIANTS = ["rail", "overflow", "header"] as const;
+
+  it("are Ajustes, the language, then sign-out — sign-out last, on every mount", () => {
+    for (const variant of VARIANTS) {
+      renderMenu({ variant });
+      const panel = screen.getByRole("group", { name: ptBR.panelLabel });
+      const rows = Array.from(panel.querySelectorAll<HTMLElement>(".account-menu-item"));
+
+      expect(rows.map((row) => row.tagName), variant).toEqual(["A", "A", "BUTTON"]);
+      expect(within(panel).getAllByRole("link").map((link) => link.getAttribute("aria-label") ?? link.textContent))
+        .toEqual([ptBR.settings, "Idioma: Português. Mudar para English"]);
+      // The way out is the last control in the panel, in DOM order — which is
+      // its visual order and its focus order, because nothing reorders it.
+      const controls = Array.from(panel.querySelectorAll("a, button"));
+      expect(controls.at(-1)).toBe(screen.getByRole("button", { name: ptBR.signOut }));
+      cleanup();
+    }
+  });
+
+  it("carries the language row on every mount, as one link", () => {
+    for (const variant of VARIANTS) {
+      renderMenu({ variant });
+      const row = screen.getByRole("link", { name: languageRowLabel("pt-BR") });
+      expect(disclosure().contains(row), variant).toBe(true);
+      expect(screen.getAllByRole("link", { name: /Idioma/ })).toHaveLength(1);
+      cleanup();
+    }
+  });
+
+  it("says what the language is and what the row does, in words a reader can see", () => {
+    renderMenu();
+    const row = screen.getByRole("link", { name: languageRowLabel("pt-BR") });
+
+    // WCAG 2.5.3: the accessible name contains both visible lines verbatim.
+    expect(within(row).getByText("Idioma: Português")).toBeTruthy();
+    expect(row.textContent).toContain("Mudar para English");
+    for (const visible of ["Idioma: Português", "Mudar para English"]) {
+      expect(row.getAttribute("aria-label")).toContain(visible);
+    }
+    // The other language is written in itself and declared as itself, so a
+    // screen reader pronounces "English" as English.
+    expect(within(row).getByText("English")).toHaveAttribute("lang", "en");
+    expect(row).toHaveAttribute("hreflang", "en");
+  });
+
+  it("keeps the page and the whole query when it switches, in both directions", () => {
+    // `docs/ENGINEERING_STANDARDS.md`: a locale switch preserves route and
+    // navigation state. The row reuses `LocaleSwitchLink`, so this is the same
+    // contract the top-bar link had — asserted where the link now lives.
+    vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox/entry-1");
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("view=needs-you&page=2") as never);
+    renderMenu({ variant: "header" });
+    expect(screen.getByRole("link", { name: languageRowLabel("pt-BR") }))
+      .toHaveAttribute("href", "/en/app/inbox/entry-1?view=needs-you&page=2");
+    cleanup();
+
+    vi.mocked(usePathname).mockReturnValue("/en/app/calendar");
+    vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("mode=week") as never);
+    renderMenu({ locale: "en", variant: "rail" });
+    const back = screen.getByRole("link", { name: "Language: English. Switch to Português" });
+    expect(back).toHaveAttribute("href", "/pt-BR/app/calendar?mode=week");
+    expect(within(back).getByText("Português")).toHaveAttribute("lang", "pt-BR");
+  });
+
+  it("closes the panel when a row is followed, so it is not left open over the next page", () => {
+    for (const name of [ptBR.settings, languageRowLabel("pt-BR")]) {
+      renderMenu({ variant: "header" });
+      const element = disclosure();
+      element.open = true;
+      const row = screen.getByRole("link", { name });
+      // The navigation itself is the router's; only the panel is ours.
+      row.addEventListener("click", (event) => event.preventDefault());
+      fireEvent.click(row);
+      expect(element.open, name).toBe(false);
+      cleanup();
+    }
+  });
+
+  it("draws the name once per mount: beside the control on the rail, at the head of the panel in the top bar", () => {
+    renderMenu({ variant: "rail" });
+    expect(within(summary()).getByText(NAME)).toBeTruthy();
+    expect(document.querySelector(".account-menu-identity")).toBeNull();
+    expect(screen.getAllByText(NAME)).toHaveLength(1);
+    cleanup();
+
+    // In the top bar the control is a 44px icon, one of three of the same
+    // family, so it has no room for a name — the panel it opens is headed by it.
+    renderMenu({ variant: "header" });
+    expect(within(summary()).queryByText(NAME)).toBeNull();
+    const panel = screen.getByRole("group", { name: ptBR.panelLabel });
+    expect(panel.firstElementChild).toHaveClass("account-menu-identity");
+    expect(within(panel.firstElementChild as HTMLElement).getByText(NAME)).toBeTruthy();
+    expect(within(panel.firstElementChild as HTMLElement).getByText(ptBR.signedInAs)).toBeTruthy();
+    expect(screen.getAllByText(NAME)).toHaveLength(1);
+    // Still named for a screen reader before it is opened.
+    expect(summary().getAttribute("aria-label")).toBe(`${ptBR.menuLabel}: ${NAME}`);
+  });
+});
+
 describe("signing out", () => {
+  it("submits the same action from the top bar's mount as from the rail's", async () => {
+    const user = userEvent.setup();
+    for (const variant of ["rail", "header"] as const) {
+      const { action, submissions } = renderMenu({ variant });
+      await user.click(screen.getByRole("button", { name: ptBR.signOut }));
+      await waitFor(() => expect(submissions, variant).toHaveLength(1));
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(submissions[0]).toEqual({ locale: "pt-BR" });
+      cleanup();
+    }
+  });
+
   it("cannot be submitted twice: the control is disabled while in flight", async () => {
     const user = userEvent.setup();
     let release: (() => void) | undefined;

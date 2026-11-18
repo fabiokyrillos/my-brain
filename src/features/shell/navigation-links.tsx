@@ -72,6 +72,14 @@ const icons = {
   jobs: Wrench,
 } as const satisfies Record<NavigationKey, typeof Home>;
 
+/**
+ * The shell's line icons share one size and one stroke, so the top bar's three
+ * controls, the rail and the bottom bar read as one family. 1.75 rather than
+ * lucide's default 2: at 20px the default is the heaviest thing in the chrome.
+ */
+export const SHELL_ICON_SIZE = 20;
+export const SHELL_ICON_STROKE = 1.75;
+
 function closeMoreOnFollow(event: MouseEvent<HTMLAnchorElement>) {
   event.currentTarget.closest("details")?.removeAttribute("open");
 }
@@ -104,7 +112,7 @@ function NavigationOverflow({
   return (
     <details className={`${variant}${active ? " active" : ""}`} onKeyDown={onKeyDown} ref={ref}>
       <summary aria-label={label}>
-        <Menu size={20} aria-hidden="true" />
+        <Menu size={variant === "side-more" ? 18 : SHELL_ICON_SIZE} strokeWidth={SHELL_ICON_STROKE} aria-hidden="true" />
         <span>{label}</span>
       </summary>
       <div className={`${variant}-menu`}>{children}</div>
@@ -137,23 +145,54 @@ export function NotificationsLink({ locale }: { locale: Locale }) {
       className={`notification-link${active ? " active" : ""}`}
       href={`/${locale}/app/notifications`}
     >
-      {active ? <BellRing size={19} aria-hidden="true" /> : <Bell size={19} aria-hidden="true" />}
+      {/* The same size and stroke as the search and account controls beside it:
+          the top bar's three controls are one family (Editorial calmo, slice 7). */}
+      {active
+        ? <BellRing size={SHELL_ICON_SIZE} strokeWidth={SHELL_ICON_STROKE} aria-hidden="true" />
+        : <Bell size={SHELL_ICON_SIZE} strokeWidth={SHELL_ICON_STROKE} aria-hidden="true" />}
     </Link>
   );
 }
 
-export function LocaleSwitchLink({ locale }: { locale: Locale }) {
+/**
+ * The one implementation of "the same page, in the other language".
+ *
+ * It preserves the pathname and the whole query (`getLocaleSwitchHref`), which
+ * `docs/ENGINEERING_STANDARDS.md` requires of every locale switch. It reads
+ * `useSearchParams()`, so whoever mounts it wraps it in a `<Suspense>`.
+ *
+ * It used to be a bare "EN" in the top bar of every page. A language is chosen
+ * once, so since slice 7 of Editorial calmo it is a row of the account menu,
+ * and this component draws whatever row its one caller hands it: the caller
+ * owns the words and the class, this owns where the link goes.
+ */
+export function LocaleSwitchLink({
+  locale,
+  label,
+  className,
+  onClick,
+  children,
+}: {
+  locale: Locale;
+  /** The accessible name. It must contain the visible words (WCAG 2.5.3). */
+  label: string;
+  className?: string;
+  onClick?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  children: ReactNode;
+}) {
   const pathname = usePathname() ?? `/${locale}/app`;
   const searchParams = useSearchParams();
   const targetLocale = locale === "pt-BR" ? "en" : "pt-BR";
-  const t = getMessages(locale);
 
   return (
     <Link
       href={getLocaleSwitchHref(pathname, searchParams?.toString() ?? "", targetLocale)}
-      aria-label={t.shell.switchLanguage}
+      aria-label={label}
+      className={className}
+      hrefLang={targetLocale}
+      onClick={onClick}
     >
-      {locale === "pt-BR" ? "EN" : "PT"}
+      {children}
     </Link>
   );
 }
@@ -187,7 +226,11 @@ export function NavigationLinks({
         aria-label={options.capture ? t.nav.capture : undefined}
         onClick={options.closeMore ? closeMoreOnFollow : undefined}
       >
-        <Icon size={options.capture ? 24 : options.compact ? 20 : 18} aria-hidden="true" />
+        <Icon
+          size={options.capture ? 24 : options.compact ? SHELL_ICON_SIZE : 18}
+          strokeWidth={SHELL_ICON_STROKE}
+          aria-hidden="true"
+        />
         <span>{t.nav[key]}</span>
         <NavigationPendingIndicator locale={locale} />
       </Link>

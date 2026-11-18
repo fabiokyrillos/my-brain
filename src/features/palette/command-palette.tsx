@@ -28,6 +28,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 
 import { useScrollLock } from "@/features/shell/use-scroll-lock";
 import { useRouter } from "next/navigation";
+import { Search } from "lucide-react";
 
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getMessages } from "@/i18n/messages";
@@ -193,6 +194,13 @@ export function CommandPalette({ locale, canCreate = true, onActionChosen }: Com
         aria-haspopup="dialog"
         data-palette-trigger="true"
       >
+        {/*
+          The glyph is what a phone's top bar draws: there the trigger is one of
+          three 44px icon controls and its words are kept for assistive
+          technology only (`mobile-navigation.css`). The words stay in the DOM,
+          so the control's accessible name is the same on every viewport.
+        */}
+        <Search size={20} strokeWidth={1.75} aria-hidden="true" />
         <span>{text.trigger}</span>
         <kbd aria-hidden="true">{apple ? text.triggerHint.apple : text.triggerHint.other}</kbd>
       </button>

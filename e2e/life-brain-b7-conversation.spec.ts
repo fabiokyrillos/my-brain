@@ -94,7 +94,7 @@ function suggestionRow(locale: Locale): string {
 
 function paletteTrigger(locale: Locale): string {
   return `<button class="palette-trigger" type="button" data-palette-trigger="true">
-    <span>${COPY[locale].trigger}</span><kbd aria-hidden="true">Ctrl+K</kbd>
+    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"></svg><span>${COPY[locale].trigger}</span><kbd aria-hidden="true">Ctrl+K</kbd>
   </button>`;
 }
 

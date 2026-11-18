@@ -32,6 +32,10 @@ const STYLESHEETS = [
   "experience.css",
   "ui.css",
   "globals.css",
+  // The command trigger's own rules. It is one of the top bar's three controls
+  // since Editorial calmo's slice 7, so the bar cannot be measured without it;
+  // `globals.css` imports it before `mobile-navigation.css`, as it sits here.
+  "palette.css",
   "operations.css",
   "chat.css",
   "agent.css",
@@ -208,20 +212,60 @@ function listBody() {
   return `<div class="content-page"><header class="list-header"><div><h1>Registros</h1></div></header><div class="list-stack">${inboxRow(LONG_TITLE)}</div></div>`;
 }
 
-function document_(body: string) {
+/**
+ * Mirrors the header mount of `src/features/shell/account-menu.tsx` — the
+ * `variant="header"` branch, where the name heads the panel instead of sitting
+ * beside the control — with its three rows in the component's order.
+ */
+function accountMenu(open: boolean) {
+  const row = (tag: "a" | "button", extra: string, inner: string) =>
+    `<${tag} class="account-menu-item${extra}"${tag === "a" ? ' href="#"' : ' type="submit"'}>${ICON}${inner}</${tag}>`;
+  return `<details class="account-menu account-menu-header"${open ? " open" : ""}>
+<summary aria-label="Sua conta: Marina Duarte"><span aria-hidden="true" class="account-avatar">${ICON}</span></summary>
+<div aria-label="Conta e sessão" class="account-menu-panel" role="group">
+<div class="account-menu-identity"><span class="account-summary-text"><small>Conectado como</small><strong>Marina Duarte</strong></span></div>
+${row("a", "", "<span>Ajustes</span>")}
+${row("a", "", '<span class="account-menu-item-text"><span>Idioma: Português</span><small>Mudar para <span lang="en">English</span></small></span>').replace("<a ", '<a aria-label="Idioma: Português. Mudar para English" hreflang="en" ')}
+<form><input type="hidden" name="locale" value="pt-BR">${row("button", " account-sign-out", "<span>Sair da conta</span>")}</form>
+<div aria-atomic="true" aria-busy="false" aria-live="polite" class="sr-only" role="status"></div>
+</div></details>`;
+}
+
+/**
+ * Mirrors the `<header className="top-bar">` of `src/features/shell/app-shell.tsx`:
+ * the brand, then the three controls — the command trigger
+ * (`command-palette.tsx`), the bell (`NotificationsLink`) and the account.
+ *
+ * **This mirror had gone stale too**: it was a single `<a>EN</a>`, the locale
+ * link, standing in for a bar that also carried a palette trigger, a bell and
+ * an account. Nothing here measured the bar, so nothing noticed. The
+ * "fixture still mirrors the markup" test below reads the two components and
+ * fails when a class this builder emits is no longer one they render.
+ */
+function topBar(accountOpen: boolean) {
+  return `<header class="top-bar"><a href="#" class="top-brand" aria-label="My Brain"><span class="brand-mark">B</span><span class="brand-name">My Brain</span></a><div class="top-actions"><button type="button" class="palette-trigger" aria-haspopup="dialog" data-palette-trigger="true">${ICON}<span>Buscar e agir</span><kbd aria-hidden="true">Ctrl+K</kbd></button><a aria-label="Notificações" class="notification-link" href="#">${ICON}</a><span class="top-account">${accountMenu(accountOpen)}</span></div></header>`;
+}
+
+function document_(body: string, options: { accountOpen?: boolean } = {}) {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 :root{--font-plex-sans:system-ui,sans-serif;--font-newsreader:Georgia,serif;--font-plex-mono:ui-monospace,monospace}
 ${css}
 </style></head><body><div class="app-frame">
-<aside class="side-rail"><a href="#" class="brand"><span class="brand-mark">B</span><span>My Brain</span></a><nav aria-label="Navegação principal" class="side-nav">${sideNav()}</nav></aside>
-<div class="main-stage"><header class="top-bar"><div class="top-actions"><a href="#">EN</a></div></header><main>${body}</main></div>
+<aside class="side-rail"><a href="#" class="brand" aria-label="My Brain"><span class="brand-mark">B</span><span class="brand-name">My Brain</span></a><nav aria-label="Navegação principal" class="side-nav">${sideNav()}</nav></aside>
+<div class="main-stage">${topBar(options.accountOpen ?? false)}<main>${body}</main></div>
 <nav aria-label="Navegação móvel" class="bottom-nav">${bottomNav()}</nav>
 </div></body></html>`;
 }
 
-async function render(page: Page, body: string, width: number, height: number) {
+async function render(
+  page: Page,
+  body: string,
+  width: number,
+  height: number,
+  options: { accountOpen?: boolean } = {},
+) {
   await page.setViewportSize({ width, height });
-  await page.setContent(document_(body));
+  await page.setContent(document_(body, options));
   await page.waitForTimeout(60);
 }
 
@@ -420,6 +464,163 @@ test.describe("mobile bottom navigation", () => {
       declared.some((value) => value.includes("safe-area-inset-bottom")),
       "no .bottom-nav rule reserves env(safe-area-inset-bottom)",
     ).toBe(true);
+  });
+});
+
+/*
+ * Editorial calmo, slice 7 — the top bar a phone sees.
+ *
+ * It was four unlike controls pushed to the right edge with nothing on the
+ * left. These hold the recomposition where only a layout engine can: the brand
+ * leads, three controls of one size follow, nothing is under 44px, nothing is
+ * wider than the screen, and the account's panel opens inside the space the two
+ * bars leave.
+ */
+const PHONES = [
+  { name: "390x844", width: 390, height: 844 },
+  { name: "320x568", width: 320, height: 568 },
+] as const;
+
+test.describe("the phone top bar", () => {
+  test("the fixture still mirrors the markup the shell renders", () => {
+    const shell = readFileSync(join(ROOT, "src/features/shell/app-shell.tsx"), "utf8");
+    const menu = readFileSync(join(ROOT, "src/features/shell/account-menu.tsx"), "utf8");
+    const palette = readFileSync(join(ROOT, "src/features/palette/command-palette.tsx"), "utf8");
+
+    for (const className of ["top-bar", "top-brand", "brand-mark", "brand-name", "top-actions", "top-account"]) {
+      expect(shell, `app-shell.tsx no longer renders .${className}`).toContain(className);
+    }
+    for (const className of [
+      "account-menu-panel", "account-menu-identity", "account-menu-item", "account-menu-item-text",
+      "account-sign-out", "account-avatar", "account-summary-text",
+    ]) {
+      expect(menu, `account-menu.tsx no longer renders .${className}`).toContain(className);
+    }
+    // The bar's three controls, in the order this fixture emits them.
+    const actions = shell.slice(shell.indexOf('className="top-actions"'), shell.indexOf("</header>"));
+    const order = ["<CommandPalette", "<NotificationsLink", 'account("header")'].map((token) => actions.indexOf(token));
+    expect(order.every((index) => index >= 0), "a top-bar control is missing from app-shell.tsx").toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+    // And the one this fixture used to stand in for is not among them.
+    expect(actions).not.toContain("<LocaleSwitchLink");
+    expect(menu).toContain("<LocaleSwitchLink");
+    // The trigger's glyph precedes its words, as the fixture has it.
+    expect(palette).toMatch(/<Search[^>]*\/>\s*<span>\{text\.trigger\}<\/span>/);
+  });
+
+  for (const viewport of PHONES) {
+    test(`is the brand and three 44px controls, in one row, at ${viewport.name}`, async ({ page }) => {
+      await render(page, homeBody(), viewport.width, viewport.height);
+
+      const measured = await page.evaluate(() => {
+        const bar = document.querySelector(".top-bar")!;
+        const box = (element: Element) => {
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, width: rect.width, height: rect.height };
+        };
+        const controls = [
+          ...bar.querySelectorAll(".top-actions > button, .top-actions > a, .top-actions > .top-account > details > summary"),
+        ];
+        return {
+          bar: box(bar),
+          brand: box(bar.querySelector(".top-brand")!),
+          brandText: (bar.querySelector(".top-brand")!.textContent ?? "").trim(),
+          controls: controls.map((control) => ({
+            named: control.getAttribute("aria-label") ?? (control.textContent ?? "").trim(),
+            ...box(control),
+          })),
+          // Anything else in the bar that a finger could land on.
+          others: [...bar.querySelectorAll("a, button, summary")].filter(
+            (element) => !controls.includes(element) && !element.classList.contains("top-brand")
+              && (element as HTMLElement).offsetParent !== null && element.closest("details:not([open]) > :not(summary)") === null,
+          ).length,
+          viewport: window.innerWidth,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+
+      expect(measured.overflow, "the page scrolls sideways").toBeLessThanOrEqual(1);
+      expect(measured.brandText).toBe("BMy Brain");
+      expect(measured.controls.map((control) => control.named)).toEqual([
+        expect.stringContaining("Buscar e agir"),
+        "Notificações",
+        "Sua conta: Marina Duarte",
+      ]);
+      expect(measured.others, "a fourth control is in the bar").toBe(0);
+
+      // The brand leads and is itself a full target; the controls follow it.
+      expect(measured.brand.height).toBeGreaterThanOrEqual(44);
+      expect(measured.brand.left).toBeGreaterThanOrEqual(0);
+      expect(measured.brand.right).toBeLessThanOrEqual(measured.controls[0].left);
+
+      let previousRight = measured.brand.right;
+      for (const control of measured.controls) {
+        expect(control.width, `${control.named} is ${control.width.toFixed(1)}px wide`).toBeGreaterThanOrEqual(44);
+        expect(control.height, `${control.named} is ${control.height.toFixed(1)}px tall`).toBeGreaterThanOrEqual(44);
+        // One family: the three are the same box.
+        expect(Math.abs(control.width - measured.controls[0].width)).toBeLessThanOrEqual(0.5);
+        expect(Math.abs(control.height - measured.controls[0].height)).toBeLessThanOrEqual(0.5);
+        // DOM order is visual order, with no overlap, inside the screen.
+        expect(control.left, `${control.named} overlaps the control before it`).toBeGreaterThanOrEqual(previousRight - 0.5);
+        expect(control.right, `${control.named} leaves the screen`).toBeLessThanOrEqual(measured.viewport + 0.5);
+        // One row: every control sits inside the bar's own height.
+        expect(control.top).toBeGreaterThanOrEqual(measured.bar.top - 0.5);
+        expect(control.top + control.height).toBeLessThanOrEqual(measured.bar.top + measured.bar.height + 0.5);
+        previousRight = control.right;
+      }
+    });
+
+    test(`the account panel opens inside the screen, clear of both bars, at ${viewport.name}`, async ({ page }) => {
+      await render(page, homeBody(), viewport.width, viewport.height, { accountOpen: true });
+
+      const measured = await page.evaluate(() => {
+        const rect = (element: Element) => element.getBoundingClientRect();
+        const panel = rect(document.querySelector(".account-menu-header .account-menu-panel")!);
+        const rows = [...document.querySelectorAll(".account-menu-header .account-menu-item")];
+        return {
+          panel: { left: panel.left, right: panel.right, top: panel.top, bottom: panel.bottom },
+          barBottom: rect(document.querySelector(".top-bar")!).bottom,
+          navTop: rect(document.querySelector(".bottom-nav")!).top,
+          rows: rows.map((row) => ({ named: (row.textContent ?? "").trim(), height: rect(row).height, right: rect(row).right })),
+          name: (document.querySelector(".account-menu-identity strong")!.textContent ?? "").trim(),
+          viewport: window.innerWidth,
+          overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        };
+      });
+
+      expect(measured.overflow, "the open panel makes the page scroll sideways").toBeLessThanOrEqual(1);
+      expect(measured.panel.left, "the panel is clipped by the left edge").toBeGreaterThanOrEqual(0);
+      expect(measured.panel.right, "the panel is clipped by the right edge").toBeLessThanOrEqual(measured.viewport);
+      expect(measured.panel.top).toBeGreaterThanOrEqual(measured.barBottom - 8);
+      expect(measured.panel.bottom, "the panel reaches behind the bottom bar").toBeLessThanOrEqual(measured.navTop);
+
+      expect(measured.name).toBe("Marina Duarte");
+      expect(measured.rows.map((row) => row.named)).toEqual([
+        "Ajustes",
+        "Idioma: PortuguêsMudar para English",
+        "Sair da conta",
+      ]);
+      for (const row of measured.rows) {
+        expect(row.height, `${row.named} is ${row.height.toFixed(1)}px tall`).toBeGreaterThanOrEqual(44);
+        expect(row.right).toBeLessThanOrEqual(measured.panel.right);
+      }
+    });
+  }
+
+  test("stays at the top of the screen while the page scrolls", async ({ page }) => {
+    await render(page, `${homeBody()}<div style="height:1600px"></div>`, 390, 844);
+    await page.evaluate(() => window.scrollTo(0, 600));
+    const top = await page.evaluate(() => document.querySelector(".top-bar")!.getBoundingClientRect().top);
+    expect(Math.abs(top)).toBeLessThanOrEqual(0.5);
+  });
+
+  test("on desktop the rail carries the brand and the account, and the bar keeps search and the bell", async ({ page }) => {
+    await render(page, homeBody(), 1440, 900);
+    await expect(page.locator(".top-brand")).toBeHidden();
+    await expect(page.locator(".top-account")).toBeHidden();
+    await expect(page.locator(".side-rail .brand")).toBeVisible();
+    await expect(page.locator(".top-actions .palette-trigger")).toBeVisible();
+    await expect(page.locator(".top-actions .notification-link")).toBeVisible();
   });
 });
 

@@ -78,7 +78,9 @@ test.describe("authenticated converged navigation", () => {
             more: "Mais",
             groups: ["Contexto", "Reflexão", "Organização", "Transparência", "Preferências"],
             notification: "Notificações",
-            switchLanguage: "Mudar idioma para inglês",
+            // The language row of the account menu (Editorial calmo, slice 7).
+            // It was a bare "EN" link in the top bar, named "Mudar idioma para inglês".
+            languageRow: "Idioma: Português. Mudar para English",
             allSaved: "Nada pendente. Tudo salvo.",
             attentionSection: "Precisa de você",
             costsLink: /^Custos de IA/,
@@ -109,7 +111,7 @@ test.describe("authenticated converged navigation", () => {
             more: "More",
             groups: ["Context", "Reflection", "Organization", "Transparency", "Preferences"],
             notification: "Notifications",
-            switchLanguage: "Switch language to Portuguese",
+            languageRow: "Language: English. Switch to Português",
             allSaved: "Nothing pending. Everything is saved.",
             attentionSection: "Needs you",
             costsLink: /^AI costs/,
@@ -221,14 +223,33 @@ test.describe("authenticated converged navigation", () => {
         const accountTarget = await page.locator(".top-account .account-menu-header > summary").boundingBox();
         expect(accountTarget?.width).toBeGreaterThanOrEqual(44);
         expect(accountTarget?.height).toBeGreaterThanOrEqual(44);
+        /*
+          The bar's other two controls. The locale switch used to be measured
+          here as a third top-level link; since Editorial calmo's slice 7 it is a
+          row of the account menu, so the command trigger takes its place in
+          this list and the row is measured where it lives, just below.
+        */
         for (const globalControl of [
-          page.getByRole("link", { name: labels.switchLanguage }),
+          page.locator(".top-actions .palette-trigger"),
           page.getByRole("link", { name: labels.notification }),
         ]) {
           const box = await globalControl.boundingBox();
           expect(box?.width).toBeGreaterThanOrEqual(44);
           expect(box?.height).toBeGreaterThanOrEqual(44);
         }
+
+        // Nothing in the bar switches language until the account is opened…
+        await expect(page.getByRole("link", { name: labels.languageRow })).toBeHidden();
+        const accountControl = page.locator(".top-account .account-menu-header > summary");
+        await accountControl.click();
+        // …and then it is a row of that menu, a full target, that keeps the page.
+        const languageRow = page.locator(".top-account").getByRole("link", { name: labels.languageRow });
+        await expect(languageRow).toBeVisible();
+        const languageBox = await languageRow.boundingBox();
+        expect(languageBox?.height).toBeGreaterThanOrEqual(44);
+        await expect(languageRow).toHaveAttribute("href", `/${locale === "pt-BR" ? "en" : "pt-BR"}/app`);
+        await accountControl.press("Escape");
+        await expect(languageRow).toBeHidden();
       }
       await expect(page.getByRole("link", { name: labels.notification })).toBeVisible();
       await expect(page.locator(`a[href="/${locale}/app/jobs"]`)).toHaveCount(0);
