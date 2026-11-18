@@ -23,7 +23,6 @@ export type TaskDetailCopy = {
   readonly eyebrow: string;
   readonly sections: {
     readonly details: string;
-    readonly relations: string;
     readonly provenance: string;
     readonly history: string;
   };
@@ -32,10 +31,7 @@ export type TaskDetailCopy = {
     readonly noDue: string;
     readonly planned: string;
     readonly priority: string;
-    readonly state: string;
-    readonly origin: string;
-    readonly created: string;
-    readonly updated: string;
+    readonly noPriority: string;
     readonly completed: string;
     readonly cancelled: string;
   };
@@ -47,12 +43,24 @@ export type TaskDetailCopy = {
     readonly waitingOn: string;
     readonly parent: string;
     readonly dependsOn: string;
-    readonly empty: string;
+    /** What an empty row says, per relation: a row with no value is still a row. */
+    readonly none: {
+      readonly projects: string;
+      readonly contexts: string;
+      readonly people: string;
+      readonly waitingOn: string;
+    };
   };
   readonly provenance: {
     readonly fromEntry: string;
     readonly manual: string;
     readonly openEntry: string;
+    /**
+     * Leads the creation instant in the one caption that replaced the "Origem"
+     * and "Criada em" fields. A prefix rather than a template, so the instant
+     * is appended by the render site in the owner's own zone.
+     */
+    readonly createdPrefix: string;
   };
   readonly history: {
     readonly empty: string;
@@ -70,7 +78,6 @@ const ptBR: TaskDetailCopy = {
   eyebrow: "TAREFA",
   sections: {
     details: "Detalhes",
-    relations: "Relações",
     provenance: "De onde veio",
     history: "Histórico desta tarefa",
   },
@@ -79,10 +86,7 @@ const ptBR: TaskDetailCopy = {
     noDue: "Sem prazo definido",
     planned: "Planejado para",
     priority: "Prioridade",
-    state: "Situação",
-    origin: "Origem",
-    created: "Criada em",
-    updated: "Última alteração",
+    noPriority: "Sem prioridade",
     completed: "Concluída em",
     cancelled: "Cancelada em",
   },
@@ -94,12 +98,13 @@ const ptBR: TaskDetailCopy = {
     waitingOn: "Aguardando",
     parent: "Tarefa-mãe",
     dependsOn: "Depende de",
-    empty: "Nenhuma relação registrada.",
+    none: { projects: "Nenhum", contexts: "Nenhum", people: "Ninguém", waitingOn: "Ninguém" },
   },
   provenance: {
     fromEntry: "Esta tarefa nasceu de um registro seu.",
     manual: "Você criou esta tarefa diretamente, sem partir de um registro.",
     openEntry: "Abrir o registro original",
+    createdPrefix: "criada em",
   },
   history: {
     empty: "Nenhuma alteração registrada ainda.",
@@ -126,7 +131,6 @@ const en: TaskDetailCopy = {
   eyebrow: "TASK",
   sections: {
     details: "Details",
-    relations: "Relationships",
     provenance: "Where this came from",
     history: "History of this task",
   },
@@ -135,10 +139,7 @@ const en: TaskDetailCopy = {
     noDue: "No due date set",
     planned: "Planned for",
     priority: "Priority",
-    state: "State",
-    origin: "Origin",
-    created: "Created",
-    updated: "Last changed",
+    noPriority: "No priority",
     completed: "Completed",
     cancelled: "Cancelled",
   },
@@ -150,12 +151,13 @@ const en: TaskDetailCopy = {
     waitingOn: "Waiting on",
     parent: "Parent task",
     dependsOn: "Depends on",
-    empty: "No relationships recorded.",
+    none: { projects: "None", contexts: "None", people: "No one", waitingOn: "No one" },
   },
   provenance: {
     fromEntry: "This task came from something you captured.",
     manual: "You created this task directly, not from a capture.",
     openEntry: "Open the original record",
+    createdPrefix: "created",
   },
   history: {
     empty: "No changes recorded yet.",

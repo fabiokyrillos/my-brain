@@ -34,6 +34,18 @@ type RowRefusal = "unresolvable" | "ineligible";
 export type TaskDetailControlsCopy = {
   readonly sectionTitle: string;
   readonly sectionHint: string;
+  /**
+   * The `fields` variant's own words: the one verb a row shows at rest, and how
+   * an opened row is left. The verb is followed by the row's own label for the
+   * accessible name, so the button a screen reader meets is "Alterar prazo"
+   * rather than seven buttons all called "Alterar".
+   */
+  readonly rows: {
+    readonly change: string;
+    readonly set: string;
+    readonly add: string;
+    readonly close: string;
+  };
   /** The verb, as a person would say it. Used as the control's accessible name. */
   readonly actions: Record<TaskCommandAction, string>;
   /** The submit control's own label, which is not always the verb. */
@@ -65,6 +77,12 @@ export type TaskDetailControlsCopy = {
 const ptBR: TaskDetailControlsCopy = {
   sectionTitle: "Editar esta tarefa",
   sectionHint: "Cada alteração é registrada e pode ser desfeita por 24 horas.",
+  rows: {
+    change: "Alterar",
+    set: "Definir",
+    add: "Adicionar",
+    close: "Fechar",
+  },
   actions: {
     complete_task: "Concluir",
     reopen_task: "Reabrir",
@@ -151,6 +169,12 @@ const ptBR: TaskDetailControlsCopy = {
 const en: TaskDetailControlsCopy = {
   sectionTitle: "Edit this task",
   sectionHint: "Every change is recorded and can be undone for 24 hours.",
+  rows: {
+    change: "Change",
+    set: "Set",
+    add: "Add",
+    close: "Close",
+  },
   actions: {
     complete_task: "Complete",
     reopen_task: "Reopen",

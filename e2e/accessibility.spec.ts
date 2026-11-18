@@ -697,17 +697,40 @@ function workTaskPanel() {
     + `<button class="work-protected-toggle" type="button">Mostrar</button>`
     + `</span>`
     + `</div><span class="status-badge">Não iniciada</span></header>`
+    + `<div class="task-detail-controls task-detail-fields">`
+    + `<div class="task-title-controls"><div class="task-title-verbs">`
+    + `<button class="task-fact-verb" type="button" aria-expanded="false" aria-controls="task-fact-editor-title-rename_task">Renomear</button>`
+    + `</div></div>`
     + `<section class="task-detail-section" aria-label="Detalhes"><h2>Detalhes</h2>`
-    + `<dl class="task-fields"><div class="task-field"><dt>Prazo</dt><dd>31 de julho</dd></div></dl>`
-    + `</section>`
+    + `<dl class="task-facts">`
+    + `<div class="task-fact"><dt>Prazo</dt><dd><span class="task-fact-value">31 de julho</span>`
+    + `<button class="task-fact-verb" type="button" aria-expanded="true" aria-controls="task-fact-editor-fact-due" aria-label="Alterar prazo">Alterar</button>`
+    + `<div class="task-fact-editor" id="task-fact-editor-fact-due">`
+    + `<div class="task-fact-form"><form><label for="task-control-reschedule_due">Prazo</label>`
+    + `<input id="task-control-reschedule_due" name="value" type="date">`
+    + `<button class="row-action" type="submit">Aplicar</button></form></div>`
+    + `<button class="task-fact-verb" type="button">Fechar</button></div></dd></div>`
+    + `<div class="task-fact"><dt>Projetos</dt><dd><span class="task-fact-value"><span class="task-relations">`
+    + `<a class="task-relation" href="#">Aurora Participações</a></span></span>`
+    + `<button class="task-fact-verb" type="button" aria-expanded="false" aria-controls="task-fact-editor-fact-projects" aria-label="Alterar projetos">Alterar</button></dd></div>`
+    + `<div class="task-fact"><dt>Aguardando</dt><dd><span class="task-fact-value" data-empty="true">Ninguém</span></dd></div>`
+    + `</dl></section>`
+    + `<div class="task-detail-endnote"><div class="task-fact-form"><form>`
+    + `<button class="row-action row-action-destructive" type="submit">Cancelar a tarefa</button></form></div></div>`
+    + `</div>`
     + `<section class="task-detail-section" aria-label="De onde veio"><h2>De onde veio</h2>`
     + `<p class="quiet-state">Esta tarefa veio de um registro seu.</p>`
     + `<span class="work-protected" data-masked="true">`
     + `<span class="work-protected-label">Conteúdo protegido</span>`
     + `<button class="work-protected-toggle" type="button">Mostrar</button>`
     + `</span>`
+    + `<p class="task-origin">Criada por você · criada em 20 de julho de 2026 às 07:00</p>`
     + `<a class="panel-view-all" href="#">Abrir o registro original</a>`
-    + `</section></div>`;
+    + `</section>`
+    + `<section class="task-detail-section task-history-section" aria-label="Histórico desta tarefa">`
+    + `<details class="record-footnote"><summary><h2>Histórico desta tarefa</h2></summary>`
+    + `<ol class="task-history"><li><strong>Você alterou a tarefa</strong><time>29/07/2026</time></li></ol>`
+    + `</details></section></div>`;
 }
 
 /**

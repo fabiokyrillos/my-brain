@@ -59,7 +59,7 @@ const COPY: readonly Copy[] = [
     signIn: "Entrar",
     applied: "Feito",
     resultRegion: "Resultado da alteração",
-    section: "Editar esta tarefa",
+    section: "Detalhes",
     submit: "Aplicar",
     clearDue: "Tirar o prazo",
     cancelTask: "Cancelar a tarefa",
@@ -79,7 +79,7 @@ const COPY: readonly Copy[] = [
     signIn: "Sign in",
     applied: "Done",
     resultRegion: "Change result",
-    section: "Edit this task",
+    section: "Details",
     submit: "Apply",
     clearDue: "Remove the due date",
     cancelTask: "Cancel the task",
@@ -234,6 +234,33 @@ test.describe("task detail field edits route through apply_task_command", () => 
   }
 
   /**
+   * Which row of the detail carries an action's control (ADR-184).
+   *
+   * The controls are no longer always open: each fact is a row, and the row's
+   * verb opens the form in place. The ids are the component's own — the row's
+   * key, not its copy — so this cannot drift with the wording.
+   */
+  const ROW_OF: Record<string, string> = {
+    rename_task: "title-rename_task",
+    append_note: "title-append_note",
+    reschedule_due: "fact-due",
+    clear_due: "fact-due",
+    set_planned: "fact-planned",
+    clear_planned: "fact-planned",
+    set_priority: "fact-priority",
+    assign_project: "fact-projects",
+    assign_context: "fact-contexts",
+    assign_person: "fact-people",
+    set_waiting_on: "fact-waitingOn",
+  };
+
+  /** Opens the row an action lives on, unless it already is. */
+  async function openRow(page: Page, action: string) {
+    const verb = page.locator(`#task-fact-toggle-${ROW_OF[action]}`);
+    if ((await verb.getAttribute("aria-expanded")) !== "true") await verb.click();
+  }
+
+  /**
    * Fills one action's control and submits it.
    *
    * Located by the id the component derives from the action name, so the
@@ -241,6 +268,7 @@ test.describe("task detail field edits route through apply_task_command", () => 
    * label is still unambiguous.
    */
   async function submitField(page: Page, action: string, value: string) {
+    await openRow(page, action);
     const form = page.locator(`form:has(#task-control-${action})`);
     const field = page.locator(`#task-control-${action}`);
     const tag = await field.evaluate((node) => node.tagName);
@@ -294,6 +322,7 @@ test.describe("task detail field edits route through apply_task_command", () => 
       expect((await taskRow(taskId, "planned_at")).planned_at).not.toBeNull();
 
       await openDetail(page, copy, taskId);
+      await openRow(page, "clear_due");
       await page.getByRole("button", { name: copy.clearDue }).click();
       await expect(result(page, copy)).toContainText(copy.applied, { timeout: 30_000 });
       expect((await taskRow(taskId, "due_at")).due_at).toBeNull();
@@ -441,7 +470,7 @@ test.describe("task detail field edits route through apply_task_command", () => 
       // 2F-SURFACE-009: only the transition the taxonomy admits is offered.
       await expect(page.getByRole("button", { name: copy.restore })).toBeVisible();
       await expect(page.getByRole("button", { name: copy.cancelTask })).toHaveCount(0);
-      await expect(page.locator("#task-control-rename_task")).toHaveCount(0);
+      await expect(page.locator("#task-fact-toggle-title-rename_task")).toHaveCount(0);
 
       await page.getByRole("button", { name: copy.restore }).click();
       await expect(result(page, copy)).toContainText(copy.applied, { timeout: 30_000 });
@@ -458,6 +487,7 @@ test.describe("task detail field edits route through apply_task_command", () => 
       await signIn(page, copy);
       await openDetail(page, copy, taskId);
 
+      await openRow(page, "set_planned");
       const picker = page.locator("#task-control-set_planned");
       const form = page.locator("form:has(#task-control-set_planned)");
 
@@ -725,6 +755,9 @@ test.describe("task detail field edits route through apply_task_command", () => 
     await signIn(page, copy);
     await openDetail(page, copy, taskId);
 
+    // The row is opened from the keyboard too: its verb is a button.
+    await page.locator("#task-fact-toggle-title-rename_task").focus();
+    await page.keyboard.press("Enter");
     const field = page.locator("#task-control-rename_task");
     await field.focus();
     await field.fill(`${title} pelo teclado`);

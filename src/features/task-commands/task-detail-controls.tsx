@@ -24,7 +24,7 @@
  * form said afterwards, which is the failure 2E-DESTRUCTIVE-003 names.
  */
 
-import React, { useActionState, useEffect, useRef, useState } from "react";
+import React, { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import { useRouter } from "next/navigation";
@@ -77,7 +77,51 @@ const MAX_LENGTH_BY_FIELD: Partial<Record<TaskCommandPatchField, number>> = {
  * add or remove a verb would be the second copy this prop exists to avoid, so
  * everything below the frame is shared verbatim.
  */
-export type TaskDetailControlsVariant = "section" | "inline" | "preset";
+export type TaskDetailControlsVariant = "section" | "inline" | "preset" | "fields";
+
+/*
+ * `fields` is the task detail's frame since the page was recomposed (ADR-184).
+ *
+ * The detail said what a task is three times — a read-only list, a second list
+ * of its relations, and twelve always-open forms two screens below, each
+ * repeating the field it changed. Under `fields` there is one list: every row
+ * is a fact with its value, and the row's one quiet verb opens **the same form
+ * the other variants render**, in place, under the value it changes.
+ *
+ * The bar is the one `inline` and `preset` are held to, and it is the reason
+ * this is a variant rather than a second component: it changes no control, no
+ * eligibility and no intent. The caller says which verbs belong to which row
+ * (`TaskDetailFact.actions`); a verb is offered only if it is also in
+ * `controls`, which is still `detailControlsFor(status)`. Opening a row is
+ * presentation state and nothing else — the form body, `submit`, the
+ * per-action operation keys, the composition guard, the confirmation dialog
+ * and the outcome region below are shared verbatim.
+ */
+
+/**
+ * One row of the `fields` variant: a fact about the task, and the verbs that
+ * change it.
+ *
+ * `value` is a node, not a string, because a relation is a link and the server
+ * builds it (`task-facts.tsx`). `actions` names command verbs in the order they
+ * are offered; it is a *placement*, never a permission.
+ */
+export type TaskDetailFact = {
+  readonly id: string;
+  readonly label: string;
+  readonly value: ReactNode;
+  /** Whether `value` is the wording for "nothing here" rather than a value. */
+  readonly empty: boolean;
+  /** Whether the row's control adds to a list rather than replacing a value. */
+  readonly additive?: boolean;
+  readonly actions: readonly TaskCommandAction[];
+};
+
+/**
+ * The two verbs that are about the task's own words rather than one of its
+ * facts. Under `fields` they sit above the list, beside the title they change.
+ */
+const TITLE_ACTIONS: readonly TaskCommandAction[] = ["rename_task", "append_note"];
 
 /*
  * Life Brain D.1 — `preset` is a row whose value the surface already knows.
@@ -122,6 +166,9 @@ export function TaskDetailControls({
   submitLabels,
   undoAction,
   renderResult = true,
+  facts,
+  heading,
+  lead,
 }: {
   action: TaskDetailCommandHandler;
   locale: Locale;
@@ -150,6 +197,19 @@ export function TaskDetailControls({
    * day's contents cannot unmount.
    */
   renderResult?: boolean;
+  /** `fields` only. The rows, already ordered and formatted by the surface. */
+  facts?: readonly TaskDetailFact[];
+  /** `fields` only. The list's heading; the surface owns the word. */
+  heading?: string;
+  /**
+   * `fields` only. What the surface places between the title's own verbs and
+   * the list — on the task detail, Concluir/Aguardar.
+   *
+   * A slot rather than a sibling because the title verbs and the rows share one
+   * open-row state and one outcome region, so they are one component, and the
+   * status actions belong visually between the two.
+   */
+  lead?: ReactNode;
 }) {
   const copy = getTaskDetailControlsCopy(locale);
   const router = useRouter();
@@ -194,6 +254,15 @@ export function TaskDetailControls({
    * cause a render — a re-render mid-composition is the other half of what this
    * requirement forbids.
    */
+  /**
+   * `fields` only: which row is open, or null. One at a time, because two open
+   * editors are two unfinished thoughts and the page is meant to rest closed.
+   *
+   * Presentation state. It decides which already-eligible form is on screen and
+   * can neither add a control nor send anything.
+   */
+  const [open, setOpen] = useState<string | null>(null);
+
   const composing = useRef(false);
   const compositionProps = {
     onCompositionStart: () => { composing.current = true; },
@@ -243,6 +312,9 @@ export function TaskDetailControls({
     if (next.status !== "idle" && next.status !== "awaiting_confirmation") {
       keys.current.delete(commandAction);
     }
+    // The row closes on success: the page revalidates and the row's own value
+    // is the confirmation. A refusal leaves it open, with what was typed.
+    if (next.status === "applied") setOpen(null);
     return next;
   }
 
@@ -293,6 +365,207 @@ export function TaskDetailControls({
 
   const framed = variant === "section";
   const preset = variant === "preset";
+
+  /**
+   * One control's form — the only place a control is drawn, for every variant.
+   *
+   * `caption` is the verb printed under a valued control ("Mudar o prazo").
+   * `fields` passes false: there the form sits under the row it edits, which
+   * already says so.
+   */
+  function controlForm(control: DetailControl, caption: boolean) {
+    const label = copy.actions[control.action];
+    const inputId = `task-control-${control.action}`;
+    const intent = control.destructive ? "request_cancel" : "apply";
+    const options = control.relation === null ? null : relationOptions[control.relation];
+    const proposed = defaultValues?.[control.action];
+    // A relation control with nothing to point at is stated rather than
+    // rendered as an empty `<select>` the user can only fail to use.
+    const empty = options !== null && options.length === 0;
+
+    return (
+      <form action={formAction}>
+        {hiddenFields(control.action, intent)}
+
+        {preset ? (
+          <>
+            {proposed === undefined ? null : <input type="hidden" name="value" value={proposed} />}
+            <button
+              className={control.destructive ? "row-action row-action-destructive" : "row-action"}
+              disabled={pending}
+              type="submit"
+            >
+              {submitLabels?.[control.action] ?? label}
+            </button>
+          </>
+        ) : null}
+
+        {preset || control.field === null ? null : (
+          <label htmlFor={inputId}>{copy.fields[control.field]}</label>
+        )}
+
+        {!preset && control.kind === "text" && control.field !== null ? (
+          LONG_FIELDS.includes(control.field) ? (
+            <textarea
+              defaultValue={proposed}
+              id={inputId}
+              maxLength={MAX_LENGTH_BY_FIELD[control.field]}
+              name="value"
+              rows={3}
+              {...compositionProps}
+            />
+          ) : (
+            <input
+              defaultValue={proposed}
+              id={inputId}
+              maxLength={MAX_LENGTH_BY_FIELD[control.field]}
+              name="value"
+              type="text"
+              {...compositionProps}
+            />
+          )
+        ) : null}
+
+        {!preset && control.kind === "date" ? (
+          // `type="date"` emits `YYYY-MM-DD`, which is exactly the one
+          // temporal shape `explicit_date` resolves — and it resolves it
+          // in the caller's own zone, so the control never sends an
+          // instant. The bounds mirror the lexicon's ±730 days, so a
+          // date it would decline cannot be picked in the first place.
+          <input
+            defaultValue={proposed}
+            id={inputId}
+            max={dateBounds.max}
+            min={dateBounds.min}
+            name="value"
+            type="date"
+          />
+        ) : null}
+
+        {!preset && control.kind === "choice" && control.choices !== null ? (
+          <select
+            defaultValue={proposed !== undefined && control.choices.includes(proposed) ? proposed : ""}
+            id={inputId}
+            name="value"
+          >
+            <option disabled value="">{copy.choosePlaceholder}</option>
+            {control.choices.map((choice) => (
+              <option key={choice} value={choice}>
+                {copy.choices[choice as keyof typeof copy.choices] ?? choice}
+              </option>
+            ))}
+          </select>
+        ) : null}
+
+        {!preset && control.kind === "relation" && options !== null && control.relation !== null ? (
+          empty ? (
+            <UniversalStateLine description={copy.relationEmpty[control.relation]} locale={locale} state="empty" />
+          ) : (
+            // The **name** is submitted, never the id. It is resolved by
+            // `resolve_owned_entity_exact` inside the candidate query,
+            // so ownership is proven in the database rather than
+            // asserted by this form — and there is no path for the UI to
+            // smuggle an id it was not given.
+            <select defaultValue="" id={inputId} name="value">
+              <option disabled value="">{copy.choosePlaceholder}</option>
+              {options.map((option) => (
+                <option key={option.id} value={option.label}>{option.label}</option>
+              ))}
+            </select>
+          )
+        ) : null}
+
+        {preset ? null : (
+          <button
+            className={control.destructive ? "row-action row-action-destructive" : "row-action"}
+            disabled={pending || empty}
+            type="submit"
+          >
+            {control.field === null || control.destructive ? label : copy.submit}
+          </button>
+        )}
+
+        {preset || !caption || control.field === null || control.destructive ? null : (
+          <span className="task-control-name">{label}</span>
+        )}
+      </form>
+    );
+  }
+
+  /*
+    One polite live region, announcing the pending phrase while a round is in
+    flight and the outcome once it settles. `aria-busy` is what tells a
+    screen reader the region is mid-update rather than empty.
+  */
+  const liveRegion = (
+    <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
+      {pending ? copy.pendingAnnouncement : state.announcement}
+    </div>
+  );
+
+  const confirmDialog = (
+    <ConfirmDialog
+      cancelLabel={copy.confirm.cancel}
+      description={copy.confirm.description}
+      /*
+        Nothing here for the owner to lose: the whole body is hidden inputs and
+        buttons, so a tap outside means cancel and cancel means exactly what
+        the cancel button means. Stated rather than defaulted — the prop is
+        required so that a dialog which later gains an editable field has to
+        answer this question again.
+      */
+      discard={null}
+      onClose={dismissConfirmation}
+      open={pendingConfirmation !== null}
+      title={copy.confirm.title}
+    >
+      {pendingConfirmation === null ? null : (
+        <form action={formAction}>
+          {hiddenFields(pendingConfirmation.action, "confirm_cancel")}
+          {/*
+            The instant the confirmation's digest was derived from. Sent back
+            unchanged because `task_command_fingerprint` hashes it alongside
+            the pre-state: a second instant derives a different digest, and
+            the database refuses a cancellation the user genuinely confirmed.
+          */}
+          <input type="hidden" name="observedBefore" value={pendingConfirmation.observedBefore} />
+          <p className="task-control-target">{pendingConfirmation.title}</p>
+          <button className="row-action row-action-destructive" disabled={pending} type="submit">
+            {copy.confirm.submit}
+          </button>
+        </form>
+      )}
+    </ConfirmDialog>
+  );
+
+  const resultRegion =
+    state.status === "idle" || state.status === "awaiting_confirmation" || !renderResult ? null : (
+      <div
+        aria-label={copy.resultRegionLabel}
+        className="work-action-result"
+        ref={result}
+        // A named landmark rather than a bare `div`: a screen-reader user can
+        // navigate back to the answer after moving away from it.
+        role="region"
+        tabIndex={-1}
+      >
+        <strong>{state.heading}</strong>
+        <p>{state.detail}</p>
+        {state.reason === null ? null : <p className="task-control-reason">{state.reason}</p>}
+        {state.refreshable && (
+          <button className="row-action" onClick={() => router.refresh()} type="button">
+            {copy.refresh}
+          </button>
+        )}
+        {/* `2L-EDIT-008`, the same affordance the Work list mounts. */}
+        {undoAction ? <UndoAffordance action={undoAction} locale={locale} undo={state.undo} /> : null}
+      </div>
+    );
+
+  if (variant === "fields") {
+    return renderFields();
+  }
+
   const Frame = framed ? "section" : "div";
 
   return (
@@ -307,193 +580,159 @@ export function TaskDetailControls({
       {framed ? <h2>{copy.sectionTitle}</h2> : null}
       {framed ? <p className="quiet-state">{copy.sectionHint}</p> : null}
 
-      {/*
-        One polite live region, announcing the pending phrase while a round is in
-        flight and the outcome once it settles. `aria-busy` is what tells a
-        screen reader the region is mid-update rather than empty.
-      */}
-      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-        {pending ? copy.pendingAnnouncement : state.announcement}
-      </div>
+      {liveRegion}
 
       <ul className="task-control-list">
-        {controls.map((control) => {
-          const label = copy.actions[control.action];
-          const inputId = `task-control-${control.action}`;
-          const intent = control.destructive ? "request_cancel" : "apply";
-          const options = control.relation === null ? null : relationOptions[control.relation];
-          const proposed = defaultValues?.[control.action];
-          // A relation control with nothing to point at is stated rather than
-          // rendered as an empty `<select>` the user can only fail to use.
-          const empty = options !== null && options.length === 0;
-
-          return (
-            <li className="task-control" key={control.action}>
-              <form action={formAction}>
-                {hiddenFields(control.action, intent)}
-
-                {preset ? (
-                  <>
-                    {proposed === undefined ? null : <input type="hidden" name="value" value={proposed} />}
-                    <button
-                      className={control.destructive ? "row-action row-action-destructive" : "row-action"}
-                      disabled={pending}
-                      type="submit"
-                    >
-                      {submitLabels?.[control.action] ?? label}
-                    </button>
-                  </>
-                ) : null}
-
-                {preset || control.field === null ? null : (
-                  <label htmlFor={inputId}>{copy.fields[control.field]}</label>
-                )}
-
-                {!preset && control.kind === "text" && control.field !== null ? (
-                  LONG_FIELDS.includes(control.field) ? (
-                    <textarea
-                      defaultValue={proposed}
-                      id={inputId}
-                      maxLength={MAX_LENGTH_BY_FIELD[control.field]}
-                      name="value"
-                      rows={3}
-                      {...compositionProps}
-                    />
-                  ) : (
-                    <input
-                      defaultValue={proposed}
-                      id={inputId}
-                      maxLength={MAX_LENGTH_BY_FIELD[control.field]}
-                      name="value"
-                      type="text"
-                      {...compositionProps}
-                    />
-                  )
-                ) : null}
-
-                {!preset && control.kind === "date" ? (
-                  // `type="date"` emits `YYYY-MM-DD`, which is exactly the one
-                  // temporal shape `explicit_date` resolves — and it resolves it
-                  // in the caller's own zone, so the control never sends an
-                  // instant. The bounds mirror the lexicon's ±730 days, so a
-                  // date it would decline cannot be picked in the first place.
-                  <input
-                    defaultValue={proposed}
-                    id={inputId}
-                    max={dateBounds.max}
-                    min={dateBounds.min}
-                    name="value"
-                    type="date"
-                  />
-                ) : null}
-
-                {!preset && control.kind === "choice" && control.choices !== null ? (
-                  <select
-                    defaultValue={proposed !== undefined && control.choices.includes(proposed) ? proposed : ""}
-                    id={inputId}
-                    name="value"
-                  >
-                    <option disabled value="">{copy.choosePlaceholder}</option>
-                    {control.choices.map((choice) => (
-                      <option key={choice} value={choice}>
-                        {copy.choices[choice as keyof typeof copy.choices] ?? choice}
-                      </option>
-                    ))}
-                  </select>
-                ) : null}
-
-                {!preset && control.kind === "relation" && options !== null && control.relation !== null ? (
-                  empty ? (
-                    <UniversalStateLine description={copy.relationEmpty[control.relation]} locale={locale} state="empty" />
-                  ) : (
-                    // The **name** is submitted, never the id. It is resolved by
-                    // `resolve_owned_entity_exact` inside the candidate query,
-                    // so ownership is proven in the database rather than
-                    // asserted by this form — and there is no path for the UI to
-                    // smuggle an id it was not given.
-                    <select defaultValue="" id={inputId} name="value">
-                      <option disabled value="">{copy.choosePlaceholder}</option>
-                      {options.map((option) => (
-                        <option key={option.id} value={option.label}>{option.label}</option>
-                      ))}
-                    </select>
-                  )
-                ) : null}
-
-                {preset ? null : (
-                  <button
-                    className={control.destructive ? "row-action row-action-destructive" : "row-action"}
-                    disabled={pending || empty}
-                    type="submit"
-                  >
-                    {control.field === null || control.destructive ? label : copy.submit}
-                  </button>
-                )}
-
-                {preset || control.field === null || control.destructive ? null : (
-                  <span className="task-control-name">{label}</span>
-                )}
-              </form>
-            </li>
-          );
-        })}
+        {controls.map((control) => (
+          <li className="task-control" key={control.action}>{controlForm(control, true)}</li>
+        ))}
       </ul>
 
-      <ConfirmDialog
-        cancelLabel={copy.confirm.cancel}
-        description={copy.confirm.description}
-        /*
-          Nothing here for the owner to lose: the whole body is hidden inputs and
-          buttons, so a tap outside means cancel and cancel means exactly what
-          the cancel button means. Stated rather than defaulted — the prop is
-          required so that a dialog which later gains an editable field has to
-          answer this question again.
-        */
-        discard={null}
-        onClose={dismissConfirmation}
-        open={pendingConfirmation !== null}
-        title={copy.confirm.title}
-      >
-        {pendingConfirmation === null ? null : (
-          <form action={formAction}>
-            {hiddenFields(pendingConfirmation.action, "confirm_cancel")}
-            {/*
-              The instant the confirmation's digest was derived from. Sent back
-              unchanged because `task_command_fingerprint` hashes it alongside
-              the pre-state: a second instant derives a different digest, and
-              the database refuses a cancellation the user genuinely confirmed.
-            */}
-            <input type="hidden" name="observedBefore" value={pendingConfirmation.observedBefore} />
-            <p className="task-control-target">{pendingConfirmation.title}</p>
-            <button className="row-action row-action-destructive" disabled={pending} type="submit">
-              {copy.confirm.submit}
-            </button>
-          </form>
-        )}
-      </ConfirmDialog>
+      {confirmDialog}
 
-      {state.status === "idle" || state.status === "awaiting_confirmation" || !renderResult ? null : (
-        <div
-          aria-label={copy.resultRegionLabel}
-          className="work-action-result"
-          ref={result}
-          // A named landmark rather than a bare `div`: a screen-reader user can
-          // navigate back to the answer after moving away from it.
-          role="region"
-          tabIndex={-1}
-        >
-          <strong>{state.heading}</strong>
-          <p>{state.detail}</p>
-          {state.reason === null ? null : <p className="task-control-reason">{state.reason}</p>}
-          {state.refreshable && (
-            <button className="row-action" onClick={() => router.refresh()} type="button">
-              {copy.refresh}
-            </button>
-          )}
-          {/* `2L-EDIT-008`, the same affordance the Work list mounts. */}
-          {undoAction ? <UndoAffordance action={undoAction} locale={locale} undo={state.undo} /> : null}
-        </div>
-      )}
+      {resultRegion}
     </Frame>
   );
+
+  /**
+   * The `fields` frame. A function declaration below the return so the shared
+   * pieces above read first; it closes over them and adds only the rows, the
+   * disclosure and where things sit.
+   */
+  function renderFields() {
+    const rows = facts ?? [];
+    const claimed = new Set<TaskCommandAction>([...TITLE_ACTIONS, ...rows.flatMap((fact) => fact.actions)]);
+    const titleControls = controls.filter((control) => TITLE_ACTIONS.includes(control.action));
+    /*
+      Whatever no row and no title verb claimed — today the cancellation, or the
+      restoration of a cancelled task. Computed as a remainder rather than named,
+      so a verb the taxonomy gains later still reaches this page instead of
+      silently having nowhere to render.
+    */
+    const remaining = controls.filter((control) => !claimed.has(control.action));
+
+    /**
+     * The eligible controls placed on one row.
+     *
+     * A value-less verb on a row is that row's "clear" (`clear_due`,
+     * `clear_planned`), and an empty row has nothing to clear — offering it
+     * would be a button whose only outcome is "nothing changed".
+     */
+    const controlsOf = (fact: TaskDetailFact): readonly DetailControl[] =>
+      fact.actions.flatMap((id) => {
+        const control = controls.find((candidate) => candidate.action === id);
+        if (control === undefined) return [];
+        return fact.empty && control.kind === "immediate" ? [] : [control];
+      });
+
+    const toggleId = (key: string) => `task-fact-toggle-${key}`;
+    const editorId = (key: string) => `task-fact-editor-${key}`;
+
+    /** Closing by hand returns focus to the verb that opened the row. */
+    const close = (key: string) => {
+      setOpen(null);
+      document.getElementById(toggleId(key))?.focus();
+    };
+
+    /**
+     * Escape closes the row it is pressed in. Not during a composition: there
+     * Escape belongs to the input method, which uses it to discard a candidate.
+     */
+    const closeOnEscape = (keys: readonly string[]) => (event: React.KeyboardEvent) => {
+      if (event.key !== "Escape" || open === null || !keys.includes(open)) return;
+      if (event.nativeEvent.isComposing || composing.current) return;
+      event.stopPropagation();
+      close(open);
+    };
+
+    const toggle = (key: string, text: string, name?: string) => (
+      <button
+        aria-controls={editorId(key)}
+        aria-expanded={open === key}
+        aria-label={name}
+        className="task-fact-verb"
+        id={toggleId(key)}
+        onClick={() => setOpen((current) => (current === key ? null : key))}
+        type="button"
+      >
+        {text}
+      </button>
+    );
+
+    const editor = (key: string, editing: readonly DetailControl[]) => (
+      <div className="task-fact-editor" id={editorId(key)}>
+        {editing.map((control) => (
+          <div className="task-fact-form" key={control.action}>{controlForm(control, false)}</div>
+        ))}
+        <button className="task-fact-verb" onClick={() => close(key)} type="button">
+          {copy.rows.close}
+        </button>
+      </div>
+    );
+
+    const titleKeys = titleControls.map((control) => `title-${control.action}`);
+    const openTitle = titleControls.find((control) => open === `title-${control.action}`);
+
+    return (
+      <div className="task-detail-controls task-detail-fields">
+        {liveRegion}
+
+        {titleControls.length ? (
+          // The key handler is on the wrapper, not on a control: it only hears
+          // Escape bubbling from the buttons and the form inside it.
+          <div className="task-title-controls" onKeyDown={closeOnEscape(titleKeys)}>
+            <div className="task-title-verbs">
+              {titleControls.map((control) => (
+                <React.Fragment key={control.action}>
+                  {toggle(`title-${control.action}`, copy.actions[control.action])}
+                </React.Fragment>
+              ))}
+            </div>
+            {openTitle ? editor(`title-${openTitle.action}`, [openTitle]) : null}
+          </div>
+        ) : null}
+
+        {lead}
+
+        <section aria-label={heading ?? copy.sectionTitle} className="task-detail-section">
+          <h2>{heading ?? copy.sectionTitle}</h2>
+
+          {/* Above the rows, so the answer is met before the list it changed. */}
+          {resultRegion}
+
+          <dl className="task-facts">
+            {rows.map((fact) => {
+              const editing = controlsOf(fact);
+              const key = `fact-${fact.id}`;
+              const verb = fact.additive ? copy.rows.add : fact.empty ? copy.rows.set : copy.rows.change;
+              return (
+                <div className="task-fact" key={fact.id} onKeyDown={closeOnEscape([key])}>
+                  <dt>{fact.label}</dt>
+                  <dd>
+                    <span className="task-fact-value" data-empty={fact.empty ? "true" : undefined}>
+                      {fact.value}
+                    </span>
+                    {editing.length
+                      ? toggle(key, verb, `${verb} ${fact.label.toLocaleLowerCase(locale)}`)
+                      : null}
+                    {editing.length && open === key ? editor(key, editing) : null}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        </section>
+
+        {remaining.length ? (
+          <div className="task-detail-endnote">
+            {remaining.map((control) => (
+              <div className="task-fact-form" key={control.action}>{controlForm(control, true)}</div>
+            ))}
+          </div>
+        ) : null}
+
+        {confirmDialog}
+      </div>
+    );
+  }
 }

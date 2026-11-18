@@ -65,6 +65,9 @@ const WORK_SURFACES = [
   */
   "src/features/daily-cycle/task-detail-view.tsx",
   "src/features/daily-cycle/task-detail-surface.tsx",
+  // The rows of the detail's one list of facts (ADR-184), read by the view and
+  // by the controls' `fields` frame.
+  "src/features/daily-cycle/task-facts.tsx",
   "src/features/daily-cycle/task-panel-close.tsx",
   "src/features/task-commands/task-detail-controls.tsx",
 ] as const;
