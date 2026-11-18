@@ -49,6 +49,16 @@ The owner saw the merged page on his iPhone and reported the notice row, with it
 
 Same fixture, 390px, light: [closed](evidence/hoje/notice-mobile-light.png) · [menu open](evidence/hoje/notice-menu-open-mobile-light.png). The row is 147px closed; the open menu is 300 × 346px; no target under 44px; no horizontal overflow. Not seen on the device, and the dark theme and the desktop width were not re-captured.
 
+## Follow-up, 2026-11-18 — the greeting and the repeated task
+
+- The greeting is "Bom dia / Boa tarde / Boa noite, <first name>." from the owner's zone and `profiles.display_name`. It degrades to a nameless greeting when the name cannot be read and to "Olá" when the zone is unsupported.
+- A task that a rendered notice is about is not listed again under "Hoje e atrasado". The status sentence counts notices; a noticed task is counted once, in the attention number.
+- The capture field rests one line tall on a phone as well.
+
+Same fixture as above, with the dashboard's new output: [390](evidence/hoje/v2-mobile-light.png) · [1280](evidence/hoje/v2-desktop-light.png). 1,789px at 390. `npm test` 593 files / 10,932 tests; static specs 371 passed, 5 skipped.
+
+Not verified: the real read of `profiles.display_name` against a database (mocked in the dashboard tests); the device. Still open: an overdue-task notice and a reminder notice about the same thing are two notices with different subjects, and both render.
+
 ## Left open
 
 Listed in `docs/TODO.md` under *Editorial calmo*.

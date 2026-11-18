@@ -337,6 +337,8 @@ export function deriveHomeOperationalStatus({
   attentionCount,
   attentionHasNext,
   conflictCount,
+  noticeCount,
+  noticesHaveMore,
 }: {
   items: readonly { productState: ProductState }[];
   attentionCount: number;
@@ -352,10 +354,27 @@ export function deriveHomeOperationalStatus({
    * reintroduce exactly that, without the compiler noticing.
    */
   conflictCount: number;
+  /**
+   * The unanswered notices Hoje renders in *Precisa de você*, and whether more
+   * exist than it shows.
+   *
+   * **Required**, for the reason `conflictCount` is. The section's heading has
+   * counted notices since slice 2S.2 and this sentence had not, so a day whose
+   * only pending thing was an overdue-task notice read *"Nada pendente. Tudo
+   * salvo."* directly above a section headed *Precisa de você · 1*. Once a
+   * noticed task stopped being listed a second time under *Hoje e atrasado*
+   * (`noticed-tasks.ts`), that notice row became the task's only appearance on
+   * the page — and the sentence above it would have denied it.
+   *
+   * So the status sentence and the section heading now state the same number:
+   * entries + conflicts + rendered notices.
+   */
+  noticeCount: number;
+  noticesHaveMore: boolean;
 }) {
-  const pending = attentionCount + conflictCount;
+  const pending = attentionCount + conflictCount + noticeCount;
   if (pending > 0) {
-    return { kind: "attention" as const, count: pending, hasMore: attentionHasNext };
+    return { kind: "attention" as const, count: pending, hasMore: attentionHasNext || noticesHaveMore };
   }
   const organizingCount = items.filter((item) => item.productState === "organizing").length;
   if (organizingCount > 0) {

@@ -385,6 +385,8 @@ describe("navigation capabilities", () => {
       attentionCount: 2,
       attentionHasNext: true,
       conflictCount: 0,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "attention", count: 2, hasMore: true });
 
     expect(deriveHomeOperationalStatus({
@@ -392,6 +394,8 @@ describe("navigation capabilities", () => {
       attentionCount: 0,
       attentionHasNext: false,
       conflictCount: 0,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "organizing", count: 1, hasMore: false });
 
     expect(deriveHomeOperationalStatus({
@@ -399,6 +403,8 @@ describe("navigation capabilities", () => {
       attentionCount: 0,
       attentionHasNext: false,
       conflictCount: 0,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "saved", count: 0, hasMore: false });
   });
 
@@ -413,6 +419,8 @@ describe("navigation capabilities", () => {
       attentionCount: 0,
       attentionHasNext: false,
       conflictCount: 1,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "attention", count: 1, hasMore: false });
   });
 
@@ -422,7 +430,36 @@ describe("navigation capabilities", () => {
       attentionCount: 2,
       attentionHasNext: false,
       conflictCount: 3,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "attention", count: 5, hasMore: false });
+  });
+
+  /**
+   * The section heading has counted notices since 2S.2; this sentence had not.
+   * A noticed task is no longer listed again under the day's work, so the
+   * notice is its only row on Hoje and the sentence above must not deny it.
+   */
+  it("counts a rendered notice as pending, so Home cannot say nothing is pending above one", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [{ productState: "organizing" }],
+      attentionCount: 0,
+      attentionHasNext: false,
+      conflictCount: 0,
+      noticeCount: 1,
+      noticesHaveMore: false,
+    })).toEqual({ kind: "attention", count: 1, hasMore: false });
+  });
+
+  it("adds notices to entries and conflicts, and marks the total partial when more notices exist", () => {
+    expect(deriveHomeOperationalStatus({
+      items: [],
+      attentionCount: 2,
+      attentionHasNext: false,
+      conflictCount: 1,
+      noticeCount: 3,
+      noticesHaveMore: true,
+    })).toEqual({ kind: "attention", count: 6, hasMore: true });
   });
 
   it("still reports organizing when there is neither attention nor a conflict", () => {
@@ -431,6 +468,8 @@ describe("navigation capabilities", () => {
       attentionCount: 0,
       attentionHasNext: false,
       conflictCount: 0,
+      noticeCount: 0,
+      noticesHaveMore: false,
     })).toEqual({ kind: "organizing", count: 1, hasMore: false });
   });
 });

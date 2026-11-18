@@ -281,65 +281,6 @@ a.task-relation:hover{text-decoration:underline}
 .home-quiet .quiet-state{margin:0}
 .home-quiet .panel-view-all{margin-top:var(--space-1)}
 
-/*
- * The expanded lead of "Precisa de você".
- *
- * The 3px amber rule and the amber wash are the direction's reserved signal for
- * *precisa de você* and appear on nothing else. The quotation is on the plain
- * surface and the proposal on the wash, which is what makes "the assistant's
- * reading is not your words" visible without reading either.
- */
-.attention-lead{
-  display:grid;
-  border:1px solid var(--tone-attention-line);
-  border-left:3px solid var(--tone-attention-fg);
-  border-radius:var(--radius-lg);
-  background:var(--background-surface);
-  overflow:hidden;
-}
-.attention-lead-original{padding:var(--space-4) var(--space-5)}
-.attention-lead-quote{
-  margin:0;
-  font:var(--type-reading);
-  color:var(--text-primary);
-  /* The owner's own words, unwrapped and unclipped: `04-estados.md` lets the
-     block grow and scroll rather than truncating what someone wrote. */
-  white-space:pre-wrap;
-  overflow-wrap:anywhere;
-  max-height:14em;
-  overflow-y:auto;
-}
-.attention-lead-stamp{margin:var(--space-2) 0 0;font:var(--type-mono);font-variant-numeric:tabular-nums;color:var(--text-muted)}
-.attention-lead-proposal{
-  padding:var(--space-4) var(--space-5);
-  border-top:1px solid var(--tone-attention-line);
-  background:var(--tone-attention-bg);
-}
-.attention-lead-eyebrow{
-  display:flex;flex-wrap:wrap;align-items:baseline;gap:var(--space-2);
-  margin:0 0 var(--space-2);
-  font:var(--type-eyebrow);letter-spacing:var(--eyebrow-tracking);text-transform:uppercase;
-  color:var(--tone-attention-fg);
-}
-.attention-lead-reversible{color:var(--text-muted);text-transform:none;letter-spacing:0}
-.attention-lead-title{margin:0;font:var(--type-heading);font-size:15.5px;letter-spacing:-.01em;color:var(--text-primary)}
-.attention-lead-explanation{margin:var(--space-1) 0 0;font:var(--type-body);color:var(--text-secondary)}
-.attention-lead-actions{display:flex;flex-wrap:wrap;gap:var(--space-2);margin-top:var(--space-4)}
-.attention-lead-primary,.attention-lead-secondary{
-  display:inline-flex;align-items:center;justify-content:center;
-  min-height:40px;padding:0 var(--space-4);
-  border-radius:var(--radius-md);
-  font:var(--type-label);
-}
-.attention-lead-primary{background:var(--action-primary);color:var(--action-primary-text);border:1px solid var(--action-primary)}
-.attention-lead-primary:hover{background:var(--action-primary-hover);border-color:var(--action-primary-hover)}
-.attention-lead-secondary{background:var(--background-surface);color:var(--text-primary);border:1px solid var(--border-strong)}
-.attention-lead-secondary:hover{border-color:var(--tone-attention-fg)}
-@media(max-width:899px){
-  /* 44px targets, and full-width actions rather than two slivers. */
-  .attention-lead-primary,.attention-lead-secondary{min-height:var(--touch-target);flex:1 1 100%}
-}
-
 /* "Adiante" — anchors, not a second task list. The time is mono and tabular so
    a column of them lines up; the lane is carried by the row's own data
    attribute for styling only, never as the sole signal. */
@@ -1202,7 +1143,6 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .composer-hint,
 .home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-actions button[type=submit],
 .home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-no-classification{display:none}
-@media(max-width:600px){.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{min-height:calc(var(--space-16) + var(--space-4))}}
 
 /* A notice's stamp takes its own line and its controls share the next one, so a
    row with verbs is two lines taller than a row without — not five. The outcome
@@ -1244,8 +1184,18 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 /* At rest the field is exactly one control tall; a textarea's own two rows
    would otherwise decide its height. */
 .home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:var(--control-lg)}
-@media(max-width:600px){.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{height:calc(var(--space-16) + var(--space-4))}}
+/* One line on a phone too. The field used to rest 80px tall there so the
+   prompt could wrap, and its third line was cut in half by the box. The prompt
+   is now one line that ends in an ellipsis; the full text is the field's label. */
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.home-dashboard .composer:has(textarea:placeholder-shown:not(:focus)) .capture-card>textarea::placeholder{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 @media(max-width:600px){.home-dashboard .notice-attention-row .notification-primary-action,.home-dashboard .notice-attention-row .notification-menu-trigger{flex:0 1 auto}}
+/* The notice verbs are a full touch target at every width, not only on a
+   phone. The shared rule grants 44px below 601px and leaves the buttons at
+   their 34px content height above it — and a tablet or a touch laptop is a
+   finger on a wide screen. Height only: the phone already had it, so nothing
+   there moves. */
+.home-dashboard .notice-attention-row .notification-primary-action,.home-dashboard .notice-attention-row .notification-menu-trigger{min-height:var(--touch-target)}
 
 /*
  * Editorial calmo, slice 3 — every stacked list (ADR-180, Decision 1).

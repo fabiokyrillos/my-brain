@@ -360,7 +360,7 @@ test.describe("the unanswered notices, on the pages that actually render them", 
 
     const section = page.locator("section.home-section", { hasText: "Precisa de você" }).first();
     const shown = (await section.locator("header .count").innerText()).replace("+", "").trim();
-    const rows = await section.locator(".notice-attention-row, .needs-attention-row, .attention-lead, [data-conflict=\"row\"]").count();
+    const rows = await section.locator(".notice-attention-row, .needs-attention-row, [data-conflict=\"row\"]").count();
 
     // Derived, never typed: the number on the heading is the number of rows the
     // reader can see under it.

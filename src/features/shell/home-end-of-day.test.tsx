@@ -39,6 +39,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
     timeZone: "America/Sao_Paulo",
     todayLabel: "SÁBADO, 8 DE AGOSTO",
+    greeting: { partOfDay: "afternoon", name: null },
     status: { kind: "saved" },
     priorities: [],
     attention: [],

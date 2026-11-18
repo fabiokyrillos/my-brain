@@ -29,9 +29,10 @@ import { signInWithoutTheLoginForm } from "./support/online-session";
  *    Desktop Chrome and Pixel 7, light and dark — a token, a margin or a
  *    stylesheet that moved shows here.
  *  - NOT PROVEN: surfaces full of data (the account is empty), WebKit, or
- *    anything a real device adds. The day name on Hoje is masked, because it is
- *    the one thing on these pages that changes by itself; the Agenda is pinned
- *    to January 2026 for the same reason.
+ *    anything a real device adds. The day name and the greeting on Hoje are
+ *    masked, because they are the two things on these pages that change by
+ *    themselves (the date, and the part of the day); the Agenda is pinned to
+ *    January 2026 for the same reason.
  *
  * ## How much difference it tolerates
  *
@@ -66,7 +67,10 @@ type Surface = {
 };
 
 const SURFACES: readonly Surface[] = [
-  { name: "hoje", path: "/pt-BR/app", mask: [".today-hero .eyebrow"] },
+  // The greeting joins the day name behind the mask: it names the part of the
+  // day in the owner's zone, so a baseline drawn in the morning would fail every
+  // afternoon run for a reason that is not the product.
+  { name: "hoje", path: "/pt-BR/app", mask: [".today-hero .eyebrow", ".today-hero h1"] },
   { name: "conversar", path: "/pt-BR/app/chat", mask: [] },
   // `/app/tasks` redirects here. Under `app/loading.tsx` that redirect lands
   // client-side after the shell streams, so asserting the old path raced it.

@@ -55,6 +55,7 @@ const loadMemoryConflicts = vi.fn();
 const loadHomeAgendaProjection = vi.fn();
 const loadOnboardingPath = vi.fn();
 const loadAttentionNotices = vi.fn();
+const loadOwnerGreetingName = vi.fn();
 
 vi.mock("@/features/daily-cycle/work-projection", () => ({
   loadWorkProjection: (...args: unknown[]) => loadWorkProjection(...args),
@@ -118,6 +119,16 @@ vi.mock("@/features/onboarding/actions", () => ({
   restoreOnboarding: vi.fn(),
 }));
 
+/*
+  The greeting's name is a NINTH read, and the one Hoje can most easily do
+  without. It is isolated like the other eight for that reason: a page that
+  went down because it could not learn what to call its owner would have lost
+  the capture box over a first name.
+*/
+vi.mock("./owner-greeting-name", () => ({
+  loadOwnerGreetingName: (...args: unknown[]) => loadOwnerGreetingName(...args),
+}));
+
 import { HomeDashboard } from "./home-dashboard";
 
 function healthy() {
@@ -128,6 +139,7 @@ function healthy() {
   loadMemoryConflicts.mockResolvedValue({ items: [], bounded: false, limit: 20 });
   loadHomeAgendaProjection.mockResolvedValue({ items: [], hasMore: false, timezone: "America/Sao_Paulo" });
   loadAttentionNotices.mockResolvedValue({ items: [], hasMore: false });
+  loadOwnerGreetingName.mockResolvedValue("Fábio");
   // A finished path: the panel renders nothing, which is the healthy shape for
   // every other test in this file that is not about onboarding.
   loadOnboardingPath.mockResolvedValue({
@@ -160,6 +172,8 @@ const PROJECTIONS = [
   ["conflicts", loadMemoryConflicts],
   ["agenda", loadHomeAgendaProjection],
   ["onboarding", loadOnboardingPath],
+  ["notices", loadAttentionNotices],
+  ["greeting name", loadOwnerGreetingName],
 ] as const;
 
 describe("2J-HOJE-010: a failing section degrades that section only", () => {
@@ -245,6 +259,28 @@ describe("2J-HOJE-010: a failing section degrades that section only", () => {
 
     expect(error).toHaveBeenCalled();
     expect(String(error.mock.calls[0]?.[0])).toContain("inbox");
+  });
+
+  it("greets without a name when the name cannot be read, and says which read failed", async () => {
+    const error = vi.spyOn(console, "error");
+    loadOwnerGreetingName.mockRejectedValue(new Error("profiles unavailable"));
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    // A greeting with no name is still a greeting: the sentence ends where
+    // the name would have begun, with no comma left dangling.
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toMatch(/^(Bom dia|Boa tarde|Boa noite)\.$/);
+    expect(String(error.mock.calls[0]?.[0])).toContain("greeting name");
+  });
+
+  it("names no part of the day when the owner's zone did not load", async () => {
+    // The work projection carries the zone. Its fallback is "UTC" — a real
+    // zone and the wrong one — so the greeting must not be computed in it.
+    loadWorkProjection.mockRejectedValue(new Error("work unavailable"));
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Olá, Fábio.");
   });
 
   it("renders normally when every projection succeeds", async () => {

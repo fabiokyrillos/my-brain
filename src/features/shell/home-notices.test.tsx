@@ -60,6 +60,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
     timeZone: "America/Sao_Paulo",
     todayLabel: "SEGUNDA-FEIRA, 24 DE AGOSTO",
+    greeting: { partOfDay: "afternoon", name: null },
     status: { kind: "saved" },
     priorities: [],
     attention: [],
@@ -211,8 +212,9 @@ describe("2S-ATTENTION-007: the surface's existing sources are unchanged", () =>
    *
    * An EQUALITY against the pre-slice projection is what the requirement asks
    * for, and equality needs something comparable. Selecting the rows each older
-   * source renders — the expanded lead, the collapsed entry rows, the conflict
-   * rows — and reading their text in document order captures which sources
+   * source renders — the entry rows and the conflict rows (the expanded lead
+   * card left with ADR-180; the lead is an entry row like the rest) — and
+   * reading their text in document order captures which sources
    * contributed, how many rows each produced, and where they sat. A source that
    * stopped contributing fails here; so does one whose rows moved.
    *
@@ -221,7 +223,7 @@ describe("2S-ATTENTION-007: the surface's existing sources are unchanged", () =>
    * surgery on a number — a test that edits its own subject to make it match.
    */
   function existingRows(): string[] {
-    return [...attentionSection().querySelectorAll(".attention-lead, .needs-attention-row, [data-conflict=\"row\"]")]
+    return [...attentionSection().querySelectorAll(".needs-attention-row, [data-conflict=\"row\"]")]
       .map((row) => row.textContent ?? "");
   }
 

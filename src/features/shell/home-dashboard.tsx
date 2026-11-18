@@ -19,7 +19,10 @@ import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-e
 import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 import { deriveHomeOperationalStatus } from "./capabilities";
+import { partOfDayIn } from "./greeting";
 import { HomeView, type HomePriorityView, type HomeTaskView, type HomeViewModel } from "./home-view";
+import { withoutNoticedTasks } from "./noticed-tasks";
+import { loadOwnerGreetingName } from "./owner-greeting-name";
 import { getAgentName } from "@/features/profile/agent-identity";
 
 const ORGANIZING_HOME_LIMIT = 4;
@@ -75,7 +78,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     findable. It just does not take the page down to say so.
   */
   const now = new Date();
-  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled, onboardingSettled, noticesSettled] = await Promise.allSettled([
+  const [workSettled, supplementalSettled, inboxSettled, attentionSettled, conflictSettled, agendaSettled, onboardingSettled, noticesSettled, greetingNameSettled] = await Promise.allSettled([
     loadWorkProjection(supabase, { userId: user.id, locale, view: "today", page: 1 }),
     loadHomeSupplementalProjection(supabase, user.id),
     loadInboxProjection(supabase, { locale, page: 1 }),
@@ -105,6 +108,13 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
       row, not take the capture box down with it.
     */
     loadAttentionNotices(supabase, { userId: user.id, locale, limit: NEEDS_ATTENTION_HOME_LIMIT }),
+    /*
+      The name the greeting uses. Its own settled slot on the same rule, and it
+      is the read this page can most easily do without: a failed or empty one
+      greets with "Bom dia." instead of "Bom dia, Fábio.", and nothing else on
+      the page knows the difference.
+    */
+    loadOwnerGreetingName(supabase, user.id),
   ]);
 
   function settled<T>(result: PromiseSettledResult<T>, fallback: T, section: string): T {
@@ -147,13 +157,47 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
   );
   const agenda = settled(agendaSettled, EMPTY_HOME_AGENDA, "agenda");
   const notices = settled(noticesSettled, EMPTY_ATTENTION_NOTICES, "notices");
+  const greetingName = settled(greetingNameSettled, null, "greeting name");
 
+  /*
+    What the numbers on this page mean, now that a noticed task is listed once.
+
+    - The status sentence under the greeting and the heading of *Precisa de
+      você* are the SAME number: entries awaiting a decision + memory conflicts
+      + the notices rendered here. `notices.items` is exactly what the section
+      renders, so a notice past the bound is not counted — it is the `+`.
+    - The heading of *Hoje e atrasado* counts the tasks listed under it, and
+      those no longer include a task one of these notices is about (see
+      `dayTasks` below). That task is counted once, above, as its notice.
+
+    So no task is counted twice, and none drops out of every total: it moves
+    from the day's number to the attention number together with its row.
+  */
   const operationalStatus = deriveHomeOperationalStatus({
     items: inboxProjection.items,
     attentionCount: attentionProjection.items.length,
     attentionHasNext: attentionProjection.hasNext,
     conflictCount: conflicts.items.length,
+    noticeCount: notices.items.length,
+    noticesHaveMore: notices.hasMore,
   });
+
+  /*
+    A task that is already a notice in *Precisa de você* is not listed again
+    below it — `2J-HOJE-004`'s rule, one level up. The owner saw one task three
+    times on this screen: as an overdue notice, as a reminder notice, and under
+    *Hoje e atrasado*.
+
+    Removed HERE, before `selectTodayPriorities` takes its three, so the slot a
+    noticed task would have held goes to the next task that qualifies rather
+    than staying empty. `selectTodayPriorities` is untouched: it still caps
+    whatever it is given, for this caller and for any other.
+
+    `notices.items` is the bounded page this surface renders. A notice that
+    exists but is not shown hides nothing — its task stays in the list, because
+    otherwise it would be on the page nowhere.
+  */
+  const dayTasks = withoutNoticedTasks(workProjection.items, notices.items);
 
   /*
     `2J-HOJE-004`. Computed from the SAME `today` projection the list below
@@ -167,7 +211,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     month: "short",
     timeZone: workProjection.timezone,
   });
-  const priorities: HomePriorityView[] = selectTodayPriorities(workProjection.items, {
+  const priorities: HomePriorityView[] = selectTodayPriorities(dayTasks, {
     now,
     timeZone: workProjection.timezone,
   }).map((priority) => ({
@@ -187,7 +231,7 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     here, because the second copy carries less information than the first.
   */
   const promoted = new Set(priorities.map((priority) => priority.taskId));
-  const today: HomeTaskView[] = workProjection.items
+  const today: HomeTaskView[] = dayTasks
     .filter((task) => !promoted.has(task.taskId))
     .slice(0, TODAY_HOME_LIMIT)
     .map((task) => ({
@@ -253,6 +297,20 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     })
       .format(now)
       .toUpperCase(),
+    /*
+      The same instant and the same zone as the label above, so the greeting
+      cannot say "Boa tarde" over a header that says it is 23:47 — which is what
+      the fixed string did.
+
+      Only when the work projection actually loaded. Its fallback names "UTC",
+      which is a real zone and the wrong one: three hours off for this owner,
+      enough to turn an evening into a morning. With no zone to trust the
+      greeting names no part of the day at all.
+    */
+    greeting: {
+      partOfDay: workSettled.status === "fulfilled" ? partOfDayIn(now, workProjection.timezone) : null,
+      name: greetingName,
+    },
     status:
       operationalStatus.kind === "attention"
         ? { kind: "attention", count: operationalStatus.count, hasMore: operationalStatus.hasMore }
@@ -266,8 +324,9 @@ export async function HomeDashboard({ locale }: { locale: Locale }) {
     noticesHaveMore: notices.hasMore,
     conflicts,
     today,
+    // Of the tasks this section may list — a noticed one is not "more" of it.
     todayHasMore:
-      workProjection.items.length - promoted.size > TODAY_HOME_LIMIT || workProjection.hasNext,
+      dayTasks.length - promoted.size > TODAY_HOME_LIMIT || workProjection.hasNext,
     waitingCount: supplemental.waitingCount,
     openQuestion: supplemental.openQuestionPreview,
     organizing,

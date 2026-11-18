@@ -66,6 +66,7 @@ function viewModel(overrides: Partial<HomeViewModel> = {}): HomeViewModel {
   return {
     timeZone: "America/Sao_Paulo",
     todayLabel: "QUINTA-FEIRA, 30 DE JULHO",
+    greeting: { partOfDay: "afternoon", name: null },
     status: { kind: "attention", count: 2, hasMore: false },
     priorities: [],
     attention: [attentionItem()],
@@ -285,6 +286,38 @@ describe("HomeView", () => {
     renderHome(viewModel({}));
 
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(/^Boa tarde\.$/);
+  });
+
+  /*
+    The greeting used to be the literal "Boa tarde." — at 23:47 in the owner's
+    recording. The view has no clock: it is handed the part of the day and the
+    name, and these assert it says exactly what it was handed, in both locales.
+  */
+  it.each([
+    ["pt-BR", "morning", "Fábio", "Bom dia, Fábio."],
+    ["pt-BR", "afternoon", "Fábio", "Boa tarde, Fábio."],
+    ["pt-BR", "evening", "Fábio", "Boa noite, Fábio."],
+    ["pt-BR", "evening", null, "Boa noite."],
+    ["pt-BR", null, "Fábio", "Olá, Fábio."],
+    ["pt-BR", null, null, "Olá."],
+    ["en", "morning", "Fábio", "Good morning, Fábio."],
+    ["en", "afternoon", null, "Good afternoon."],
+    ["en", "evening", "Fábio", "Good evening, Fábio."],
+    ["en", null, null, "Hello."],
+  ] as const)("greets in %s for %s / %s", (locale, partOfDay, name, expected) => {
+    renderHome(viewModel({ greeting: { partOfDay, name } }), locale);
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.textContent).toBe(expected);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("renders the owner's name as text, never as markup", () => {
+    renderHome(viewModel({ greeting: { partOfDay: "morning", name: "<img src=x onerror=alert(1)>" } }));
+
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading.querySelector("img")).toBeNull();
+    expect(heading.textContent).toBe("Bom dia, <img src=x onerror=alert(1)>.");
   });
 
   it("renders the agenda in the owner's zone, not the runner's", () => {

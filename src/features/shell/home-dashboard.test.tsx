@@ -5,9 +5,13 @@ import { loadInboxProjection } from "@/features/daily-cycle/inbox-projection";
 import { loadAttentionProjection } from "@/features/daily-cycle/attention-projection";
 import { loadWorkProjection } from "@/features/daily-cycle/work-projection";
 import { loadHomeSupplementalProjection } from "@/features/daily-cycle/home-projection";
+import { loadAttentionNotices } from "@/features/notifications/attention-notices";
+import type { NotificationRowView } from "@/features/notifications/row-projection";
 import { NeedsAttentionViewed } from "@/features/product-analytics/interaction-events";
+import { noticeRow } from "@/test/notification-verb-fixtures";
 import type { InboxItemView, NeedsAttentionItemView, WorkItemView } from "@/features/daily-cycle/contracts";
 import { HomeDashboard } from "./home-dashboard";
+import { loadOwnerGreetingName } from "./owner-greeting-name";
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/auth/require-user", () => ({ requireUser: vi.fn() }));
@@ -16,6 +20,19 @@ vi.mock("@/features/daily-cycle/attention-projection", () => ({ loadAttentionPro
 vi.mock("@/features/daily-cycle/work-projection", () => ({ loadWorkProjection: vi.fn() }));
 vi.mock("@/features/daily-cycle/home-projection", () => ({ loadHomeSupplementalProjection: vi.fn() }));
 vi.mock("@/features/capture/actions", () => ({ captureEntry: vi.fn() }));
+/*
+  The notices and the greeting's name are loaded through mocks so a test can
+  plant them. Both used to reach the bare `supabase` stub and reject, which
+  rendered the page without them — fine for the tests above, and no way to
+  assert what the page does WITH a notice or a name.
+*/
+vi.mock("@/features/notifications/attention-notices", () => ({
+  loadAttentionNotices: vi.fn(),
+  EMPTY_ATTENTION_NOTICES: { items: [], hasMore: false },
+}));
+vi.mock("./owner-greeting-name", () => ({ loadOwnerGreetingName: vi.fn() }));
+// The notice rows mount a client component that refreshes the route.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock("@/features/product-analytics/interaction-events", () => ({
   NeedsAttentionViewed: vi.fn(() => <span data-testid="needs-attention-view-marker" />),
   recordNeedsAttentionItemOpened: vi.fn(),
@@ -24,6 +41,7 @@ vi.mock("@/features/product-analytics/interaction-events", () => ({
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
 });
 
 function setup(options: {
@@ -33,6 +51,11 @@ function setup(options: {
   openQuestionPreview?: string | null;
   attentionItems?: readonly NeedsAttentionItemView[];
   attentionHasNext?: boolean;
+  notices?: readonly NotificationRowView[];
+  noticesHaveMore?: boolean;
+  /** What the profile read resolves to, or the error it rejects with. */
+  greetingName?: string | null | Error;
+  timezone?: string;
 } = {}) {
   const {
     items = [],
@@ -41,14 +64,21 @@ function setup(options: {
     openQuestionPreview = null,
     attentionItems = [],
     attentionHasNext = false,
+    notices = [],
+    noticesHaveMore = false,
+    greetingName = null,
+    timezone = "America/Sao_Paulo",
   } = options;
 
   const supabase = { from: vi.fn() };
   vi.mocked(requireUser).mockResolvedValue({ supabase, user: { id: "user-1" } } as never);
   vi.mocked(loadInboxProjection).mockResolvedValue({ items, hasNext: false });
   vi.mocked(loadAttentionProjection).mockResolvedValue({ items: attentionItems, hasNext: attentionHasNext, nextCursor: null });
-  vi.mocked(loadWorkProjection).mockResolvedValue({ items: workItems, hasNext: false, timezone: "America/Sao_Paulo", editControlsByTaskId: {}, statusByTaskId: {} });
+  vi.mocked(loadWorkProjection).mockResolvedValue({ items: workItems, hasNext: false, timezone, editControlsByTaskId: {}, statusByTaskId: {} });
   vi.mocked(loadHomeSupplementalProjection).mockResolvedValue({ waitingCount, openQuestionPreview });
+  vi.mocked(loadAttentionNotices).mockResolvedValue({ items: notices, hasMore: noticesHaveMore });
+  if (greetingName instanceof Error) vi.mocked(loadOwnerGreetingName).mockRejectedValue(greetingName);
+  else vi.mocked(loadOwnerGreetingName).mockResolvedValue(greetingName);
   return { supabase };
 }
 
@@ -310,5 +340,201 @@ describe("HomeDashboard", () => {
     render(await HomeDashboard({ locale: "en" }));
 
     expect(screen.getByRole("link", { name: "View all" })).toHaveAttribute("href", "/en/app/inbox?view=needs-you");
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * The greeting knows the hour and the owner's name.
+ * -------------------------------------------------------------------------- */
+
+describe("HomeDashboard: the greeting", () => {
+  /** Only `Date` is faked: the page awaits real promises and must not stall. */
+  function at(instant: string) {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(instant));
+  }
+
+  function heading(): string {
+    return screen.getByRole("heading", { level: 1 }).textContent ?? "";
+  }
+
+  it("says good evening at 23:47 in the owner's zone, where the fixed string said good afternoon", async () => {
+    // 02:47 UTC on the 18th is 23:47 on the 17th in America/Sao_Paulo.
+    at("2026-11-18T02:47:00.000Z");
+    setup({ greetingName: "Fábio" });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(heading()).toBe("Boa noite, Fábio.");
+  });
+
+  it("reads the hour in the owner's zone rather than the host's", async () => {
+    // The same instant is 11:47 in Tokyo. A greeting computed in UTC, or in the
+    // runner's own zone, could not produce both of these answers.
+    at("2026-11-18T02:47:00.000Z");
+    setup({ greetingName: "Fábio", timezone: "Asia/Tokyo" });
+
+    render(await HomeDashboard({ locale: "en" }));
+
+    expect(heading()).toBe("Good morning, Fábio.");
+  });
+
+  it("says good afternoon in the afternoon, in English too", async () => {
+    at("2026-11-18T18:10:00.000Z"); // 15:10 in São Paulo.
+    setup({ greetingName: "Fábio" });
+
+    render(await HomeDashboard({ locale: "en" }));
+
+    expect(heading()).toBe("Good afternoon, Fábio.");
+  });
+
+  it("greets without a name when the profile has none", async () => {
+    at("2026-11-18T12:00:00.000Z"); // 09:00 in São Paulo.
+    setup({ greetingName: null });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(heading()).toBe("Bom dia.");
+  });
+
+  it("degrades to the nameless greeting when the name read fails, and keeps the page", async () => {
+    at("2026-11-18T12:00:00.000Z");
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    setup({ greetingName: new Error("profiles unavailable"), workItems: [workItem({ title: "Preparar reunião" })] });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(heading()).toBe("Bom dia.");
+    expect(screen.getByText("Preparar reunião")).toBeInTheDocument();
+    expect(error.mock.calls.some(([message]) => String(message).includes("greeting name"))).toBe(true);
+    error.mockRestore();
+  });
+});
+
+/* -------------------------------------------------------------------------- *
+ * A task that is already a notice is not listed again below.
+ * -------------------------------------------------------------------------- */
+
+describe("HomeDashboard: a noticed task is on the page once", () => {
+  const TASK_IDS = [
+    "11111111-1111-4111-8111-111111111111",
+    "22222222-2222-4222-8222-222222222222",
+    "33333333-3333-4333-8333-333333333333",
+    "44444444-4444-4444-8444-444444444444",
+    "55555555-5555-4555-8555-555555555555",
+  ] as const;
+
+  /** Five overdue tasks; the first is the oldest, so it would lead the priorities. */
+  function overdueTasks(): WorkItemView[] {
+    return TASK_IDS.map((taskId, index) =>
+      workItem({ taskId, title: `Tarefa ${index + 1}`, dueAt: `2026-07-1${index}T14:00:00.000Z` }));
+  }
+
+  function overdueNotice(taskId: string, title: string, subjectStatus: string | null = "todo") {
+    return noticeRow({
+      source: {
+        id: `aaaaaaaa-0000-4000-8000-${taskId.slice(-12)}`,
+        title: "Tarefa atrasada",
+        body: title,
+        dedupe_key: `overdue:${taskId}:2026-11-17`,
+      },
+      subjectStatus,
+      subjectLabel: title,
+    });
+  }
+
+  it("lists it only as its notice, and refills the priorities with the next task", async () => {
+    setup({ workItems: overdueTasks(), notices: [overdueNotice(TASK_IDS[0], "Tarefa 1")] });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    // Once on the whole page, and that once is in *Precisa de você*.
+    expect(screen.getAllByText("Tarefa 1")).toHaveLength(1);
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    expect(within(attention).getByText("Tarefa 1")).toBeInTheDocument();
+
+    // Still three priorities: the slot went to the next task that qualifies.
+    const priorities = [...container.querySelectorAll(".home-priorities li strong")].map((node) => node.textContent);
+    expect(priorities).toEqual(["Tarefa 2", "Tarefa 3", "Tarefa 4"]);
+    const day = screen.getByRole("region", { name: "Hoje e atrasado" });
+    expect(within(day).getByText("Tarefa 5")).toBeInTheDocument();
+  });
+
+  it("counts the task once: in the attention number, not in the day's", async () => {
+    setup({ workItems: overdueTasks(), notices: [overdueNotice(TASK_IDS[0], "Tarefa 1")] });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    const attention = screen.getByRole("region", { name: "Precisa de você" });
+    const day = screen.getByRole("region", { name: "Hoje e atrasado" });
+    expect(attention.querySelector("header .count")?.textContent).toBe("1");
+    // Five tasks are due; four are listed here, because the fifth is above.
+    expect(day.querySelector("header .count")?.textContent).toBe("4");
+    // The sentence under the greeting states the attention section's number.
+    expect(screen.getByText("1 item precisa de você.")).toHaveAttribute("role", "status");
+  });
+
+  it("does not say nothing is pending above a notice that is the task's only row", async () => {
+    setup({
+      workItems: [workItem({ taskId: TASK_IDS[0], title: "Tarefa 1" })],
+      notices: [overdueNotice(TASK_IDS[0], "Tarefa 1")],
+    });
+
+    render(await HomeDashboard({ locale: "pt-BR" }));
+
+    expect(screen.queryByText("Nada pendente. Tudo salvo.")).not.toBeInTheDocument();
+    expect(screen.getByText("1 item precisa de você.")).toBeInTheDocument();
+    // The day's section is honestly empty rather than repeating the task.
+    expect(screen.getByText("Nenhum prazo exige sua atenção hoje.")).toBeInTheDocument();
+  });
+
+  it("keeps a task whose notice is not on the page, and marks the count as partial", async () => {
+    // The loader returns only the bounded page Hoje renders — three rows. Task
+    // 4 has a notice as well, past that bound: it must stay in the list.
+    setup({
+      workItems: overdueTasks(),
+      notices: [
+        overdueNotice(TASK_IDS[0], "Tarefa 1"),
+        overdueNotice(TASK_IDS[1], "Tarefa 2"),
+        overdueNotice(TASK_IDS[2], "Tarefa 3"),
+      ],
+      noticesHaveMore: true,
+    });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    const priorities = [...container.querySelectorAll(".home-priorities li strong")].map((node) => node.textContent);
+    expect(priorities).toEqual(["Tarefa 4", "Tarefa 5"]);
+    expect(screen.getByText("3+ itens precisam de você.")).toBeInTheDocument();
+  });
+
+  it("keeps a task whose notice could not resolve its subject", async () => {
+    // That row offers no task verb, so removing the task would leave nothing on
+    // the page able to act on it.
+    setup({ workItems: overdueTasks(), notices: [overdueNotice(TASK_IDS[0], "Tarefa 1", null)] });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    const priorities = [...container.querySelectorAll(".home-priorities li strong")].map((node) => node.textContent);
+    expect(priorities).toEqual(["Tarefa 1", "Tarefa 2", "Tarefa 3"]);
+  });
+
+  it("keeps a task when the only notice near it is about a reminder", async () => {
+    const reminder = noticeRow({
+      source: {
+        id: "bbbbbbbb-0000-4000-8000-000000000001",
+        type: "reminder",
+        title: "Lembrete",
+        body: "Tarefa 1",
+        dedupe_key: "reminder:99999999-9999-4999-8999-999999999999",
+      },
+      subjectStatus: "scheduled",
+    });
+    setup({ workItems: overdueTasks(), notices: [reminder] });
+
+    const { container } = render(await HomeDashboard({ locale: "pt-BR" }));
+
+    const priorities = [...container.querySelectorAll(".home-priorities li strong")].map((node) => node.textContent);
+    expect(priorities).toEqual(["Tarefa 1", "Tarefa 2", "Tarefa 3"]);
   });
 });
