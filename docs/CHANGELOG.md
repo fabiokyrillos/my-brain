@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-18 — Hoje greets by the hour and by name, and stops listing a noticed task twice
+
+- `features/shell/greeting.ts` (new, pure): the part of the day from an instant and the owner's zone; the first word of `profiles.display_name` as the name, never a placeholder or an e-mail address. `home-dashboard.tsx` reads the name in its own settled slot and greets without it when the read fails; an unsupported zone greets "Olá".
+- `features/shell/noticed-tasks.ts` (new, pure): a task that a notice rendered in "Precisa de você" is about is filtered out before the day's priorities are selected, so the section refills instead of repeating it. The status sentence now counts notices, as the section's own heading already did.
+- The capture field rests one line tall on a phone too; its prompt ends in an ellipsis instead of being cut in half by an 80px box.
+- Removed `NeedsAttentionLeadCard` and `.attention-lead*` (no call site since ADR-180). The notice verbs are 44px at every width. The screenshot lane masks the greeting, which now varies with the hour. No migration.
+
 ## 2026-11-18 — The task detail is one list of facts, each edited in place (ADR-185)
 
 - `features/task-commands/task-detail-controls.tsx`: a fourth frame, `variant="fields"`, renders the task's facts as rows with one verb each (*Alterar* / *Definir* / *Adicionar*) that opens the field's existing control under the row. The per-control form is one function shared by every variant; nothing in the write path changed.

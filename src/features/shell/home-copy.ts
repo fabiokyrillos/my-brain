@@ -1,5 +1,6 @@
 import type { Locale } from "@/lib/preferences";
 import { withAgentName } from "@/lib/agent-name";
+import type { HomeGreeting, PartOfDay } from "./greeting";
 
 /**
  * Home's copy, as a typed feature module.
@@ -15,8 +16,21 @@ import { withAgentName } from "@/lib/agent-name";
  * `src/features/shell/operational-copy.test.ts` audits this file for unsupported
  * continuous-attention promises, exactly as it audited the strings' previous home.
  */
+/**
+ * One sentence per part of the day, plus the one for when the hour could not be
+ * read in the owner's zone.
+ *
+ * Functions rather than a template with a `{name}` token, because the name is
+ * optional and the punctuation depends on it: "Bom dia, Fábio." and "Bom dia."
+ * are two sentences, not one sentence with a hole in it. `withAgentName` passes
+ * functions through by reference, so these survive `getHomeCopy` untouched.
+ */
+export type HomeGreetingCopy = Readonly<
+  Record<PartOfDay | "neutral", (name: string | null) => string>
+>;
+
 export type HomeCopy = {
-  readonly greeting: string;
+  readonly greeting: HomeGreetingCopy;
   readonly prompt: string;
   /** The one-line answer to "what is my state right now". */
   readonly statusAttentionOne: string;
@@ -37,10 +51,6 @@ export type HomeCopy = {
       readonly organizedOne: string;
       readonly organizedMany: string;
       readonly viewOrganized: string;
-      /** The expanded lead item's proposal eyebrow — `03-componentes.md`, InterpretationCard. */
-      readonly proposes: string;
-      /** Said on the lead card, because nothing has been created yet. */
-      readonly reversible: string;
     };
     readonly today: { readonly title: string; readonly hint: string; readonly empty: string };
     /**
@@ -109,7 +119,12 @@ export type HomeCopy = {
 
 export const homeCopy = {
   "pt-BR": {
-    greeting: "Boa tarde.",
+    greeting: {
+      morning: (name) => (name ? `Bom dia, ${name}.` : "Bom dia."),
+      afternoon: (name) => (name ? `Boa tarde, ${name}.` : "Boa tarde."),
+      evening: (name) => (name ? `Boa noite, ${name}.` : "Boa noite."),
+      neutral: (name) => (name ? `Olá, ${name}.` : "Olá."),
+    },
     prompt: "O que merece sua atenção agora?",
     statusAttentionOne: "1 item precisa de você.",
     statusAttentionMany: "{count} itens precisam de você.",
@@ -124,8 +139,6 @@ export const homeCopy = {
         organizedOne: "1 registro foi organizado hoje sem ambiguidade.",
         organizedMany: "{count} registros foram organizados hoje sem ambiguidade.",
         viewOrganized: "Ver o que foi organizado",
-        proposes: "o {agent} propõe",
-        reversible: "Nada foi criado ainda.",
       },
       day: { title: "Hoje e atrasado" },
       agenda: {
@@ -181,7 +194,12 @@ export const homeCopy = {
     answerQuestion: "Responder",
   },
   en: {
-    greeting: "Good afternoon.",
+    greeting: {
+      morning: (name) => (name ? `Good morning, ${name}.` : "Good morning."),
+      afternoon: (name) => (name ? `Good afternoon, ${name}.` : "Good afternoon."),
+      evening: (name) => (name ? `Good evening, ${name}.` : "Good evening."),
+      neutral: (name) => (name ? `Hello, ${name}.` : "Hello."),
+    },
     prompt: "What deserves your attention now?",
     statusAttentionOne: "1 item needs you.",
     statusAttentionMany: "{count} items need you.",
@@ -196,8 +214,6 @@ export const homeCopy = {
         organizedOne: "1 record was organized today with no ambiguity.",
         organizedMany: "{count} records were organized today with no ambiguity.",
         viewOrganized: "See what was organized",
-        proposes: "{agent} proposes",
-        reversible: "Nothing has been created yet.",
       },
       day: { title: "Today and overdue" },
       agenda: {
@@ -260,6 +276,16 @@ export const homeCopy = {
  */
 export function getHomeCopy(locale: Locale, agentName: string): HomeCopy {
   return withAgentName(homeCopy[locale], agentName);
+}
+
+/**
+ * The page's one-line greeting, composed from what the dashboard decided.
+ *
+ * The view calls this and nothing else: it holds no clock and no zone, so which
+ * sentence applies is entirely the `HomeGreeting` it was handed.
+ */
+export function greetingLine(copy: HomeCopy, greeting: HomeGreeting): string {
+  return copy.greeting[greeting.partOfDay ?? "neutral"](greeting.name);
 }
 
 /** Substitutes the single `{count}` placeholder the plural strings carry. */

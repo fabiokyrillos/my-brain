@@ -20,7 +20,8 @@ import { formatInstant } from "@/lib/time/instant-format";
 import type { Locale } from "@/lib/preferences";
 import { getMessages } from "@/i18n/messages";
 import { getNavigationHref } from "./capabilities";
-import { getHomeCopy, withCount } from "./home-copy";
+import type { HomeGreeting } from "./greeting";
+import { getHomeCopy, greetingLine, withCount } from "./home-copy";
 
 /**
  * The destinations Hoje offers directly, as capability **keys**.
@@ -80,6 +81,16 @@ export type HomePriorityView = {
 
 export type HomeViewModel = {
   readonly todayLabel: string;
+  /**
+   * Which part of the day it is for the owner, and the name to greet them by.
+   *
+   * Decided by the dashboard (`greeting.ts`) from the same instant and the same
+   * zone as `todayLabel`, and carried here as two facts rather than read from a
+   * clock: this component has neither a clock nor a zone of its own, which is
+   * what keeps the header from naming a different hour than the day under it
+   * (`LDC-HOME-001`). The sentence itself is the copy module's.
+   */
+  readonly greeting: HomeGreeting;
   readonly status:
     | { readonly kind: "attention"; readonly count: number; readonly hasMore: boolean }
     | { readonly kind: "organizing"; readonly count: number }
@@ -111,7 +122,14 @@ export type HomeViewModel = {
    * they are here rather than only on the full queue.
    */
   readonly conflicts: Bounded<ConflictAttentionItemView>;
-  /** `2J-HOJE-004`. Already capped and ordered by `selectTodayPriorities`. */
+  /**
+   * `2J-HOJE-004`. Already capped and ordered by `selectTodayPriorities`.
+   *
+   * Neither this nor `today` holds a task that one of `notices` is about
+   * (`noticed-tasks.ts`): that task is on the page once, as the notice row that
+   * can act on it, and it is counted once — in the attention section's number,
+   * not in this section's.
+   */
   readonly priorities: readonly HomePriorityView[];
   readonly today: readonly HomeTaskView[];
   readonly todayHasMore: boolean;
@@ -312,8 +330,10 @@ export function HomeView({
         <p className="eyebrow">{view.todayLabel}</p>
         {/* One line. The question that used to follow the greeting took two more
             lines of the first screen and said nothing the status line below does
-            not say with a number. */}
-        <h1>{copy.greeting}</h1>
+            not say with a number. The part of the day and the name arrive on
+            the view model; the name is the owner's own text and is rendered as
+            text. */}
+        <h1>{greetingLine(copy, view.greeting)}</h1>
         {/*
           The state of the day as one sentence under the greeting rather than as
           its own dark panel. The old "Estado agora" panel restated the count that
@@ -491,7 +511,7 @@ export function HomeView({
                   AFTER the entry rows rather than among them, and that placement
                   is deliberate: `2S-ATTENTION-007` requires every source this
                   surface already had to still contribute, unchanged. Appending
-                  leaves the lead card, the collapsed rows and their masking
+                  leaves the entry rows, the conflict rows and their masking
                   exactly where they were — a new kind of row displacing the
                   expanded lead would have changed the existing projection's
                   behaviour while claiming only to have added to it.

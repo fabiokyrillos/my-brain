@@ -130,11 +130,11 @@ Design and page-by-page plan: `docs/initiatives/editorial-calmo/DESIGN.md`. Reco
 
 ### Open work
 
-- **The same thing appears up to three times on Hoje.** Raised by the owner on 16 November 2026 from his own screen: "Cancelar o Claude Code" is an overdue-task notice, a reminder notice and a row under "Hoje e atrasado" at once. Each is correct by its own projection; together they read as three items. Needs a rule for which surface owns a task that is also the subject of a notice — a projection decision, not a drawing.
-- The greeting is a fixed string: "Boa tarde." at 23:47, and no name. The approved mockup said "Boa tarde, Fábio.".
+- ~~**The same thing appears up to three times on Hoje.**~~ — **reduced 2026-11-18:** a task that a rendered notice is about is no longer listed again under "Hoje e atrasado" or in the day's list (`noticed-tasks.ts`). STILL OPEN: an overdue-task notice and a reminder notice about the same thing are two notices with two different subjects (a task and a reminder), so both still render; merging them is a projection decision, not a drawing.
+- ~~The greeting is a fixed string~~ — **done 2026-11-18:** "Bom dia / Boa tarde / Boa noite, <first name>." from the owner's zone and `profiles.display_name` (`greeting.ts`).
 - Redraw the four Hoje baselines of the screenshot lane through `visual-baselines.yml`, and look at the page on the owner's device.
-- `NeedsAttentionLeadCard` and the `.attention-lead*` rules have no call site left; remove them.
-- The notice verbs are 34px tall from 601px up (unchanged by this slice).
+- ~~`NeedsAttentionLeadCard` and the `.attention-lead*` rules have no call site left; remove them.~~ — **done 2026-11-18.**
+- ~~The notice verbs are 34px tall from 601px up.~~ — **done 2026-11-18:** 44px at every width on Hoje.
 - Slices 2–7: shared row and section-heading primitives, then Registros/Tarefas/Lembretes, the entity lists, Avisos/Histórico/Perguntas/Revisões/Busca, the detail pages, the shell.
 
 ## Life Brain — OPENED 2026-10-30 (ADR-145) — tracks A–E merged (E.8 #391, ADR-179 #392); LB-M1…M4, `202611060108` and `202611090109` applied hosted (109 = 109); owner decisions LB-OD-1…9 all DECIDED
