@@ -1,23 +1,49 @@
 "use client";
 
-import { CheckCheck, Eraser, RotateCcw } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef } from "react";
+import { createContext, useActionState, useContext, useEffect, useRef, type ReactNode } from "react";
 
-import { Button } from "@/components/ui";
 import type { Locale } from "@/lib/preferences";
 
 import { idleNotificationBulkState, type NotificationBulkState } from "./bulk-state";
 import { getNotificationSettingsCopy } from "./copy";
 
 type BulkHandler = (state: NotificationBulkState, formData: FormData) => Promise<NotificationBulkState>;
+type BulkScope = "mark_all_read" | "clear_read";
+
+type BulkContext = {
+  readonly dispatch: (formData: FormData) => void;
+  readonly latest: NotificationBulkState;
+  readonly locale: Locale;
+  readonly pending: boolean;
+  readonly readCount: number;
+  readonly unreadCount: number;
+};
+
+const NotificationBulkContext = createContext<BulkContext | null>(null);
+
+function useBulk(): BulkContext {
+  const value = useContext(NotificationBulkContext);
+  if (!value) throw new Error("A notification bulk control was rendered outside NotificationBulkBar.");
+  return value;
+}
 
 /**
- * Life Brain D.2 — "Marcar todos como lidos" and "Limpar os lidos", above the
- * list (T5).
+ * Life Brain D.2 — "Marcar todos como lidos" and "Limpar os lidos" (T5),
+ * recomposed for Editorial calmo (ADR-180).
  *
- * The component is always mounted, in the same place, even when both counts are
- * zero: the undo it offers must survive the refresh that empties them. The live
+ * The two verbs used to sit together in a bar above the list, on every visit,
+ * whether or not either was wanted. Each now sits beside what it acts on —
+ * `NotificationBulkVerb scope="mark_all_read"` on the line that counts the
+ * unread notices, `scope="clear_read"` at the foot of the ones already read —
+ * and costs no line of its own.
+ *
+ * This component is what keeps them one thing: ONE action state for both verbs
+ * and the undo, so what `NotificationBulkOutcome` shows is always the latest
+ * answer, whichever form produced it. It draws nothing itself.
+ *
+ * It is always mounted, and so is the outcome, even when both counts are zero:
+ * the undo it offers must survive the refresh that empties them. The live
  * region exists, empty, before anything happens, so the outcome is announced
  * (a conditional live region is not).
  *
@@ -27,23 +53,22 @@ type BulkHandler = (state: NotificationBulkState, formData: FormData) => Promise
  */
 export function NotificationBulkBar({
   applyAction,
+  children,
   locale,
   readCount,
   undoAction,
   unreadCount,
 }: {
   readonly applyAction: BulkHandler;
+  readonly children: ReactNode;
   readonly locale: Locale;
   readonly readCount: number;
   readonly undoAction: BulkHandler;
   readonly unreadCount: number;
 }) {
-  const copy = getNotificationSettingsCopy(locale).bulk;
   // Held in a ref: the effect below must fire once per settled answer, never
   // again because the router object is a new one on a later render.
   const router = useRef(useRouter());
-  // One state for both verbs and the undo, so what is shown is always the
-  // latest answer, whichever form produced it.
   const [latest, dispatch, pending] = useActionState(
     (state: NotificationBulkState, formData: FormData) =>
       formData.get("intent") === "undo" ? undoAction(state, formData) : applyAction(state, formData),
@@ -54,45 +79,50 @@ export function NotificationBulkBar({
     if (latest.status === "applied" || latest.status === "undone") router.current.refresh();
   }, [latest]);
 
+  return (
+    <NotificationBulkContext.Provider value={{ dispatch, latest, locale, pending, readCount, unreadCount }}>
+      {children}
+    </NotificationBulkContext.Provider>
+  );
+}
+
+/** One bulk verb, drawn only when it has something to act on. */
+export function NotificationBulkVerb({ scope }: { readonly scope: BulkScope }) {
+  const { dispatch, locale, pending, readCount, unreadCount } = useBulk();
+  const copy = getNotificationSettingsCopy(locale).bulk;
+  const count = scope === "mark_all_read" ? unreadCount : readCount;
+  if (count <= 0) return null;
+
+  return (
+    <form action={dispatch} className="notification-bulk-form">
+      <input name="locale" type="hidden" value={locale} />
+      <input name="scope" type="hidden" value={scope} />
+      <button className="notification-bulk-verb" disabled={pending} type="submit">
+        {scope === "mark_all_read" ? copy.markAllRead : copy.clearRead}
+      </button>
+    </form>
+  );
+}
+
+/** What the last bulk verb did, and the way back. Empty — and no taller than nothing — at rest. */
+export function NotificationBulkOutcome() {
+  const { dispatch, latest, locale, pending } = useBulk();
+  const copy = getNotificationSettingsCopy(locale).bulk;
   const offer = latest.status === "applied" ? latest.undo : null;
 
   return (
-    <div aria-label={copy.label} className="notification-bulk" role="group">
-      {unreadCount > 0 || readCount > 0 ? (
-        <div className="notification-bulk-verbs">
-          {unreadCount > 0 ? (
-            <form action={dispatch}>
-              <input name="locale" type="hidden" value={locale} />
-              <input name="scope" type="hidden" value="mark_all_read" />
-              <Button disabled={pending} icon={<CheckCheck />} size="sm" type="submit" variant="secondary">
-                {copy.markAllRead}
-              </Button>
-            </form>
-          ) : null}
-          {readCount > 0 ? (
-            <form action={dispatch}>
-              <input name="locale" type="hidden" value={locale} />
-              <input name="scope" type="hidden" value="clear_read" />
-              <Button disabled={pending} icon={<Eraser />} size="sm" type="submit" variant="ghost">
-                {copy.clearRead}
-              </Button>
-            </form>
-          ) : null}
-        </div>
+    <div aria-label={copy.label} className="notification-bulk-outcome" role="group">
+      <p aria-live="polite" className="notification-bulk-message" role="status">{latest.message}</p>
+      {offer ? (
+        <form action={dispatch} className="notification-bulk-form">
+          <input name="intent" type="hidden" value="undo" />
+          <input name="locale" type="hidden" value={locale} />
+          <input name="auditId" type="hidden" value={offer.auditId} />
+          <button className="notification-bulk-verb" disabled={pending} type="submit">
+            {copy.undo}
+          </button>
+        </form>
       ) : null}
-      <div className="notification-bulk-outcome">
-        <p aria-live="polite" className="notification-bulk-message" role="status">{latest.message}</p>
-        {offer ? (
-          <form action={dispatch}>
-            <input name="intent" type="hidden" value="undo" />
-            <input name="locale" type="hidden" value={locale} />
-            <input name="auditId" type="hidden" value={offer.auditId} />
-            <Button disabled={pending} icon={<RotateCcw />} size="sm" type="submit" variant="ghost">
-              {copy.undo}
-            </Button>
-          </form>
-        ) : null}
-      </div>
     </div>
   );
 }

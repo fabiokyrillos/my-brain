@@ -138,6 +138,8 @@ export type NotificationSettingsCopy = {
   readonly readBadge: string;
   readonly unreadSummary: (count: number) => string;
   readonly allReadSummary: string;
+  /** Editorial calmo: the heading of the notices already read, under the unread ones. */
+  readonly readHeading: string;
   readonly markRead: string;
   readonly openDestination: string;
   /**
@@ -256,6 +258,7 @@ const PT_BR: NotificationSettingsCopy = {
   readBadge: "Lida",
   unreadSummary: (count) => (count === 1 ? "1 aviso não lido." : `${count} avisos não lidos.`),
   allReadSummary: "Nenhum aviso não lido.",
+  readHeading: "Já lidos",
   markRead: "Marcar como lida",
   openDestination: "Abrir",
   preferencesLink: "Ajustar preferências de notificação",
@@ -365,6 +368,7 @@ const EN: NotificationSettingsCopy = {
   readBadge: "Read",
   unreadSummary: (count) => (count === 1 ? "1 unread alert." : `${count} unread alerts.`),
   allReadSummary: "No unread alerts.",
+  readHeading: "Already read",
   markRead: "Mark as read",
   openDestination: "Open",
   preferencesLink: "Adjust notification preferences",

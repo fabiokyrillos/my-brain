@@ -192,7 +192,7 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
    was added to the census: the four classes the recomposition introduced
    without a rule of their own (`memory-segment`, `review-detail-content`,
    `day-review-page`, `day-review-promise`) each got one. */
-const RECORDED_UNSTYLED = 26;
+const RECORDED_UNSTYLED = 24;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

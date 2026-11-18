@@ -41,6 +41,15 @@ export type CalendarCopy = {
     /** Life Brain A.4: the filter button's name when lanes are hidden. */
     readonly hiddenLabel: (count: number) => string;
   };
+  /**
+   * ADR-180 — what one row is, in the singular: the caption under its title.
+   *
+   * `lanes.names` are the filter's words ("Prazos": which lanes to show) and
+   * read wrongly under one item. Each kind is a different word, so the kind
+   * alone tells a commitment from an intention from a suggestion without any
+   * colour (`2M-ACCESS-005`).
+   */
+  readonly kinds: Record<CalendarLane, string>;
   readonly commitment: Record<CalendarCommitment, string>;
   readonly navigation: {
     readonly previous: string;
@@ -60,6 +69,8 @@ export type CalendarCopy = {
   readonly states: {
     readonly empty: string;
     readonly emptyNarrowed: string;
+    /** One day with nothing on it, inside a period that has something. */
+    readonly emptyDay: string;
     readonly loading: string;
     readonly error: string;
     readonly partial: (lanes: string) => string;
@@ -108,6 +119,11 @@ export type CalendarCopy = {
     readonly listHeading: string;
     readonly gridLabel: (period: string) => string;
   };
+  /** ADR-180 — the phone's week: seven days on one line, then the days as a list. */
+  readonly week: {
+    readonly stripLabel: string;
+    readonly dayLabel: (day: string, count: number) => string;
+  };
   readonly summary: (count: number) => string;
   readonly todayLabel: string;
 };
@@ -142,6 +158,14 @@ const PT_BR: CalendarCopy = {
       event: "Consultas, viagens e outros compromissos com hora ou período.",
     },
   },
+  kinds: {
+    deadline: "Prazo",
+    intention: "Intenção",
+    reminder: "Lembrete",
+    event: "Evento",
+    review: "Revisão",
+    suggestion: "Data sugerida",
+  },
   commitment: {
     committed: "Compromisso",
     intended: "Intenção",
@@ -158,6 +182,7 @@ const PT_BR: CalendarCopy = {
   states: {
     empty: "Nada marcado para este período.",
     emptyNarrowed: "Nada marcado para este período com os filtros atuais.",
+    emptyDay: "Nada marcado",
     loading: "Carregando o período…",
     error: "Não foi possível carregar este período.",
     partial: (lanes) => `Não foi possível carregar: ${lanes}. O restante está aqui.`,
@@ -183,6 +208,10 @@ const PT_BR: CalendarCopy = {
     more: (count) => (count === 1 ? "mais 1" : `mais ${count}`),
     listHeading: "Dias com itens neste mês",
     gridLabel: (period) => `Grade do mês de ${period}`,
+  },
+  week: {
+    stripLabel: "Dias desta semana",
+    dayLabel: (day, count) => (count === 0 ? `${day}, nada marcado` : count === 1 ? `${day}, 1 item` : `${day}, ${count} itens`),
   },
   summary: (count) => (count === 1 ? "1 item neste período" : `${count} itens neste período`),
   todayLabel: "Hoje",
@@ -216,6 +245,14 @@ const EN: CalendarCopy = {
       event: "Appointments, trips and other plans with a time or a period.",
     },
   },
+  kinds: {
+    deadline: "Deadline",
+    intention: "Intention",
+    reminder: "Reminder",
+    event: "Event",
+    review: "Review",
+    suggestion: "Suggested date",
+  },
   commitment: {
     committed: "Commitment",
     intended: "Intention",
@@ -232,6 +269,7 @@ const EN: CalendarCopy = {
   states: {
     empty: "Nothing scheduled for this period.",
     emptyNarrowed: "Nothing scheduled for this period with the current filters.",
+    emptyDay: "Nothing scheduled",
     loading: "Loading this period…",
     error: "This period could not be loaded.",
     partial: (lanes) => `Could not load: ${lanes}. Everything else is here.`,
@@ -255,6 +293,10 @@ const EN: CalendarCopy = {
     more: (count) => (count === 1 ? "1 more" : `${count} more`),
     listHeading: "Days with items this month",
     gridLabel: (period) => `Month grid for ${period}`,
+  },
+  week: {
+    stripLabel: "Days of this week",
+    dayLabel: (day, count) => (count === 0 ? `${day}, nothing scheduled` : count === 1 ? `${day}, 1 item` : `${day}, ${count} items`),
   },
   summary: (count) => (count === 1 ? "1 item in this period" : `${count} items in this period`),
   todayLabel: "Today",

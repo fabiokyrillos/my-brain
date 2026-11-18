@@ -142,7 +142,8 @@ Design and page-by-page plan: `docs/initiatives/editorial-calmo/DESIGN.md`. Reco
 - An event suggestion declined with *Agora não* returns on reload: no server-side decline exists.
 - On the Memória overview the lens strip sits above an index of the same seven destinations (a guard requires the strip); "Nova organização" sits at the overview's foot.
 - Stale specs found and left alone: `e2e/life-brain-b7-conversation.spec.ts:140` fails on both projects; `online-phase-2o-mobile-accessibility.spec.ts` asserts the palette trigger is under 44px, which is untrue; `e2e/layout-contracts.spec.ts` still mirrors the old Hoje `<h1>`.
-- Not touched by this pass: Conversar, Agenda, Avisos, Histórico, Busca's own page, Ajustes, the auth pages, Custos, Jobs.
+- Avisos, Histórico, Agenda and Planejar recomposed 2026-11-18 (`AVISOS-HISTORICO-AGENDA.md`, ADR-186). **Owner's eye needed on ADR-186**: the phone week as strip + list, the commitment word no longer printed, the planner's explanations folded. Also open: the planner's *O que vale notar* block repeats the conflict the row already states; the Lembretes lens still has the large title; `online-history`, `online-phase-2p-settings`, `online-phase-2p-device-findings` and `online-phase-2p-planning` were rewritten and not run; the Agenda screenshot baseline gains a period notice from about 2026-12-15 and resolves to today from about 2027-01-15, neither masked.
+- Not touched by this pass: Conversar, Busca's own page, Ajustes, the auth pages, Custos, Jobs.
 
 ## Life Brain — OPENED 2026-10-30 (ADR-145) — tracks A–E merged (E.8 #391, ADR-179 #392); LB-M1…M4, `202611060108` and `202611090109` applied hosted (109 = 109); owner decisions LB-OD-1…9 all DECIDED
 

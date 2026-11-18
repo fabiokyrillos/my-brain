@@ -73,10 +73,25 @@ function renderPlanner(overrides: Record<string, unknown> = {}) {
 
 const copy = getPlannerCopy("en");
 
+/**
+ * ADR-180. The account of the page — what "planned" means, that it creates
+ * nothing, the capacity sentences — sits behind one closed line at its foot.
+ * Every sentence is still on the page and one press away; this opens the line
+ * the way a reader would, so the assertions below are about what they then see.
+ */
+function openAbout(label: string = copy.howItWorks): HTMLDetailsElement {
+  const summary = screen.getByText(label);
+  expect(summary).toBeVisible();
+  const about = summary.closest("details") as HTMLDetailsElement;
+  expect(about).not.toBeNull();
+  about.open = true;
+  return about;
+}
+
 describe("2M-PLAN-004 — it arranges what exists and creates nothing", () => {
   it("says so, where a user reading the screen can see it", () => {
     renderPlanner();
-    expect(screen.getByText(copy.createsNothing)).toBeVisible();
+    expect(within(openAbout()).getByText(copy.createsNothing)).toBeVisible();
   });
 
   it("offers no way to create a task", () => {
@@ -100,22 +115,34 @@ describe("2M-PLAN-006 — overload, without an invented estimate", () => {
     renderPlanner({ projection: projection({ capacity: {
       plannedCount: 5, availableHours: null, availabilityDeclared: false, overloaded: false,
     } }) });
-    expect(screen.getByText(copy.capacity.count(5))).toBeVisible();
-    expect(screen.getByText(copy.capacity.undeclared)).toBeVisible();
+    const about = openAbout();
+    expect(within(about).getByText(copy.capacity.count(5))).toBeVisible();
+    expect(within(about).getByText(copy.capacity.undeclared)).toBeVisible();
     expect(screen.queryByText(copy.capacity.overloaded)).not.toBeInTheDocument();
   });
 
   it("always names its own assumption, so no number stands unexplained", () => {
+    // Wherever the capacity is read, its assumption is in the same region.
     renderPlanner();
-    expect(screen.getByText(copy.capacity.noDuration)).toBeVisible();
+    const capacity = within(openAbout()).getByLabelText(copy.capacity.heading);
+    expect(within(capacity).getByText(copy.capacity.count(0))).toBeVisible();
+    expect(within(capacity).getByText(copy.capacity.noDuration)).toBeVisible();
   });
 
   it("announces an overloaded day through a status role rather than silently", () => {
     renderPlanner({ projection: projection({ capacity: {
       plannedCount: 20, availableHours: 17, availabilityDeclared: true, overloaded: true,
     } }) });
+    // An overloaded day opens the account by itself: the word "more" is on
+    // screen, so the hours and the assumption it rests on are too.
+    expect(screen.getByText(copy.howItWorks).closest("details")).toHaveAttribute("open");
     expect(screen.getByText(copy.capacity.available(17))).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent(copy.capacity.overloaded);
+    expect(screen.getByText(copy.capacity.noDuration)).toBeVisible();
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent(copy.capacity.overloaded);
+    // Stated before the lists, not inside the closed line.
+    expect(status.closest("details")).toBeNull();
+    expect(status.compareDocumentPosition(screen.getByLabelText(copy.planned)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -129,11 +156,34 @@ describe("2M-PLAN-007/-008 — conflicts are stated and never resolved", () => {
     expect(screen.getByText(copy.conflicts.statement.double_booking)).toBeVisible();
     expect(screen.getByText(copy.conflicts.notResolved)).toBeVisible();
     expect(screen.getByText(copy.conflicts.count(2))).toBeVisible();
+    // Something to notice comes before the lists, never behind a disclosure.
+    const region = screen.getByLabelText(copy.conflicts.heading);
+    expect(region.closest("details")).toBeNull();
+    expect(region.compareDocumentPosition(screen.getByLabelText(copy.planned)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says it on the row of the task it is about, as a statement with no control", () => {
+    renderPlanner({ projection: projection({
+      planned: [
+        item("a", { plannedAt: "2026-08-15T14:00:00.000Z", dueAt: "2026-08-14T14:00:00.000Z" }),
+        item("b", { plannedAt: "2026-08-15T14:00:00.000Z" }),
+      ],
+      conflicts: [{ kind: "intention_after_deadline", taskIds: ["a"], day: "2026-08-15" }],
+    }) });
+    const rows = within(screen.getByLabelText(copy.planned)).getAllByRole("listitem")
+      .filter((row) => row.classList.contains("planner-item"));
+    expect(within(rows[0]).getByText(copy.conflicts.statement.intention_after_deadline)).toHaveClass("planner-item-noted");
+    expect(rows[1].querySelector(".planner-item-noted")).toBeNull();
+    // Still one verb on the row, and it is the list's own.
+    expect(within(rows[0]).getAllByRole("button").map((button) => button.textContent)).toEqual([copy.removeHere]);
   });
 
   it("says a quiet day is quiet rather than showing an empty region", () => {
+    // The region exists and says so; with nothing to notice it is part of the
+    // page's account rather than a section standing before the tasks.
     renderPlanner();
-    expect(screen.getByText(copy.conflicts.none)).toBeVisible();
+    const region = within(openAbout()).getByLabelText(copy.conflicts.heading);
+    expect(within(region).getByText(copy.conflicts.none)).toBeVisible();
   });
 
   it("offers no control that would resolve one", () => {
@@ -149,22 +199,45 @@ describe("2M-PLAN-007/-008 — conflicts are stated and never resolved", () => {
 });
 
 describe("the lists", () => {
-  it("shows a planned item with its day, formatted as a day", () => {
+  /*
+    ADR-180. The planned day is the page's subject and the list's heading, so a
+    row under "Planned for this day" no longer repeats it. What a row says under
+    its title is what the plan is weighed against: the deadline, as a day.
+  */
+  it("does not repeat the planned day on a planned row", () => {
     renderPlanner({ projection: projection({
       planned: [item("a", { plannedAt: "2026-08-15T14:00:00.000Z" })],
       capacity: { plannedCount: 1, availableHours: null, availabilityDeclared: false, overloaded: false },
     }) });
-    // Scoped to the row: the section heading is "Planned for this day", which a
-    // bare text query matches too — a locator that ignores the structure the
-    // surface is organized by finds the surface working and calls it broken.
-    // The first list item in the section is the row; `TaskDetailControls`
-    // renders its own list inside it, which is why this is scoped rather than
-    // queried globally.
     const row = within(screen.getByLabelText(copy.planned)).getAllByRole("listitem")[0];
-    const meta = within(row).getByText(new RegExp(`^${getPlannedAtCopy("en").prefix}\\s`));
-    expect(meta).toBeVisible();
-    // `2M-PLAN-001` consequence 1: a day the user chose, never a time.
+    expect(within(row).queryByText(new RegExp(`^${getPlannedAtCopy("en").prefix}\\s`))).toBeNull();
+    expect(row.querySelector(".planner-item-meta")).toBeNull();
+    // `2M-PLAN-001` consequence 1 still holds: no clock component is presented.
+    expect(row.textContent).not.toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("shows a task's deadline under its title, as a day and never as a time", () => {
+    renderPlanner({ projection: projection({
+      available: [item("a", { dueAt: "2026-08-20T21:00:00.000Z" })],
+    }) });
+    const row = within(screen.getByLabelText(copy.available)).getAllByRole("listitem")[0];
+    const meta = row.querySelector(".planner-item-meta") as HTMLElement;
+    expect(meta.textContent).toMatch(/^Due: .*20/);
     expect(meta.textContent).not.toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("makes the title the link to the task", () => {
+    renderPlanner({ projection: projection({ available: [item("a")] }) });
+    expect(screen.getByRole("link", { name: "Task a" })).toHaveAttribute("href", "/en/app/work/a");
+  });
+
+  it("counts each list in its heading", () => {
+    renderPlanner({ projection: projection({
+      planned: [item("p", { plannedAt: "2026-08-15T14:00:00.000Z" })],
+      available: [item("a"), item("b")],
+    }) });
+    expect(within(screen.getByLabelText(copy.planned)).getByRole("heading").textContent).toBe(`${copy.planned}1`);
+    expect(within(screen.getByLabelText(copy.available)).getByRole("heading").textContent).toBe(`${copy.available}2`);
   });
 
   /*
@@ -175,7 +248,7 @@ describe("the lists", () => {
   it("does not repeat 'no planned day' under every available item", () => {
     renderPlanner({ projection: projection({ available: [item("a"), item("b")] }) });
     expect(screen.queryByText(getPlannedAtCopy("en").none)).not.toBeInTheDocument();
-    expect(screen.getByText(copy.availableHint)).toBeVisible();
+    expect(within(openAbout()).getByText(copy.availableHint)).toBeVisible();
   });
 
   it("offers selection only on the pool, because bulk planning sets a day", () => {
@@ -191,13 +264,38 @@ describe("the lists", () => {
 });
 
 describe("Life Brain D.1 — Planejar says what planned means, and plans in one tap", () => {
-  it("says what 'planned' means before anything else", () => {
+  /*
+    ADR-180. What the page asks is one line under the day — and it is the
+    meaning, said as the thing to do ("what you intend to do on this day"). The
+    longer sentence D.1 wrote stays, first in the page's account.
+  */
+  it("says what the page asks under the day, before either list", () => {
     renderPlanner();
-    expect(screen.getByText(copy.meaning)).toBeVisible();
-    // The meaning is the first thing under the lenses, before the counts.
-    const meaning = screen.getByText(copy.meaning);
-    const capacity = screen.getByLabelText(copy.capacity.heading);
+    const lede = screen.getByText(copy.lede);
+    expect(lede).toBeVisible();
+    expect(lede.compareDocumentPosition(screen.getByLabelText(copy.planned)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps what 'planned' means, first in the account of the page", () => {
+    renderPlanner();
+    const about = openAbout();
+    const meaning = within(about).getByText(copy.meaning);
+    expect(meaning).toBeVisible();
+    const capacity = within(about).getByLabelText(copy.capacity.heading);
     expect(meaning.compareDocumentPosition(capacity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the account closed until asked for, on a day that is not overloaded", () => {
+    renderPlanner();
+    expect(screen.getByText(copy.howItWorks).closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("offers Today in the stepper only on a day that is not today", () => {
+    renderPlanner();
+    expect(document.querySelector(".agenda-stepper-today")).toBeNull();
+    cleanup();
+    renderPlanner({ projection: projection({ day: "2026-08-20", isToday: false }) });
+    expect(document.querySelector(".agenda-stepper-today")).toHaveAttribute("href", "/en/app/calendar/plan");
   });
 
   it("an available task is planned for this day with one button, no date field and no Apply", async () => {
@@ -263,7 +361,8 @@ describe("both locales", () => {
   it("renders the Portuguese record when asked for it", () => {
     renderPlanner({ locale: "pt-BR" });
     const ptBR = getPlannerCopy("pt-BR");
-    expect(screen.getByText(ptBR.createsNothing)).toBeVisible();
+    expect(screen.getByText(ptBR.lede)).toBeVisible();
+    expect(within(openAbout(ptBR.howItWorks)).getByText(ptBR.createsNothing)).toBeVisible();
     expect(screen.getByRole("heading", { level: 1, name: "Agenda" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Planejar" })).toHaveAttribute("aria-current", "page");
   });

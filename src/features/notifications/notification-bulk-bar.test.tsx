@@ -6,7 +6,7 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import type { NotificationBulkState } from "./bulk-state";
-import { NotificationBulkBar } from "./notification-bulk-bar";
+import { NotificationBulkBar, NotificationBulkOutcome, NotificationBulkVerb } from "./notification-bulk-bar";
 
 afterEach(() => {
   cleanup();
@@ -19,11 +19,24 @@ function applied(): NotificationBulkState {
   return { status: "applied", scope: "mark_all_read", count: 3, message: "3 avisos marcados como lidos.", undo: { auditId: AUDIT, expiresAt: "2026-11-13T15:00:00.000Z" } };
 }
 
-function bar(overrides: Partial<Parameters<typeof NotificationBulkBar>[0]> = {}) {
+type BarProps = Omit<Parameters<typeof NotificationBulkBar>[0], "children">;
+
+/** The page's own composition: one verb by the unread line, the outcome, one verb after the read rows. */
+function Composed(props: BarProps) {
+  return (
+    <NotificationBulkBar {...props}>
+      <NotificationBulkVerb scope="mark_all_read" />
+      <NotificationBulkOutcome />
+      <NotificationBulkVerb scope="clear_read" />
+    </NotificationBulkBar>
+  );
+}
+
+function bar(overrides: Partial<BarProps> = {}) {
   const applyAction = vi.fn(async () => applied());
   const undoAction = vi.fn(async (): Promise<NotificationBulkState> => ({ status: "undone", scope: "mark_all_read", count: 3, message: "Desfeito: 3 avisos voltaram como estavam.", undo: null }));
   const props = { applyAction, undoAction, locale: "pt-BR" as const, readCount: 2, unreadCount: 3, ...overrides };
-  const view = render(<NotificationBulkBar {...props} />);
+  const view = render(<Composed {...props} />);
   return { ...view, applyAction, undoAction, props };
 }
 
@@ -53,7 +66,7 @@ describe("NotificationBulkBar", () => {
     await user.click(screen.getByRole("button", { name: "Marcar todos como lidos" }));
     await screen.findByRole("button", { name: "Desfazer" });
 
-    rerender(<NotificationBulkBar {...props} readCount={5} unreadCount={0} />);
+    rerender(<Composed {...props} readCount={5} unreadCount={0} />);
     const undo = screen.getByRole("button", { name: "Desfazer" });
     await user.click(undo);
     await waitFor(() => expect(undoAction).toHaveBeenCalled());
@@ -66,5 +79,23 @@ describe("NotificationBulkBar", () => {
   it("keeps an empty live region in the page before anything happens", () => {
     bar({ readCount: 0, unreadCount: 0 });
     expect(screen.getByRole("status")).toBeEmptyDOMElement();
+  });
+
+  it("shares one answer between the two verbs, wherever each is drawn", async () => {
+    const user = userEvent.setup();
+    const { applyAction } = bar();
+    await user.click(screen.getByRole("button", { name: "Limpar os lidos" }));
+    await waitFor(() => expect(applyAction).toHaveBeenCalled());
+    const sent = (applyAction.mock.calls[0] as unknown as [unknown, FormData])[1];
+    expect(sent.get("scope")).toBe("clear_read");
+    // One live region, one undo: the outcome is not repeated beside each verb.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(await screen.findAllByRole("button", { name: "Desfazer" })).toHaveLength(1);
+  });
+
+  it("draws nothing of its own: a verb with nothing to act on leaves no trace", () => {
+    const { container } = bar({ readCount: 0, unreadCount: 0 });
+    expect(container.querySelectorAll("form")).toHaveLength(0);
+    expect(container.querySelectorAll("button")).toHaveLength(0);
   });
 });

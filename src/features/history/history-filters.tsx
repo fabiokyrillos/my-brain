@@ -1,4 +1,6 @@
-import { Button, ButtonLink } from "@/components/ui";
+import Link from "next/link";
+
+import { Button } from "@/components/ui";
 import type { Locale } from "@/lib/preferences";
 import type { HistoryCopy } from "./copy";
 import { hasActiveFilters, type HistoryFilters } from "./filters";
@@ -24,14 +26,18 @@ import {
  * because carrying page 4 into a newly narrowed list is how a reader lands on
  * an empty page and concludes they have no history.
  *
- * ## Mobile
+ * ## One line, at every width (Editorial calmo, ADR-180)
  *
  * The controls sit inside `<details>`, which is a disclosure with keyboard and
- * screen-reader behaviour already correct and no script. CSS opens it and drops
- * the marker from the tablet breakpoint up, so a wide viewport sees the row of
- * controls directly and a narrow one sees a "Filtros" button — rather than five
- * controls squeezed into a horizontal toolbar. The active-filter summary lives
- * *outside* the disclosure, so it stays visible while the controls are folded.
+ * screen-reader behaviour already correct and no script. It is closed at rest
+ * on a phone and on a desktop alike: this page is read far more often than it
+ * is filtered, and five controls and a button used to stand between the
+ * heading and the first event on every wide screen.
+ *
+ * It stays closed while a filter is active, too. What is narrowing the list is
+ * said in words on the line under the toggle, with the way to clear it beside
+ * them — *outside* the disclosure, so a filtered list never looks like a list
+ * that is simply short, and clearing never needs the form open.
  */
 export function HistoryFilterControls({
   locale,
@@ -46,7 +52,7 @@ export function HistoryFilterControls({
 
   return (
     <section className="history-filters" aria-label={copy.filters.legend}>
-      <details className="history-filters-disclosure" open={active}>
+      <details className="history-filters-disclosure">
         <summary className="history-filters-summary">{copy.filters.toggle}</summary>
 
         <form className="history-filters-form" method="get" action={`/${locale}/app/history`}>
@@ -106,19 +112,21 @@ export function HistoryFilterControls({
           </div>
 
           <div className="history-filter-actions">
-            <Button type="submit" variant="primary">
+            <Button type="submit" variant="secondary">
               {copy.filters.apply}
             </Button>
-            {active ? (
-              <ButtonLink href={`/${locale}/app/history`} variant="secondary">
-                {copy.filters.clear}
-              </ButtonLink>
-            ) : null}
           </div>
         </form>
       </details>
 
-      {active ? <ActiveFilterSummary copy={copy} filters={filters} /> : null}
+      {active ? (
+        <div className="history-active">
+          <ActiveFilterSummary copy={copy} filters={filters} />
+          <Link className="history-filters-clear" href={`/${locale}/app/history`}>
+            {copy.filters.clear}
+          </Link>
+        </div>
+      ) : null}
 
       {filters.ignoredKeys.length ? (
         <p className="history-filters-note" role="status">
@@ -132,9 +140,9 @@ export function HistoryFilterControls({
 /**
  * What is currently narrowing the list, in words.
  *
- * Outside the disclosure on purpose: on a phone the controls are folded away,
- * and a filtered list that does not say it is filtered is indistinguishable
- * from a list that is simply short.
+ * Outside the disclosure on purpose: the controls are folded away, and a
+ * filtered list that does not say it is filtered is indistinguishable from a
+ * list that is simply short.
  */
 function ActiveFilterSummary({
   copy,

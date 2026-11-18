@@ -227,7 +227,9 @@ test.describe("the calendar has a real month", () => {
     expect(events, "the month must not emit an event the deployed validator refuses").toHaveLength(0);
 
     await page.goto(`/pt-BR/app/calendar?date=${firstOfThisMonth()}&orientation=week`);
-    await expect(page.locator(".calendar-week")).toBeVisible();
+    // ADR-180: the week is its grid from 768px and its list of days below it;
+    // exactly one of the two is drawn at any width.
+    await expect(page.locator(".calendar-week-scroll, .calendar-week-list").locator("visible=true")).toHaveCount(1);
     await expect.poll(() => events.length, { timeout: 15_000 }).toBeGreaterThan(0);
   });
 });

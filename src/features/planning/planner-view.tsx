@@ -54,6 +54,7 @@
 import { useState } from "react";
 
 import { UniversalStateLine } from "@/features/experience/universal-state";
+import { formatInstant } from "@/lib/time/instant-format";
 import { addLocalDays, formatLocalDate, parseLocalDate } from "@/lib/time/local-day";
 
 import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
@@ -78,7 +79,8 @@ import { TaskDetailControls, type TaskDetailCommandHandler } from "@/features/ta
 import type { Locale } from "@/lib/preferences";
 
 import { getPlannerCopy } from "./copy";
-import { formatPlannedDay, getPlannedAtCopy, plannedControlsFor } from "./planned-at";
+import { plannedControlsFor } from "./planned-at";
+import type { PlannerConflictKind } from "./planner-conflicts";
 import type { PlannerItem, PlannerProjection } from "./planner-projection";
 
 /**
@@ -120,7 +122,6 @@ export function PlannerView({
   undoAction?: TaskUndoHandler;
 }) {
   const copy = getPlannerCopy(locale);
-  const plannedCopy = getPlannedAtCopy(locale);
   const bulkCopy = getWorkCopy(locale).bulk;
 
   const [outcome, setOutcome] = useState<TaskDetailCommandState | null>(null);
@@ -165,6 +166,21 @@ export function PlannerView({
     .filter((item) => isSelected(selection, item.taskId))
     .map((item) => ({ taskId: item.taskId, title: item.title, status: item.status }));
 
+  /*
+   * ADR-180. A conflict is a fact about particular tasks, and the projection
+   * already says which. So besides the statement above the lists, each task it
+   * names carries it on its own row — where the person is looking when they
+   * decide what to do about it. Still a statement: no control comes with it.
+   */
+  const notedByTask = new Map<string, PlannerConflictKind[]>();
+  for (const conflict of projection.conflicts) {
+    for (const taskId of conflict.taskIds) {
+      const kinds = notedByTask.get(taskId) ?? [];
+      if (!kinds.includes(conflict.kind)) kinds.push(conflict.kind);
+      notedByTask.set(taskId, kinds);
+    }
+  }
+
   /**
    * One row of the plan, in a fixed grammar: **seleção · tarefa · quando ·
    * o que você pode fazer**.
@@ -186,29 +202,31 @@ export function PlannerView({
      */
     const verb = operation === "set" ? "set_planned" : "clear_planned";
     const controls = plannedControlsFor(item.status).filter((control) => control.action === verb);
+    // The deadline, as a day: what an intention is weighed against. The planned
+    // day itself is not repeated — the page's subject and the list say it.
+    const due = formatInstant(item.dueAt, "day", locale, projection.timezone);
+    const noted = notedByTask.get(item.taskId) ?? [];
     return (
       <li className="planner-item" data-operation={operation} key={item.taskId}>
+        {operation === "set" ? (
+          // The label is the 44px target and sits on the title's first line.
+          <label className="planner-select-label">
+            <input
+              aria-label={item.title}
+              checked={isSelected(selection, item.taskId)}
+              className="planner-select"
+              onChange={() => changeSelection(toggleSelected(selection, item.taskId))}
+              type="checkbox"
+            />
+          </label>
+        ) : null}
         <div className="planner-item-head">
-          {operation === "set" ? (
-            // The label is the 44px target and sits on the title's first line.
-            <label className="planner-select-label">
-              <input
-                aria-label={item.title}
-                checked={isSelected(selection, item.taskId)}
-                className="planner-select"
-                onChange={() => changeSelection(toggleSelected(selection, item.taskId))}
-                type="checkbox"
-              />
-            </label>
-          ) : null}
           {/*
             The title is never rendered directly. `surface="calendar"` because
             the planner lives under `/app/calendar` and shares its governed
             surface — a second surface name would be a vocabulary entry nothing
-            declared.
+            declared. It is the row's link to the task (ADR-180).
           */}
-          {/* One flex item, whatever `ProtectedContent` renders (a bare text node
-              when nothing is withheld), so the title never wraps under the box. */}
           <span className="planner-item-title">
             <ProtectedContent
               href={item.href}
@@ -217,16 +235,18 @@ export function PlannerView({
               sensitivity={item.sensitivity}
               surface="calendar"
             >
-              {item.title}
+              <a className="planner-item-link" href={item.href}>{item.title}</a>
             </ProtectedContent>
           </span>
+          {due === null && noted.length === 0 ? null : (
+            <p className="planner-item-meta">
+              {due === null ? null : <span>{copy.dueOn(due)}</span>}
+              {noted.map((kind) => (
+                <span className="planner-item-noted" key={kind}>{copy.conflicts.statement[kind]}</span>
+              ))}
+            </p>
+          )}
         </div>
-        {/* The pool is the tasks with no day: saying so on every row said nothing. */}
-        {item.plannedAt ? (
-          <p className="planner-item-meta">
-            {`${plannedCopy.prefix} ${formatPlannedDay(item.plannedAt, locale, projection.timezone)}`}
-          </p>
-        ) : null}
         {controls.length > 0 ? (
           <div className="planner-item-controls">
           <TaskDetailControls
@@ -248,20 +268,56 @@ export function PlannerView({
     );
   }
 
+  /*
+   * `2M-PLAN-007`/`-008`. The conflicts, stated and never resolved. One region,
+   * drawn in one of two places: above the lists when there is something to
+   * notice, and inside "how planning works" when there is not — a quiet day
+   * still says it is quiet, without a section of its own saying so first.
+   */
+  const conflicts = (
+    <section
+      aria-label={copy.conflicts.heading}
+      className="planner-conflicts"
+      data-has-conflicts={projection.conflicts.length > 0 ? "true" : "false"}
+    >
+      <h2>{copy.conflicts.heading}</h2>
+      {projection.conflicts.length === 0 ? (
+        <UniversalStateLine description={copy.conflicts.none} locale={locale} state="empty" />
+      ) : (
+        <>
+          <p className="planner-conflict-count">{copy.conflicts.count(projection.conflicts.length)}</p>
+          <ul className="planner-conflict-list">
+            {projection.conflicts.map((conflict) => (
+              <li key={`${conflict.kind}:${conflict.taskIds.join("-")}`}>
+                {copy.conflicts.statement[conflict.kind]}
+              </li>
+            ))}
+          </ul>
+          {/* `2M-PLAN-008`: stated as a fact, with nothing already applied. */}
+          <p className="quiet-state">{copy.conflicts.notResolved}</p>
+        </>
+      )}
+    </section>
+  );
+
   return (
     <div className="content-page planner-page">
       {/*
         Life Brain A.4 (`LB-A-007`). Planejar is a lens of the Agenda, under the
-        Agenda's one compact header, with the day stepper in its action slot.
-        The eyebrow, the title and the description went with the
-        "Lista · Calendário · Planejar" strip; the one sentence that is a
-        guarantee rather than an explanation stays.
+        Agenda's one header. ADR-180: the day being planned is the page's
+        subject, and under it one line says what the page asks.
       */}
       <AgendaHeader
         lens="plan"
         locale={locale}
-        actions={(
+        period={(
           <AgendaStepper
+            caption={(
+              <p className="planner-lede">
+                {projection.isToday ? <span className="calendar-today">{copy.today}</span> : null}
+                <span>{copy.lede}</span>
+              </p>
+            )}
             className="planner-day-nav"
             locale={locale}
             next={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, 1)}`, label: copy.nextDay }}
@@ -273,14 +329,11 @@ export function PlannerView({
               today: today ?? (projection.isToday ? projection.day : ""),
             }}
             previous={{ href: `${dayHrefBase}?date=${shiftDay(projection.day, -1)}`, label: copy.previousDay }}
-            rangeLabel={`${dayLabel(projection.day, locale)}${projection.isToday ? ` · ${copy.today}` : ""}`}
-            today={{ href: dayHrefBase, label: copy.today }}
+            rangeLabel={dayLabel(projection.day, locale)}
+            today={projection.isToday ? null : { href: dayHrefBase, label: copy.today }}
           />
         )}
       />
-      {/* Life Brain D.1: what "planned" means, before any number about it. */}
-      <p className="planner-meaning">{copy.meaning}</p>
-      <p className="quiet-state planner-guarantee">{copy.createsNothing}</p>
 
       {/*
         `2M-ACCESS-004`. One region, announced, above both lists — so the answer
@@ -290,65 +343,20 @@ export function PlannerView({
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
       {/*
-        Capacity and conflicts, side by side above the two lists.
-
-        They were two stacked sections between the header and the work, so on a
-        wide screen the first task was about 600px down a page whose subject is
-        the tasks. Both answer the same question — *is this day already full, and
-        does anything on it contradict anything else* — and `03-componentes.md`
-        puts what orients a view in one band above it.
-
-        Neither says anything new. The counts, the declared availability, the
-        conflict statements and the two disclaimers are the same sentences the
-        projection already produced; what changed is that they read as one
-        orientation rather than as two competing sections.
+        What needs a look comes before the lists, and only when it exists: a day
+        with more items than declared hours, and anything on it that contradicts
+        anything else. Both keep their full sentence (`2M-PLAN-006`, `-008`).
       */}
-      <div className="planner-orientation">
-      <section aria-label={copy.capacity.heading} className="planner-capacity">
-        <h2>{copy.capacity.heading}</h2>
-        <p className="planner-capacity-count">{copy.capacity.count(projection.capacity.plannedCount)}</p>
-        <p>
-          {projection.capacity.availabilityDeclared && projection.capacity.availableHours !== null
-            ? copy.capacity.available(projection.capacity.availableHours)
-            : copy.capacity.undeclared}
-        </p>
-        {/*
-          `2M-PLAN-006`'s second clause, in the sentence the user reads rather
-          than in a coefficient: nothing here knows how long anything takes.
-        */}
-        <p className="quiet-state">{copy.capacity.noDuration}</p>
-        {projection.capacity.overloaded ? (
-          <p className="planner-overloaded" role="status">{copy.capacity.overloaded}</p>
-        ) : null}
-      </section>
-
-      <section
-        aria-label={copy.conflicts.heading}
-        className="planner-conflicts"
-        data-has-conflicts={projection.conflicts.length > 0 ? "true" : "false"}
-      >
-        <h2>{copy.conflicts.heading}</h2>
-        {projection.conflicts.length === 0 ? (
-          <UniversalStateLine description={copy.conflicts.none} locale={locale} state="empty" />
-        ) : (
-          <>
-            <p className="planner-conflict-count">{copy.conflicts.count(projection.conflicts.length)}</p>
-            <ul className="planner-conflict-list">
-              {projection.conflicts.map((conflict) => (
-                <li key={`${conflict.kind}:${conflict.taskIds.join("-")}`}>
-                  {copy.conflicts.statement[conflict.kind]}
-                </li>
-              ))}
-            </ul>
-            {/* `2M-PLAN-008`: stated as a fact, with nothing already applied. */}
-            <p className="quiet-state">{copy.conflicts.notResolved}</p>
-          </>
-        )}
-      </section>
-      </div>
+      {projection.capacity.overloaded ? (
+        <p className="planner-overloaded" role="status">{copy.capacity.overloaded}</p>
+      ) : null}
+      {projection.conflicts.length > 0 ? conflicts : null}
 
       <section aria-label={copy.planned} className="planner-list">
-        <h2>{copy.planned}</h2>
+        <h2>
+          <span>{copy.planned}</span>
+          <span className="planner-list-count">{projection.planned.length}</span>
+        </h2>
         {projection.planned.length === 0 ? (
           <UniversalStateLine description={copy.plannedEmpty} locale={locale} state="empty" />
         ) : (
@@ -357,13 +365,18 @@ export function PlannerView({
       </section>
 
       <section aria-label={copy.available} className="planner-list">
-        <h2>{copy.available}</h2>
-        <p className="quiet-state planner-list-hint">{copy.availableHint}</p>
+        <h2>
+          <span>{copy.available}</span>
+          <span className="planner-list-count">{projection.available.length}</span>
+        </h2>
         {projection.available.length === 0 ? (
           <UniversalStateLine description={copy.availableEmpty} locale={locale} state="empty" />
         ) : (
           <>
-            <div className="work-bulk-select-all">
+            <ul>{projection.available.map((item) => <Row item={item} key={item.taskId} operation="set" />)}</ul>
+            {/* Planning several at once is the second path, so its entry is at
+                the foot of the pool rather than above the first task. */}
+            <div className="work-bulk-select-all planner-select-all">
               <button
                 className="row-action"
                 onClick={() => changeSelection(
@@ -374,7 +387,6 @@ export function PlannerView({
                 {bulkCopy.selectAllShown}
               </button>
             </div>
-            <ul>{projection.available.map((item) => <Row item={item} key={item.taskId} operation="set" />)}</ul>
             {/*
               `2M-PLAN-009`. The Phase 2L bulk bar, unchanged: the same selection
               ceiling, the same preview, the same partial-result contract and the
@@ -394,6 +406,40 @@ export function PlannerView({
           </>
         )}
       </section>
+
+      {/*
+        ADR-180 — the account of the page, behind one closed line.
+
+        What "planned" means (Life Brain D.1), that the page creates nothing
+        (`2M-PLAN-004`), what the pool is, and the capacity sentences with their
+        own assumption (`2M-PLAN-006`). All still here, in the owner's reach,
+        and none of it between the day and its tasks. It opens by itself when
+        the day is overloaded, because then the assumption behind that word is
+        what the person needs next.
+      */}
+      <details className="planner-about" open={projection.capacity.overloaded}>
+        <summary className="planner-about-summary">{copy.howItWorks}</summary>
+        <div className="planner-about-body">
+          <p className="planner-meaning">{copy.meaning}</p>
+          <p className="quiet-state planner-guarantee">{copy.createsNothing}</p>
+          <p className="quiet-state planner-list-hint">{copy.availableHint}</p>
+          <section aria-label={copy.capacity.heading} className="planner-capacity">
+            <h2>{copy.capacity.heading}</h2>
+            <p className="planner-capacity-count">{copy.capacity.count(projection.capacity.plannedCount)}</p>
+            <p>
+              {projection.capacity.availabilityDeclared && projection.capacity.availableHours !== null
+                ? copy.capacity.available(projection.capacity.availableHours)
+                : copy.capacity.undeclared}
+            </p>
+            {/*
+              `2M-PLAN-006`'s second clause, in the sentence the user reads rather
+              than in a coefficient: nothing here knows how long anything takes.
+            */}
+            <p className="quiet-state">{copy.capacity.noDuration}</p>
+          </section>
+          {projection.conflicts.length === 0 ? conflicts : null}
+        </div>
+      </details>
     </div>
   );
 }
@@ -412,7 +458,7 @@ function dayLabel(day: string, locale: Locale): string {
   // A calendar date has no instant: noon UTC, formatted in UTC, is that date
   // in every zone (the reasoning of `calendar-view.tsx`'s `formatDayLabel`).
   const instant = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, 12));
-  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(instant);
+  return new Intl.DateTimeFormat(locale, { weekday: "short", day: "numeric", month: "long", timeZone: "UTC" }).format(instant);
 }
 
 function shiftDay(day: string, delta: number): string {

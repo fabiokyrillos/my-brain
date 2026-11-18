@@ -832,8 +832,9 @@ function entityWorkspace() {
   const changes = `<section class="entity-changes" id="changes"><details class="entity-changes-disclosure">`
     + `<summary><h2>O que mudou recentemente</h2></summary>`
     + `<p class="section-explainer">Vem do registro de alterações: edições feitas nesta pessoa.</p>`
-    + `<ol class="history-list"><li class="history-event"><span class="history-dot"></span>`
-    + `<div class="history-event-body"><p class="history-sentence">Você alterou o nome.</p></div></li></ol>`
+    + `<ol class="history-list"><li class="history-event" data-actor="user">`
+    + `<div class="history-event-body"><span class="history-sentence">Você alterou o nome.</span>`
+    + `<span class="history-meta"><span class="history-kind">pessoa</span><time datetime="2026-11-18T14:12:00.000Z">18 de nov. de 2026, 11:12</time></span></div></li></ol>`
     + `</details></section>`;
 
   const openColumn = `<section class="entity-workspace-column" aria-labelledby="ws-open">`

@@ -317,7 +317,10 @@ test.describe("Settings is six groups, each with its own URL", () => {
 
     // The page it became.
     await expect(page.getByRole("heading", { level: 1, name: "Notificações" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Avisos recebidos" })).toBeVisible();
+    // The feed's name is for the outline since Editorial calmo; what a reader
+    // sees first is the line that counts the unread notices.
+    await expect(page.getByRole("heading", { name: "Avisos recebidos" })).toBeAttached();
+    await expect(page.locator(".notification-unread-summary")).toBeVisible();
     await expect(page.getByRole("status")).toContainText(/aviso/i);
 
     // The controls it no longer holds. Asserted as absence WITH the positive

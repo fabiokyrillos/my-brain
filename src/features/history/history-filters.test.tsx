@@ -91,13 +91,27 @@ describe("HistoryFilterControls", () => {
     );
   });
 
-  it("opens the disclosure when filters are active and folds it when they are not", () => {
+  it("keeps the controls folded at rest, filtered or not", () => {
+    // Editorial calmo: the filters are one line. What is active is said in
+    // words outside the disclosure, so the form does not need to stand open.
     renderFilters();
     expect(document.querySelector("details")).not.toHaveAttribute("open");
 
     cleanup();
     renderFilters({ actor: "user" });
-    expect(document.querySelector("details")).toHaveAttribute("open");
+    expect(document.querySelector("details")).not.toHaveAttribute("open");
+  });
+
+  it("offers the way to clear beside the active filters, outside the disclosure", () => {
+    renderFilters({ actor: "user" });
+    const clear = screen.getByRole("link", { name: "Limpar filtros" });
+    expect(clear.closest("details")).toBeNull();
+    expect(clear.parentElement).toContainElement(screen.getByRole("list", { name: "Filtros ativos" }));
+  });
+
+  it("does not make the submit the loudest thing on the page", () => {
+    renderFilters();
+    expect(screen.getByRole("button", { name: "Aplicar filtros" }).className).not.toMatch(/primary/);
   });
 
   it("preserves a specific-subject filter through a submit without exposing the uuid", () => {
