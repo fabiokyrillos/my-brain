@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-18 — The shell: a brand and three controls on a phone; the language is in the account menu (ADR-180, slice 7)
+
+- `features/shell/app-shell.tsx`: on a phone the top bar is the brand (linking to Hoje) and three 44px line icons — search, notifications, account. It is sticky at phone widths, with a hairline that appears on scroll in CSS only.
+- `features/shell/account-menu.tsx`: still one implementation. The locale switch is a row in it ("Idioma: Português / Mudar para English"), through the same `LocaleSwitchLink`, so pathname and query are preserved. The panel is headed by the owner's name; sign-out is last, as text in the risk tone. Following a row closes the panel.
+- `app/mobile-navigation.css`: the bottom bar's current slot is ink, weight and a rule rather than colour alone; the capture button sits inside the bar; the desktop rail's current item is a rule and weight, not a card.
+- `mobile-reachability-guard` now pins the locale switch in the account menu and absent from the top bar. All eight screenshot baselines redrawn through `visual-baselines.yml`. No migration. Record: `docs/reports/editorial-calmo/SHELL.md`.
+
 ## 2026-11-18 — The record's other suggestions are questions of the same list (ADR-184, continued)
 
 - Events (`events/event-candidate-form.tsx`), birthdays (`birthdays/birthday-proposal.tsx`), the memory proposal (new `memories/record-memory-question.tsx`; the chat's `MemoryProposalCard` keeps its card) and the confirmation (`interpretations/confirmation-panel.tsx`) are rows like tasks and people: a question, a caption, the answers. Each tap sends the request the old form sent for that decision.
