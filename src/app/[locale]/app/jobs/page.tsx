@@ -1,9 +1,12 @@
 import { notFound } from "next/navigation";
+
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
+import { ProcessingView } from "@/features/processing/processing-view";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { getTransparencyCopy } from "@/features/transparency/copy";
 import { DataAiTabs } from "@/features/transparency/data-ai-tabs";
-import { getVocabularyCopy, jobStatusLabel, jobTypeLabel } from "@/features/vocabulary/copy";
+import { getVocabularyCopy } from "@/features/vocabulary/copy";
 import { requireUser } from "@/lib/auth/require-user";
 import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { formatInstant } from "@/lib/time/instant-format";
@@ -35,6 +38,13 @@ import { requireSupabaseData } from "@/lib/supabase/result";
  * Every row is owner-scoped by RLS through the request-scoped client. Read-only:
  * this page has no write path, and the one retry control the product offers
  * lives on `/app/files`, beside the file it would retry.
+ *
+ * ## Editorial calmo (ADR-180)
+ *
+ * The page opens the way Histórico does — the strip, then its name — and then
+ * answers *está tudo andando?* in one sentence. The rows follow in the order
+ * they matter (`ProcessingView`): failed, in flight, and the finished ones
+ * folded behind a count. The same read as before; nothing else is queried.
  */
 export default async function JobsPage({
   params,
@@ -62,43 +72,22 @@ export default async function JobsPage({
   const { items, hasNext } = paginateRows(requireSupabaseData(result, "load jobs") ?? []);
 
   return (
-    <div className="content-page">
-      <header className="list-header">
-        <div>
-          <p className="eyebrow">{transparency.title.toUpperCase()}</p>
-          <h1>{transparency.lenses.jobs}</h1>
-          <p>{transparency.descriptions.jobs}</p>
-        </div>
-      </header>
-
+    <div className="content-page jobs-page">
       <DataAiTabs active="jobs" locale={locale} />
 
+      <PageHeader size="compact" title={transparency.lenses.jobs} />
+
       {items.length ? (
-        <div className="list-stack">
-          {items.map((job) => (
-            <article className="list-row" key={job.id}>
-              <div className="list-row-main">
-                <strong>{jobTypeLabel(locale, job.type)}</strong>
-                {/*
-                  The error when there is one, the attempt count when there is
-                  not — the row's most informative line either way. Both were
-                  already here; what they gained is the instant beside them,
-                  which is the difference between "this failed" and "this failed
-                  three weeks ago and nothing has run since".
-                */}
-                <p>{job.error ?? `${vocabulary.attempts}: ${job.attempts}/${job.max_attempts}`}</p>
-              </div>
-              <div className="list-meta">
-                <span className={`status-badge ${job.status}`}>
-                  {jobStatusLabel(locale, job.status) ?? vocabulary.unknownState}
-                </span>
-                <small>{formatInstant(job.created_at, "dayAndTime", locale, timeZone)}</small>
-              </div>
-            </article>
-          ))}
-        </div>
+        <ProcessingView
+          formatWhen={(iso) => formatInstant(iso, "dayAndTime", locale, timeZone)}
+          hasNext={hasNext}
+          jobs={items}
+          locale={locale}
+          page={page}
+        />
       ) : (
         <UniversalStateView
+          className="ux-state-quiet"
           description={vocabulary.jobsEmptyBody}
           locale={locale}
           state="empty"

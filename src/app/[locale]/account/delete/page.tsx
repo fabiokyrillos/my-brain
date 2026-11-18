@@ -17,6 +17,7 @@
 import { notFound, redirect } from "next/navigation";
 import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { DeletionSurface } from "@/features/account/deletion-surface";
+import { SignedOutFrame } from "@/features/auth/signed-out-frame";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { assertActiveAccount } from "@/lib/auth/require-user";
 import { isLocale } from "@/lib/preferences";
@@ -48,7 +49,7 @@ export default async function DeleteAccountPage({
    * at. `next.config.ts` carries the matching CSP source for exactly this route.
    */
   return (
-    <main className="auth-stage">
+    <SignedOutFrame locale={locale}>
       {/*
         `2O-PREF-002`. Ajustes now reaches this page by name, so this page says
         where it came from — the strip is what stops consolidation being a claim
@@ -67,6 +68,6 @@ export default async function DeleteAccountPage({
       */}
       <AccountDataStrip locale={locale} route="deletion" />
       <DeletionSurface locale={locale} captcha={<TurnstileWidget />} />
-    </main>
+    </SignedOutFrame>
   );
 }

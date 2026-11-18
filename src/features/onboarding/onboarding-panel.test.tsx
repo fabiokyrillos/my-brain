@@ -71,6 +71,70 @@ describe("2O-ONBOARD-001 / -002: the path renders the declared steps, in both lo
   });
 });
 
+/*
+ * ADR-180 — on Hoje the path is one section like its neighbours: a heading over
+ * a hairline with the progress in words, each step a row, nothing folded and
+ * nothing boxed inside it.
+ */
+describe("ADR-180: the path is a section of rows", () => {
+  const withTwoDone = () => pathOf({ facts: { locale_and_timezone: SATISFIED, ai_credential: SATISFIED } });
+
+  it.each(LOCALES)("says the progress in words, beside the heading (%s)", (locale) => {
+    renderPanel(locale, withTwoDone());
+    const progress = document.querySelector(".onboarding-progress") as HTMLElement;
+    expect(progress.textContent).toBe(locale === "pt-BR" ? "2 de 7 passos" : "2 of 7 steps");
+    expect(progress.closest("header")?.querySelector("h2")).not.toBeNull();
+  });
+
+  it("folds nothing: every step is a row in the open", () => {
+    const { container } = renderPanel("pt-BR", withTwoDone());
+    expect(container.querySelector("details")).toBeNull();
+    expect(container.querySelectorAll("ol > li")).toHaveLength(onboardingSteps.length);
+  });
+
+  it("gives the next step, and only it, its sentence and its one verb", () => {
+    const { container } = renderPanel("pt-BR", withTwoDone());
+    const copy = getOnboardingCopy("pt-BR");
+    const next = container.querySelector('[aria-current="step"]') as HTMLElement;
+    expect(next.dataset.step).toBe("assistant_identity");
+    expect(within(next).getByText(copy.steps.assistant_identity.body)).toBeTruthy();
+    expect(within(next).getByRole("link").textContent).toBe(copy.steps.assistant_identity.action);
+    expect(container.querySelectorAll(".onboarding-step-body")).toHaveLength(1);
+    expect(container.querySelectorAll(".onboarding-step-action")).toHaveLength(1);
+  });
+
+  it("makes a later step's own title its link, with no second verb on the row", () => {
+    renderPanel("pt-BR", withTwoDone());
+    const copy = getOnboardingCopy("pt-BR");
+    const row = document.querySelector('[data-step="memory_created"]') as HTMLElement;
+    const links = within(row).getAllByRole("link");
+    expect(links).toHaveLength(1);
+    expect(links[0].textContent).toBe(copy.steps.memory_created.title);
+    expect(links[0].closest("h3")).not.toBeNull();
+  });
+
+  it("marks a finished step with a check and says so without printing the word", () => {
+    renderPanel("pt-BR", withTwoDone());
+    const row = document.querySelector('[data-step="locale_and_timezone"]') as HTMLElement;
+    expect(row.querySelector(".onboarding-step-mark svg")).not.toBeNull();
+    expect(within(row).getByText("Feito").className).toContain("sr-only");
+  });
+
+  it("prints the state where it explains the row: blocked, or not verified", () => {
+    renderPanel("pt-BR", pathOf({ facts: { ai_credential: UNSATISFIED, entry_captured: UNREADABLE } }));
+    const copy = getOnboardingCopy("pt-BR");
+    const blocked = document.querySelector('[data-step="interpretation_reviewed"]') as HTMLElement;
+    expect(within(blocked).getByText(copy.states.blocked).className).not.toContain("sr-only");
+    const unreadable = document.querySelector('[data-step="entry_captured"]') as HTMLElement;
+    expect(within(unreadable).getByText(copy.states.unreadable).className).not.toContain("sr-only");
+  });
+
+  it("uses no primary button anywhere in the section", () => {
+    const { container } = renderPanel("pt-BR", pathOf({ facts: { ai_credential: UNSATISFIED } }));
+    expect(container.querySelector(".ui-button, [data-variant='primary']")).toBeNull();
+  });
+});
+
 describe("2O-ONBOARD-003: the path never asks again for something already set", () => {
   it.each(LOCALES)("offers no action on a satisfied step (%s)", (locale) => {
     renderPanel(locale, pathOf({ facts: { locale_and_timezone: SATISFIED } }));

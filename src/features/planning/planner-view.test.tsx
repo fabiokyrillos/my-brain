@@ -178,6 +178,43 @@ describe("2M-PLAN-007/-008 — conflicts are stated and never resolved", () => {
     expect(within(rows[0]).getAllByRole("button").map((button) => button.textContent)).toEqual([copy.removeHere]);
   });
 
+  it("does not repeat above the lists what the task's own row already states", () => {
+    // ADR-180. Every observation here is on a row, so the region is one quiet
+    // caption — how many, and that nothing was changed — with no heading, no
+    // list and no second copy of the sentence.
+    renderPlanner({ projection: projection({
+      planned: [item("a", { plannedAt: "2026-08-15T14:00:00.000Z", dueAt: "2026-08-14T14:00:00.000Z" })],
+      conflicts: [{ kind: "intention_after_deadline", taskIds: ["a"], day: "2026-08-15" }],
+    }) });
+    const region = screen.getByLabelText(copy.conflicts.heading);
+    expect(region).toHaveAttribute("data-on-rows", "true");
+    expect(within(region).queryByRole("heading")).toBeNull();
+    expect(region.querySelector("ul")).toBeNull();
+    expect(within(region).getByText(copy.conflicts.count(1))).toBeVisible();
+    expect(within(region).getByText(copy.conflicts.notResolved)).toBeVisible();
+    expect(screen.getAllByText(copy.conflicts.statement.intention_after_deadline)).toHaveLength(1);
+    // Still before the lists, never behind a disclosure.
+    expect(region.closest("details")).toBeNull();
+    expect(region.compareDocumentPosition(screen.getByLabelText(copy.planned)) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("keeps the block for what no row carries, and lists only that", () => {
+    renderPlanner({ projection: projection({
+      planned: [item("a", { plannedAt: "2026-08-15T14:00:00.000Z", dueAt: "2026-08-14T14:00:00.000Z" })],
+      conflicts: [
+        { kind: "intention_after_deadline", taskIds: ["a"], day: "2026-08-15" },
+        { kind: "double_booking", taskIds: ["x", "y"], day: "2026-08-15" },
+      ],
+    }) });
+    const region = screen.getByLabelText(copy.conflicts.heading);
+    expect(region).not.toHaveAttribute("data-on-rows");
+    expect(within(region).getByRole("heading")).toHaveTextContent(copy.conflicts.heading);
+    expect(within(region).getAllByRole("listitem").map((row) => row.textContent))
+      .toEqual([copy.conflicts.statement.double_booking]);
+    expect(within(region).getByText(copy.conflicts.count(1))).toBeVisible();
+    expect(within(region).getByText(copy.conflicts.notResolved)).toBeVisible();
+  });
+
   it("says a quiet day is quiet rather than showing an empty region", () => {
     // The region exists and says so; with nothing to notice it is part of the
     // page's account rather than a section standing before the tasks.

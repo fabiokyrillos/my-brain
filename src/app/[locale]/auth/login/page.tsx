@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { signIn } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
 import { accountCopy } from "@/features/shell/account-copy";
-import { getAuthSubmitCopy, getResendCopy } from "@/features/auth/copy";
+import { getAuthPagesCopy, getAuthSubmitCopy, getResendCopy } from "@/features/auth/copy";
 import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { TurnstileWidget } from "@/features/auth/turnstile";
 import { safeReturnPath } from "@/features/entry/return-path";
@@ -42,18 +42,26 @@ export default async function LoginPage({
   const locale = candidate;
   const query = await searchParams;
   const returnPath = safeReturnPath(query.next, locale);
-  const pt = locale === "pt-BR";
+  const pages = getAuthPagesCopy(locale);
+  const copy = pages.login;
   const signInCopy = getAuthSubmitCopy("signIn", locale);
   const message = successMessages[query.message as keyof typeof successMessages]?.[locale];
 
   return (
-    <div className="auth-card">
-      <Link href="/" className="brand"><span className="brand-mark">B</span><span>My Brain</span></Link>
-      <p className="eyebrow">{pt ? "SEU CONTEXTO, DE VOLTA" : "YOUR CONTEXT, RESTORED"}</p>
-      <h1>{pt ? "Entre no seu Brain" : "Sign in to your Brain"}</h1>
-      <p>{pt ? "Continue exatamente de onde parou." : "Continue exactly where you left off."}</p>
-      {query.error && <div className="form-alert">{authErrorMessage(query.error, locale)}</div>}
-      {message && <div className="form-success">{message}</div>}
+    <div className="auth-column">
+      {/*
+        Editorial calmo (ADR-180). The page is its one sentence, the two fields
+        and the one action. The mark is the layout's; the eyebrow and "Continue
+        exatamente de onde parou." are cut.
+
+        What happened last — a refused sign-in, a link on its way — is a
+        sentence between the question and the fields, in the tone that says
+        which it is. `alert` and `status` rather than a bare `div`: both were
+        unannounced before.
+      */}
+      <h1>{copy.title}</h1>
+      {query.error && <p className="form-alert" role="alert">{authErrorMessage(query.error, locale)}</p>}
+      {message && <p className="form-success" role="status">{message}</p>}
       <form action={signIn} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
         {/*
@@ -69,11 +77,11 @@ export default async function LoginPage({
         */}
         {returnPath && <input type="hidden" name="next" value={returnPath} />}
         <label>
-          E-mail
+          {pages.emailLabel}
           <input name="email" type="email" autoComplete="email" required maxLength={254} />
         </label>
         <label>
-          {pt ? "Senha" : "Password"}
+          {copy.passwordLabel}
           <input name="password" type="password" autoComplete="current-password" required maxLength={128} />
         </label>
         {/*
@@ -95,11 +103,11 @@ export default async function LoginPage({
         */}
         <AuthSubmitButton label={signInCopy.submit} pendingLabel={signInCopy.submitPending} />
       </form>
-      <div className="auth-links">
-        <Link href={`/${locale}/auth/recover`}>{pt ? "Esqueci minha senha" : "Forgot password"}</Link>
-        <Link href={`/${locale}/auth/register`}>{pt ? "Criar conta" : "Create account"}</Link>
+      <nav aria-label={pages.linksLabel} className="auth-links">
+        <Link href={`/${locale}/auth/recover`}>{copy.forgot}</Link>
+        <Link href={`/${locale}/auth/register`}>{copy.create}</Link>
         <Link href={`/${locale}/auth/resend`}>{getResendCopy(locale).linkFromLogin}</Link>
-      </div>
+      </nav>
     </div>
   );
 }

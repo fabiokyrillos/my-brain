@@ -69,6 +69,34 @@ describe("2O-ENTRY-003: no availability claim while the door is shut", () => {
   });
 });
 
+describe("Editorial calmo: what this is, the one way in, then the claims", () => {
+  it.each(LOCALES)("puts sign-in under the sentence and before the claims in %s", (locale) => {
+    const { container } = render(<EntryPage locale={locale} signupOpen={false} />);
+    const copy = getEntryCopy(locale);
+    const heading = screen.getByRole("heading", { level: 1 });
+    const signIn = screen.getByRole("link", { name: copy.signIn });
+    const notice = screen.getByText(copy.closedNotice);
+    const claims = screen.getByRole("region", { name: copy.claimsLabel });
+    const following = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    expect(following(heading, signIn)).toBe(true);
+    expect(following(signIn, notice)).toBe(true);
+    expect(following(notice, claims)).toBe(true);
+    // One way in, and it is found once: the journey locates it in strict mode.
+    expect(container.querySelectorAll('a[href$="/auth/login"]')).toHaveLength(1);
+    expect(container.querySelectorAll("h1")).toHaveLength(1);
+  });
+
+  it("opens with the product's own mark, not an eyebrow naming it", () => {
+    const { container } = render(<EntryPage locale="pt-BR" signupOpen={false} />);
+    const brand = screen.getByRole("link", { name: "My Brain" });
+    expect(brand.textContent).toBe("BMy Brain");
+    expect(container.querySelector(".entry-page")!.firstElementChild!.contains(brand)).toBe(true);
+    expect(container.querySelector(".eyebrow")).toBeNull();
+  });
+});
+
 describe("2O-ENTRY-001: the page tells the truth about its own language", () => {
   it.each(LOCALES)("declares lang=%s on the element that knows the locale", (locale) => {
     const { container } = render(<EntryPage locale={locale} signupOpen={false} />);

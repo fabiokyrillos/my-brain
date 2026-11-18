@@ -13,69 +13,75 @@
    has an inherited touch-target defect already waiting in 2O.7 without adding a
    contrast one beside it. */
 
+/*
+ * ADR-180 — one section like its neighbours on Hoje: a heading over a
+ * hairline with the progress in words, each step a row between hairlines, and
+ * a quiet line to dismiss it. No panel border, no panel fill, no tile.
+ */
 .onboarding {
   display: grid;
-  gap: var(--space-5);
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
   margin: var(--space-8) 0 0;
-  padding: var(--space-6);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
 }
 
 .onboarding-head {
-  display: grid;
-  gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .onboarding-head > h2 {
   margin: 0;
-  font: var(--type-title-2);
+  font: var(--type-section);
   color: var(--text-primary);
-}
-
-.onboarding-intro {
-  margin: 0;
-  font: var(--type-body);
-  color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 .onboarding-progress {
   margin: 0;
   font: var(--type-caption);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .onboarding-notice {
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
+  margin: var(--space-2) 0 0;
   font: var(--type-caption);
   color: var(--text-secondary);
 }
 
+/* `2O-ONBOARD-011` — what every blocked step is waiting on, said once, as the
+   section's first row: the sentence, and its one verb. */
 .onboarding-recovery {
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--background-subtle);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-default);
 }
 
-.onboarding-recovery > h3 {
-  margin: 0;
-  font: var(--type-heading);
-  color: var(--text-primary);
+.onboarding-recovery-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
-.onboarding-recovery > p {
+.onboarding-recovery h3 {
   margin: 0;
-  font: var(--type-body);
+  font: var(--type-label);
+  color: var(--tone-attention-fg);
+}
+
+.onboarding-recovery p {
+  margin: 0;
+  font: var(--type-caption);
   color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 .onboarding-steps {
@@ -83,105 +89,147 @@
   margin: 0;
   padding: 0;
   display: grid;
-  gap: var(--space-3);
-  counter-reset: onboarding-step;
+  grid-template-columns: minmax(0, 1fr);
 }
 
+/* A row: its mark, its name, and — on the next one only — its one verb. */
 .onboarding-step {
+  position: relative;
   display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--border-divider);
-  border-radius: var(--radius-md);
+  grid-template-columns: var(--space-5) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
+  min-width: 0;
+  min-height: var(--touch-target);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-default);
 }
 
-/* The step being offered now. A left rule rather than a fill, so the row stays
-   on the same background every other row uses and nothing depends on a tint. */
-.onboarding-step[aria-current="step"] {
-  border-inline-start: 3px solid var(--text-primary);
-}
-
-/* A step already done, de-emphasised **without** `opacity`.
-
-   It read `opacity: 0.72` until slice 2O.7, and that is the defect
-   `jsdom-cannot-see-contrast` records in its purest form: opacity composites
-   the whole subtree toward whatever is behind it, so `--text-secondary` — which
-   passes AA everywhere else in this product at full strength — landed below
-   4.5:1 here and nowhere else. No unit test could see it, the token was
-   correct, and the rule that broke it says nothing about colour.
-
-   Axe on the rendered page found it on the cockpit in **both themes**. What
-   replaces it changes no text colour that is not already proved: the body and
-   the state label keep `--text-secondary` at full strength, the title steps
-   down from primary to secondary, and the row's completeness is carried by a
-   fill and a border rather than by dimming. */
-.onboarding-step[data-state="satisfied"] {
-  background: var(--background-subtle);
-  border-color: var(--border-divider);
-}
-
-.onboarding-step[data-state="satisfied"] .onboarding-step-title {
+/* The mark is shape, and the state is also a word on the row (or in its
+   accessible text): a ring for what is still to do, a check for what is done,
+   a filled dot for the step being offered now. */
+.onboarding-step-mark {
+  display: inline-grid;
+  place-items: center;
+  justify-self: center;
+  width: var(--space-3);
+  height: var(--space-3);
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-full);
   color: var(--text-secondary);
 }
 
-.onboarding-step-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  align-items: baseline;
-  justify-content: space-between;
+.onboarding-step[data-state="satisfied"] .onboarding-step-mark {
+  width: var(--space-5);
+  height: var(--space-5);
+  border-color: transparent;
+}
+
+.onboarding-step[aria-current="step"] .onboarding-step-mark {
+  border-color: var(--text-primary);
+  background: var(--text-primary);
+}
+
+.onboarding-step-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
 }
 
 .onboarding-step-title {
   margin: 0;
-  font: var(--type-heading);
-  color: var(--text-primary);
+  font: var(--type-body);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
 }
 
+/* The step being offered now is the one in ink. De-emphasis elsewhere is by
+   tone, never by `opacity`: opacity composites the whole subtree toward what is
+   behind it and took `--text-secondary` below 4.5:1 here once (slice 2O.7). */
+.onboarding-step[aria-current="step"] {
+  align-items: start;
+  padding: var(--space-3) 0;
+}
+
+.onboarding-step[aria-current="step"] .onboarding-step-mark {
+  margin-top: 6px;
+}
+
+.onboarding-step[aria-current="step"] .onboarding-step-title {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* The link is the title, and its cover makes the row the target. */
+.onboarding-step-link {
+  display: block;
+  margin-block: -11px;
+  padding-block: 11px;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.onboarding-step-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.onboarding-step-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.onboarding-step-link:focus-visible { outline: none; }
+.onboarding-step-link:focus-visible::after { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+
 .onboarding-step-state {
-  font: var(--type-label);
-  color: var(--text-secondary);
-  letter-spacing: var(--eyebrow-tracking);
-  text-transform: uppercase;
+  font: var(--type-caption);
+  color: var(--text-muted);
 }
 
 .onboarding-step-body {
   margin: 0;
-  font: var(--type-body);
+  overflow-wrap: anywhere;
+  font: var(--type-caption);
   color: var(--text-secondary);
-  line-height: 1.6;
 }
 
 .onboarding-step-action,
 .onboarding-recovery-action {
   display: inline-flex;
   align-items: center;
-  justify-self: start;
-  /* `2N-MOBILE`'s 21px target is an admitted residual for slice 2O.7. Nothing
-     this slice ships may add a second one. */
   min-height: var(--touch-target);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--action-primary);
-  color: var(--action-primary-text);
+  color: var(--link);
   font: var(--type-label);
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .onboarding-step-action:hover,
 .onboarding-recovery-action:hover {
-  background: var(--action-primary-hover);
+  color: var(--link-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .onboarding-dismiss {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border-divider);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-3);
+  min-width: 0;
 }
 
-.onboarding-dismiss-action,
+.onboarding-dismiss-action {
+  min-height: var(--touch-target);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+}
+
+.onboarding-dismiss-action:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 3px; }
+
 .onboarding-restore-action {
   min-height: var(--touch-target);
   padding: 0 var(--space-4);
@@ -197,6 +245,22 @@
   margin: 0;
   font: var(--type-caption);
   color: var(--text-muted);
+}
+
+/* On a phone the next step's verb takes its own line under the sentence, so
+   neither is squeezed by the other. */
+@media (max-width: 600px) {
+  .onboarding-step[aria-current="step"] {
+    grid-template-columns: var(--space-5) minmax(0, 1fr);
+  }
+
+  .onboarding-step[aria-current="step"] .onboarding-step-action {
+    grid-column: 2;
+  }
+
+  .onboarding-recovery {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .onboarding-restore {
@@ -243,40 +307,3 @@
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
-
-/* Life Brain A.1 — the compact shape: next step first, the rest folded.
-   Tokens only; state by text and border, never colour alone (see above). */
-.onboarding--compact { gap: var(--space-4); padding: var(--card-padding); }
-.onboarding--compact .onboarding-head > h2 { font: var(--type-heading); }
-.onboarding-next {
-  display: grid;
-  gap: var(--space-2);
-  justify-items: start;
-  padding: var(--space-4);
-  border: 1px solid var(--border-default);
-  border-inline-start: 3px solid var(--text-primary);
-  border-radius: var(--radius-md);
-  background: var(--background-subtle);
-}
-.onboarding-next-label {
-  margin: 0;
-  font: var(--type-eyebrow);
-  letter-spacing: var(--eyebrow-tracking);
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-.onboarding-next-title { margin: 0; font: var(--type-heading); color: var(--text-primary); }
-.onboarding-next-body { margin: 0; font: var(--type-body); color: var(--text-secondary); }
-.onboarding-all { display: grid; gap: var(--space-3); }
-.onboarding-all-summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-target);
-  cursor: pointer;
-  font: var(--type-label);
-  color: var(--link);
-  list-style: none;
-}
-.onboarding-all-summary::-webkit-details-marker { display: none; }
-.onboarding-all-summary:hover { color: var(--link-hover); text-decoration: underline; }
-.onboarding-all-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }

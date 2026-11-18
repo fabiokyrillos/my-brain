@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { SignedOutHeader } from "@/features/auth/signed-out-header";
 import { getLegalDocument } from "@/features/legal/documents";
 import { legalDocumentPath } from "@/features/legal/versions";
 import type { Locale } from "@/lib/preferences";
@@ -47,9 +48,35 @@ export function EntryPage({ locale, signupOpen }: { locale: Locale; signupOpen: 
 
   return (
     <div className="entry-page" lang={locale}>
+      {/*
+        Editorial calmo (ADR-180). The product's mark and the other language,
+        exactly as on the sign-in pages this leads to; it replaces the "MY
+        BRAIN" eyebrow, which named the product without showing it.
+      */}
+      <SignedOutHeader locale={locale} />
+
       <header className="entry-header">
-        <p className="eyebrow">{copy.productName}</p>
         <h1>{copy.tagline}</h1>
+        {/*
+          `2O-ENTRY-008`: a forward path, and since Editorial calmo the page's
+          one action — directly under the sentence that says what this is,
+          where it used to be the last line of the page, under the claims and
+          the documents. Someone who already has an account is not a
+          registration, so it is here whether the door is open or shut, and it
+          is the only account-related control on the page while it is shut.
+        */}
+        <Link className="entry-sign-in" href={`/${locale}/auth/login`}>
+          {copy.signIn}
+        </Link>
+        {/*
+          `2O-ENTRY-003` and `2O-ENTRY-006`. The notice is rendered from the same
+          predicate the Server Action enforces and **does not vary with any
+          request input**, so the closed door answers identically to everyone and
+          is not a probe surface. `SH-SIGNUP-001`'s uniform-refusal property is
+          re-asserted here rather than replaced. It sits beside the one way in,
+          because it is the answer to "and if I have no account?".
+        */}
+        {!signupOpen && <p className="entry-closed">{copy.closedNotice}</p>}
       </header>
 
       <section className="entry-claims" aria-labelledby="entry-claims-heading">
@@ -77,25 +104,6 @@ export function EntryPage({ locale, signupOpen }: { locale: Locale; signupOpen: 
         </Link>
       </section>
 
-      <footer className="entry-footer">
-        {/*
-          `2O-ENTRY-003` and `2O-ENTRY-006`. The notice is rendered from the same
-          predicate the Server Action enforces and **does not vary with any
-          request input**, so the closed door answers identically to everyone and
-          is not a probe surface. `SH-SIGNUP-001`'s uniform-refusal property is
-          re-asserted here rather than replaced.
-        */}
-        {!signupOpen && <p className="entry-closed">{copy.closedNotice}</p>}
-        {/*
-          `2O-ENTRY-008`: a forward path. Someone who already has an account is
-          not a registration, so this link stays whether the door is open or
-          shut — and it is the only account-related control on the page while it
-          is shut.
-        */}
-        <Link className="entry-sign-in" href={`/${locale}/auth/login`}>
-          {copy.signIn}
-        </Link>
-      </footer>
     </div>
   );
 }

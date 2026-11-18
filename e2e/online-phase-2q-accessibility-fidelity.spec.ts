@@ -230,6 +230,9 @@ test.describe("the fixture lane and the real app agree", () => {
       [APPEARANCE_STORAGE_KEY, "dark"],
     );
     await page.goto("/pt-BR/app/search");
+    // Editorial calmo (ADR-180): the filters are one closed line; open it so
+    // the select is drawn and can be measured.
+    await page.locator(".search-filters-summary").click();
     await page.waitForSelector("select", { timeout: 20_000 });
     const real = await measure(page, "select");
 
@@ -313,6 +316,9 @@ test.describe("the fixture lane and the real app agree", () => {
       [APPEARANCE_STORAGE_KEY, "light"],
     );
     await page.goto("/pt-BR/app/search");
+    // Editorial calmo (ADR-180): the filters are one closed line; open it so
+    // the select is drawn and can be measured.
+    await page.locator(".search-filters-summary").click();
     await page.waitForSelector("select", { timeout: 20_000 });
     const real = await measure(page, "select");
 

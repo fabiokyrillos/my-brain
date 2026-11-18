@@ -93,10 +93,13 @@ export default async function RemindersPage({
    * each doing their own construction is that same hazard one level up and
    * `2R-TIME-005` asks for one authority rather than several.
    */
-  const { formatInstant, formatLocalInput, formatLocalTime } = reminderFormatters(
+  const { formatInstant, formatLocalTime, formatLocalDay, formatDayLabel } = reminderFormatters(
     locale,
     timezone,
   );
+  // One instant for the whole render: the query's "overdue" and the list's
+  // "today" must be read off the same clock.
+  const now = new Date();
 
   const taskOptions = await loadReminderTaskOptions(
     supabase,
@@ -109,7 +112,7 @@ export default async function RemindersPage({
     locale,
     page,
     view,
-    now: new Date(),
+    now,
   });
 
   /*
@@ -140,24 +143,32 @@ export default async function RemindersPage({
   return (
     <div className="content-page">
       {/*
-        Life Brain A.4 (`LB-A-007`). Lembretes is a lens of the Agenda, under
-        the Agenda's one compact header. Its one action stays where it was, in
-        the header.
+        Life Brain A.4 (`LB-A-007`). Lembretes is a lens of the Agenda, and since
+        ADR-180 it opens with the Agenda's own masthead: the destination is a
+        small line beside the lenses, and the page's subject — what is coming —
+        is the largest text on it, in the reading face, where Calendário and
+        Planejar put their period.
 
         `2P-REMINDER-001`. A single action, not a form: the header used to
         carry `ReminderForm` — three controls and a submit button, permanently
-        open above the list. The options are resolved on the server because the
-        picker renders task titles, which are governed content; see
-        `task-options.ts` for why that resolution cannot happen inside an
-        `<option>`.
+        open above the list. It is one quiet verb on the subject's caption line.
+        The options are resolved on the server because the picker renders task
+        titles, which are governed content; see `task-options.ts` for why that
+        resolution cannot happen inside an `<option>`.
       */}
       <AgendaHeader
-        actions={<ReminderComposer action={createReminderOrSeries} locale={locale} taskOptions={taskOptions} />}
         lens="reminders"
         locale={locale}
+        period={(
+          <div className="reminders-subject">
+            <p className="reminders-subject-title">{copy.list.subject[view]}</p>
+            <p className="reminders-subject-caption">
+              {reminders.length ? copy.list.count(reminders.length, hasNext || page > 1) : copy.emptyTitle}
+            </p>
+            <ReminderComposer action={createReminderOrSeries} locale={locale} taskOptions={taskOptions} />
+          </div>
+        )}
       />
-
-      <ReminderViewNav current={view} labels={copy.viewLabel} locale={locale} />
 
       {/*
         `2O-NOTIFY-002`. The invitation appears here and only here, and only
@@ -191,10 +202,12 @@ export default async function RemindersPage({
           <ReminderSeriesBanner locale={locale} />
           {reminders.length ? (
             <ReminderList
+              formatDayLabel={formatDayLabel}
               formatInstant={formatInstant}
-              formatLocalInput={formatLocalInput}
+              formatLocalDay={formatLocalDay}
               formatLocalTime={formatLocalTime}
               locale={locale}
+              now={now}
               reminders={reminders}
             />
           ) : (
@@ -202,6 +215,10 @@ export default async function RemindersPage({
           )}
         </ReminderSeriesProvider>
       </ReminderFeedbackProvider>
+
+      {/* What was delivered or cancelled is bookkeeping: one quiet line under
+          the list, each view still its own URL. */}
+      <ReminderViewNav current={view} label={copy.list.viewsLabel} labels={copy.viewLabel} locale={locale} />
 
       {/* The view travels through `query`, not concatenated into `path` —
           `PaginationLinks` builds its own `?page=…`, so a query string baked

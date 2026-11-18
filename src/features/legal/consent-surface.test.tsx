@@ -46,5 +46,43 @@ describe("consent decline path (SH-LEGAL-010)", () => {
       // a link would be a GET and would not clear the session.
       expect(screen.getByRole("button", { name: copy.declineSignOut })).toBeInTheDocument();
     });
+
+    it(`asks first, and puts the way to say no under it — both ways, on one line (${locale})`, () => {
+      // Editorial calmo (ADR-180): the column, not the card. Nothing the
+      // surface offered was removed by recomposing it.
+      const { container } = render(<ConsentSurface hasAcceptedBefore={false} locale={locale} />);
+      expect(container.querySelector(".auth-card")).toBeNull();
+      const column = container.querySelector(".auth-column")!;
+      expect(column.querySelector(".auth-caption")!.textContent).toBe(copy.firstSessionBody);
+
+      const following = (a: Element, b: Element) =>
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      const documents = [...column.querySelectorAll(".auth-facts > li > a")];
+      expect(documents.map((link) => link.getAttribute("href"))).toEqual([
+        `/${locale}/legal/terms`,
+        `/${locale}/legal/privacy`,
+      ]);
+      const accept = screen.getByRole("button", { name: copy.accept });
+      const aside = screen.getByRole("region", { name: copy.declineTitle });
+      expect(following(documents[1], accept)).toBe(true);
+      expect(following(accept, aside)).toBe(true);
+      expect(aside.textContent).toContain(copy.declineBody);
+
+      const ways = aside.querySelector(".auth-links")!;
+      expect(ways.contains(screen.getByRole("button", { name: copy.declineSignOut }))).toBe(true);
+      expect(ways.contains(screen.getByRole("link", { name: copy.declineDelete }))).toBe(true);
+    });
+
+    it(`both forms still send the locale and nothing else (${locale})`, () => {
+      const { container } = render(<ConsentSurface hasAcceptedBefore locale={locale} />);
+      const forms = [...container.querySelectorAll("form")];
+      expect(forms).toHaveLength(2);
+      for (const form of forms) {
+        expect([...form.querySelectorAll("input")].map((input) => [input.type, input.name, input.value]))
+          .toEqual([["hidden", "locale", locale]]);
+        expect(form.querySelectorAll("button[type=submit]")).toHaveLength(1);
+      }
+      expect(container.querySelector(".auth-caption")!.textContent).toBe(copy.updatedBody);
+    });
   }
 });

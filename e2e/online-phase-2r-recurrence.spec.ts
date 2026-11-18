@@ -152,9 +152,10 @@ test.describe("slice 2R.3 — creating a routine", () => {
 
     // `2R-SURFACE-003`. The list says it repeats, and how.
     await page.reload();
-    const row = page.locator("article.reminder-row").filter({ hasText: "Tomar o remédio" });
-    await expect(row.getByText("Repete")).toBeVisible();
-    await expect(row.locator(".reminder-series-rule")).toContainText("Toda");
+    const row = page.locator(".reminder-row").filter({ hasText: "Tomar o remédio" });
+    // The rule in words is the row's caption (ADR-180); "Repete" alone is
+    // printed only when the stored rule does not parse.
+    await expect(row.locator(".reminder-row-repeats")).toContainText("Toda");
 
     // `2R-SURFACE-004`. No rule string anywhere on the page.
     const text = (await page.locator("body").innerText()).toLowerCase();
@@ -289,8 +290,8 @@ test.describe("slice 2R.3 — creating a routine", () => {
 
     // And the list says how it repeats, in words, naming all three days.
     await page.reload();
-    const rule = page.locator("article.reminder-row").filter({ hasText: "Academia" })
-      .locator(".reminder-series-rule");
+    const rule = page.locator(".reminder-row").filter({ hasText: "Academia" })
+      .locator(".reminder-row-repeats");
     await expect(rule).toContainText("segunda-feira");
     await expect(rule).toContainText("quarta-feira");
     await expect(rule).toContainText("sexta-feira");

@@ -146,7 +146,7 @@ export const quotaSectionCopy: Record<Locale, {
   "pt-BR": {
     title: "Limites da conta",
     intro:
-      "Estes são os limites que o banco de dados aplica de verdade — os mesmos números que aparecem quando uma ação é recusada. As janelas diárias viram à meia-noite UTC, e não no seu fuso.",
+      "Os mesmos números que aparecem quando uma ação é recusada. As janelas diárias viram à meia-noite UTC, e não no seu fuso.",
     listLabel: "Limites e uso",
     ofCeiling: "de",
     unreadable: "Não foi possível ler este número agora.",
@@ -154,7 +154,7 @@ export const quotaSectionCopy: Record<Locale, {
   en: {
     title: "Account limits",
     intro:
-      "These are the limits the database really enforces — the same numbers that appear when an action is refused. Daily windows turn over at UTC midnight, not in your own zone.",
+      "The same numbers that appear when an action is refused. Daily windows turn over at UTC midnight, not in your own zone.",
     listLabel: "Limits and usage",
     ofCeiling: "of",
     unreadable: "This number could not be read right now.",

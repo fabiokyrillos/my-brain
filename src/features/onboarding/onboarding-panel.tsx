@@ -1,6 +1,6 @@
+import { Check } from "lucide-react";
 import Link from "next/link";
 
-import { ButtonLink } from "@/components/ui";
 import { destinationHref, type OnboardingPath, type OnboardingStep } from "./contracts";
 import { getOnboardingCopy } from "./copy";
 import type { Locale } from "@/lib/preferences";
@@ -8,13 +8,19 @@ import type { Locale } from "@/lib/preferences";
 /**
  * The guided path, offered on Hoje beneath the composer (`2O-ONBOARD-001`).
  *
- * Life Brain A.1 changed its shape, not its contract. The baseline rendered the
- * whole path as seven stacked cards, each with its own black button — on an
- * iPhone that was two screens of guide between the composer and the day. The
- * panel now leads with **the next step** (title, one sentence, one action) and
- * folds the complete list behind a disclosure. Every row, state attribute and
- * link is still rendered, so the tests and the reachability census read the
- * same facts; what changed is what is open by default.
+ * Its contract has not changed since the baseline; its shape has, twice. The
+ * baseline was seven stacked cards, each with its own black button. Life Brain
+ * A.1 led with the next step in a tinted card and folded the list behind a
+ * disclosure — a box inside a box, on a page that ADR-180 then made of
+ * sections over hairlines.
+ *
+ * It is now **one section like its neighbours**: a heading over a hairline with
+ * the progress said in words, and each step a row. A step that is done is quiet
+ * and carries a check; the next one is in ink, with the one sentence that says
+ * what it does and its one verb; the ones after it are their own links. Nothing
+ * is folded — seven short rows are shorter than the card they replace — and
+ * dismissing is one quiet line at the foot. Every row, state attribute and link
+ * the tests and the reachability census read is still rendered.
  *
  * Reads only: the decision of what to show is `onboarding-view.ts`'s, and the
  * only write this component reaches is the dismissal form it is given.
@@ -33,6 +39,11 @@ function StepRow({
 }) {
   const text = copy.steps[step.key];
   const offersAction = step.state === "unsatisfied" || step.state === "unreadable";
+  const href = destinationHref(step.destination, locale);
+  // "Feito" is the check's name and "Pendente" is every other row's default:
+  // both are said to a screen reader and not printed. The two states that
+  // explain why a row offers nothing, or may be wrong, are words on the row.
+  const stateIsCaption = step.state === "blocked" || step.state === "unreadable";
 
   return (
     <li
@@ -41,15 +52,26 @@ function StepRow({
       data-state={step.state}
       aria-current={isNext ? "step" : undefined}
     >
-      <div className="onboarding-step-head">
-        <h3 className="onboarding-step-title">{text.title}</h3>
-        <span className="onboarding-step-state" data-state={step.state}>
+      <span aria-hidden="true" className="onboarding-step-mark">
+        {step.state === "satisfied" ? <Check size={14} strokeWidth={2.5} /> : null}
+      </span>
+      <div className="onboarding-step-main">
+        <h3 className="onboarding-step-title">
+          {/* The row is the link: a step still to do opens where it is done.
+              The next one keeps its title plain, because its verb is beside it. */}
+          {offersAction && !isNext ? (
+            <Link className="onboarding-step-link" href={href}>{text.title}</Link>
+          ) : (
+            text.title
+          )}
+        </h3>
+        {isNext ? <p className="onboarding-step-body">{text.body}</p> : null}
+        <span className={stateIsCaption ? "onboarding-step-state" : "onboarding-step-state sr-only"} data-state={step.state}>
           {copy.states[step.state]}
         </span>
       </div>
-      <p className="onboarding-step-body">{text.body}</p>
-      {offersAction ? (
-        <Link className="onboarding-step-action" href={destinationHref(step.destination, locale)}>
+      {offersAction && isNext ? (
+        <Link className="onboarding-step-action" href={href}>
           {text.action}
         </Link>
       ) : null}
@@ -71,12 +93,9 @@ export function OnboardingPanel({
   const copy = getOnboardingCopy(locale);
   const hasUnreadable = path.steps.some((step) => step.state === "unreadable");
   const credentialAbsent = path.credential === "unsatisfied";
-  const next = path.nextStep;
-  const nextText = next ? copy.steps[next.key] : null;
-  const nextOffersAction = next ? next.state === "unsatisfied" || next.state === "unreadable" : false;
 
   return (
-    <section className="onboarding onboarding--compact" aria-labelledby="onboarding-title" data-onboarding="offered">
+    <section className="onboarding" aria-labelledby="onboarding-title" data-onboarding="offered">
       <header className="onboarding-head">
         <h2 id="onboarding-title">{copy.title}</h2>
         <p className="onboarding-progress" data-done={path.satisfiedCount} data-total={path.total}>
@@ -102,43 +121,29 @@ export function OnboardingPanel({
       */}
       {credentialAbsent ? (
         <div className="onboarding-recovery" data-recovery="credential">
-          <h3>{copy.recovery.title}</h3>
-          <p>{copy.recovery.body}</p>
+          <div className="onboarding-recovery-text">
+            <h3>{copy.recovery.title}</h3>
+            <p>{copy.recovery.body}</p>
+          </div>
           <Link className="onboarding-recovery-action" href={destinationHref("settings", locale)}>
             {copy.recovery.action}
           </Link>
         </div>
       ) : null}
 
-      {next && nextText ? (
-        <div className="onboarding-next" data-next-step={next.key}>
-          <p className="onboarding-next-label">{copy.next.label}</p>
-          <p className="onboarding-next-title">{nextText.title}</p>
-          <p className="onboarding-next-body">{nextText.body}</p>
-          {nextOffersAction ? (
-            <ButtonLink href={destinationHref(next.destination, locale)} size="md" variant="primary">
-              {nextText.action}
-            </ButtonLink>
-          ) : null}
-        </div>
-      ) : (
-        <p className="onboarding-next-body">{copy.next.done}</p>
-      )}
+      {path.nextStep ? null : <p className="onboarding-notice">{copy.next.done}</p>}
 
-      <details className="onboarding-all">
-        <summary className="onboarding-all-summary">{copy.next.allSteps}</summary>
-        <ol className="onboarding-steps">
-          {path.steps.map((step) => (
-            <StepRow
-              key={step.key}
-              step={step}
-              locale={locale}
-              isNext={path.nextStep?.key === step.key}
-              copy={copy}
-            />
-          ))}
-        </ol>
-      </details>
+      <ol className="onboarding-steps">
+        {path.steps.map((step) => (
+          <StepRow
+            key={step.key}
+            step={step}
+            locale={locale}
+            isNext={path.nextStep?.key === step.key}
+            copy={copy}
+          />
+        ))}
+      </ol>
 
       <form className="onboarding-dismiss" action={dismissAction}>
         <input type="hidden" name="locale" value={locale} />

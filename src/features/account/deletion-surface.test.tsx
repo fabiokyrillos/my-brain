@@ -63,5 +63,47 @@ describe("the deletion surface carries the challenge", () => {
         expect(text).toContain(claim);
       }
     });
+
+    it(`says what cannot be undone first, then the rest as rows, all above the first field (${locale})`, () => {
+      // Editorial calmo (ADR-180). The recomposition may place the four claims;
+      // it may not drop one or let a control come ahead of them.
+      const { container } = render(<DeletionSurface captcha={marker} locale={locale} />);
+      const column = container.querySelector(".auth-column")!;
+      expect(container.querySelector(".auth-card")).toBeNull();
+
+      const warning = column.querySelector("p.auth-warning")!;
+      expect(warning.textContent).toBe(copy.irreversible);
+      const rows = [...column.querySelectorAll(".auth-facts > li")].map((row) => row.textContent);
+      expect(rows).toEqual([copy.removes, copy.retains, copy.timeline]);
+
+      const firstControl = column.querySelector("input:not([type=hidden]), button")!;
+      const following = (a: Element, b: Element) =>
+        Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+      expect(following(column.querySelector("h1")!, warning)).toBe(true);
+      expect(following(warning, column.querySelector(".auth-facts")!)).toBe(true);
+      expect(following(column.querySelector(".auth-facts")!, firstControl)).toBe(true);
+    });
+
+    it(`sends exactly what it sent: the word, the password, the locale, one submit (${locale})`, () => {
+      const { container } = render(<DeletionSurface captcha={marker} locale={locale} />);
+      const form = container.querySelector("form.auth-form")!;
+      const attributes = (name: string) => {
+        const input = form.querySelector<HTMLInputElement>(`input[name="${name}"]`)!;
+        return Object.fromEntries([...input.attributes].map((attribute) => [attribute.name, attribute.value]));
+      };
+      expect([...form.querySelectorAll("input")].map((input) => input.name)).toEqual(["locale", "confirmation", "password"]);
+      expect(attributes("locale")).toEqual({ type: "hidden", name: "locale", value: locale });
+      expect(attributes("confirmation")).toEqual({ autocomplete: "off", maxlength: "64", name: "confirmation", required: "" });
+      expect(attributes("password")).toEqual({
+        autocomplete: "current-password", maxlength: "256", name: "password", required: "", type: "password",
+      });
+      const buttons = form.querySelectorAll("button");
+      expect(buttons).toHaveLength(1);
+      expect(buttons[0].getAttribute("type")).toBe("submit");
+      // The one filled risk button: it is marked as such, and it is the only one.
+      expect(buttons[0].classList.contains("auth-danger-action")).toBe(true);
+      expect(screen.getByLabelText(copy.confirmationLabel).getAttribute("name")).toBe("confirmation");
+      expect(screen.getByLabelText(copy.passwordLabel).getAttribute("name")).toBe("password");
+    });
   }
 });

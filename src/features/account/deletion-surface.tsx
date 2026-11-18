@@ -57,20 +57,29 @@ export function DeletionSurface({
 
   if (state.status === "started") {
     return (
-      <div className="auth-card">
+      <div className="auth-column">
         <h1>{copy.receiptTitle}</h1>
-        <p>{copy.receiptBody}</p>
+        <p className="auth-caption">{copy.receiptBody}</p>
       </div>
     );
   }
 
   return (
-    <div className="auth-card">
+    <div className="auth-column">
       <h1>{copy.title}</h1>
-      <p>{copy.irreversible}</p>
-      <p>{copy.removes}</p>
-      <p>{copy.retains}</p>
-      <p>{copy.timeline}</p>
+      {/*
+        Editorial calmo (ADR-180). The four SH-COPY-003 claims, every word of
+        them, still ahead of the first control. They were four paragraphs run
+        together in one grey block; now the one that cannot be taken back is
+        said first, in the risk tone, and the other three — what goes, what
+        stays, how long — are rows.
+      */}
+      <p className="auth-warning">{copy.irreversible}</p>
+      <ul className="auth-facts">
+        <li>{copy.removes}</li>
+        <li>{copy.retains}</li>
+        <li>{copy.timeline}</li>
+      </ul>
 
       <form action={formAction} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
@@ -89,7 +98,9 @@ export function DeletionSurface({
           />
         </label>
         {captcha}
-        <button disabled={pending} type="submit">
+        {/* The one filled risk button in the product: this is the action that
+            cannot be undone, and it looks like nothing else. */}
+        <button className="auth-danger-action" disabled={pending} type="submit">
           {pending ? copy.submitting : copy.submit}
         </button>
       </form>

@@ -12,6 +12,7 @@
  */
 
 import { notFound, redirect } from "next/navigation";
+import { SignedOutFrame } from "@/features/auth/signed-out-frame";
 import { AccountStateSurface } from "@/features/shell/account-state-surface";
 import type { AccountStateKind } from "@/features/shell/lifecycle-copy";
 import { isLocale } from "@/lib/preferences";
@@ -45,10 +46,12 @@ export default async function AccountStatePage({
   // public label by the copy module, which falls back to the generic label for
   // anything it does not know. The code itself never reaches the page.
   return (
-    <AccountStateSurface
-      locale={locale}
-      reasonCode={lifecycle.error ? null : lifecycle.data?.reason_code ?? null}
-      state={state}
-    />
+    <SignedOutFrame locale={locale}>
+      <AccountStateSurface
+        locale={locale}
+        reasonCode={lifecycle.error ? null : lifecycle.data?.reason_code ?? null}
+        state={state}
+      />
+    </SignedOutFrame>
   );
 }

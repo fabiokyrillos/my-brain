@@ -413,12 +413,17 @@ export function CalendarView({
             /*
               One caption under the subject: that this is today, when it is,
               and how much the period holds. The count is a live region, so
-              moving between periods says what was found.
+              moving between periods says what was found. An empty period is
+              said once, by the line under the controls ("Nada marcado para
+              este período."); "0 itens" above it was the same fact twice, so
+              the region stays and holds nothing.
             */
             caption={(
               <div className="calendar-status">
                 {singleDay?.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-                <p aria-live="polite" className="calendar-summary">{copy.summary(projection.itemCount)}</p>
+                <p aria-live="polite" className="calendar-summary">
+                  {projection.itemCount === 0 ? null : copy.summary(projection.itemCount)}
+                </p>
               </div>
             )}
             className="calendar-navigation"

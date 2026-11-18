@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarSync, LoaderCircle, Repeat, Square } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { Locale } from "@/lib/preferences";
@@ -62,11 +62,12 @@ export function ReminderSeriesControls({
 }: {
   locale: Locale;
   /**
-   * Life Brain D.1. The card shows the rule's **facts** (that it repeats, how,
-   * detached) without opening anything, and keeps its **controls** in the
-   * "Mais" menu. `all` is both, as before.
+   * ADR-180. On the reminder's page the rule is one row of the facts list —
+   * `fact`: how it repeats, with *Alterar repetição* opening the scope question
+   * under it — and ending the rule waits at the foot with the other risky verb
+   * (`end`). `all` is both, in that order.
    */
-  part?: "all" | "facts" | "controls";
+  part?: "all" | "fact" | "end";
   reminder: ReminderViewModel;
   /**
    * The occurrence's wall clock as `HH:MM` in the owner's zone — **computed by
@@ -116,15 +117,17 @@ export function ReminderSeriesControls({
   // is the placeholder UX-12 refuses; absence says the same thing truthfully.
   const editable = series.active && !series.detached;
 
-  const facts = part !== "controls";
-  const controls = part !== "facts";
+  const facts = part !== "end";
+  const ending = part !== "fact";
 
   return (
-    <div className={part === "controls" ? "reminder-series reminder-series-controls" : "reminder-series"}>
+    <div className="reminder-series" data-part={part}>
       {facts ? (
       <p className="reminder-series-facts">
-        <span className="status-badge reminder-series-badge">
-          <Repeat aria-hidden="true" size={12} /> {copy.badge}
+        {/* Under a label that already reads "Repetição" the word is said to a
+            screen reader only; it is printed when it is all there is to say. */}
+        <span className={series.description === null ? "reminder-series-badge" : "reminder-series-badge sr-only"}>
+          {copy.badge}
         </span>
         {/*
           `2R-SURFACE-003` asks for two things — that it repeats, **and how** —
@@ -142,41 +145,40 @@ export function ReminderSeriesControls({
           <span className="reminder-series-rule">{series.description}</span>
         )}
         {series.detached ? (
-          <span className="status-badge reminder-series-detached">{copy.detachedBadge}</span>
+          <span className="reminder-series-detached">{copy.detachedBadge}</span>
         ) : null}
       </p>
       ) : null}
 
+      {facts && editable ? (
+        <button
+          aria-expanded={openPanel === "edit"}
+          className="reminder-fact-verb"
+          onClick={() => {
+            setDismissed(state);
+            setPanel(openPanel === "edit" ? null : "edit");
+          }}
+          type="button"
+        >
+          {copy.editLabel}
+        </button>
+      ) : null}
+
       {facts && series.detached ? <p className="reminder-series-hint">{copy.detachedHint}</p> : null}
 
-      {controls && editable ? (
+      {ending && editable ? (
         <>
-          <div className="reminder-action-row">
-            <button
-              aria-expanded={openPanel === "edit"}
-              className="reminder-button"
-              onClick={() => {
-                setDismissed(state);
-                setPanel(openPanel === "edit" ? null : "edit");
-              }}
-              type="button"
-            >
-              <CalendarSync aria-hidden="true" size={14} />
-              {copy.editLabel}
-            </button>
-            <button
-              aria-expanded={openPanel === "end"}
-              className="reminder-button danger"
-              onClick={() => {
-                setDismissed(state);
-                setPanel(openPanel === "end" ? null : "end");
-              }}
-              type="button"
-            >
-              <Square aria-hidden="true" size={14} />
-              {copy.endLabel}
-            </button>
-          </div>
+          <button
+            aria-expanded={openPanel === "end"}
+            className="reminder-risk-verb"
+            onClick={() => {
+              setDismissed(state);
+              setPanel(openPanel === "end" ? null : "end");
+            }}
+            type="button"
+          >
+            {copy.endLabel}
+          </button>
 
           {/*
             `2R-SERIES-006`, stated where it is needed rather than discovered.
@@ -191,8 +193,8 @@ export function ReminderSeriesControls({
         </>
       ) : null}
 
-      {openPanel === "edit" ? (
-        <form action={formAction} className="reminder-panel">
+      {facts && openPanel === "edit" ? (
+        <form action={formAction} className="reminder-panel reminder-fact-editor">
           {hidden(
             // The intent that mints the key is the DEFAULT, not the radio's live
             // value: the key is a hidden field fixed at render, and reading a
@@ -263,7 +265,7 @@ export function ReminderSeriesControls({
         </form>
       ) : null}
 
-      {openPanel === "end" ? (
+      {ending && openPanel === "end" ? (
         <form action={formAction} className="reminder-panel danger">
           {hidden("end")}
           {/* `end` travels as its own field rather than as a third scope: the

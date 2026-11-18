@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { signUp } from "@/features/auth/actions";
 import { authErrorMessage } from "@/features/auth/flow";
-import { getAuthSubmitCopy } from "@/features/auth/copy";
+import { getAuthPagesCopy, getAuthSubmitCopy } from "@/features/auth/copy";
+import { PasswordHint } from "@/features/auth/password-hint";
 import { isSignupOpenIn } from "@/features/auth/signup-policy";
 import { AuthSubmitButton } from "@/features/auth/submit-button";
 import { getEntryCopy } from "@/features/entry/copy";
@@ -23,7 +24,8 @@ export default async function RegisterPage({
   if (!isLocale(candidate)) notFound();
   const locale = candidate;
   const { error } = await searchParams;
-  const pt = locale === "pt-BR";
+  const pages = getAuthPagesCopy(locale);
+  const copy = pages.register;
   const consent = getLegalCopy(locale).consentControl;
   const submit = getAuthSubmitCopy("signUp", locale);
   /*
@@ -45,20 +47,22 @@ export default async function RegisterPage({
   const entry = getEntryCopy(locale);
 
   return (
-    <div className="auth-card">
-      <p className="eyebrow">MY BRAIN</p>
+    <div className="auth-column">
       {/*
         `2O-ENTRY-003`: no availability claim while the door is shut. "Crie seu
         espaço" over a form that cannot succeed is an invitation the product
         cannot honour.
       */}
-      <h1>{signupOpen
-        ? (pt ? "Crie seu espaço" : "Create your space")
-        : (pt ? "Cadastro fechado" : "Registration closed")}</h1>
-      {signupOpen
-        ? <p>{pt ? "Privado, contextual e pronto para acompanhar seu ritmo." : "Private, contextual, and ready for your rhythm."}</p>
-        : <p className="form-alert" role="status">{entry.closedNotice}</p>}
-      {error && <div className="form-alert">{authErrorMessage(error, locale)}</div>}
+      <h1>{signupOpen ? copy.title : copy.closedTitle}</h1>
+      {/*
+        Editorial calmo (ADR-180). The closed door is the page's caption, said
+        once under the heading that already says it; it keeps `form-alert` and
+        `status`, which is how the entry journey finds it. The line that sold
+        the product while the door was open is cut — this page asks for four
+        things and that is what it shows.
+      */}
+      {!signupOpen && <p className="form-alert" role="status">{entry.closedNotice}</p>}
+      {error && <p className="form-alert" role="alert">{authErrorMessage(error, locale)}</p>}
       {/*
         `2O-ENTRY-005` says the page states the closed door **before** asking for
         a name, an e-mail, a password or a consent — and "before asking"
@@ -81,24 +85,22 @@ export default async function RegisterPage({
       <form action={signUp} className="auth-form">
         <input type="hidden" name="locale" value={locale} />
         <label>
-          {pt ? "Nome" : "Name"}
+          {copy.nameLabel}
           <input name="displayName" required minLength={2} maxLength={100} autoComplete="name" />
         </label>
         <label>
-          E-mail
+          {pages.emailLabel}
           <input name="email" type="email" required maxLength={254} autoComplete="email" />
         </label>
         <label>
-          {pt ? "Senha" : "Password"}
-          <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
+          {copy.passwordLabel}
+          <input name="password" type="password" required minLength={12} maxLength={128} autoComplete="new-password" aria-describedby="register-password-hint" />
         </label>
-        <small>
-          {pt
-            ? "Use 12 ou mais caracteres, com maiúscula, minúscula, número e símbolo."
-            : "Use 12 or more characters with uppercase, lowercase, number, and symbol."}
-        </small>
+        {/* The rule, as one caption that follows what is typed. Outside the
+            label, so the field's name is still exactly its label. */}
+        <PasswordHint copy={pages.passwordHint} id="register-password-hint" locale={locale} />
         <label>
-          {pt ? "Confirme a senha" : "Confirm password"}
+          {copy.confirmLabel}
           <input name="passwordConfirmation" type="password" required minLength={12} maxLength={128} autoComplete="new-password" />
         </label>
         {/*
@@ -108,7 +110,7 @@ export default async function RegisterPage({
           browser. The copy comes from `legal/copy.ts` rather than from another
           inline ternary — the locale-ternary ceiling does not rise (SH-COPY-001).
         */}
-        <label>
+        <label className="auth-consent">
           <input name="acceptedPolicies" required type="checkbox" value="on" />
           <span>
             {consent.leadIn}{" "}
@@ -130,8 +132,10 @@ export default async function RegisterPage({
         for someone who already has an account, and back to the page that says
         what the product is. Neither is a registration.
       */}
-      <Link href={`/${locale}/auth/login`}>{entry.signIn}</Link>
-      <Link href={`/${locale}`}>{pt ? "O que é o My Brain" : "What My Brain is"}</Link>
+      <nav aria-label={pages.linksLabel} className="auth-links">
+        <Link href={`/${locale}/auth/login`}>{entry.signIn}</Link>
+        <Link href={`/${locale}`}>{copy.about}</Link>
+      </nav>
     </div>
   );
 }

@@ -1,25 +1,285 @@
-.cost-page{max-width:var(--width-wide);margin:auto;padding:58px var(--gutter) 130px}.cost-hero{display:flex;align-items:flex-end;justify-content:space-between;gap:35px}.cost-hero h1{font:500 clamp(42px,6vw,68px)/.96 var(--font-reading);letter-spacing:-.045em;margin:8px 0 14px}.cost-hero>div>p:not(.eyebrow){max-width:650px;color:var(--text-secondary);line-height:1.6}.cost-hero-actions{display:grid;justify-items:end;gap:10px}.calculated-badge,.cost-settings-link{display:flex;align-items:center;gap:8px;min-height:var(--touch-target);white-space:nowrap;border-radius: var(--radius-full);padding:9px 12px;font: var(--type-caption);font-weight:750}.calculated-badge{background:var(--tone-success-bg);color:var(--tone-success-fg)}.cost-settings-link{border:1px solid var(--border-strong);background:var(--background-surface)}.cost-profile-strip{display:grid;grid-template-columns:auto auto 1fr;gap:14px;align-items:center;margin-top:38px;padding:14px 18px;border:1px solid var(--border-default);border-left:4px solid var(--link);border-radius: var(--radius-lg);background:var(--background-surface)}.cost-profile-strip>span{font: var(--type-eyebrow);letter-spacing:.1em;color:var(--link)}.cost-profile-strip strong{font: var(--type-caption)}.cost-profile-strip p{margin:0;color:var(--text-secondary);font: var(--type-caption)}.cost-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.cost-metrics article{position:relative;display:grid;align-content:center;min-height:138px;padding:20px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);overflow:hidden}.cost-metrics article:after{content:"";position:absolute;right:-28px;bottom:-52px;width:105px;height:105px;border:1px solid var(--border-default);border-radius: var(--radius-full)}.cost-metrics article.primary{background:var(--text-primary);color:var(--action-primary-text)}.cost-metrics article.primary:after{border-color:var(--mark-decorative)}.cost-metrics span{font: var(--type-eyebrow);letter-spacing:.1em;color:var(--text-secondary);text-transform:uppercase}.cost-metrics .primary span{color:var(--text-inverse)}.cost-metrics strong{font:500 clamp(24px,3vw,37px) var(--font-reading);letter-spacing:-.035em;margin:10px 0 3px}.cost-metrics small{color:var(--text-secondary);font: var(--type-caption)}.cost-metrics .primary small{color:var(--text-inverse)}.cost-warning{display:flex;gap:12px;margin-top:14px;padding:15px 17px;border-radius: var(--radius-lg);background:var(--tone-attention-bg);color:var(--tone-attention-fg)}.cost-warning strong{font: var(--type-caption)}.cost-warning p{margin:4px 0 0;font: var(--type-caption);line-height:1.5}.cost-empty{display:grid;justify-items:center;text-align:center;margin-top:20px;min-height:350px;padding:70px;border:1px dashed var(--border-default);border-radius: var(--radius-sheet);color:var(--text-secondary)}.cost-empty strong{font: var(--type-title-2);color:var(--text-primary);margin-top:13px}.cost-empty p{max-width:480px;font: var(--type-caption);line-height:1.6}.cost-empty a{margin-top:10px;padding:10px 14px;border-radius: var(--radius-md);background:var(--text-primary);color:var(--action-primary-text);font: var(--type-caption);font-weight:750}.spend-trace,.cost-panel,.recent-costs,.pricing-catalog{margin-top:14px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface);padding:22px}.spend-trace header,.cost-panel>header,.recent-costs>header,.pricing-catalog>header{display:flex;align-items:flex-start;justify-content:space-between;gap:15px}.spend-trace header span,.cost-panel header span,.recent-costs header span,.pricing-catalog header span{font: var(--type-eyebrow);letter-spacing:.12em;color:var(--text-muted)}.spend-trace h2,.cost-panel h2,.recent-costs h2,.pricing-catalog h2{margin:5px 0 0;font-size:16px;letter-spacing:-.02em}.spend-trace header small,.recent-costs header small,.pricing-catalog header small{color:var(--text-secondary);font: var(--type-caption)}.trace-bar{display:flex;height:16px;margin:25px 0 16px;border-radius: var(--radius-full);background:var(--background-subtle);overflow:hidden}.trace-bar span{min-width:3px}.terra{background:var(--tone-information-fg)}.luna{background:var(--tone-suggestion-fg)}.mini{background:var(--tone-attention-fg)}.embedding{background:var(--tone-success-fg)}.trace-legend{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.trace-legend>div{display:grid;grid-template-columns:8px 1fr auto;gap:7px;align-items:center;font: var(--type-caption)}.trace-legend i{width:7px;height:7px;border-radius: var(--radius-full)}.trace-legend span{color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.trace-legend strong{font: var(--type-eyebrow)}.cost-breakdown-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.cost-panel>header{justify-content:flex-start}.cost-panel>header>svg{margin-top:3px;color:var(--link)}.cost-ranking{display:grid;margin-top:18px}.cost-ranking article{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:13px 0;border-top:1px solid var(--border-default)}.rank,.model-dot{display:grid;place-items:center;width:25px;height:25px;border-radius: var(--radius-full);background:var(--background-subtle);color:var(--text-secondary);font: var(--type-eyebrow)}.model-dot{color:var(--action-primary-text)}.cost-ranking div{display:grid;gap:3px}.cost-ranking strong{font: var(--type-caption)}.cost-ranking small{color:var(--text-secondary);font: var(--type-caption)}.cost-ranking b{font: var(--type-eyebrow)}.cost-table-wrap{overflow-x:auto;margin-top:18px}.recent-costs table{width:100%;border-collapse:collapse;min-width:760px}.recent-costs th{text-align:left;padding:9px 10px;border-bottom:1px solid var(--border-default);color:var(--text-muted);font: var(--type-eyebrow);letter-spacing:.08em;text-transform:uppercase}.recent-costs td{padding:13px 10px;border-bottom:1px solid var(--border-divider);color:var(--text-secondary);font: var(--type-caption)}.recent-costs td:last-child{color:var(--text-primary);font: var(--type-eyebrow)}.table-model{display:inline-flex;align-items:center;border-radius: var(--radius-full);padding:5px 8px;color:var(--action-primary-text);font-weight:750}.pricing-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:18px}.pricing-grid a{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas)}.pricing-grid a:hover{border-color:var(--border-strong)}.pricing-grid strong{grid-column:1/-1;font: var(--type-caption)}.pricing-grid span{display:grid;color:var(--text-secondary);font: var(--type-caption)}.pricing-grid b{color:var(--text-primary);font: var(--type-eyebrow)}.pricing-grid svg{position:absolute;right:12px;top:12px;color:var(--mark-decorative)}.cost-footnote{display:flex;gap:12px;margin-top:14px;padding:17px 19px;border-radius: var(--radius-lg);background:var(--background-subtle);color:var(--text-secondary)}.cost-footnote svg{flex:0 0 auto}.cost-footnote p{margin:0;font: var(--type-caption);line-height:1.65}.cost-footnote strong{color:var(--text-primary)}
-@media(max-width: 899px){.cost-hero{display:grid}.cost-hero-actions{justify-items:start}.cost-metrics{grid-template-columns:1fr 1fr}.cost-breakdown-grid{grid-template-columns:1fr}.pricing-grid{grid-template-columns:1fr 1fr}.trace-legend{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.cost-page{padding:38px 18px 110px}.cost-hero h1{font-size:45px}.cost-profile-strip{grid-template-columns:1fr;gap:5px}.cost-metrics{grid-template-columns:1fr 1fr}.cost-metrics article{min-height:124px;padding:16px}.cost-metrics strong{font-size:23px}.spend-trace,.cost-panel,.recent-costs,.pricing-catalog{padding:17px}.trace-legend,.pricing-grid{grid-template-columns:1fr}.cost-empty{padding:45px 22px}.cost-footnote{align-items:flex-start}}
-@media(prefers-reduced-motion:no-preference){.cost-metrics article,.spend-trace{animation:rise var(--motion-emphasis) var(--ease-enter) both}.cost-metrics article:nth-child(2){animation-delay:.05s}.cost-metrics article:nth-child(3){animation-delay:.1s}.cost-metrics article:nth-child(4){animation-delay:.15s}}
-.cost-metrics strong{font-size:clamp(22px,2.35vw,31px);font-variant-numeric:tabular-nums;white-space:nowrap}
-/* `2O-COST-006`. The zone the periods above were computed in, said once. */
-.cost-zone{margin:14px 0 0;font: var(--type-caption);color:var(--text-secondary)}
-/* `2O-COST-007`. A failed read, styled as a state rather than as a value. */
-.cost-metrics.unreadable{grid-template-columns:1fr}
-.cost-metrics.unreadable article.primary{background:var(--tone-attention-bg);color:var(--tone-attention-fg)}
-.cost-metrics.unreadable article.primary span,.cost-metrics.unreadable article.primary small{color:var(--tone-attention-fg)}
-.cost-metrics.unreadable article.primary strong{font:500 clamp(20px,2.4vw,28px) var(--font-reading);letter-spacing:-.03em}
-.cost-read-failed{margin:14px 0 0;padding:12px 14px;border-radius: var(--radius-md);background:var(--tone-attention-bg);color:var(--tone-attention-fg);font: var(--type-caption);line-height:1.55}
+/*
+ * Custos, recomposed (Editorial calmo, ADR-180).
+ *
+ * The page answers one question — how much was spent — so its subject is a
+ * figure in the reading face. Under it, what makes the spend up is rows between
+ * hairlines, each with a thin rule as long as its part of the whole; everything
+ * a reader consults rather than reads is a closed line. No card, no panel, no
+ * chart: `.content-page`, the strip and the page header are shared.
+ */
+
+.cost-page > .ui-page-header { margin-bottom: 0; }
+/* The strip opens the page; its own bottom margin is the gap to the title. */
+.cost-page > .data-ai-tabs { margin-bottom: var(--space-4); }
+
+/* A desktop has more width than a column of figures can use: the label and its
+   amount stay within one glance of each other. */
+.cost-page > :not(.data-ai-tabs) { max-width: var(--width-reading); }
+
+/* The figure -------------------------------------------------------------- */
+
+.cost-figure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: var(--space-5);
+}
+
+.cost-figure-period {
+  margin: 0;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.cost-figure-value {
+  margin: var(--space-1) 0 0;
+  color: var(--text-primary);
+  font: var(--type-display);
+  font-size: var(--space-12);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* `2O-COST-007`. A failed read is a sentence, not a number. */
+.cost-figure.unreadable .cost-figure-value {
+  font: var(--type-title-2);
+  letter-spacing: 0;
+}
+
+.cost-figure-others {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-6);
+  margin: var(--space-3) 0 0;
+}
+
+.cost-figure-others > div {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.cost-figure-others dt {
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.cost-figure-others dd {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-body);
+  font-variant-numeric: tabular-nums;
+}
+
+/* `2O-COST-006`. The zone the periods were computed in, and what kind of number
+   this is, said once. */
+.cost-zone {
+  margin: var(--space-3) 0 0;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* Amber, and always with its words. */
+.cost-warning {
+  margin: var(--space-2) 0 0;
+  max-width: 62ch;
+  color: var(--tone-attention-fg);
+  font: var(--type-caption);
+}
+
+.cost-empty { margin-top: var(--space-2); }
+
+/* A section is a heading over a hairline --------------------------------- */
+
+.cost-section,
+.quota-section { margin-top: var(--space-8); }
+
+.cost-section-title,
+.quota-title,
+.cost-fold-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  margin: 0;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-section);
+}
+
+.cost-section-title > small,
+.cost-fold-summary > small {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows ------------------------------------------------------------------- */
+
+.cost-rows,
+.quota-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cost-row,
+.quota-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.cost-row-main,
+.quota-item-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cost-row-label,
+.quota-item strong {
+  color: var(--text-primary);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+.cost-row-caption,
+.quota-window {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  overflow-wrap: anywhere;
+}
+
+.cost-row-amount,
+.quota-figure {
+  color: var(--text-primary);
+  font: var(--type-body);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The row's part of the whole: a hairline's weight, as long as its share. */
+.cost-row-rule {
+  grid-column: 1 / -1;
+  display: block;
+  height: 2px;
+  margin-top: var(--space-2);
+  background: var(--border-divider);
+}
+
+.cost-row-rule > span {
+  display: block;
+  height: 100%;
+  background: var(--text-secondary);
+}
+
+/* A row that is a link carries the padding, so the whole of it is the target. */
+.cost-row:has(> .cost-row-link) { display: block; padding: 0; }
+
+.cost-row-link,
+.cost-profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cost-row-link > svg,
+.cost-profile > svg { color: var(--text-muted); }
+
+.cost-row-link:hover,
+.cost-profile:hover { background: var(--background-subtle); }
+
+.cost-row-link:focus-visible,
+.cost-profile:focus-visible,
+.cost-fold-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* What is consulted, not read: one closed line each ----------------------- */
+
+.cost-fold { margin-top: 0; }
+.quota-section + .cost-fold { margin-top: var(--space-8); }
+
+.cost-fold-summary {
+  border-bottom-color: var(--border-divider);
+  cursor: pointer;
+  list-style: none;
+}
+
+.cost-fold-summary::-webkit-details-marker { display: none; }
+.cost-fold-summary > span { flex: 1 1 auto; min-width: 0; }
+
+.cost-fold-summary::after {
+  content: "";
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: 0 var(--space-1) var(--space-1);
+  border: solid var(--text-muted);
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+
+.cost-fold[open] > .cost-fold-summary { border-bottom-color: var(--border-default); }
+
+.cost-fold[open] > .cost-fold-summary::after {
+  margin-bottom: 0;
+  transform: rotate(-135deg);
+}
+
+.cost-fold[open] { margin-bottom: var(--space-6); }
+
+.cost-fold-note {
+  margin: var(--space-3) 0 0;
+  max-width: 62ch;
+  color: var(--text-secondary);
+  font: var(--type-caption);
+}
+
+.cost-read-failed {
+  margin: var(--space-3) 0 0;
+  color: var(--tone-attention-fg);
+  font: var(--type-caption);
+}
+
+/* The one way out: the profile that decides the figure. */
+.cost-profile {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: var(--space-2);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.cost-profile-value {
+  color: var(--text-secondary);
+  font: var(--type-body);
+  text-align: right;
+}
+
 /* `2O-COST-002`. The ceilings the database enforces, beside the spend. */
-.quota-section{margin-top:14px;padding:22px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-surface)}
-.quota-section>h2{margin:0;font-size:16px;letter-spacing:-.02em}
-.quota-intro{margin:6px 0 0;max-width:68ch;color:var(--text-secondary);font: var(--type-caption);line-height:1.6}
-.quota-list{list-style:none;margin:18px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
-.quota-item{display:grid;gap:4px;padding:15px;border:1px solid var(--border-default);border-radius: var(--radius-lg);background:var(--background-canvas)}
-.quota-item strong{font: var(--type-caption)}
-.quota-figure{color:var(--text-primary);font: var(--type-eyebrow);font-variant-numeric:tabular-nums}
-.quota-figure.unreadable{color:var(--tone-attention-fg);font: var(--type-caption);line-height:1.5}
-.quota-window{color:var(--text-secondary);font: var(--type-caption)}
-@media(max-width: 899px){.quota-list{grid-template-columns:1fr 1fr}}
-@media(max-width:600px){.quota-section{padding:17px}.quota-list{grid-template-columns:1fr}}
+.quota-figure.unreadable {
+  max-width: 18ch;
+  color: var(--tone-attention-fg);
+  font: var(--type-caption);
+  white-space: normal;
+}
+
+.quota-intro {
+  margin: var(--space-3) 0 0;
+  max-width: 62ch;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}

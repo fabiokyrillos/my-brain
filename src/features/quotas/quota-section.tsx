@@ -48,15 +48,19 @@ export function QuotaSection({
 
   return (
     <section className="quota-section" aria-labelledby="quota-heading">
-      <h2 id="quota-heading">{copy.title}</h2>
-      <p className="quota-intro">{copy.intro}</p>
+      <h2 className="quota-title" id="quota-heading">{copy.title}</h2>
+      {/* Editorial calmo (ADR-180): a row per ceiling — its name over when it
+          frees, the count against the ceiling at the row's right edge. */}
       <ul className="quota-list" aria-label={copy.listLabel}>
         {usage.map((entry) => {
           const status = getQuotaStatusCopy(locale, entry.detail);
           const figures = formatUsed(entry, locale);
           return (
             <li key={entry.detail} className="quota-item">
-              <strong>{status.title}</strong>
+              <span className="quota-item-copy">
+                <strong>{status.title}</strong>
+                <small className="quota-window">{status.window}</small>
+              </span>
               {figures.used === null ? (
                 <span className="quota-figure unreadable">{copy.unreadable}</span>
               ) : (
@@ -64,11 +68,11 @@ export function QuotaSection({
                   {figures.used} {copy.ofCeiling} {figures.ceiling}
                 </span>
               )}
-              <small className="quota-window">{status.window}</small>
             </li>
           );
         })}
       </ul>
+      <p className="quota-intro">{copy.intro}</p>
     </section>
   );
 }

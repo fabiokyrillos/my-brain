@@ -301,22 +301,32 @@ function paletteOpen() {
     + `</div></div></div>`;
 }
 
-/** Mirrors `src/features/search/search-surface.tsx:108-175`. */
+/**
+ * Mirrors `src/features/search/search-surface.tsx` (Editorial calmo, ADR-180).
+ * The filters are mirrored **open**: closed they are one line, and the selects
+ * this lane measures would not be drawn at all.
+ */
 function searchSurface() {
-  return `<section class="search-surface"><h1 class="search-title">Buscar</h1>`
+  return `<section class="search-surface">`
+    + `<header class="ui-page-header ui-page-header--compact search-header"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Buscar</h1></div></header>`
     + `<form class="search-form" role="search">`
     + `<label class="sr-only" for="search-q">O que você procura?</label>`
+    + `<div class="search-field">`
     + `<input id="search-q" class="search-input" type="search" value="">`
-    + `<button type="submit" class="ux-action ux-action-primary">Buscar</button>`
+    + `<button type="submit" class="search-submit">Buscar</button>`
+    + `</div>`
+    + `<details class="search-filters-disclosure" open><summary class="search-filters-summary"><span>Filtros</span></summary>`
     + `<div class="search-filters">`
     + `<label for="search-type">Tipo</label>`
     + `<select id="search-type"><option>Tudo</option></select>`
     + `<label for="search-period">Período</label>`
     + `<select id="search-period"><option>Sempre</option></select>`
-    + `</div>`
+    + `</div></details>`
     + `</form>`
-    + `<p class="sr-only" role="status" aria-live="polite">3 resultados</p>`
-    + `<ul class="search-results"><li><a href="#">Contrato da Aurora</a></li></ul>`
+    + `<p class="search-count" role="status" aria-live="polite">3 resultados</p>`
+    + `<section class="search-group"><h2 class="search-group-title"><span>Projetos</span><small>1</small></h2>`
+    + `<ul class="search-results"><li class="search-result"><a class="search-row" href="#"><span class="search-row-title">Contrato da <mark>Aurora</mark></span>`
+    + `<span class="search-row-caption"><span class="search-row-date">2 de out. de 2026</span><span class="search-row-snippet">…renovação do contrato da <mark>Aurora</mark>…</span></span></a></li></ul></section>`
     + `</section>`;
 }
 

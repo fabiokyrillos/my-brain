@@ -369,3 +369,184 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- Processamento, recomposed (Editorial calmo, ADR-180) ----------------- */
+
+/*
+ * The page answers "is everything moving?" with one sentence in the reading
+ * face, then lists what failed, what is in flight and — folded — what finished.
+ * Rows between hairlines; the state is a word in tone, never a pill.
+ */
+
+.jobs-page > .ui-page-header { margin-bottom: 0; }
+.jobs-page > .data-ai-tabs { margin-bottom: var(--space-4); }
+.jobs-page > :not(.data-ai-tabs) { max-width: var(--width-reading); }
+
+.jobs-lead { margin-top: var(--space-5); }
+
+.jobs-lead-sentence {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-display);
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.jobs-lead-caption {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+.jobs-section { margin-top: var(--space-8); }
+.jobs-fold { margin-top: var(--space-8); }
+
+.jobs-section-title,
+.jobs-fold-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--touch-target);
+  margin: 0;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-section);
+}
+
+.jobs-section-title > small,
+.jobs-fold-summary > small {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.jobs-fold-summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.jobs-fold-summary::-webkit-details-marker,
+.jobs-row-detail-summary::-webkit-details-marker { display: none; }
+
+.jobs-fold-summary > span { flex: 1 1 auto; min-width: 0; }
+
+.jobs-fold-summary::after {
+  content: "";
+  flex: none;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin: 0 var(--space-1) var(--space-1);
+  border: solid var(--text-muted);
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+
+.jobs-fold[open] > .jobs-fold-summary::after {
+  margin-bottom: 0;
+  transform: rotate(-135deg);
+}
+
+.jobs-fold-summary:focus-visible,
+.jobs-row-detail-summary:focus-visible,
+.jobs-row-verb:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.jobs-rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jobs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.jobs-row-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.jobs-row-title {
+  color: var(--text-primary);
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+.jobs-row-caption {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The row's right edge: the state over which attempt this is. */
+.jobs-row-state {
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* The state, as a word. Finished is muted: it asks nothing. */
+.jobs-row-status {
+  color: var(--text-muted);
+  font: var(--type-label);
+}
+
+.jobs-row[data-status="running"] .jobs-row-status { color: var(--text-primary); font-weight: 600; }
+.jobs-row[data-status="pending"] .jobs-row-status { color: var(--text-secondary); }
+.jobs-row[data-status="failed"] .jobs-row-status { color: var(--tone-risk-fg); font-weight: 600; }
+
+/* Under a failed row: the technical detail, one press away, and the way to the
+   page that can retry it. */
+.jobs-row-more {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0 var(--space-4);
+  min-width: 0;
+}
+
+.jobs-row-detail { flex: 1 1 12rem; min-width: 0; }
+
+.jobs-row-detail-summary,
+.jobs-row-verb {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  font: var(--type-label);
+}
+
+.jobs-row-detail-summary {
+  color: var(--text-secondary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.jobs-row-detail-summary:hover { color: var(--text-primary); }
+
+.jobs-row-verb { color: var(--link); }
+.jobs-row-verb:hover { text-decoration: underline; }
+
+.jobs-row-error,
+.jobs-row-id {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  overflow-wrap: anywhere;
+}
+
+.jobs-row-id { color: var(--text-muted); }
