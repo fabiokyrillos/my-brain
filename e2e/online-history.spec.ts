@@ -152,9 +152,10 @@ test.describe("history reads as sentences, filters in the database, and links to
     expect(creationSentences.length).toBeGreaterThan(0);
     expect(new Set(creationSentences).size).toBe(creationSentences.length);
 
-    // The subject is reachable.
+    // The subject is reachable: the row itself is the link (Editorial calmo).
     const event = page.locator(".history-event").filter({ hasText: taskTitle }).first();
-    const open = event.getByRole("link", { name: "Abrir" });
+    const open = event.getByRole("link");
+    await expect(open).toHaveCount(1);
     await expect(open).toBeVisible();
     // The one control on a row a finger aims at.
     if (mobile) expect((await open.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
@@ -297,7 +298,7 @@ test.describe("history reads as sentences, filters in the database, and links to
 
     // And no link was left pointing at a page that would 404.
     const gone = page.locator(".history-event").filter({ hasText: "Este item não está mais disponível." }).first();
-    await expect(gone.getByRole("link", { name: "Abrir" })).toHaveCount(0);
+    await expect(gone.getByRole("link")).toHaveCount(0);
   });
 
   test("one reader never sees another's history", async ({ page }) => {
@@ -337,14 +338,12 @@ test.describe("history reads as sentences, filters in the database, and links to
     await signIn(page);
     await page.goto("/pt-BR/app/history");
 
-    // On a phone the controls start folded so the list keeps the screen; the
-    // summary is the disclosure, and it is a real 44 px target.
-    if (mobile) {
-      const toggle = page.getByText("Filtros", { exact: true });
-      await expect(toggle).toBeVisible();
-      expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
-      await toggle.click();
-    }
+    // The controls start folded at every width, so the list keeps the screen;
+    // the summary is the disclosure, and it is a real 44 px target.
+    const toggle = page.getByText("Filtros", { exact: true });
+    await expect(toggle).toBeVisible();
+    expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await toggle.click();
 
     for (const label of ["De", "Até", "Quem", "Tipo de item", "Tipo de ação"]) {
       await expect(page.getByLabel(label, { exact: true })).toBeVisible();
@@ -368,8 +367,7 @@ test.describe("history reads as sentences, filters in the database, and links to
     await expect(page).toHaveURL(/actor=user/);
   });
 
-  test("the English surface uses English throughout", async ({ page }, testInfo) => {
-    const mobile = testInfo.project.name === "mobile";
+  test("the English surface uses English throughout", async ({ page }) => {
     await signIn(page, "en");
     const { taskTitle, projectName } = await seedHistory(page);
 
@@ -383,8 +381,8 @@ test.describe("history reads as sentences, filters in the database, and links to
       page.getByText(`You changed the state of “${projectName}” from Active to Paused`),
     ).toBeVisible();
 
-    // Folded by default on a phone, so the list keeps the screen.
-    if (mobile) await page.getByText("Filters", { exact: true }).click();
+    // Folded by default, so the list keeps the screen.
+    await page.getByText("Filters", { exact: true }).click();
     for (const label of ["From", "To", "Who", "Item type", "Action type"]) {
       await expect(page.getByLabel(label, { exact: true })).toBeVisible();
     }

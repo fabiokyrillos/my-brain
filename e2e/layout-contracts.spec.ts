@@ -1834,78 +1834,670 @@ test.describe("Life Brain A.3 part 3: the task row and its sheet", () => {
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
- * Life Brain A.5 — Notificações with fifty notices fits in 3,500px on a phone
- * (`IMPLEMENTATION_PLAN.md` §A.5). Each row is two lines and one visible
- * control; the verbs wait behind a "⋯".
+ * Avisos (Life Brain A.5, recomposed by Editorial calmo, ADR-180).
+ *
+ * A.5's budget stands: fifty notices fit in 3,500px on a phone
+ * (`IMPLEMENTATION_PLAN.md` §A.5). What changed is what a row is. An unanswered
+ * notice is its subject, one caption and a line with its one visible verb, the
+ * "⋯" and "Abrir"; a read one is a single quieter row. Unread notices come
+ * first under the line that counts them; the read ones follow behind a
+ * disclosure, folded once there are more than a few beside something unread.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-/** Mirrors `NotificationHistoryRow` with `NotificationVerbs collapsed`. */
-function notificationItem(index: number) {
-  const status = index % 3 === 0 ? "unread" : "read";
-  const title = index % 5 === 0 ? LONG_TITLE : `Tarefa atrasada ${index}`;
+/** Mirrors `NotificationHistoryRow`: verbs shown when unread, collapsed when read. */
+function notificationItem(index: number, status: "unread" | "read") {
+  const subject = index % 5 === 0 ? LONG_TITLE : `Pagar a conta de luz ${index}`;
+  const kind = "Tarefa atrasada";
+  const primary = status === "unread"
+    ? `<form><input name="verb" type="hidden" value="complete_task"><button aria-label="Concluir tarefa: ${subject}" class="row-action notification-primary-action" type="submit">Concluir tarefa</button></form>`
+    : "";
   return `<li class="notification-item" data-status="${status}">`
-    + `<span aria-hidden="true" class="notification-item-dot"></span>`
-    + `<div class="notification-item-main"><p class="notification-item-title">${title}</p>`
-    + `<p class="notification-item-meta"><span class="notification-status-badge" data-status="${status}">${status === "unread" ? "Não lida" : "Lida"}</span>`
-    + `<span class="notification-item-time">04/11/2026, 14:00</span>`
-    + `<span class="notification-item-body">Pagar a conta de luz antes do vencimento, que é amanhã de manhã</span></p></div>`
-    + `<div class="notification-item-trailing">`
-    + `<a aria-label="Abrir: ${title}" class="row-action notification-open-link" href="#">Abrir</a>`
-    + `<div class="notification-row-actions"><div class="notification-verb-menu">`
-    + `<button aria-haspopup="menu" aria-label="Mais ações para: ${title}" class="row-action notification-menu-trigger notification-menu-trigger--icon" type="button">${ICON}</button></div>`
-    + `<p aria-live="polite" class="notification-row-outcome" role="status"></p></div>`
-    + `</div></li>`;
+    + `<div class="notification-item-main"><p class="notification-item-subject">${subject}</p>`
+    + `<p class="notification-item-meta"><span class="notification-item-kind">${kind}</span>`
+    + `<span class="notification-item-time">4 de nov. de 2026, 14:00</span>`
+    + `<span class="notification-status-badge" data-status="${status}">${status === "unread" ? "Não lida" : "Lida"}</span></p></div>`
+    + `<div class="notification-item-verbs"><div class="notification-row-actions">${primary}<div class="notification-verb-menu">`
+    + `<button aria-haspopup="menu" aria-label="Mais ações para: ${subject}" class="row-action notification-menu-trigger notification-menu-trigger--icon" type="button">${ICON}</button></div>`
+    + `<p aria-live="polite" class="notification-row-outcome" role="status"></p></div></div>`
+    + `<a aria-label="Abrir: ${kind}" class="notification-open-link" href="#"><span class="notification-open-label">Abrir</span></a>`
+    + `</li>`;
 }
 
-function notificationsBody(count: number) {
-  return `<div class="content-page">`
-    + `<header class="ui-page-header ui-page-header--compact"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Notificações</h1>`
-    + `<p class="ui-page-header__description">Somente sinais relevantes, com deduplicação e respeito ao silêncio.</p></div>`
-    + `<div class="ui-page-header__actions"><a class="notification-preferences-link" href="#">Ajustar preferências de notificação</a></div></header>`
-    + `<section class="notification-history"><h2>Avisos recebidos</h2><p class="notification-unread-summary" role="status">17 não lidas</p>`
-    + `<ul class="notification-list">${Array.from({ length: count }, (_, index) => notificationItem(index)).join("")}</ul>`
-    + `<nav class="pagination-links" aria-label="Paginação"><a href="#">Próxima</a></nav></section></div>`;
+/** Mirrors `notifications/page.tsx`. `readFolded` is the page's own rule, stated by the caller. */
+function notificationsBody(options: { unread: number; read: number; readFolded: boolean }) {
+  const unread = Array.from({ length: options.unread }, (_, index) => notificationItem(index, "unread")).join("");
+  const read = Array.from({ length: options.read }, (_, index) => notificationItem(index + 1, "read")).join("");
+  const bulk = (label: string) => `<form class="notification-bulk-form"><button class="notification-bulk-verb" type="submit">${label}</button></form>`;
+  return `<div class="content-page notification-page">`
+    + `<nav aria-label="Dados e conta" class="data-ai-tabs"><a class="data-ai-up" href="#">${ICON}Voltar para Ajustes</a><div class="data-ai-lenses"><span aria-current="page" class="data-ai-lens">Notificações</span></div></nav>`
+    + `<header class="ui-page-header ui-page-header--compact"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Notificações</h1></div></header>`
+    + `<section class="notification-history"><h2 class="sr-only">Avisos recebidos</h2>`
+    + `<div class="notification-group-head"><p class="notification-unread-summary" role="status">${options.unread ? `${options.unread} avisos não lidos.` : "Nenhum aviso não lido."}</p>${options.unread ? bulk("Marcar todos como lidos") : ""}</div>`
+    + `<div aria-label="Todos os avisos" class="notification-bulk-outcome" role="group"><p aria-live="polite" class="notification-bulk-message" role="status"></p></div>`
+    + (options.unread ? `<ul class="notification-list">${unread}</ul>` : "")
+    + (options.read ? `<details class="notification-read"${options.readFolded ? "" : " open"}><summary class="notification-read-summary"><span>Já lidos</span><span class="notification-read-count">${options.read}</span></summary><ul class="notification-list">${read}</ul>${bulk("Limpar os lidos")}</details>` : "")
+    + `<nav class="pagination-links" aria-label="Paginação"><a href="#">Próxima</a></nav>`
+    + `<p class="notification-page-foot"><a class="notification-preferences-link" href="#">Ajustar preferências de notificação</a></p></section></div>`;
 }
 
-test.describe("Life Brain A.5: Notificações on a phone", () => {
-  test("fifty notices fit in 3,500px at 390px", async ({ page }) => {
-    await render(page, notificationsBody(50), 390, 844);
+/** Every visible control inside `scope` shorter than a touch target, as "label:height". */
+async function shortTargets(page: Page, scope: string) {
+  return page.evaluate(({ selector, minimum }) => {
+    const root = document.querySelector(selector);
+    if (!root) return ["scope not found"];
+    return [...root.querySelectorAll<HTMLElement>("a, button, summary, input:not([type=hidden]), select")]
+      .filter((node) => node.getClientRects().length > 0)
+      .map((node) => ({ label: (node.textContent ?? "").trim().slice(0, 24) || node.tagName, height: Math.round(node.getBoundingClientRect().height) }))
+      .filter((entry) => entry.height < minimum)
+      .map((entry) => `${entry.label}:${entry.height}`);
+  }, { selector: scope, minimum: TOUCH_TARGET });
+}
+
+async function sidewaysOverflow(page: Page) {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
+
+test.describe("Avisos on a phone (Life Brain A.5, Editorial calmo)", () => {
+  test("fifty notices fit in 3,500px at 390px — seventeen unread, the read ones folded", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 17, read: 33, readFolded: true }), 390, 844);
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     expect(height).toBeLessThanOrEqual(3500);
   });
 
-  test("each row is two lines high, with one visible control and the “⋯”", async ({ page }) => {
-    await render(page, notificationsBody(6), 390, 844);
+  test("fifty read notices, standing open, still fit in 3,500px at 390px", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 0, read: 50, readFolded: false }), 390, 844);
+    const height = await page.evaluate(() => document.documentElement.scrollHeight);
+    expect(height).toBeLessThanOrEqual(3500);
+  });
+
+  test("a read row is two lines high: subject and caption, the “⋯” beside them, the row as its link", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 0, read: 6, readFolded: false }), 390, 844);
     const rows = await page.locator(".notification-item").evaluateAll((nodes) =>
       nodes.map((node) => Math.round(node.getBoundingClientRect().height)));
     for (const height of rows) expect(height).toBeLessThanOrEqual(70);
-    for (const control of await page.locator(".notification-open-link, .notification-menu-trigger").all()) {
-      const box = (await control.boundingBox())!;
-      expect(box.height).toBeGreaterThanOrEqual(44);
-    }
-    // The trailing controls sit on the title's row, never under it.
     const first = page.locator(".notification-item").first();
-    const title = (await first.locator(".notification-item-title").boundingBox())!;
+    const subject = (await first.locator(".notification-item-subject").boundingBox())!;
     const trigger = (await first.locator(".notification-menu-trigger").boundingBox())!;
-    expect(trigger.x).toBeGreaterThan(title.x + title.width - 1);
+    expect(trigger.x).toBeGreaterThan(subject.x + subject.width - 1);
+    expect(trigger.y).toBeLessThan(subject.y + subject.height);
+    // One caption line: the kind and the time fit beside the "⋯" at 390.
+    expect((await first.locator(".notification-item-meta").boundingBox())!.height).toBeLessThanOrEqual(24);
+    // No "Abrir" is drawn on a read row; the subject is where the link is pressed.
+    expect((await first.locator(".notification-open-label").boundingBox())!.width).toBeLessThanOrEqual(1);
+    const pressed = await first.locator(".notification-item-subject").evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      return document.elementFromPoint(box.x + 20, box.y + box.height / 2)?.closest("a")?.className ?? "";
+    });
+    expect(pressed).toContain("notification-open-link");
   });
 
-  test("the page never scrolls sideways at 320 CSS px", async ({ page }) => {
-    await render(page, notificationsBody(6), 320, 700);
-    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(1);
+  test("an unread row is its subject, its caption, then one line of verb, “⋯” and “Abrir”", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 3, read: 0, readFolded: false }), 390, 844);
+    const row = page.locator(".notification-item").nth(1);
+    const caption = (await row.locator(".notification-item-meta").boundingBox())!;
+    const verb = (await row.locator(".notification-primary-action").boundingBox())!;
+    const trigger = (await row.locator(".notification-menu-trigger").boundingBox())!;
+    const open = (await row.locator(".notification-open-link").boundingBox())!;
+    // Under the caption, never beside the subject.
+    expect(verb.y).toBeGreaterThanOrEqual(caption.y + caption.height - 1);
+    // One line: the three share a vertical centre.
+    const centre = (box: { y: number; height: number }) => box.y + box.height / 2;
+    expect(Math.abs(centre(verb) - centre(trigger))).toBeLessThanOrEqual(2);
+    expect(Math.abs(centre(verb) - centre(open))).toBeLessThanOrEqual(2);
+    // Left to right in the order the document reads.
+    expect(trigger.x).toBeGreaterThan(verb.x);
+    expect(open.x).toBeGreaterThan(trigger.x);
+    // The caption is one line at 390.
+    expect(caption.height).toBeLessThanOrEqual(24);
   });
 
-  test("the fixture still mirrors the markup the component emits", () => {
+  test("the row is the link, and a verb is never under it", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 2, read: 0, readFolded: false }), 390, 844);
+    const row = page.locator(".notification-item").first();
+    const hit = (selector: string) => row.locator(selector).evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return top?.closest("a, button")?.className ?? "";
+    });
+    expect(await hit(".notification-item-subject")).toContain("notification-open-link");
+    expect(await hit(".notification-item-meta")).toContain("notification-open-link");
+    expect(await hit(".notification-primary-action")).toContain("notification-primary-action");
+    expect(await hit(".notification-menu-trigger")).toContain("notification-menu-trigger");
+  });
+
+  test("the unread line carries its bulk verb, and no bar stands above the list", async ({ page }) => {
+    await renderLogbook(page, notificationsBody({ unread: 3, read: 5, readFolded: true }), 390, 844);
+    const summary = (await page.locator(".notification-unread-summary").boundingBox())!;
+    const verb = (await page.locator(".notification-group-head .notification-bulk-verb").boundingBox())!;
+    expect(verb.y).toBeLessThan(summary.y + summary.height);
+    expect(verb.x).toBeGreaterThan(summary.x + summary.width - 1);
+    // At rest the outcome region is in the tree and takes no height.
+    const outcome = (await page.locator(".notification-bulk-outcome").boundingBox())!;
+    expect(outcome.height).toBeLessThanOrEqual(1);
+    // Folded: the read rows are not drawn, and their heading is one target tall.
+    await expect(page.locator(".notification-read .notification-item").first()).toBeHidden();
+    expect((await page.locator(".notification-read-summary").boundingBox())!.height).toBeLessThanOrEqual(48);
+  });
+
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px`, async ({ page }) => {
+      await renderLogbook(page, notificationsBody({ unread: 6, read: 6, readFolded: false }), width, 800);
+      expect(await sidewaysOverflow(page)).toBeLessThanOrEqual(1);
+      expect(await shortTargets(page, ".notification-history")).toEqual([]);
+    });
+  }
+
+  test("the fixture still mirrors the markup the components emit", () => {
     const row = readFileSync(join(ROOT, "src", "features", "notifications", "notification-history-row.tsx"), "utf8");
-    for (const name of ["notification-item", "notification-item-dot", "notification-item-main", "notification-item-title",
-      "notification-item-meta", "notification-status-badge", "notification-item-time", "notification-item-body",
-      "notification-item-trailing", "row-action notification-open-link"]) {
+    for (const name of ["notification-item", "notification-item-main", "notification-item-subject",
+      "notification-item-meta", "notification-item-kind", "notification-item-time", "notification-status-badge",
+      "notification-item-verbs", "notification-open-link", "notification-open-label"]) {
       expect(row, `the row lost ${name}`).toContain(`className="${name}"`);
     }
+    // Verbs before the link, in the document as on the screen.
+    expect(row.indexOf('className="notification-item-verbs"')).toBeLessThan(row.indexOf('className="notification-open-link"'));
     const actions = readFileSync(join(ROOT, "src", "features", "notifications", "notification-row-actions.tsx"), "utf8");
     expect(actions).toContain("notification-menu-trigger notification-menu-trigger--icon");
     expect(actions).toContain('className="notification-row-outcome"');
+    const bulk = readFileSync(join(ROOT, "src", "features", "notifications", "notification-bulk-bar.tsx"), "utf8");
+    for (const name of ["notification-bulk-form", "notification-bulk-verb", "notification-bulk-outcome", "notification-bulk-message"]) {
+      expect(bulk, `the bulk verbs lost ${name}`).toContain(`className="${name}"`);
+    }
+    const route = readFileSync(join(ROOT, "src", "app", "[locale]", "app", "notifications", "page.tsx"), "utf8");
+    for (const name of ["content-page notification-page", "notification-history", "notification-group-head",
+      "notification-unread-summary", "notification-list", "notification-read", "notification-read-summary",
+      "notification-read-count", "notification-page-foot", "notification-preferences-link"]) {
+      expect(route, `the page lost ${name}`).toContain(`className="${name}"`);
+    }
+  });
+});
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Histórico, as a logbook (Editorial calmo, ADR-180). Days are headings over a
+ * rule; an event is one row — its sentence and one caption — and the row is the
+ * link. The filters are one closed line at every width.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+const HISTORY_CSS = readFileSync(join(ROOT, "src", "app", "history.css"), "utf8");
+
+const LONG_SENTENCE = `Você alterou a tarefa “${LONG_TITLE}”`;
+
+/** Mirrors one `<li>` of `HistoryList`. */
+function logbookEvent(options: { sentence: string; kind: string; time: string; linked?: boolean; actor?: string; changes?: boolean; gone?: boolean }) {
+  const changes = options.changes
+    ? `<dl class="history-changes">`
+      + `<div class="history-change"><dt>Situação</dt><dd><span class="history-change-from">A fazer</span><span aria-hidden="true"> → </span><span class="history-change-to">Em andamento</span></dd></div>`
+      + `<div class="history-change"><dt>Prazo</dt><dd><span class="history-change-from">20 de nov. de 2026</span><span aria-hidden="true"> → </span><span class="history-change-to">19 de nov. de 2026</span></dd></div>`
+      + `</dl>`
+    : "";
+  const body = `<span class="history-sentence">${options.sentence}</span>${changes}`
+    + `<span class="history-meta"><span class="history-kind">${options.kind}</span><time datetime="2026-11-18T14:12:00.000Z">${options.time}</time>`
+    + `${options.gone ? "<span>Este item não está mais disponível.</span>" : ""}</span>`;
+  return `<li class="history-event" data-actor="${options.actor ?? "user"}">`
+    + (options.linked === false ? `<div class="history-event-body">${body}</div>` : `<a class="history-event-link" href="#">${body}</a>`)
+    + `</li>`;
+}
+
+function logbookDay(label: string, events: string[]) {
+  return `<section aria-label="${label}" class="history-day"><h2 class="history-day-title">${label}</h2><ol class="history-list">${events.join("")}</ol></section>`;
+}
+
+/** Mirrors `history/page.tsx` with `DataAiTabs`, `HistoryFilterControls` and `HistoryList`. */
+function logbookBody(options: { filtered?: boolean; filtersOpen?: boolean } = {}) {
+  const field = (id: string, label: string, control: string) => `<div class="history-filter-field"><label for="${id}">${label}</label>${control}</div>`;
+  const select = (id: string, any: string) => `<select id="${id}" name="${id}"><option value="">${any}</option><option value="x">Opção</option></select>`;
+  const filters = `<section class="history-filters" aria-label="Filtrar histórico">`
+    + `<details class="history-filters-disclosure"${options.filtersOpen ? " open" : ""}><summary class="history-filters-summary">Filtros</summary>`
+    + `<form class="history-filters-form" method="get" action="#">`
+    + field("history-from", "De", `<input id="history-from" name="from" type="date">`)
+    + field("history-to", "Até", `<input id="history-to" name="to" type="date">`)
+    + field("history-actor", "Quem", select("history-actor", "Qualquer pessoa"))
+    + field("history-entity", "Tipo de item", select("history-entity", "Qualquer item"))
+    + field("history-category", "Tipo de ação", select("history-category", "Qualquer ação"))
+    + `<div class="history-filter-actions"><button class="ui-button ui-button--secondary ui-button--md" type="submit">Aplicar filtros</button></div>`
+    + `</form></details>`
+    + (options.filtered
+      ? `<div class="history-active"><ul class="history-active-filters" aria-label="Filtros ativos"><li>Quem: Você</li><li>Tipo de item: tarefa</li><li>Tipo de ação: Alteração de situação</li></ul><a class="history-filters-clear" href="#">Limpar filtros</a></div>`
+      : "")
+    + `</section>`;
+  return `<div class="content-page history-page">`
+    + `<nav aria-label="Dados e IA" class="data-ai-tabs"><a class="data-ai-up" href="#">${ICON}Ajustes</a><div class="data-ai-lenses">`
+    + `<a class="data-ai-lens" aria-current="page" href="#">Atividade</a><a class="data-ai-lens" href="#">Custos</a><a class="data-ai-lens" href="#">Processamento</a></div></nav>`
+    + `<header class="ui-page-header ui-page-header--compact"><div class="ui-page-header__text"><h1 class="ui-page-header__title">Histórico de alterações</h1></div></header>`
+    + filters
+    + `<div class="history-days">`
+    + logbookDay("quarta-feira, 18 de novembro de 2026", [
+      logbookEvent({ sentence: LONG_SENTENCE, kind: "tarefa", time: "11:12", changes: true }),
+      logbookEvent({ sentence: "O Michael interpretou o registro “Revisão do carro na sexta às 9h”", kind: "registro", time: "10:40", actor: "agent" }),
+      logbookEvent({ sentence: "Você marcou todos os avisos como lidos", kind: "avisos", time: "09:02", linked: false }),
+    ])
+    + logbookDay("terça-feira, 17 de novembro de 2026", [
+      logbookEvent({ sentence: "Você desfez uma alteração", kind: "tarefa", time: "09:10", linked: false, gone: true }),
+      logbookEvent({ sentence: "O sistema devolveu um processamento à fila", kind: "processamento", time: "10:02", linked: false, actor: "system" }),
+      logbookEvent({ sentence: `Você criou a memória “${"semfim".repeat(30)}”`, kind: "memória", time: "16:30" }),
+    ])
+    + `</div>`
+    + `<nav class="pagination-links" aria-label="Paginação"><a href="#">Próxima</a></nav></div>`;
+}
+
+/** `render`, plus the stylesheet that draws the Dados e IA strip both pages open with. */
+async function renderLogbook(page: Page, body: string, width: number, height: number) {
+  await render(page, body, width, height);
+  await page.addStyleTag({ content: HISTORY_CSS });
+  await page.waitForTimeout(40);
+}
+
+test.describe("Histórico as a logbook (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px, filters closed and open`, async ({ page }) => {
+      for (const filtersOpen of [false, true]) {
+        await renderLogbook(page, logbookBody({ filtered: true, filtersOpen }), width, 800);
+        expect(await sidewaysOverflow(page), `filters ${filtersOpen ? "open" : "closed"}`).toBeLessThanOrEqual(1);
+        expect(await shortTargets(page, ".history-page"), `filters ${filtersOpen ? "open" : "closed"}`).toEqual([]);
+      }
+    });
+  }
+
+  test("the filters are one line at rest, on a phone and on a desktop", async ({ page }) => {
+    for (const [width, height] of [[390, 844], [1280, 900]] as const) {
+      await renderLogbook(page, logbookBody(), width, height);
+      const filters = (await page.locator(".history-filters").boundingBox())!;
+      expect(filters.height, `at ${width}`).toBeLessThanOrEqual(48);
+      await expect(page.locator(".history-filters-form")).toBeHidden();
+    }
+  });
+
+  test("an active filter is said in words beside the way to clear it, with the form still closed", async ({ page }) => {
+    await renderLogbook(page, logbookBody({ filtered: true }), 390, 844);
+    await expect(page.locator(".history-filters-form")).toBeHidden();
+    await expect(page.locator(".history-active-filters")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Limpar filtros" })).toBeVisible();
+  });
+
+  test("a day is a heading over a rule, and its rows hang from it", async ({ page }) => {
+    await renderLogbook(page, logbookBody(), 390, 844);
+    const day = page.locator(".history-day").first();
+    const title = day.locator(".history-day-title");
+    expect(await title.evaluate((node) => getComputedStyle(node).borderBottomWidth)).toBe("1px");
+    const heading = (await title.boundingBox())!;
+    const firstRow = (await day.locator(".history-event").first().boundingBox())!;
+    expect(firstRow.y).toBeGreaterThanOrEqual(heading.y + heading.height - 1);
+    // Rows are separated by hairlines, never boxed.
+    const row = day.locator(".history-event").first();
+    expect(await row.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return [style.borderTopWidth, style.borderLeftWidth, style.borderRightWidth, style.borderBottomWidth].join(" ");
+    })).toBe("0px 0px 0px 1px");
+  });
+
+  test("the row is the link: the anchor is as wide and as tall as its row", async ({ page }) => {
+    await renderLogbook(page, logbookBody(), 390, 844);
+    const row = page.locator(".history-event").first();
+    const box = (await row.boundingBox())!;
+    const link = (await row.locator(".history-event-link").boundingBox())!;
+    expect(Math.abs(link.width - box.width)).toBeLessThanOrEqual(1);
+    expect(link.height).toBeGreaterThanOrEqual(box.height - 2);
+    expect(await row.locator("a").count()).toBe(1);
+  });
+
+  test("the sentence is in the reading face and the caption is one quiet line", async ({ page }) => {
+    await renderLogbook(page, logbookBody(), 390, 844);
+    const row = page.locator(".history-event").nth(1);
+    const sentence = row.locator(".history-sentence");
+    const caption = row.locator(".history-meta");
+    expect(await sentence.evaluate((node) => getComputedStyle(node).fontFamily)).toContain("Georgia");
+    expect(await caption.evaluate((node) => getComputedStyle(node).fontFamily)).not.toContain("Georgia");
+    expect((await caption.boundingBox())!.height).toBeLessThanOrEqual(24);
+    expect(await sentence.evaluate((node) => parseFloat(getComputedStyle(node).fontSize)))
+      .toBeGreaterThan(await caption.evaluate((node) => parseFloat(getComputedStyle(node).fontSize)));
+  });
+
+  test("the fixture still mirrors the markup the components emit", () => {
+    const list = readFileSync(join(ROOT, "src", "features", "history", "history-list.tsx"), "utf8");
+    for (const name of ["history-days", "history-day", "history-day-title", "history-list", "history-event",
+      "history-event-link", "history-event-body", "history-sentence", "history-changes", "history-change",
+      "history-change-from", "history-change-to", "history-meta", "history-kind"]) {
+      expect(list, `the list lost ${name}`).toContain(`className="${name}"`);
+    }
+    const filters = readFileSync(join(ROOT, "src", "features", "history", "history-filters.tsx"), "utf8");
+    for (const name of ["history-filters", "history-filters-disclosure", "history-filters-summary", "history-filters-form",
+      "history-filter-field", "history-filter-actions", "history-active", "history-active-filters", "history-filters-clear"]) {
+      expect(filters, `the filters lost ${name}`).toContain(`className="${name}"`);
+    }
+    expect(filters, "the disclosure must not be opened by an active filter").not.toMatch(/<details[^>]*\bopen\b/);
+    const route = readFileSync(join(ROOT, "src", "app", "[locale]", "app", "history", "page.tsx"), "utf8");
+    expect(route).toContain('className="content-page history-page"');
+    expect(route.indexOf("<DataAiTabs")).toBeLessThan(route.indexOf("<PageHeader"));
+    expect(route.indexOf("<PageHeader")).toBeLessThan(route.indexOf("<HistoryFilterControls"));
+  });
+});
+
+/**
+ * The Agenda and Planejar, recomposed (Editorial calmo, ADR-180).
+ *
+ * `calendar.spec.ts` and `daily-surfaces.spec.ts` mirror these two pages part
+ * by part. What is held here is the page as a whole, inside the app frame, on
+ * the two phone widths this file measures everything at: nothing scrolls
+ * sideways and no control is shorter than a touch target — in each form the
+ * page takes (a day, a week, a month, the plan), closed and with its
+ * disclosures open.
+ */
+const AGENDA_CSS = readFileSync(join(ROOT, "src", "app", "calendar.css"), "utf8");
+
+function agendaMasthead(options: { lens: "calendar" | "plan"; period: string; caption: string; away?: boolean; navClass: string }) {
+  const lens = (key: string, label: string) =>
+    `<a class="ui-segmented__option" href="#"${key === options.lens ? ' aria-current="page"' : ""}>${label}</a>`;
+  return `<header class="agenda-masthead"><div class="agenda-masthead-top"><h1 class="agenda-masthead-title"><span>Agenda</span></h1>`
+    + `<nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">${lens("calendar", "Calendário")}${lens("plan", "Planejar")}${lens("reminders", "Lembretes")}</nav></div>`
+    + `<nav aria-label="Navegar pelas datas" class="agenda-stepper ${options.navClass}">`
+    + `<details class="agenda-date-picker calendar-range"><summary aria-label="${options.period}. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>${options.period}</span>${ICON}</summary>`
+    + `<div aria-label="Escolher uma data" class="agenda-date-panel" role="group"></div></details>`
+    + `<span aria-live="polite" class="sr-only">${options.period}</span>`
+    + `<div class="agenda-stepper-caption">${options.caption}</div>`
+    + `<a aria-label="Período anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="#" rel="prev"><span aria-hidden="true" class="ui-button__icon">${ICON}</span></a>`
+    + `<a aria-label="Próximo período" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="#" rel="next"><span aria-hidden="true" class="ui-button__icon">${ICON}</span></a>`
+    + (options.away ? `<a class="ui-button ui-button--ghost ui-button--sm agenda-stepper-today" href="#"><span class="ui-button__label">Hoje</span></a>` : "")
+    + `</nav></header>`;
+}
+
+function agendaRow(options: { time: string; title: string; kind: string; extra?: string[]; dates?: boolean; open?: boolean; elapsed?: boolean }) {
+  const caption = [`<span class="calendar-item-lane">${options.kind}<span class="sr-only calendar-item-commitment">, Compromisso</span></span>`,
+    ...(options.elapsed ? [`<span class="calendar-item-elapsed">Já passou</span>`] : []),
+    ...(options.extra ?? []).map((text) => `<span class="calendar-item-repeats">${text}</span>`)].join("");
+  const dates = options.dates
+    ? `<details class="calendar-reschedule"${options.open ? " open" : ""}><summary class="calendar-reschedule-summary">Datas</summary>`
+      + `<p class="quiet-state calendar-reschedule-hint">Altere o prazo ou o dia que você pretende trabalhar nisso. Nada muda até você confirmar.</p>`
+      + `<div class="task-detail-controls task-detail-controls-inline"><ul class="task-control-list">`
+      + `<li class="task-control"><form><label for="agenda-due">Prazo</label><input id="agenda-due" name="value" type="date" /><button class="row-action" type="submit">Aplicar</button><span class="task-control-name">Reagendar prazo</span></form></li>`
+      + `<li class="task-control"><form><button class="row-action" type="submit">Remover prazo</button></form></li></ul></div></details>`
+    : "";
+  return `<li class="calendar-item" data-lane="deadline" data-commitment="committed" data-elapsed="${options.elapsed ? "true" : "false"}">`
+    + `<time class="calendar-item-time" datetime="2026-11-18T21:00:00.000Z">${options.time}</time>`
+    + `<span class="calendar-item-main"><span class="calendar-item-body"><a class="calendar-item-link" href="#">${options.title}</a></span>`
+    + `<span class="calendar-item-meta">${caption}</span></span>${dates}</li>`;
+}
+
+function agendaDay(label: string, rows: string[], options: { today?: boolean; quiet?: boolean; heading?: "h2" | "h3" } = {}) {
+  const tag = options.heading ?? "h2";
+  return `<li class="calendar-day"${rows.length === 0 ? ' data-empty="true"' : ""}${options.today ? ' data-today="true"' : ""}>`
+    + `<${tag} class="calendar-day-heading${options.quiet ? " sr-only" : ""}"><span class="calendar-day-name">${label}</span>${options.today ? '<span class="calendar-today">Hoje</span>' : ""}</${tag}>`
+    + (rows.length === 0
+      ? `<p class="ux-state-line calendar-empty" data-ux-state="empty"><span class="ux-state-line-text">Nada marcado</span></p>`
+      : `<ul class="calendar-day-items">${rows.join("")}</ul>`)
+    + `</li>`;
+}
+
+const AGENDA_UNBREAKABLE = "Enviar_o_relatorio_semanal_de_participacao_do_app_por_navio_e_por_canal_de_venda_2026";
+
+function agendaDays(options: { datesOpen?: boolean } = {}) {
+  return [
+    agendaDay("segunda-feira, 16 de novembro", [
+      agendaRow({ time: "08:00", title: "Tomar o remédio da pressão", kind: "Lembrete", extra: ["Toda última sexta-feira do mês"], elapsed: true }),
+      agendaRow({ time: "14:00", title: LONG_TITLE, kind: "Prazo", extra: ["Lembrete às 13:00"], dates: true, open: options.datesOpen, elapsed: true }),
+    ]),
+    agendaDay("terça-feira, 17 de novembro", []),
+    agendaDay("quarta-feira, 18 de novembro", [
+      agendaRow({ time: "Dia todo", title: "Viagem a Recife", kind: "Evento" }),
+      agendaRow({ time: "18:00", title: AGENDA_UNBREAKABLE, kind: "Prazo", dates: true }),
+    ], { today: true }),
+  ];
+}
+
+function agendaToolbar(orientation: string, filtersOpen: boolean) {
+  const option = (value: string, label: string) =>
+    `<a class="ui-segmented__option" href="#"${value === orientation ? ' aria-current="page"' : ""}>${label}</a>`;
+  const lane = (label: string, shown: boolean) => `<li><a data-shown="${shown}" href="#">${label}<span class="sr-only">${shown ? ", mostrando" : ", oculto"}</span></a></li>`;
+  return `<div class="calendar-toolbar"><nav aria-label="Formato" class="ui-segmented ui-segmented--sm calendar-orientation">${option("day", "Dia")}${option("week", "Semana")}${option("month", "Mês")}${option("agenda", "Lista")}</nav>`
+    + `<details class="calendar-filters"${filtersOpen ? " open" : ""}><summary class="ui-button ui-button--ghost ui-button--sm">${ICON}<span class="ui-button__label">O que mostrar</span></summary>`
+    + `<nav aria-label="O que mostrar" class="calendar-lanes"><ul>${lane("Prazos", true)}${lane("Intenções", true)}${lane("Lembretes", false)}${lane("Eventos", true)}${lane("Revisões", true)}${lane("Datas sugeridas", false)}</ul></nav></details></div>`;
+}
+
+function agendaBody(orientation: "day" | "week" | "month" | "agenda", options: { datesOpen?: boolean; filtersOpen?: boolean } = {}) {
+  const days = agendaDays(options);
+  const period = orientation === "day" ? "qua., 18 de novembro" : orientation === "month" ? "novembro de 2026" : "30 de novembro – 6 de dezembro";
+  const caption = `<div class="calendar-status">${orientation === "day" ? '<span class="calendar-today">Hoje</span>' : ""}<p aria-live="polite" class="calendar-summary">14 itens neste período</p></div>`;
+  const stream = `<ol class="calendar-days">${days.join("")}</ol>`;
+  const strip = `<ol aria-label="Dias desta semana" class="calendar-week-strip">${["seg.", "ter.", "qua.", "qui.", "sex.", "sáb.", "dom."].map((weekday, index) =>
+    `<li${index === 2 ? ' data-today="true"' : ""}><a aria-label="dia ${16 + index}" class="calendar-week-strip-day" data-has-items="${index !== 1}" href="#"><span class="calendar-week-strip-weekday">${weekday}</span><span class="calendar-week-strip-number">${16 + index}</span></a></li>`).join("")}</ol>`;
+  const body = orientation === "week"
+    ? `<div class="calendar-week-scroll"><table class="calendar-week"><caption class="sr-only">semana</caption><thead><tr>${[...Array(7)].map((_unused, index) => `<th scope="col"><a class="calendar-week-head" href="#"><span class="calendar-week-weekday">seg.</span><span class="calendar-week-day">${16 + index}</span></a></th>`).join("")}</tr></thead><tbody><tr>${"<td></td>".repeat(7)}</tr></tbody></table></div>`
+      + `<div class="calendar-week-list">${strip}${stream}</div>`
+    : orientation === "month"
+      ? `<div class="calendar-month-scroll"><table class="calendar-month"><caption class="sr-only">mês</caption><thead><tr>${'<th scope="col">Seg</th>'.repeat(7)}</tr></thead><tbody><tr>${'<td><a class="calendar-month-daynumber" href="#">1</a></td>'.repeat(7)}</tr></tbody></table></div>`
+        + `<div class="calendar-month-list"><h2>Dias com itens neste mês</h2><ol class="calendar-days">${[days[0], days[2]].join("").replace(/<(\/?)h2/g, "<$1h3")}</ol></div>`
+      : orientation === "day"
+        ? `<ol class="calendar-days">${agendaDay("quarta-feira, 18 de novembro", [
+          agendaRow({ time: "08:00", title: "Tomar o remédio da pressão", kind: "Lembrete", extra: ["Todo dia"], elapsed: true }),
+          agendaRow({ time: "18:00", title: AGENDA_UNBREAKABLE, kind: "Prazo", extra: ["Lembrete às 17:00"], dates: true, open: options.datesOpen }),
+        ], { today: true, quiet: true })}</ol>`
+        : stream;
+  return `<div class="content-page calendar-page"><section class="calendar" data-orientation="${orientation}">`
+    + agendaMasthead({ lens: "calendar", period, caption, away: orientation !== "day", navClass: "calendar-navigation" })
+    + agendaToolbar(orientation, options.filtersOpen ?? false)
+    + `<p class="calendar-bound" role="status">Este é o fim do período que o calendário cobre.</p>`
+    + body + `</section></div>`;
+}
+
+function plannerRowBody(options: { title: string; pool: boolean; due?: string; noted?: string }) {
+  const caption = options.due || options.noted
+    ? `<p class="planner-item-meta">${options.due ? `<span>Prazo: ${options.due}</span>` : ""}${options.noted ? `<span class="planner-item-noted">${options.noted}</span>` : ""}</p>`
+    : "";
+  return `<li class="planner-item" data-operation="${options.pool ? "set" : "cleared"}">`
+    + (options.pool ? `<label class="planner-select-label"><input aria-label="${options.title}" class="planner-select" type="checkbox" /></label>` : "")
+    + `<div class="planner-item-head"><span class="planner-item-title"><a class="planner-item-link" href="#">${options.title}</a></span>${caption}</div>`
+    + `<div class="planner-item-controls"><div class="task-detail-controls task-detail-controls-inline task-detail-controls-preset"><ul class="task-control-list"><li class="task-control"><form>`
+    + `<button class="row-action" type="submit">${options.pool ? "Planejar" : "Tirar"}</button></form></li></ul></div></div></li>`;
+}
+
+function plannerBody(options: { aboutOpen?: boolean } = {}) {
+  const list = (label: string, rows: string[], foot = "") =>
+    `<section aria-label="${label}" class="planner-list"><h2><span>${label}</span><span class="planner-list-count">${rows.length}</span></h2><ul>${rows.join("")}</ul>${foot}</section>`;
+  return `<div class="content-page planner-page">`
+    + agendaMasthead({
+      lens: "plan",
+      period: "qua., 18 de novembro",
+      caption: `<p class="planner-lede"><span class="calendar-today">Hoje</span><span>Escolha o que você pretende fazer neste dia.</span></p>`,
+      away: true,
+      navClass: "planner-day-nav",
+    })
+    + `<p class="planner-overloaded" role="status">Há mais itens do que horas declaradas, contando um item por hora.</p>`
+    + `<section aria-label="O que vale notar" class="planner-conflicts" data-has-conflicts="true"><h2>O que vale notar</h2><p class="planner-conflict-count">1 observação</p>`
+    + `<ul class="planner-conflict-list"><li>A intenção é para depois do prazo da tarefa.</li></ul><p class="quiet-state">Nada foi alterado. Você decide o que fazer com cada uma.</p></section>`
+    + list("Planejado para este dia", [
+      plannerRowBody({ title: LONG_TITLE, pool: false, due: "17 de nov. de 2026", noted: "A intenção é para depois do prazo da tarefa." }),
+      plannerRowBody({ title: "Pagar o condomínio", pool: false, due: "18 de nov. de 2026" }),
+    ])
+    + list("Disponível para planejar", [
+      plannerRowBody({ title: AGENDA_UNBREAKABLE, pool: true }),
+      plannerRowBody({ title: "Renovar o seguro do carro", pool: true, due: "22 de nov. de 2026" }),
+      plannerRowBody({ title: LONG_TITLE, pool: true }),
+    ], `<div class="work-bulk-select-all planner-select-all"><button class="row-action" type="button">Selecionar as que estão nesta página</button></div>`)
+    + `<details class="planner-about"${options.aboutOpen ? " open" : ""}><summary class="planner-about-summary">Como o planejamento funciona</summary><div class="planner-about-body">`
+    + `<p class="planner-meaning">Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete: é só a sua intenção para aquele dia.</p>`
+    + `<p class="quiet-state planner-guarantee">Esta tela não cria tarefas. Ela só organiza o que já existe.</p>`
+    + `<p class="quiet-state planner-list-hint">Tarefas em aberto que ainda não têm um dia escolhido.</p>`
+    + `<section aria-label="Quanto você planejou" class="planner-capacity"><h2>Quanto você planejou</h2><p class="planner-capacity-count">2 itens planejados</p>`
+    + `<p>Você não declarou suas horas disponíveis, então não há com o que comparar.</p><p class="quiet-state">Nenhuma tarefa tem duração registrada, então não dá para dizer se cabe no dia.</p></section>`
+    + `</div></details></div>`;
+}
+
+async function renderAgenda(page: Page, body: string, width: number, height: number) {
+  await render(page, body, width, height);
+  await page.addStyleTag({ content: AGENDA_CSS });
+  await page.waitForTimeout(40);
+}
+
+/** Every visible control inside `scope` shorter than a touch target, as "label:height". */
+async function agendaShortTargets(page: Page, scope: string) {
+  return page.evaluate(({ selector, minimum }) => {
+    const root = document.querySelector(selector);
+    if (!root) return ["scope not found"];
+    return [...root.querySelectorAll<HTMLElement>("a, button, summary, input:not([type=hidden]), select, label:has(input[type=checkbox])")]
+      .filter((node) => node.getClientRects().length > 0 && !node.matches("label input"))
+      .map((node) => ({ label: (node.textContent ?? "").trim().slice(0, 24) || node.tagName, height: Math.round(node.getBoundingClientRect().height) }))
+      .filter((entry) => entry.height < minimum)
+      .map((entry) => `${entry.label}:${entry.height}`);
+  }, { selector: scope, minimum: 44 });
+}
+
+async function agendaOverflow(page: Page) {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
+
+test.describe("the Agenda as a stream of days (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    for (const orientation of ["day", "week", "month", "agenda"] as const) {
+      test(`${orientation}: no sideways scroll and no target under 44px at ${width} CSS px, at rest and with every disclosure open`, async ({ page }) => {
+        for (const open of [false, true]) {
+          await renderAgenda(page, agendaBody(orientation, { datesOpen: open, filtersOpen: open }), width, 800);
+          expect(await agendaOverflow(page), `sideways overflow, open=${open}`).toBeLessThanOrEqual(0);
+          expect(await agendaShortTargets(page, ".calendar-page"), `short targets, open=${open}`).toEqual([]);
+        }
+        // The date picker's own panel, opened by its label.
+        await page.locator(".agenda-date-trigger").click();
+        expect(await agendaOverflow(page), "sideways overflow with the picker open").toBeLessThanOrEqual(0);
+      });
+    }
+
+    test(`a row keeps its time column, and an unbreakable title breaks inside it, at ${width} CSS px`, async ({ page }) => {
+      await renderAgenda(page, agendaBody("agenda"), width, 800);
+      const rows = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".calendar-days .calendar-item")].map((row) => {
+        const time = row.querySelector(".calendar-item-time")!.getBoundingClientRect();
+        const words = row.querySelector(".calendar-item-body")!.getBoundingClientRect();
+        const box = row.getBoundingClientRect();
+        return { timeLeft: Math.round(time.left - box.left), wordsLeft: Math.round(words.left - box.left), wordsRight: words.right, right: box.right, wordsWidth: words.width };
+      }));
+      expect(rows.length).toBeGreaterThanOrEqual(4);
+      // One column for the time and one edge for the words, down the whole list.
+      expect(new Set(rows.map((row) => row.timeLeft)).size).toBe(1);
+      expect(new Set(rows.map((row) => row.wordsLeft)).size).toBe(1);
+      for (const row of rows) {
+        expect(row.wordsRight).toBeLessThanOrEqual(row.right + 1);
+        expect(row.wordsWidth, "the words kept a readable width").toBeGreaterThanOrEqual(150);
+      }
+    });
+
+    test(`the week is its list, and the month is its list, at ${width} CSS px`, async ({ page }) => {
+      await renderAgenda(page, agendaBody("week"), width, 800);
+      await expect(page.locator(".calendar-week-scroll")).toBeHidden();
+      await expect(page.locator(".calendar-week-list")).toBeVisible();
+      const strip = await page.locator(".calendar-week-strip-day").evaluateAll((nodes) => nodes.map((node) => {
+        const box = node.getBoundingClientRect();
+        return box.left >= 0 && box.right <= window.innerWidth + 1 && box.height >= 44;
+      }));
+      expect(strip).toEqual([true, true, true, true, true, true, true]);
+      await renderAgenda(page, agendaBody("month"), width, 800);
+      await expect(page.locator(".calendar-month-scroll")).toBeHidden();
+      await expect(page.locator(".calendar-month-list")).toBeVisible();
+    });
+  }
+
+  test("an empty day is one muted line among the days, at 390px", async ({ page }) => {
+    await renderAgenda(page, agendaBody("agenda"), 390, 844);
+    const empty = page.locator('.calendar-day[data-empty="true"]');
+    await expect(empty).toHaveCount(1);
+    expect((await empty.boundingBox())!.height).toBeLessThanOrEqual(28);
+    const drawn = await empty.evaluate((node) => {
+      const heading = getComputedStyle(node.querySelector(".calendar-day-heading")!);
+      return { rule: heading.borderBottomWidth, background: getComputedStyle(node).backgroundColor };
+    });
+    expect(parseFloat(drawn.rule)).toBe(0);
+    expect(drawn.background).toBe("rgba(0, 0, 0, 0)");
+  });
+
+  test("the day and the list keep a reading measure on a desktop, and the week keeps the width", async ({ page }) => {
+    await renderAgenda(page, agendaBody("agenda"), 1280, 900);
+    const list = (await page.locator(".calendar").boundingBox())!.width;
+    expect(list).toBeLessThanOrEqual(700);
+    await renderAgenda(page, agendaBody("week"), 1280, 900);
+    await expect(page.locator(".calendar-week-scroll")).toBeVisible();
+    await expect(page.locator(".calendar-week-list")).toBeHidden();
+    expect((await page.locator(".calendar").boundingBox())!.width).toBeGreaterThan(list);
+  });
+
+  test("the fixture still mirrors the markup the components emit", () => {
+    const view = readFileSync(join(ROOT, "src", "features", "calendar", "calendar-view.tsx"), "utf8");
+    for (const name of ["calendar-status", "calendar-summary", "calendar-toolbar", "calendar-orientation", "calendar-filters", "calendar-lanes",
+      "calendar-days", "calendar-day", "calendar-day-name", "calendar-day-items", "calendar-week-scroll", "calendar-week-list",
+      "calendar-week-strip", "calendar-week-strip-day", "calendar-week-strip-weekday", "calendar-week-strip-number",
+      "calendar-month-scroll", "calendar-month-list", "calendar-bound"]) {
+      expect(view, `the view lost ${name}`).toContain(name);
+    }
+    const item = readFileSync(join(ROOT, "src", "features", "calendar", "calendar-item.tsx"), "utf8");
+    for (const name of ["calendar-item", "calendar-item-time", "calendar-item-main", "calendar-item-body", "calendar-item-link",
+      "calendar-item-meta", "calendar-item-lane", "calendar-item-commitment", "calendar-item-elapsed", "calendar-item-repeats"]) {
+      expect(item, `the row lost ${name}`).toContain(name);
+    }
+    expect(item.indexOf('className="calendar-item-time"', item.indexOf("ADR-180"))).toBeLessThan(item.indexOf('className="calendar-item-main"'));
+    const header = readFileSync(join(ROOT, "src", "features", "calendar", "agenda-header.tsx"), "utf8");
+    for (const name of ["agenda-masthead", "agenda-masthead-top", "agenda-masthead-title", "agenda-lenses", "agenda-stepper", "agenda-stepper-caption", "agenda-stepper-today"]) {
+      expect(header, `the header lost ${name}`).toContain(name);
+    }
+    // The period comes first in the stepper, then its caption, then the arrows.
+    const stepper = header.slice(header.indexOf("export function AgendaStepper"));
+    expect(stepper.indexOf("<AgendaDatePicker")).toBeLessThan(stepper.indexOf("agenda-stepper-caption"));
+    expect(stepper.indexOf("agenda-stepper-caption")).toBeLessThan(stepper.indexOf('rel="prev"'));
+    expect(stepper.indexOf('rel="prev"')).toBeLessThan(stepper.indexOf('rel="next"'));
+  });
+});
+
+test.describe("Planejar as two lists of rows (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px, the account closed and open`, async ({ page }) => {
+      for (const aboutOpen of [false, true]) {
+        await renderAgenda(page, plannerBody({ aboutOpen }), width, 800);
+        expect(await agendaOverflow(page), `sideways overflow, open=${aboutOpen}`).toBeLessThanOrEqual(0);
+        expect(await agendaShortTargets(page, ".planner-page"), `short targets, open=${aboutOpen}`).toEqual([]);
+      }
+    });
+
+    test(`every row ends in its verb and the titles share one edge per list, at ${width} CSS px`, async ({ page }) => {
+      await renderAgenda(page, plannerBody(), width, 800);
+      const lists = await page.evaluate(() => [...document.querySelectorAll(".planner-list")].map((list) =>
+        [...list.querySelectorAll<HTMLElement>(".planner-item")].map((row) => {
+          const box = row.getBoundingClientRect();
+          const title = row.querySelector(".planner-item-title")!.getBoundingClientRect();
+          const verb = row.querySelector("button.row-action")!.getBoundingClientRect();
+          return { titleLeft: Math.round(title.left - box.left), titleWidth: title.width, verbAfter: verb.left >= title.right - 1, verbInside: verb.right <= box.right + 1 };
+        })));
+      expect(lists).toHaveLength(2);
+      for (const rows of lists) {
+        expect(new Set(rows.map((row) => row.titleLeft)).size).toBe(1);
+        for (const row of rows) {
+          expect(row.verbAfter).toBe(true);
+          expect(row.verbInside).toBe(true);
+          expect(row.titleWidth, "the title kept a readable width").toBeGreaterThanOrEqual(140);
+        }
+      }
+    });
+  }
+
+  test("what the page asks is on the first screen, above the first task, at 390px", async ({ page }) => {
+    await renderAgenda(page, plannerBody(), 390, 844);
+    const [lede, first, about] = await Promise.all([
+      page.locator(".planner-lede").boundingBox(),
+      page.locator(".planner-item").first().boundingBox(),
+      page.locator(".planner-about").boundingBox(),
+    ]);
+    expect(lede!.y).toBeLessThan(first!.y);
+    expect(first!.y, "the first task is on the first screen").toBeLessThan(844);
+    expect(about!.y).toBeGreaterThan(first!.y);
+    await expect(page.locator(".planner-meaning")).toBeHidden();
+  });
+
+  test("the fixture still mirrors the markup the planner emits", () => {
+    const view = readFileSync(join(ROOT, "src", "features", "planning", "planner-view.tsx"), "utf8");
+    for (const name of ["planner-page", "planner-lede", "planner-overloaded", "planner-conflicts", "planner-conflict-count", "planner-conflict-list",
+      "planner-list", "planner-list-count", "planner-item", "planner-select-label", "planner-select", "planner-item-head", "planner-item-title",
+      "planner-item-link", "planner-item-meta", "planner-item-noted", "planner-item-controls", "planner-select-all", "planner-about",
+      "planner-about-summary", "planner-about-body", "planner-meaning", "planner-guarantee", "planner-list-hint", "planner-capacity", "planner-capacity-count"]) {
+      expect(view, `the planner lost ${name}`).toContain(name);
+    }
+    // The account of the page comes after both lists, and is closed unless the day is overloaded.
+    expect(view.lastIndexOf("</section>", view.indexOf('className="planner-about"'))).toBeGreaterThan(view.indexOf("<BulkBar"));
+    expect(view).toContain('<details className="planner-about" open={projection.capacity.overloaded}>');
   });
 });

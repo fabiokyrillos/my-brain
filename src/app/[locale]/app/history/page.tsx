@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { PageHeader } from "@/components/ui";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getHistoryCopy } from "@/features/history/copy";
 import { HistoryFilterControls } from "@/features/history/history-filters";
@@ -9,7 +10,7 @@ import { loadHistoryPage } from "@/features/history/projection";
 import { getAgentName } from "@/features/profile/agent-identity";
 import { PaginationLinks } from "@/features/shell/pagination-links";
 import { DataAiTabs } from "@/features/transparency/data-ai-tabs";
-import { getTransparencyCopy } from "@/features/transparency/copy";
+
 import { requireUser } from "@/lib/auth/require-user";
 import { parsePage } from "@/lib/pagination";
 import { defaultAgentPreferences, isLocale } from "@/lib/preferences";
@@ -34,6 +35,14 @@ import { requireSupabaseData } from "@/lib/supabase/result";
  * lives in `projection.ts`.
  *
  * Read-only, as authorized: no migration, no RPC, no grant change, no write path.
+ *
+ * ## Editorial calmo (ADR-180)
+ *
+ * The page is a logbook. The strip that says where it lives comes first and
+ * replaces the eyebrow that said the same thing; the sentence under the title
+ * described the list and is gone; the filters are one closed line; and the
+ * events are grouped under their day, so a row carries the hour and the day is
+ * said once.
  */
 export default async function HistoryPage({
   params,
@@ -64,13 +73,17 @@ export default async function HistoryPage({
 
   // One formatter per render, in the reader's own zone, so the date a filter
   // means and the date a row shows cannot disagree.
-  const dateTimeFormat = new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
+  const dayFormat = new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
     timeZone: timezone,
   });
+  const timeFormat = new Intl.DateTimeFormat(locale, { timeStyle: "short", timeZone: timezone });
   const dateFormat = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: timezone });
-  const formatDateTime = (iso: string) => dateTimeFormat.format(new Date(iso));
+  const formatDay = (iso: string) => dayFormat.format(new Date(iso));
+  const formatTime = (iso: string) => timeFormat.format(new Date(iso));
   const formatDate = (iso: string) => dateFormat.format(new Date(iso));
 
   const { events, hasNext } = await loadHistoryPage(supabase, {
@@ -86,30 +99,25 @@ export default async function HistoryPage({
   const filtered = hasActiveFilters(filters);
 
   return (
-    <div className="content-page">
-      <header className="list-header">
-        <div>
-          {/*
-            The eyebrow names the section this surface belongs to, not the
-            abstract virtue it serves. "TRANSPARÊNCIA" was true of all three
-            transparency surfaces and located none of them; **Dados e IA** is
-            where the product now says they live, and the strip below repeats it
-            as a place you can move around in.
-          */}
-          <p className="eyebrow">{getTransparencyCopy(locale).title.toUpperCase()}</p>
-          <h1>{copy.title}</h1>
-          <p>{copy.intro}</p>
-        </div>
-      </header>
-
+    <div className="content-page history-page">
+      {/*
+        **Dados e IA** is where the product says this surface lives, and the
+        strip is that place as something you can move around in. It is first, so
+        a reader who arrived on a deep link learns where they are before what is
+        here — and it is the only thing that says so: the eyebrow above the
+        title repeated it.
+      */}
       <DataAiTabs active="history" locale={locale} />
+
+      <PageHeader size="compact" title={copy.title} />
 
       <HistoryFilterControls copy={copy} filters={filters} locale={locale} />
 
       {events.length ? (
-        <HistoryList copy={copy} events={events} formatDateTime={formatDateTime} locale={locale} />
+        <HistoryList copy={copy} events={events} formatDateTime={formatTime} formatDay={formatDay} locale={locale} />
       ) : (
         <UniversalStateView
+          className="ux-state-quiet"
           description={filtered ? copy.empty.filteredBody : copy.empty.body}
           locale={locale}
           state="empty"

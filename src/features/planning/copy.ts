@@ -61,6 +61,16 @@ export type PlannerCopy = {
   /** The one button on an available row, and on a planned row. */
   readonly planHere: string;
   readonly removeHere: string;
+  /**
+   * ADR-180 — what the page asks, in one line under the day: the thing a person
+   * does here, which is also what "planned" means. The longer account
+   * (`meaning`, `createsNothing`, the capacity sentences) waits behind
+   * `howItWorks`.
+   */
+  readonly lede: string;
+  readonly howItWorks: string;
+  /** A task's deadline, as the row's caption: what a plan is weighed against. */
+  readonly dueOn: (day: string) => string;
 };
 
 const ptBR: PlannerCopy = {
@@ -96,8 +106,11 @@ const ptBR: PlannerCopy = {
   createsNothing: "Esta tela não cria tarefas. Ela só organiza o que já existe.",
   meaning: "Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete: é só a sua intenção para aquele dia.",
   availableHint: "Tarefas em aberto que ainda não têm um dia escolhido.",
-  planHere: "Planejar para este dia",
-  removeHere: "Tirar deste dia",
+  planHere: "Planejar",
+  removeHere: "Tirar",
+  lede: "Escolha o que você pretende fazer neste dia.",
+  howItWorks: "Como o planejamento funciona",
+  dueOn: (day) => `Prazo: ${day}`,
 };
 
 const en: PlannerCopy = {
@@ -133,8 +146,11 @@ const en: PlannerCopy = {
   createsNothing: "This screen creates no tasks. It only arranges what already exists.",
   meaning: "Planning is choosing the day you intend to do a task. It does not move the deadline or create a reminder: it is only your intention for that day.",
   availableHint: "Open tasks that do not have a chosen day yet.",
-  planHere: "Plan for this day",
-  removeHere: "Remove from this day",
+  planHere: "Plan",
+  removeHere: "Remove",
+  lede: "Choose what you intend to do on this day.",
+  howItWorks: "How planning works",
+  dueOn: (day) => `Due: ${day}`,
 };
 
 const BY_LOCALE: Record<Locale, PlannerCopy> = { "pt-BR": ptBR, en };

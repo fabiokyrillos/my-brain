@@ -1,14 +1,17 @@
 /**
- * Life Brain A.5 — the history page's notice row.
+ * The Avisos page's notice row (Life Brain A.5, recomposed by Editorial calmo,
+ * ADR-180).
  *
- * What it owes: two lines (title, then the state as a word with the time and
- * the body), one visible control, and the row's verbs — exactly the projected
- * set, primary first — behind a "⋯". The destination link renders only for an
- * owner-scoped path and never marks the notice read on the way out (a history
- * surface does not answer on the reader's behalf).
+ * What it owes: what the notice is about as its subject, one caption (the kind
+ * of notice and the time), the state as a word, and the row's verbs — exactly
+ * the projected set. An unanswered notice shows its primary verb and keeps the
+ * rest behind a "⋯"; a read one keeps them all there, primary first. The
+ * destination link renders only for an owner-scoped path and never marks the
+ * notice read on the way out (this surface does not answer on the reader's
+ * behalf).
  *
  * The verbs' behaviour is `notification-row-actions.test.tsx`'s; this file
- * proves the row draws them where A.5 says and adds or removes none.
+ * proves the row draws them where the design says and adds or removes none.
  */
 
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -41,7 +44,23 @@ function renderRow(options: Parameters<typeof noticeRow>[0] = {}) {
   return { row, spies };
 }
 
-describe("NotificationHistoryRow — two lines, one visible control", () => {
+describe("NotificationHistoryRow — a subject, one caption, one visible verb", () => {
+  it("is headed by what the notice is about, with its kind and time as the caption", () => {
+    renderRow({ source: { title: "Tarefa atrasada", body: "Pagar a conta de luz" } });
+    const item = screen.getByRole("listitem");
+    expect(item.querySelector(".notification-item-subject")).toHaveTextContent("Pagar a conta de luz");
+    const caption = item.querySelector(".notification-item-meta");
+    expect(caption?.querySelector(".notification-item-kind")).toHaveTextContent("Tarefa atrasada");
+    expect(caption?.querySelector(".notification-item-time")).toHaveTextContent("04/11, 14:00");
+  });
+
+  it("is headed by its title when it has no body, and does not say the title twice", () => {
+    renderRow({ source: { title: "Resumo do dia", body: "  " } });
+    const item = screen.getByRole("listitem");
+    expect(item.querySelector(".notification-item-subject")).toHaveTextContent("Resumo do dia");
+    expect(item.querySelector(".notification-item-kind")).toBeNull();
+    expect(within(item).getAllByText("Resumo do dia")).toHaveLength(1);
+  });
   it("says the state as a word, beside the time and the body", () => {
     const { row } = renderRow({ source: { status: "unread", title: "Tarefa atrasada", body: "Pagar a conta de luz" } });
     const item = screen.getByRole("listitem");
@@ -69,17 +88,41 @@ describe("NotificationHistoryRow — two lines, one visible control", () => {
     },
   );
 
-  it("draws no verb as a visible button: the primary waits first in the menu", async () => {
+  it("shows an unanswered notice's primary verb, and keeps the rest behind the menu", async () => {
     const { row } = renderRow({ source: { status: "unread" } });
     expect(row.primaryVerb, "the fixture must have a primary verb").not.toBeNull();
     const verbCopy = getVerbCopy("pt-BR");
     const primaryName = verbCopy[row.primaryVerb!.id].accessibleName(row.subjectLabel);
+    expect(screen.getByRole("button", { name: primaryName })).toBeInTheDocument();
+    // One visible verb: every other button at rest is the menu's trigger.
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+
+    const trigger = screen.getByRole("button", { name: getNotificationActionCopy("pt-BR").menuLabel(row.subjectLabel) });
+    await userEvent.click(trigger);
+    const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
+    const expected = row.menuVerbs.map((verb) => verbCopy[verb.id].accessibleName(row.subjectLabel));
+    expect(items.map((item) => item.getAttribute("aria-label"))).toEqual(expected);
+  });
+
+  it("draws no verb on a notice already read: the primary waits first in the menu", async () => {
+    const { row } = renderRow({ source: { status: "read" } });
+    expect(row.primaryVerb, "the fixture must have a primary verb").not.toBeNull();
+    const verbCopy = getVerbCopy("pt-BR");
+    const primaryName = verbCopy[row.primaryVerb!.id].accessibleName(row.subjectLabel);
     expect(screen.queryByRole("button", { name: primaryName })).toBeNull();
+    expect(screen.getAllByRole("button")).toHaveLength(1);
 
     const trigger = screen.getByRole("button", { name: getNotificationActionCopy("pt-BR").menuLabel(row.subjectLabel) });
     await userEvent.click(trigger);
     const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
     const expected = [row.primaryVerb!, ...row.menuVerbs].map((verb) => verbCopy[verb.id].accessibleName(row.subjectLabel));
     expect(items.map((item) => item.getAttribute("aria-label"))).toEqual(expected);
+  });
+
+  it("puts the row's link after its verbs, so the document reads subject, verbs, open", () => {
+    renderRow({ source: { status: "unread", action_url: "/pt-BR/app/tasks/abc" } });
+    const item = screen.getByRole("listitem");
+    const controls = [...item.querySelectorAll("button, a")];
+    expect(controls.at(-1)?.tagName).toBe("A");
   });
 });

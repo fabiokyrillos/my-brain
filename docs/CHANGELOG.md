@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-18 — Avisos, Histórico and Agenda, recomposed (ADR-180, ADR-186)
+
+- **Avisos** (`notifications/page.tsx`, `notification-history-row.tsx`, `notification-bulk-bar.tsx`, `settings-extended.css`): the page opens with the count of unread notices and *Marcar todos como lidos* as a text verb; an unread row is the notice's subject in the reading face, one caption and its primary verb; read notices fold under *Já lidos* when something is unread and more than three are read. The standing bulk bar is gone; `NotificationBulkBar` is now a provider with `NotificationBulkVerb` and `NotificationBulkOutcome`.
+- **Histórico** (`history/page.tsx`, `history-list.tsx`, `history-filters.tsx`, `history.css`): a logbook — days as headings, one row per event (sentence, caption with kind and time), the row is the link; filters are one closed line at every width, with the active ones said in words beside it. `HistoryList` is shared, so *O que mudou recentemente* on the memory, person and project pages draws the same row.
+- **Agenda** (`agenda-header.tsx`, `calendar-view.tsx`, `calendar-item.tsx`, `calendar.css`): the period is the subject; a day is a heading over rows with a time column, the title as the link and one caption. On a phone the week is a seven-day strip over the list of days; the table stays from 768px (ADR-186).
+- **Planejar** (`planner-view.tsx`): what is planned and what is available come first, one line per task with one verb; the explanations are one closed disclosure at the foot, opened when the day is overloaded (ADR-186).
+- `RECORDED_UNSTYLED` 26 → 24. No Server Action, RPC, query or migration changed. Record: `docs/reports/editorial-calmo/AVISOS-HISTORICO-AGENDA.md`.
+
 ## 2026-11-18 — Memória and Revisões, recomposed (ADR-180, slices 4–6)
 
 - **Memória overview** (`library/page.tsx`, `brain.css`): search is the first control; the seven domains are an index of rows (name, count, latest items on one line; the row is the link) instead of a grid of bordered tiles; areas and ideas are rows.

@@ -110,10 +110,10 @@ describe("2M-PRIVACY-001/-005: no title reaches the page unprotected", () => {
     expect(screen.getByText("Entregar o relatório")).toBeTruthy();
     // The row survives: the item's existence, lane and instant are still there.
     expect(document.querySelectorAll(".calendar-item")).toHaveLength(1);
-    // Scoped to the item list: "Prazos" is also the lane filter's own label, and
-    // an unscoped query would pass on the control while the row was missing.
+    // Scoped to the item list, so the assertion is about the row and cannot
+    // pass on a control. The row says its kind in the singular (ADR-180).
     const rows = document.querySelector(".calendar-day-items") as HTMLElement;
-    expect(within(rows).getByText("Prazos")).toBeTruthy();
+    expect(within(rows).getByText("Prazo")).toBeTruthy();
   });
 
   it("shows a highly sensitive REMINDER title by the same mechanism", () => {
@@ -155,18 +155,37 @@ describe("2M-PRIVACY-001/-005: no title reaches the page unprotected", () => {
 });
 
 describe("2M-CAL-003 / 2M-ACCESS-005: the distinction is never colour alone", () => {
-  it("states the lane and the commitment in visible text", () => {
+  /*
+    ADR-180. A row's caption names its kind in the singular, in visible text,
+    and every kind is a different word — so a deadline, an intention and a
+    suggested date are told apart by reading, with every colour removed. The
+    commitment each kind implies is said beside it for a screen reader rather
+    than printed as a second word ("Intenção · Intenção"), which is what the
+    week's compact line has done since Life Brain D.1.
+  */
+  it("states the kind in visible text and the commitment in the row's accessible text", () => {
     view({ projection: projection({
       days: [{ date: "2026-08-15", isToday: true, items: [
         item(),
         item({ id: "intention:t2", lane: "intention", commitment: "intended", title: "Rascunho" }),
       ] }],
     }) });
-    const rows = document.querySelector(".calendar-day-items") as HTMLElement;
-    expect(within(rows).getByText("Prazos")).toBeTruthy();
-    expect(within(rows).getByText("Compromisso")).toBeTruthy();
-    expect(within(rows).getByText("Intenções")).toBeTruthy();
-    expect(within(rows).getByText("Intenção")).toBeTruthy();
+    const rows = Array.from(document.querySelectorAll<HTMLElement>(".calendar-day-items .calendar-item"));
+    const kinds = rows.map((row) => row.querySelector(".calendar-item-lane")?.firstChild?.textContent);
+    expect(kinds).toEqual(["Prazo", "Intenção"]);
+    for (const row of rows) {
+      expect(row.querySelector(".calendar-item-lane")).not.toHaveClass("sr-only");
+    }
+    expect(rows[0].textContent).toContain("Compromisso");
+    expect(rows[1].querySelector(".calendar-item-commitment")?.textContent).toContain("Intenção");
+  });
+
+  it("gives every lane a kind of its own, so the word alone tells them apart", () => {
+    for (const locale of ["pt-BR", "en"] as const) {
+      const kinds = Object.values(getCalendarCopy(locale).kinds);
+      expect(new Set(kinds).size).toBe(kinds.length);
+      expect(kinds.every((kind) => kind.trim().length > 0)).toBe(true);
+    }
   });
 
   it("exposes the lane and commitment programmatically as well", () => {
@@ -278,7 +297,9 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
         projection: projection({ days: weekDays([item({ sensitivity: { kind: "derived", level: "highly_sensitive" } })]) }),
         query: query({ orientation: "week" }),
       });
-      expect(screen.getByText("Entregar o relatório")).toBeTruthy();
+      // Scoped to the grid: the phone's list of the same week is in the DOM too.
+      const grid = document.querySelector("table.calendar-week") as HTMLElement;
+      expect(within(grid).getByText("Entregar o relatório")).toBeTruthy();
       expect(document.querySelectorAll("table.calendar-week .calendar-item")).toHaveLength(1);
     });
 
@@ -315,7 +336,48 @@ describe("2M-ACCESS-001/-002: structure and operation without a pointer", () => 
       const bars = document.querySelectorAll("table.calendar-week tr.calendar-span-row td.calendar-span-cell");
       expect(bars).toHaveLength(1);
       expect(bars[0].getAttribute("colspan")).toBe("3");
-      expect(screen.getAllByText("Viagem a Recife")).toHaveLength(1);
+      const grid = document.querySelector("table.calendar-week") as HTMLElement;
+      expect(within(grid).getAllByText("Viagem a Recife")).toHaveLength(1);
+    });
+
+    /*
+      ADR-180 — the phone's week. Seven columns at 390px gave a day 48px. The
+      same week is also rendered as its seven days on one line and, under it,
+      the days as rows; CSS shows one of the two (`calendar.css`), as the month
+      has always done.
+    */
+    it("also renders the week as seven day links and a stream of days, for a phone", () => {
+      render(
+        <CalendarView
+          dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+          locale="pt-BR"
+          projection={projection({ days: weekDays([item({ reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } })]) })}
+          query={query({ orientation: "week" })}
+          rescheduleAction={vi.fn(async () => idleTaskDetailCommandState)}
+          today={TODAY}
+        />,
+      );
+      const list = document.querySelector(".calendar-week-list") as HTMLElement;
+      expect(list.closest(".calendar-week-scroll")).toBeNull();
+      const strip = Array.from(list.querySelectorAll(".calendar-week-strip a"));
+      expect(strip).toHaveLength(7);
+      expect(strip[2].getAttribute("href")).toBe("/pt-BR/app/calendar?date=2026-08-12");
+      expect(strip[2].getAttribute("aria-label")).toBe("quarta-feira, 12 de agosto, 1 item");
+      expect(strip[2].getAttribute("data-has-items")).toBe("true");
+      expect(strip[5].getAttribute("aria-current")).toBe("date");
+      // The stream: seven days, one of them with a row that keeps its dates.
+      const days = list.querySelectorAll(".calendar-days > .calendar-day");
+      expect(days).toHaveLength(7);
+      expect(list.querySelectorAll(".calendar-day[data-empty='true']")).toHaveLength(6);
+      expect(list.querySelectorAll(".calendar-item")).toHaveLength(1);
+      expect(list.querySelector("details.calendar-reschedule")).toBeTruthy();
+    });
+
+    it("keeps the seven days on a phone and draws no day list for an empty week", () => {
+      view({ projection: projection({ days: weekDays() }), query: query({ orientation: "week" }) });
+      const list = document.querySelector(".calendar-week-list") as HTMLElement;
+      expect(list.querySelectorAll(".calendar-week-strip a")).toHaveLength(7);
+      expect(list.querySelector(".calendar-days")).toBeNull();
     });
 
     it("says an empty week is empty once, not seven times", () => {
@@ -801,5 +863,127 @@ describe("Life Brain A.4: a task's own reminder is on the task's line", () => {
     }) });
     expect(screen.getByText("Entregar o relatório")).toBeTruthy();
     expect(screen.getByText("Lembrete às 14:00")).toBeTruthy();
+  });
+});
+
+/**
+ * ADR-180 — the Agenda as a stream of days.
+ *
+ * The period is the page's subject; a day is a heading and its rows; a row is
+ * the time, the words, one caption and at most one verb.
+ */
+describe("ADR-180: the period is the subject and a day is a stream of rows", () => {
+  const fortnight = (items: Record<string, CalendarItemView[]> = {}): readonly DayFixture[] =>
+    Array.from({ length: 14 }, (_unused, index) => {
+      const key = formatLocalDate(addLocalDays(TODAY, index));
+      return { date: key, isToday: index === 0, items: items[key] ?? [] };
+    });
+
+  it("names the period in the stepper: one day by its date, a span as a range", () => {
+    view();
+    expect(document.querySelector(".calendar-navigation summary")).toHaveTextContent("sáb., 15 de agosto");
+    cleanup();
+    view({ projection: projection({ days: fortnight() }), query: query({ orientation: "agenda" }) });
+    expect(document.querySelector(".calendar-navigation summary")).toHaveTextContent("15 – 28 de agosto");
+  });
+
+  it("puts the period before its arrows, and the destination's name in a quiet h1", () => {
+    view();
+    const stepper = document.querySelector(".calendar-navigation") as HTMLElement;
+    const order = Array.from(stepper.children).map((child) => child.tagName.toLowerCase());
+    expect(order[0]).toBe("details");
+    expect(order.filter((tag) => tag === "a")).toHaveLength(2);
+    expect(document.querySelector("h1")).toHaveClass("agenda-masthead-title");
+  });
+
+  it("offers Hoje only when the period on screen does not hold today", () => {
+    view();
+    expect(document.querySelector(".agenda-stepper-today")).toBeNull();
+    cleanup();
+    view({
+      projection: projection({ days: [{ date: "2026-08-20", isToday: false, items: [item()] }] }),
+      query: query({ anchor: { year: 2026, month: 8, day: 20 } }),
+    });
+    const today = document.querySelector(".agenda-stepper-today");
+    expect(today?.textContent).toBe("Hoje");
+    expect(today?.getAttribute("href")).toBe("/pt-BR/app/calendar?date=2026-08-15");
+  });
+
+  it("says a single day is today in the caption, and does not draw its heading twice", () => {
+    view();
+    expect(document.querySelector(".calendar-status .calendar-today")?.textContent).toBe("Hoje");
+    expect(document.querySelector(".calendar-day-heading")).toHaveClass("sr-only");
+  });
+
+  it("lays a row out as time, words, one caption, and the dates as its one verb", () => {
+    render(
+      <CalendarView
+        dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+        locale="pt-BR"
+        projection={projection({ days: [{ date: "2026-08-15", isToday: true, items: [
+          item({ elapsed: true, reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } }),
+        ] }] })}
+        query={query()}
+        rescheduleAction={vi.fn(async () => idleTaskDetailCommandState)}
+        today={TODAY}
+      />,
+    );
+    const row = document.querySelector(".calendar-item") as HTMLElement;
+    expect(Array.from(row.children).map((child) => child.className)).toEqual([
+      "calendar-item-time", "calendar-item-main", "calendar-reschedule",
+    ]);
+    expect(row.querySelector(".calendar-item-time")?.textContent).toBe("15:00");
+    // The words are the row's link; the caption follows them.
+    const main = row.querySelector(".calendar-item-main") as HTMLElement;
+    expect(main.firstElementChild).toHaveClass("calendar-item-body");
+    expect(main.querySelector(".calendar-item-body a")?.getAttribute("href")).toBe("/pt-BR/app/work/t1");
+    expect(main.querySelector(".calendar-item-meta")?.textContent).toContain("Já passou");
+    expect(row.querySelectorAll("summary")).toHaveLength(1);
+  });
+
+  it("lists only the days that hold something, and today either way", () => {
+    view({
+      projection: projection({ days: fortnight({ "2026-08-18": [item({ id: "deadline:t9", date: "2026-08-18" })] }) }),
+      query: query({ orientation: "agenda" }),
+    });
+    const days = Array.from(document.querySelectorAll(".calendar-days > .calendar-day"));
+    expect(days).toHaveLength(2);
+    expect(days[0].getAttribute("data-today")).toBe("true");
+    expect(days[0].getAttribute("data-empty")).toBe("true");
+    expect(within(days[0] as HTMLElement).getByText("Nada marcado")).toBeTruthy();
+    expect(days[1].querySelector(".calendar-day-heading")?.textContent).toBe("terça-feira, 18 de agosto");
+  });
+
+  it("says an empty fortnight is empty once, not fourteen times", () => {
+    view({ projection: projection({ days: fortnight() }), query: query({ orientation: "agenda" }) });
+    expect(document.querySelectorAll(".calendar-empty")).toHaveLength(1);
+    expect(screen.getByText("Nada marcado para este período.")).toBeTruthy();
+  });
+
+  it("draws a month cell's items as compact lines, with their dates one tap away in the day", () => {
+    const first = { year: 2026, month: 7, day: 27 };
+    const days = Array.from({ length: 42 }, (_unused, index) => {
+      const date = addLocalDays(first, index);
+      const key = formatLocalDate(date);
+      return {
+        date: key, isToday: key === "2026-08-15", inPeriod: date.month === 8,
+        items: key === "2026-08-15" ? [item({ reschedule: { taskId: "t1", controls: schedulingControlsFor("todo") } })] : [],
+      };
+    });
+    render(
+      <CalendarView
+        dateBounds={{ min: "2024-08-15", max: "2028-08-15" }}
+        locale="pt-BR"
+        projection={projection({ days })}
+        query={query({ orientation: "month" })}
+        rescheduleAction={vi.fn(async () => idleTaskDetailCommandState)}
+        today={TODAY}
+      />,
+    );
+    const grid = document.querySelector("table.calendar-month") as HTMLElement;
+    expect(grid.querySelector(".calendar-item")).toHaveAttribute("data-density", "compact");
+    expect(grid.querySelector("details, form, input")).toBeNull();
+    // The phone's list of the same month keeps the row and its verb.
+    expect(document.querySelector(".calendar-month-list details.calendar-reschedule")).toBeTruthy();
   });
 });

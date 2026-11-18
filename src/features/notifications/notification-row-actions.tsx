@@ -93,9 +93,16 @@ export function NotificationVerbs({
   timeZone,
   handlers,
   collapsed = false,
+  iconTrigger = collapsed,
 }: {
   row: NotificationRowView;
   locale: Locale;
+  /**
+   * Editorial calmo (ADR-180) — the Avisos row draws the menu's trigger as "⋯"
+   * beside a visible primary verb too, so a long verb and the trigger share one
+   * line on a phone. Where it is drawn only; the trigger keeps its name.
+   */
+  iconTrigger?: boolean;
   /**
    * Life Brain A.5 — the history page's row keeps ONE visible control ("Abrir"
    * when there is a destination), so its verbs sit behind a "⋯" with the
@@ -120,6 +127,7 @@ export function NotificationVerbs({
       menuVerbs={row.menuVerbs}
       notificationId={row.notification.id}
       collapsed={collapsed}
+      iconTrigger={iconTrigger}
       primaryVerb={row.primaryVerb}
       subject={row.subject}
       subjectLabel={row.subjectLabel}
@@ -170,10 +178,13 @@ export function NotificationRowActions({
   detailAction,
   undoAction,
   collapsed = false,
+  iconTrigger = collapsed,
 }: {
   locale: Locale;
   /** Primary verb drawn as the menu's first item, trigger as "⋯" (see `NotificationVerbs`). */
   collapsed?: boolean;
+  /** The trigger as "⋯" whether or not the primary verb is in the menu. */
+  iconTrigger?: boolean;
   /** The owner's zone (`LDC-DAILY-001`). Required, never defaulted. */
   timeZone: string;
   notificationId: string;
@@ -600,13 +611,13 @@ export function NotificationRowActions({
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
             aria-label={copy.menuLabel(subjectLabel)}
-            className={collapsed ? "row-action notification-menu-trigger notification-menu-trigger--icon" : "row-action notification-menu-trigger"}
+            className={iconTrigger ? "row-action notification-menu-trigger notification-menu-trigger--icon" : "row-action notification-menu-trigger"}
             disabled={pending}
             onClick={() => setMenuOpen((open) => !open)}
             ref={menuTrigger}
             type="button"
           >
-            {collapsed ? <MoreHorizontal aria-hidden="true" size={18} /> : copy.menuTrigger}
+            {iconTrigger ? <MoreHorizontal aria-hidden="true" size={18} /> : copy.menuTrigger}
           </button>
           {isMenuOpen ? (
             <ul

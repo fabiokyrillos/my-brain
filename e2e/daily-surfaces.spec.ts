@@ -174,28 +174,29 @@ function controlMarkup(options: { action: string; label: string; kind: "date" | 
 /**
  * One planner row, mirroring `src/features/planning/planner-view.tsx`.
  *
- * Life Brain D.1: a pool row (`selectable`) has its checkbox inside a 44px
- * label, no meta line (the pool is the tasks with no day) and one preset button;
- * a planned row has the meta line and one button that takes it off the day.
+ * ADR-180: **seleção · tarefa · um verbo**, at every width. A pool row
+ * (`selectable`) has its checkbox inside a 44px label; the title is the link to
+ * the task; under it one caption — the deadline, and anything on this task
+ * worth noticing; the row ends in one short verb.
  */
 function plannerRow(options: { locale: Locale; masked?: boolean; selectable?: boolean }): string {
   const body = options.masked
     ? '<span class="protected-content"><button type="button" class="row-action">Mostrar</button></span>'
-    : '<a href="/pt-BR/app/work/t1">Entregar o relatório</a>';
+    : '<a class="planner-item-link" href="/pt-BR/app/work/t1">Revisar o contrato da Aurora Participações antes da reunião de quinta 5030</a>';
   const pool = options.selectable !== false;
   return `<li class="planner-item" data-operation="${pool ? "set" : "cleared"}">
+    ${pool ? '<label class="planner-select-label"><input aria-label="Entregar o relatório" class="planner-select" type="checkbox" /></label>' : ""}
     <div class="planner-item-head">
-      ${pool ? '<label class="planner-select-label"><input aria-label="Entregar o relatório" class="planner-select" type="checkbox" /></label>' : ""}
-      <span class="planner-item-title">${options.masked ? body : "Revisar o contrato da Aurora Participações antes da reunião de quinta 5030"}</span>
+      <span class="planner-item-title">${body}</span>
+      ${pool ? "" : '<p class="planner-item-meta"><span>Prazo: 11 de ago. de 2026</span><span class="planner-item-noted">A intenção é para depois do prazo da tarefa.</span></p>'}
     </div>
-    ${pool ? "" : '<p class="planner-item-meta">Planejado para 11 de ago. de 2026</p>'}
     <div class="planner-item-controls">
       <div class="task-detail-controls task-detail-controls-inline task-detail-controls-preset">
         <ul class="task-control-list">
           <li class="task-control">
             <form>
               ${pool ? '<input type="hidden" name="value" value="2026-08-11" />' : ""}
-              <button class="row-action" type="submit">${pool ? "Planejar para este dia" : "Tirar deste dia"}</button>
+              <button class="row-action" type="submit">${pool ? "Planejar" : "Tirar"}</button>
             </form>
           </li>
         </ul>
@@ -242,52 +243,62 @@ function shell(locale: Locale, body: string): string {
   <style>${FONT_STUB}${css}</style></head><body><main>${body}</main></body></html>`;
 }
 
-/** The planner, mirroring the page `PlannerView` renders. */
+/**
+ * The planner, mirroring the page `PlannerView` renders (ADR-180): the Agenda's
+ * masthead with the day as its subject and one line saying what the page asks;
+ * what needs a look; the lists; and the account of the page behind one closed
+ * line at its foot.
+ */
 function plannerPage(locale: Locale, rows: string[]): string {
   const copy = COPY[locale];
   return shell(locale, `<div class="content-page planner-page">
-    <header class="ui-page-header ui-page-header--compact agenda-header">
-      <div class="ui-page-header__text"><h1 class="ui-page-header__title"><span>${copy.plannerTitle}</span></h1></div>
-      <div class="ui-page-header__actions">
-        <nav aria-label="Navegar pelas datas" class="agenda-stepper planner-day-nav">
-          <a aria-label="Dia anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-10" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
-          <details class="agenda-date-picker">
-            <summary aria-label="ter., 11 ago.. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>ter., 11 ago.</span></summary>
-            <div aria-label="Escolher uma data" class="agenda-date-panel" role="group"></div>
-          </details>
-          <span aria-live="polite" class="sr-only">ter., 11 ago.</span>
-          <a aria-label="Próximo dia" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-12" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
-          <a class="ui-button ui-button--secondary ui-button--sm" href="?"><span class="ui-button__label">Hoje</span></a>
+    <header class="agenda-masthead">
+      <div class="agenda-masthead-top">
+        <h1 class="agenda-masthead-title"><span>${copy.plannerTitle}</span></h1>
+        <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
+          <a class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
+          <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
+          <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
         </nav>
       </div>
+      <nav aria-label="Navegar pelas datas" class="agenda-stepper planner-day-nav">
+        <details class="agenda-date-picker">
+          <summary aria-label="ter., 11 de agosto. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>ter., 11 de agosto</span></summary>
+          <div aria-label="Escolher uma data" class="agenda-date-panel" role="group"></div>
+        </details>
+        <span aria-live="polite" class="sr-only">ter., 11 de agosto</span>
+        <div class="agenda-stepper-caption"><p class="planner-lede"><span>Escolha o que você pretende fazer neste dia.</span></p></div>
+        <a aria-label="Dia anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-10" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
+        <a aria-label="Próximo dia" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=2026-08-12" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
+        <a class="ui-button ui-button--ghost ui-button--sm agenda-stepper-today" href="?"><span class="ui-button__label">Hoje</span></a>
+      </nav>
     </header>
-    <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
-      <a class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
-      <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
-      <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
-    </nav>
-    <p class="planner-meaning">Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete.</p>
-    <p class="quiet-state planner-guarantee">Nada é criado aqui.</p>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
-    <div class="planner-orientation">
-      <section aria-label="Capacidade" class="planner-capacity">
-        <h2>Capacidade</h2>
-        <p class="planner-capacity-count">1 item planejado</p>
-        <p class="quiet-state">Nenhuma duração é conhecida.</p>
-        <p class="planner-overloaded" role="status">Este dia parece cheio.</p>
-      </section>
-      <section aria-label="Conflitos" class="planner-conflicts" data-has-conflicts="true">
-        <h2>Conflitos</h2>
-        <p class="planner-conflict-count">1 conflito neste dia</p>
-        <ul class="planner-conflict-list"><li>Duas tarefas ocupam o mesmo horário.</li></ul>
-        <p class="quiet-state">Nada foi resolvido por conta disso.</p>
-      </section>
-    </div>
-    <section aria-label="Planejado" class="planner-list">
-      <h2>Planejado</h2>
-      <p class="quiet-state planner-list-hint">Tarefas em aberto que ainda não têm um dia escolhido.</p>
-      ${rows.length === 0 ? `<p class="quiet-state">${copy.plannedEmpty}</p>` : `<ul>${rows.join("")}</ul>`}
+    <p class="planner-overloaded" role="status">Este dia parece cheio.</p>
+    <section aria-label="Conflitos" class="planner-conflicts" data-has-conflicts="true">
+      <h2>Conflitos</h2>
+      <p class="planner-conflict-count">1 conflito neste dia</p>
+      <ul class="planner-conflict-list"><li>Duas tarefas ocupam o mesmo horário.</li></ul>
+      <p class="quiet-state">Nada foi resolvido por conta disso.</p>
     </section>
+    <section aria-label="Planejado" class="planner-list">
+      <h2><span>Planejado</span><span class="planner-list-count">${rows.length}</span></h2>
+      ${rows.length === 0 ? `<p class="quiet-state">${copy.plannedEmpty}</p>` : `<ul>${rows.join("")}</ul>
+      <div class="work-bulk-select-all planner-select-all"><button class="row-action" type="button">Selecionar as que estão nesta página</button></div>`}
+    </section>
+    <details class="planner-about">
+      <summary class="planner-about-summary">Como o planejamento funciona</summary>
+      <div class="planner-about-body">
+        <p class="planner-meaning">Planejar é escolher o dia em que você pretende fazer uma tarefa. Não muda o prazo nem cria lembrete.</p>
+        <p class="quiet-state planner-guarantee">Nada é criado aqui.</p>
+        <p class="quiet-state planner-list-hint">Tarefas em aberto que ainda não têm um dia escolhido.</p>
+        <section aria-label="Capacidade" class="planner-capacity">
+          <h2>Capacidade</h2>
+          <p class="planner-capacity-count">1 item planejado</p>
+          <p class="quiet-state">Nenhuma duração é conhecida.</p>
+        </section>
+      </div>
+    </details>
   </div>`);
 }
 
@@ -540,13 +551,13 @@ function notificationPage(locale: Locale, state: PushState = "granted"): string 
       <p class="notification-inapp-note">As notificações com conteúdo continuam nesta página.</p>
     </section>
     <section class="notification-history">
-      <h2>${copy.notifyHistoryHeading}</h2>
+      <h2 class="sr-only">${copy.notifyHistoryHeading}</h2>
+      <div class="notification-group-head"><p class="notification-unread-summary" role="status">1 aviso não lido.</p></div>
       <ul class="notification-list">
         <li class="notification-item" data-status="unread">
-          <span aria-hidden="true" class="notification-item-dot"></span>
-          <div class="notification-item-main"><p class="notification-item-title">Um lembrete</p>
-            <p class="notification-item-meta"><span class="notification-status-badge" data-status="unread">Não lida</span><span class="notification-item-time">11 de ago. de 2026, 14:00</span><span class="notification-item-body">Corpo do lembrete.</span></p></div>
-          <div class="notification-item-trailing"></div>
+          <div class="notification-item-main"><p class="notification-item-subject">Corpo do lembrete.</p>
+            <p class="notification-item-meta"><span class="notification-item-kind">Um lembrete</span><span class="notification-item-time">11 de ago. de 2026, 14:00</span><span class="notification-status-badge" data-status="unread">Não lida</span></p></div>
+          <div class="notification-item-verbs"></div>
         </li>
       </ul>
     </section>
@@ -833,7 +844,9 @@ test.describe("2M-ACCESS-004: every state change is announced", () => {
 
   test("the planner's overload is a status rather than a colour", async ({ page }) => {
     await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
-    await expect(page.locator('.planner-capacity [role="status"]')).toBeVisible();
+    // ADR-180: stated before the lists, outside the page's closed account.
+    await expect(page.locator('.planner-overloaded[role="status"]')).toBeVisible();
+    expect(await page.locator(".planner-overloaded").evaluate((node) => node.closest("details"))).toBeNull();
   });
 });
 
@@ -1001,39 +1014,41 @@ test.describe("2M-REVIEW-003: what the surface proposes, and what it leaves to t
 });
 
 /**
- * The planner, recomposed — `03-componentes.md`.
+ * The planner, recomposed (ADR-180).
  *
- * Capacity and conflicts read as one orientation band above the work, and the
- * rows have a fixed grammar (**seleção · tarefa · quando · o que fazer**)
- * instead of three stacked blocks each.
+ * What needs a look comes before the work; the account of the page comes after
+ * it, closed; and a row has one grammar at every width — **seleção · tarefa ·
+ * um verbo** — instead of stacking on a phone.
  */
-test.describe("the planner orients before it lists", () => {
-  test("capacity and conflicts sit side by side above the first task", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+test.describe("the planner puts the work between what to notice and how it works", () => {
+  test("a conflict sits above the first task and the account below the last, closed", async ({ page }) => {
+    for (const width of [375, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
 
-    const [capacity, conflicts, firstRow] = await Promise.all([
-      page.locator(".planner-capacity").boundingBox(),
-      page.locator(".planner-conflicts").boundingBox(),
-      page.locator(".planner-item").first().boundingBox(),
-    ]);
-    // Side by side, not stacked: same top, different left.
-    expect(capacity!.y).toBeCloseTo(conflicts!.y, 0);
-    expect(capacity!.x).toBeLessThan(conflicts!.x);
-    // And both above the work they describe.
-    expect(conflicts!.y + conflicts!.height).toBeLessThanOrEqual(firstRow!.y + 1);
+      const [conflicts, firstRow, about] = await Promise.all([
+        page.locator(".planner-conflicts").boundingBox(),
+        page.locator(".planner-item").first().boundingBox(),
+        page.locator(".planner-about").boundingBox(),
+      ]);
+      expect(conflicts!.y + conflicts!.height, `conflict above the work at ${width}`).toBeLessThanOrEqual(firstRow!.y + 1);
+      expect(about!.y, `account below the work at ${width}`).toBeGreaterThanOrEqual(firstRow!.y + firstRow!.height - 1);
+      await expect(page.locator(".planner-about")).not.toHaveAttribute("open", /.*/);
+      await expect(page.locator(".planner-capacity")).toBeHidden();
+    }
   });
 
-  test("stacks the band on a phone rather than halving two columns", async ({ page }) => {
+  test("the account opens by keyboard and shows the capacity with its assumption", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
-
-    const [capacity, conflicts] = await Promise.all([
-      page.locator(".planner-capacity").boundingBox(),
-      page.locator(".planner-conflicts").boundingBox(),
-    ]);
-    expect(capacity!.x).toBeCloseTo(conflicts!.x, 0);
-    expect(capacity!.y).toBeLessThan(conflicts!.y);
+    const summary = page.locator(".planner-about-summary");
+    const box = await summary.boundingBox();
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    await summary.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".planner-capacity-count")).toBeVisible();
+    await expect(page.locator(".planner-capacity .quiet-state")).toBeVisible();
+    await noHorizontalScroll(page);
   });
 
   /*
@@ -1053,27 +1068,53 @@ test.describe("the planner orients before it lists", () => {
     expect(parseFloat(rule)).toBeGreaterThan(0);
   });
 
-  test("a row reads as columns on a desktop and as a stack on a phone", async ({ page }) => {
-    // A planned row: the pool's rows carry no meta line since Life Brain D.1.
+  test("a row keeps one grammar on a phone and on a desktop: the caption under the title, the verb at the end", async ({ page }) => {
     const body = plannerPage("pt-BR", [plannerRow({ locale: "pt-BR", selectable: false })]);
+    for (const width of [320, 375, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await open(page, body);
+      const [title, meta, verb, row] = await Promise.all([
+        page.locator(".planner-item-title").boundingBox(),
+        page.locator(".planner-item-meta").boundingBox(),
+        page.locator(".planner-item button.row-action").boundingBox(),
+        page.locator(".planner-item").boundingBox(),
+      ]);
+      expect(meta!.y, `caption under the title at ${width}`).toBeGreaterThanOrEqual(title!.y + title!.height - 12);
+      expect(Math.abs(meta!.x - title!.x), `caption on the title's edge at ${width}`).toBeLessThanOrEqual(1);
+      expect(verb!.x, `verb after the title at ${width}`).toBeGreaterThanOrEqual(title!.x + title!.width - 1);
+      expect(verb!.y, `verb inside the row at ${width}`).toBeGreaterThanOrEqual(row!.y - 1);
+      expect(verb!.y + verb!.height, `verb inside the row at ${width}`).toBeLessThanOrEqual(row!.y + row!.height + 1);
+      expect(verb!.height, `verb target at ${width}`).toBeGreaterThanOrEqual(44);
+      await noHorizontalScroll(page);
+    }
+  });
 
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await open(page, body);
-    let head = await page.locator(".planner-item-head").boundingBox();
-    let meta = await page.locator(".planner-item-meta").boundingBox();
-    // Life Brain D.1: the tracks are centred on one line, so the parts share a
-    // centre rather than a top edge.
-    expect(Math.abs((head!.y + head!.height / 2) - (meta!.y + meta!.height / 2))).toBeLessThanOrEqual(2);
-    expect(head!.x).toBeLessThan(meta!.x);
+  test("what a task is noticed for is said on its row, in words and in the attention tone", async ({ page }) => {
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR", selectable: false })]));
+    const noted = page.locator(".planner-item-noted");
+    await expect(noted).toHaveText("A intenção é para depois do prazo da tarefa.");
+    const colours = await page.evaluate(() => ({
+      noted: getComputedStyle(document.querySelector(".planner-item-noted")!).color,
+      caption: getComputedStyle(document.querySelector(".planner-item-meta")!).color,
+    }));
+    expect(colours.noted).not.toBe(colours.caption);
+  });
 
-    await page.setViewportSize({ width: 375, height: 800 });
-    await open(page, body);
-    head = await page.locator(".planner-item-head").boundingBox();
-    meta = await page.locator(".planner-item-meta").boundingBox();
-    expect(head!.y).toBeLessThan(meta!.y);
-    const overflow = await page.evaluate(() =>
-      document.documentElement.scrollWidth - document.documentElement.clientWidth);
-    expect(overflow).toBeLessThanOrEqual(1);
+  test("a section is a heading over a hairline, with its count", async ({ page }) => {
+    await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+    const heading = page.locator(".planner-list > h2");
+    await expect(heading.locator(".planner-list-count")).toHaveText("1");
+    const rule = await heading.evaluate((node) => getComputedStyle(node).borderBottomWidth);
+    expect(parseFloat(rule)).toBeGreaterThan(0);
+    const row = await page.locator(".planner-item").evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { top: style.borderTopWidth, left: style.borderLeftWidth, radius: style.borderTopLeftRadius, background: style.backgroundColor };
+    });
+    // A row between hairlines, not a card.
+    expect(parseFloat(row.top)).toBe(0);
+    expect(parseFloat(row.left)).toBe(0);
+    expect(parseFloat(row.radius)).toBe(0);
+    expect(row.background).toBe("rgba(0, 0, 0, 0)");
   });
 });
 
@@ -1113,7 +1154,7 @@ test.describe("Life Brain D.1: Planejar is aligned, plain and one tap per row", 
   test("a row's action is one button with no card around it", async ({ page }) => {
     await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
     await expect(page.locator(".planner-item input[type='date']")).toHaveCount(0);
-    await expect(page.locator(".planner-item button.row-action")).toHaveText("Planejar para este dia");
+    await expect(page.locator(".planner-item button.row-action")).toHaveText("Planejar");
     const frames = await page.locator(".planner-item .task-detail-controls, .planner-item .task-control form").evaluateAll((nodes) =>
       nodes.map((node) => getComputedStyle(node).borderTopWidth));
     expect(frames.every((width) => parseFloat(width) === 0)).toBe(true);
@@ -1121,6 +1162,15 @@ test.describe("Life Brain D.1: Planejar is aligned, plain and one tap per row", 
 
   test("what planned means is said before the counts", async ({ page }) => {
     await open(page, plannerPage("pt-BR", [plannerRow({ locale: "pt-BR" })]));
+    // ADR-180: what the page asks is the line under the day; the longer
+    // sentence opens the page's account, still ahead of the counts.
+    await expect(page.locator(".planner-lede")).toBeVisible();
+    const [lede, firstRow] = await Promise.all([
+      page.locator(".planner-lede").boundingBox(),
+      page.locator(".planner-item").first().boundingBox(),
+    ]);
+    expect(lede!.y).toBeLessThan(firstRow!.y);
+    await page.locator(".planner-about-summary").click();
     const [meaning, capacity] = await Promise.all([
       page.locator(".planner-meaning").boundingBox(),
       page.locator(".planner-capacity").boundingBox(),

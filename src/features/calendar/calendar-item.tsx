@@ -17,11 +17,14 @@
  *
  * `2M-ACCESS-005` forbids colour as the only carrier of the
  * committed-versus-suggested distinction, of a conflict, or of a lane. So each
- * item states its lane and its commitment **in text** — visible text, not only
- * an `aria-label`, because a sighted user with a colour-vision difference reads
+ * item states what kind of thing it is **in text** — visible text, not only an
+ * `aria-label`, because a sighted user with a colour-vision difference reads
  * the same screen as everyone else and an invisible label helps only a screen
- * reader. The colour is decoration on top of a distinction that already exists
- * without it.
+ * reader. Every kind is a different word ("Prazo", "Intenção", "Data
+ * sugerida"), so the word alone tells a commitment from an intention from a
+ * suggestion; the commitment it implies is said beside it for a screen reader
+ * (ADR-180). Whatever colour or shape is added is decoration on top of a
+ * distinction that already exists without it.
  */
 
 import { ProtectedContent } from "@/features/operations/protected-content";
@@ -89,85 +92,114 @@ export function CalendarItem({
   const time = item.span?.allDay ? copy.item.allDay : formatTime(item.at, locale, timezone);
 
   const compact = density === "compact";
+  /*
+   * The words, once, for both densities — still the only place they reach the
+   * DOM, and still through `ProtectedContent` (`2M-PRIVACY-001`/`-005`).
+   */
+  const words = item.title === null ? (
+    /*
+     * The two lanes with no user text. `null` means *there is nothing to
+     * render* and never *there is something and we are hiding it* — the
+     * second is what a masked title says, and conflating them would make
+     * the mask meaningless. So this renders the lane's own description
+     * and links out; it does not mount `ProtectedContent`, because there
+     * is nothing to protect.
+     */
+    item.href ? (
+      <a className="calendar-item-link" href={item.href}>
+        {copy.lanes.descriptions[item.lane]}
+      </a>
+    ) : (
+      <span>{copy.lanes.descriptions[item.lane]}</span>
+    )
+  ) : (
+    <ProtectedContent
+      href={item.href ?? undefined}
+      locale={locale}
+      revealKey={item.id}
+      sensitivity={item.sensitivity}
+      surface="calendar"
+    >
+      {item.href ? (
+        <a className="calendar-item-link" href={item.href}>{item.title}</a>
+      ) : (
+        <span>{item.title}</span>
+      )}
+    </ProtectedContent>
+  );
+
+  if (compact) {
+    return (
+      <li
+        className="calendar-item"
+        data-density="compact"
+        data-lane={item.lane}
+        data-commitment={item.commitment}
+        data-elapsed={item.elapsed ? "true" : "false"}
+      >
+        <span className="calendar-item-meta">
+          {/* Text, not only colour: 2M-ACCESS-005. */}
+          <time className="calendar-item-time" dateTime={item.at}>{time}</time>
+          <span className="calendar-item-lane">{laneName}</span>
+          <span className="sr-only">{commitment}</span>
+        </span>
+        <span className="calendar-item-body">{words}</span>
+      </li>
+    );
+  }
+
+  /*
+   * ADR-180 — the row: **when · what · one caption · one verb**.
+   *
+   * The time sits in a column of its own, in tabular figures, so a day is read
+   * down its left edge. The title is the owner's words, in the reading face,
+   * and it is the row's link. Under it, one caption: what kind of thing this is
+   * and, only when true, that it has passed, that it repeats, and when its own
+   * reminder fires. The one verb a row can have — its dates — waits at the end.
+   *
+   * The kind is a word and each kind is a different word (`2M-ACCESS-005`); the
+   * commitment it implies is said to a screen reader beside it rather than
+   * printed twice ("Intenção · Intenção"), as the week's compact line has done
+   * since Life Brain D.1.
+   */
   return (
     <li
       className="calendar-item"
-      data-density={compact ? "compact" : undefined}
       data-lane={item.lane}
       data-commitment={item.commitment}
       data-elapsed={item.elapsed ? "true" : "false"}
     >
-      <span className="calendar-item-meta">
-        {/* Text, not only colour: 2M-ACCESS-005. */}
-        {compact ? (
-          <>
-            <time className="calendar-item-time" dateTime={item.at}>{time}</time>
-            <span className="calendar-item-lane">{laneName}</span>
-            <span className="sr-only">{commitment}</span>
-          </>
-        ) : (
-          <>
-            <span className="calendar-item-lane">{laneName}</span>
-            <span className="calendar-item-commitment">{commitment}</span>
-            <time className="calendar-item-time" dateTime={item.at}>{time}</time>
-          </>
-        )}
-        {item.elapsed && !compact ? <span className="calendar-item-elapsed">{copy.item.elapsed}</span> : null}
-        {/*
-          `2R-SURFACE-003`, slice 2R.3 — that it repeats, and how.
-
-          Text rather than an icon, for the reason the line above this one gives:
-          a mark carrying meaning only in its shape is a mark half the readers do
-          not get. The sentence arrives already built by the reminders feature's
-          one formatter, so this surface and the reminders list cannot phrase the
-          same rule differently.
-        */}
-        {item.repeats === null || compact ? null : (
-          <span className="calendar-item-repeats">{item.repeats}</span>
-        )}
-        {/*
-          Life Brain A.4: the task's own reminder, said on its line rather than
-          listed as a second line for the same task. Time only — the title is
-          the line's, under the line's classification.
-        */}
-        {item.joinedReminders.length === 0 || compact ? null : (
-          <span className="calendar-item-repeats" data-joined-reminder="true">
-            {copy.item.joinedReminder(item.joinedReminders.map((reminder) => formatTime(reminder.at, locale, timezone)).join(", "))}
+      <time className="calendar-item-time" dateTime={item.at}>{time}</time>
+      <span className="calendar-item-main">
+        <span className="calendar-item-body">{words}</span>
+        <span className="calendar-item-meta">
+          <span className="calendar-item-lane">
+            {copy.kinds[item.lane]}
+            <span className="sr-only calendar-item-commitment">{`, ${commitment}`}</span>
           </span>
-        )}
-      </span>
-      <span className="calendar-item-body">
-        {item.title === null ? (
-          /*
-           * The two lanes with no user text. `null` means *there is nothing to
-           * render* and never *there is something and we are hiding it* — the
-           * second is what a masked title says, and conflating them would make
-           * the mask meaningless. So this renders the lane's own description
-           * and links out; it does not mount `ProtectedContent`, because there
-           * is nothing to protect.
-           */
-          item.href ? (
-            <a className="calendar-item-link" href={item.href}>
-              {copy.lanes.descriptions[item.lane]}
-            </a>
-          ) : (
-            <span>{copy.lanes.descriptions[item.lane]}</span>
-          )
-        ) : (
-          <ProtectedContent
-            href={item.href ?? undefined}
-            locale={locale}
-            revealKey={item.id}
-            sensitivity={item.sensitivity}
-            surface="calendar"
-          >
-            {item.href ? (
-              <a className="calendar-item-link" href={item.href}>{item.title}</a>
-            ) : (
-              <span>{item.title}</span>
-            )}
-          </ProtectedContent>
-        )}
+          {item.elapsed ? <span className="calendar-item-elapsed">{copy.item.elapsed}</span> : null}
+          {/*
+            `2R-SURFACE-003`, slice 2R.3 — that it repeats, and how.
+
+            Text rather than an icon: a mark carrying meaning only in its shape
+            is a mark half the readers do not get. The sentence arrives already
+            built by the reminders feature's one formatter, so this surface and
+            the reminders list cannot phrase the same rule differently.
+          */}
+          {item.repeats === null ? null : (
+            <span className="calendar-item-repeats">{item.repeats}</span>
+          )}
+          {/*
+            Life Brain A.4: the task's own reminder, said on its line rather than
+            listed as a second line for the same task. Time only — the title is
+            the line's, under the line's classification.
+          */}
+          {item.joinedReminders.length === 0 ? null : (
+            <span className="calendar-item-repeats" data-joined-reminder="true">
+              {copy.item.joinedReminder(item.joinedReminders.map((reminder) => formatTime(reminder.at, locale, timezone)).join(", "))}
+            </span>
+          )}
+        </span>
       </span>
       {/*
         `2M-CAL-009`/`-010`. Rendered **beside** the title rather than inside
@@ -178,7 +210,7 @@ export function CalendarItem({
         caller is choosing. Hiding them behind the reveal would make the mask a
         capability gate, which is not what `2M-PRIVACY-001` asks for.
       */}
-      {!compact && item.reschedule && rescheduleAction && dateBounds ? (
+      {item.reschedule && rescheduleAction && dateBounds ? (
         <CalendarReschedule
           action={rescheduleAction}
           dateBounds={dateBounds}

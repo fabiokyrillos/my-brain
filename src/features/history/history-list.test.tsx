@@ -9,7 +9,8 @@ import type { Locale } from "@/lib/preferences";
 afterEach(cleanup);
 
 const formatDate = (iso: string) => `[${iso.slice(0, 10)}]`;
-const formatDateTime = (iso: string) => `[${iso}]`;
+const formatDay = (iso: string) => `dia ${iso.slice(0, 10)}`;
+const formatTime = (iso: string) => `[${iso.slice(11, 16)}]`;
 
 function row(overrides: Partial<HistoryEventRow> = {}): HistoryEventRow {
   return {
@@ -37,7 +38,7 @@ function renderList(
     describeHistoryEvent(item.row, item.subject, copy, formatDate),
   );
   return render(
-    <HistoryList copy={copy} events={events} formatDateTime={formatDateTime} locale={locale} />,
+    <HistoryList copy={copy} events={events} formatDateTime={formatTime} formatDay={formatDay} locale={locale} />,
   );
 }
 
@@ -82,12 +83,63 @@ describe("HistoryList", () => {
     expect(within(changes as HTMLElement).getByText("Alta")).toBeInTheDocument();
   });
 
-  it("links a subject that still exists", () => {
+  it("makes the whole row the link to a subject that still exists", () => {
     renderList([{ row: row(), subject: { found: true, label: "Preparar relatório" } }]);
-    expect(screen.getByRole("link", { name: "Abrir" })).toHaveAttribute(
-      "href",
-      "/pt-BR/app/work/task-1",
+    const link = screen.getByRole("link");
+    expect(link).toHaveAttribute("href", "/pt-BR/app/work/task-1");
+    // The row, not a button under it: the sentence and its caption are inside.
+    expect(within(link).getByText("Você atualizou a tarefa “Preparar relatório”")).toBeInTheDocument();
+    expect(link.querySelector("time")).not.toBeNull();
+    expect(link.closest("li")?.querySelectorAll("a")).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Abrir" })).toBeNull();
+  });
+
+  it("groups consecutive events under the day they happened on, said once", () => {
+    renderList([
+      { row: row({ id: "a", occurredAt: "2026-07-30T18:00:00.000Z" }), subject: { found: true, label: "Um" } },
+      { row: row({ id: "b", occurredAt: "2026-07-30T09:00:00.000Z" }), subject: { found: true, label: "Dois" } },
+      { row: row({ id: "c", occurredAt: "2026-07-29T21:00:00.000Z" }), subject: { found: true, label: "Três" } },
+    ]);
+
+    const headings = screen.getAllByRole("heading", { level: 2 });
+    expect(headings.map((heading) => heading.textContent)).toEqual(["dia 2026-07-30", "dia 2026-07-29"]);
+    const first = screen.getByRole("region", { name: "dia 2026-07-30" });
+    expect(within(first).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(screen.getByRole("region", { name: "dia 2026-07-29" })).getAllByRole("listitem")).toHaveLength(1);
+    // The row carries the hour; the day is the heading's.
+    expect(within(first).getByText("[18:00]")).toBeInTheDocument();
+    expect(first.querySelector("ol")?.textContent).not.toContain("2026-07-30");
+    // Order is the caller's: nothing is re-sorted.
+    expect([...document.querySelectorAll(".history-sentence")].map((node) => node.textContent)).toEqual([
+      "Você atualizou a tarefa “Um”",
+      "Você atualizou a tarefa “Dois”",
+      "Você atualizou a tarefa “Três”",
+    ]);
+  });
+
+  it("is one plain list, with no day headings, where the caller groups by nothing", () => {
+    // The entity pages' "O que mudou recentemente": a few changes to one object.
+    const copy = getHistoryCopy("pt-BR", "Brain");
+    const events = ["a", "b"].map((id) =>
+      describeHistoryEvent(row({ id }), { found: true, label: "Um" }, copy, formatDate),
     );
+    const { container } = render(
+      <HistoryList copy={copy} events={events} formatDateTime={(iso) => `em ${iso.slice(0, 10)}`} locale="pt-BR" />,
+    );
+    expect(screen.queryByRole("heading")).toBeNull();
+    expect(container.firstElementChild?.tagName).toBe("OL");
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getAllByText("em 2026-07-30")).toHaveLength(2);
+  });
+
+  it("marks who acted on the row, so what the product did alone can be quieter", () => {
+    renderList([
+      { row: row({ id: "a", actor: "system", actionType: "entry_processing_enqueued", entityType: "entry", entityId: "e-1" }), subject: { found: true, label: "Nota" } },
+      { row: row({ id: "b" }), subject: { found: true, label: "Dois" } },
+    ]);
+    const items = screen.getAllByRole("listitem");
+    expect(items[0]).toHaveAttribute("data-actor", "system");
+    expect(items[1]).toHaveAttribute("data-actor", "user");
   });
 
   it("keeps the event but withholds the link when the subject is gone", () => {
@@ -168,7 +220,7 @@ describe("HistoryList", () => {
     );
 
     expect(screen.getByText("You added the task “Prepare the report” to the list")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open" })).toBeInTheDocument();
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/en/app/work/task-1");
     expect(document.body.textContent).not.toMatch(/Você|tarefa|Abrir/);
   });
 

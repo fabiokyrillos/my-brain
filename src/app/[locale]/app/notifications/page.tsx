@@ -5,7 +5,7 @@ import { AccountDataStrip } from "@/features/account-centre/account-data-strip";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { getNotificationSettingsCopy } from "@/features/notifications/copy";
 import { applyNotificationBulk, undoNotificationBulk } from "@/features/notifications/bulk-actions";
-import { NotificationBulkBar } from "@/features/notifications/notification-bulk-bar";
+import { NotificationBulkBar, NotificationBulkOutcome, NotificationBulkVerb } from "@/features/notifications/notification-bulk-bar";
 import { NotificationHistoryRow } from "@/features/notifications/notification-history-row";
 import { NOTIFICATION_VERB_HANDLERS } from "@/features/notifications/verb-handlers";
 import { projectNotificationRows } from "@/features/notifications/row-projection";
@@ -18,6 +18,12 @@ import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
 import { instantFormatter } from "@/lib/time/instant-format";
 import { getAgentName } from "@/features/profile/agent-identity";
+
+/**
+ * How many read notices stay in view beside unanswered ones. Up to this many,
+ * a disclosure would hide less than its own line costs.
+ */
+const READ_ROWS_SHOWN_BESIDE_UNREAD = 3;
 
 /**
  * `2P-SETTINGS-008` — the page is the history, and only the history.
@@ -52,7 +58,7 @@ import { getAgentName } from "@/features/profile/agent-identity";
  * ## The one link back
  *
  * `2P-SETTINGS-008` allows *at most one discreet contextual entry* to the
- * preferences. There is exactly one, in the header, and it resolves through
+ * preferences. There is exactly one, the page's last line, and it resolves through
  * `settingsSectionHref` so it cannot drift from where the section actually
  * lives.
  *
@@ -107,48 +113,49 @@ export default async function NotificationsPage({ params, searchParams }: { para
   */
   const projected = await projectNotificationRows(supabase, { rows: items, userId: user.id, locale });
 
-  return <div className="content-page">{/*
+  /*
+    Editorial calmo (ADR-180): what the page asks comes first. The notices not
+    yet answered open it, under the sentence that counts them; the ones already
+    read follow, quieter, and fold behind a disclosure once there are more than
+    a few of them beside something still unanswered. Nothing is reordered within
+    a group — each keeps the query's newest-first order.
+  */
+  const unreadRows = projected.filter((row) => row.notification.status === "unread");
+  const readRows = projected.filter((row) => row.notification.status !== "unread");
+  const readFolded = unreadRows.length > 0 && readRows.length > READ_ROWS_SHOWN_BESIDE_UNREAD;
+  const renderRow = (row: (typeof projected)[number]) => <NotificationHistoryRow createdAtLabel={formatCreatedAt(row.notification.created_at)} handlers={NOTIFICATION_VERB_HANDLERS} key={row.notification.id} locale={locale} row={row} timeZone={timezone} />;
+
+  return <div className="content-page notification-page">{/*
     `2O-PREF-002`. Ajustes reaches this page by name, so this page says where it
     came from. It is first, above everything, because a reader who arrived from a
     deep link or from the bell needs the orientation before the content, not
     after it.
-
-    Nothing about the route changes: the pagination, the `?page` deep link and
-    the owner-scoped read are untouched, which is the half of the Dados e IA
-    pattern that matters — no route is redirected and no route ends.
   */}<AccountDataStrip locale={locale} route="notifications" />{/*
-    The page's ONE heading, and the polish pass between slices 2O.6 and 2O.7
-    moved it here.
+    The page's ONE heading (Life Brain A.5: the shared compact header, no
+    eyebrow). The sentence that used to sit under it described the product's
+    restraint, not this page, and was already hidden on a phone; it is gone.
+  */}<PageHeader size="compact" title={copy.pageTitle} />{/*
+    The feed, as a named section. `2M-NOTIFY-008` is why it stays here at all —
+    this is the surface where notification CONTENT lives, behind the login — and
+    the section keeps its pagination, its `?page` deep link and its empty state.
+    Its name is for the outline; the line under it is what a reader sees first.
 
-    It used to sit below `NotificationSettings`, whose own `<h2>Notificações no
-    aparelho</h2>` therefore opened the document at level two — and then the
-    `<h1>Notificações</h1>` arrived in the middle of the page, so the word
-    appeared twice and the second one read as the start of a different page.
-    Slice 2P.5 moved that component to Settings entirely, so the page now opens
-    at level one with nothing above it to compete.
-  */}{/*
-    Life Brain A.5: the shared compact header — no eyebrow, the line under the
-    title hides on a phone. Its action is the one discreet contextual entry
-    `2P-SETTINGS-008` allows, deliberately a link rather than a panel: the
-    controls it points at live in Ajustes.
-  */}<PageHeader actions={<Link className="notification-preferences-link" href={settingsSectionHref(locale, "day")}>{copy.preferencesLink}</Link>} description={copy.pageDescription} size="compact" title={copy.pageTitle} />{/*
-    The feed, as a named section of this page rather than as an unlabelled tail
-    of it. `2M-NOTIFY-008` is why it stays here at all — this is the surface
-    where notification CONTENT lives, behind the login — and the section keeps
-    its pagination, its `?page` deep link and its empty state exactly as they
-    were.
-  */}<section aria-labelledby="notification-history-heading" className="notification-history"><h2 id="notification-history-heading">{copy.historyHeading}</h2>{/*
-    The unread count, announced.
+    `NotificationBulkBar` draws nothing: it is the one action state the two bulk
+    verbs and their undo share (Life Brain D.2), so each verb can sit beside
+    what it acts on. Their offer is decided by the totals, not by this page.
+  */}<NotificationBulkBar applyAction={applyNotificationBulk} locale={locale} readCount={readTotal} undoAction={undoNotificationBulk} unreadCount={unreadTotal}><section aria-labelledby="notification-history-heading" className="notification-history"><h2 className="sr-only" id="notification-history-heading">{copy.historyHeading}</h2>{/*
+    The unread count, announced — and now the page's opening line.
 
-    Before this the only signal was a tint on the row, so a screen-reader user
-    had no way to know an alert was unread and a reader who cannot distinguish
-    the two tints had none either. `role="status"` rather than a bare paragraph
-    because the number changes when a row is marked read, and that change is the
-    confirmation the action gives.
-  */}<p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p><NotificationBulkBar applyAction={applyNotificationBulk} locale={locale} readCount={readTotal} undoAction={undoNotificationBulk} unreadCount={unreadTotal} />{/*
-    Life Brain A.5: each notice is a `NotificationHistoryRow` — two lines and one
-    visible control, the verbs behind a "⋯" (still the projected set, through
-    `NotificationVerbs`), the destination behind the owner-scoped whitelist.
+    `role="status"` rather than a bare paragraph because the number changes when
+    a row is marked read, and that change is the confirmation the action gives
+    (`2P-SETTINGS-008`: the state is a word, never only a tint).
+  */}<div className="notification-group-head"><p className="notification-unread-summary" role="status">{unread > 0 ? copy.unreadSummary(unread) : copy.allReadSummary}</p><NotificationBulkVerb scope="mark_all_read" /></div><NotificationBulkOutcome />{/*
+    Each notice is a `NotificationHistoryRow`: its subject, one caption, the
+    row as the link, and the projected verbs through `NotificationVerbs`.
     `projectNotificationRows` returns one row per notice, in order.
-  */}{projected.length ? <ul className="notification-list">{projected.map((row) => <NotificationHistoryRow createdAtLabel={formatCreatedAt(row.notification.created_at)} handlers={NOTIFICATION_VERB_HANDLERS} key={row.notification.id} locale={locale} row={row} timeZone={timezone} />)}</ul> : <UniversalStateView className="ux-state-quiet" description={copy.emptyBody(agentName)} locale={locale} state="empty" title={copy.emptyTitle} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} /></section></div>;
+  */}{unreadRows.length ? <ul className="notification-list">{unreadRows.map(renderRow)}</ul> : null}{readRows.length ? <details className="notification-read" open={!readFolded}><summary className="notification-read-summary"><span>{copy.readHeading}</span><span className="notification-read-count">{readRows.length}</span></summary><ul className="notification-list">{readRows.map(renderRow)}</ul><NotificationBulkVerb scope="clear_read" /></details> : null}{projected.length ? null : <UniversalStateView className="ux-state-quiet" description={copy.emptyBody(agentName)} locale={locale} state="empty" title={copy.emptyTitle} />}<PaginationLinks locale={locale} path="notifications" page={page} hasNext={hasNext} />{/*
+    `2P-SETTINGS-008` allows at most one discreet contextual entry to the
+    preferences. It is the page's last line: the controls it points at live in
+    Ajustes, and nobody arrives here to change them.
+  */}<p className="notification-page-foot"><Link className="notification-preferences-link" href={settingsSectionHref(locale, "day")}>{copy.preferencesLink}</Link></p></section></NotificationBulkBar></div>;
 }

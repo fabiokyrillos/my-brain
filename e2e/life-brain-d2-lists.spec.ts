@@ -49,24 +49,34 @@ function openMenu(): string {
     `<li aria-hidden="true" class="notification-verb-group-label" role="none">${label}</li>`,
     ...verbs.map((verb, index) => `<li role="none"><button aria-describedby="m-${label}-${index}" class="notification-verb-menu-item" role="menuitem" tabindex="-1" type="button">${verb}</button><span class="notification-verb-meaning sr-only" id="m-${label}-${index}">Explicação longa do que isto muda e do que não muda.</span></li>`),
   ]).join("");
+  // The Avisos row since Editorial calmo (ADR-180): subject, one caption, then
+  // the visible primary verb, the "⋯" and the row's link.
   return `<ul class="notification-list"><li class="notification-item" data-status="unread">`
-    + `<span aria-hidden="true" class="notification-item-dot"></span>`
-    + `<div class="notification-item-main"><p class="notification-item-title">Tarefa sem movimento</p>`
-    + `<p class="notification-item-meta"><span class="notification-status-badge" data-status="unread">Não lida</span><span class="notification-item-time">24 de ago. de 2026, 12:00</span></p></div>`
-    + `<div class="notification-item-trailing"><a class="row-action notification-open-link" href="#">Abrir</a>`
-    + `<div class="notification-row-actions"><div class="notification-verb-menu">`
+    + `<div class="notification-item-main"><p class="notification-item-subject">Renovar o seguro do carro</p>`
+    + `<p class="notification-item-meta"><span class="notification-item-kind">Tarefa sem movimento</span><span class="notification-item-time">24 de ago. de 2026, 12:00</span><span class="notification-status-badge" data-status="unread">Não lida</span></p></div>`
+    + `<div class="notification-item-verbs"><div class="notification-row-actions">`
+    + `<form><button class="row-action notification-primary-action" type="submit">Concluir tarefa</button></form>`
+    + `<div class="notification-verb-menu">`
     + `<button aria-expanded="true" aria-haspopup="menu" class="row-action notification-menu-trigger notification-menu-trigger--icon" type="button">⋯</button>`
-    + `<ul class="notification-verb-menu-list" role="menu">${items}</ul></div></div></div></li></ul>`;
+    + `<ul class="notification-verb-menu-list" role="menu">${items}</ul></div>`
+    + `<p aria-live="polite" class="notification-row-outcome"></p></div></div>`
+    + `<a class="notification-open-link" href="#"><span class="notification-open-label">Abrir</span></a></li></ul>`;
 }
 
+/**
+ * The bulk verbs since Editorial calmo (ADR-180): no bar. "Marcar todos como
+ * lidos" ends the line that counts the unread notices, the outcome and its undo
+ * sit under that line, and "Limpar os lidos" closes the read group.
+ */
 function bulkBar(message = ""): string {
-  return `<div aria-label="Todos os avisos" class="notification-bulk" role="group">`
-    + `<div class="notification-bulk-verbs">`
-    + `<form><button class="ui-button ui-button--secondary ui-button--sm" type="submit"><span class="ui-button__label">Marcar todos como lidos</span></button></form>`
-    + `<form><button class="ui-button ui-button--ghost ui-button--sm" type="submit"><span class="ui-button__label">Limpar os lidos</span></button></form>`
-    + `</div><div class="notification-bulk-outcome"><p aria-live="polite" class="notification-bulk-message" role="status">${message}</p>`
-    + (message ? `<form><button class="ui-button ui-button--ghost ui-button--sm" type="submit"><span class="ui-button__label">Desfazer</span></button></form>` : "")
-    + `</div></div>`;
+  const verb = (label: string) => `<form class="notification-bulk-form"><button class="notification-bulk-verb" type="submit">${label}</button></form>`;
+  return `<section class="notification-history">`
+    + `<div class="notification-group-head"><p class="notification-unread-summary">18 avisos não lidos.</p>${verb("Marcar todos como lidos")}</div>`
+    + `<div aria-label="Todos os avisos" class="notification-bulk-outcome" role="group"><p aria-live="polite" class="notification-bulk-message" role="status">${message}</p>`
+    + (message ? verb("Desfazer") : "")
+    + `</div>`
+    + `<details class="notification-read" open><summary class="notification-read-summary"><span>Já lidos</span><span class="notification-read-count">4</span></summary>${verb("Limpar os lidos")}</details>`
+    + `</section>`;
 }
 
 test.describe("Life Brain D.2: the Memória strip says when it hides tabs", () => {
@@ -134,5 +144,18 @@ test.describe("Life Brain D.2: the bulk verbs", () => {
     const region = page.getByRole("status");
     await expect(region).toHaveCount(1);
     expect(await region.evaluate((node) => getComputedStyle(node).display)).not.toBe("none");
+    expect((await page.locator(".notification-bulk-outcome").boundingBox())!.height).toBeLessThanOrEqual(1);
+  });
+
+  test("each verb is a full touch target beside what it acts on, at 390 and 320", async ({ page }) => {
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.setContent(shell(bulkBar("18 avisos marcados como lidos.")), { waitUntil: "load" });
+      for (const button of await page.getByRole("button").all()) {
+        expect((await button.boundingBox())!.height, `at ${width}`).toBeGreaterThanOrEqual(44);
+      }
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+      expect(overflow, `at ${width}`).toBeLessThanOrEqual(1);
+    }
   });
 });

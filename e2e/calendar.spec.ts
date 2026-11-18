@@ -139,15 +139,17 @@ function itemMarkup(options: {
          </div>
        </details>`;
 
+  // ADR-180 — the row: when · what · one caption · one verb.
   return `<li class="calendar-item" data-lane="${options.lane}" data-commitment="${options.commitment}" data-elapsed="${options.elapsed ? "true" : "false"}">
-    <span class="calendar-item-meta">
-      <span class="calendar-item-lane">${options.lane}</span>
-      <span class="calendar-item-commitment">${options.commitment}</span>
-      <time class="calendar-item-time" datetime="2026-08-15T18:00:00.000Z">15:00</time>
-      ${options.elapsed ? '<span class="calendar-item-elapsed">Já passou</span>' : ""}
-      ${options.repeats ? `<span class="calendar-item-repeats">${options.repeats}</span>` : ""}
+    <time class="calendar-item-time" datetime="2026-08-15T18:00:00.000Z">15:00</time>
+    <span class="calendar-item-main">
+      <span class="calendar-item-body">${body}</span>
+      <span class="calendar-item-meta">
+        <span class="calendar-item-lane">${options.lane}<span class="sr-only calendar-item-commitment">, ${options.commitment}</span></span>
+        ${options.elapsed ? '<span class="calendar-item-elapsed">Já passou</span>' : ""}
+        ${options.repeats ? `<span class="calendar-item-repeats">${options.repeats}</span>` : ""}
+      </span>
     </span>
-    <span class="calendar-item-body">${body}</span>
     ${controls}
   </li>`;
 }
@@ -178,10 +180,11 @@ function datePanel(): string {
 }
 
 /**
- * The Agenda's header and control band, mirroring Life Brain A.4's
- * `AgendaHeader` + `AgendaStepper` and `calendar-view.tsx`'s toolbar: a compact
- * title with the date stepper in its action slot, the three lenses, then the
- * orientation `SegmentedControl` and the lanes behind one ghost button.
+ * The Agenda's masthead and control line, mirroring `AgendaHeader` +
+ * `AgendaStepper` and `calendar-view.tsx`'s toolbar (ADR-180): the
+ * destination's name as a small line beside the three lenses; the period as the
+ * page's subject, first in the stepper, with its caption and the arrows; then
+ * the orientation `SegmentedControl` and the lanes behind one ghost button.
  */
 function agendaHead(
   copy: { readonly title: string },
@@ -189,30 +192,35 @@ function agendaHead(
   orientation: "day" | "week" | "month" | "agenda",
   lanes: string = "",
   narrowed = false,
+  status: { readonly count?: number; readonly today?: boolean; readonly away?: boolean } = {},
 ): string {
   const option = (value: string, label: string) =>
     `<a class="ui-segmented__option" href="?orientation=${value}"${value === orientation ? ' aria-current="page"' : ""}>${label}</a>`;
   return `
-    <header class="ui-page-header ui-page-header--compact agenda-header">
-      <div class="ui-page-header__text"><h1 class="ui-page-header__title"><span id="cal">${copy.title}</span></h1></div>
-      <div class="ui-page-header__actions">
-        <nav aria-label="Navegar pelas datas" class="agenda-stepper calendar-navigation">
-          <a aria-label="Período anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=prev" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
-          <details class="agenda-date-picker calendar-range">
-            <summary aria-label="${range}. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>${range}</span></summary>
-            ${datePanel()}
-          </details>
-          <span aria-live="polite" class="sr-only">${range}</span>
-          <a aria-label="Próximo período" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=next" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
-          <a class="ui-button ui-button--secondary ui-button--sm" href="?date=today"><span class="ui-button__label">Hoje</span></a>
+    <header class="agenda-masthead">
+      <div class="agenda-masthead-top">
+        <h1 class="agenda-masthead-title"><span id="cal">${copy.title}</span></h1>
+        <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
+          <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
+          <a class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
+          <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
         </nav>
       </div>
+      <nav aria-label="Navegar pelas datas" class="agenda-stepper calendar-navigation">
+        <details class="agenda-date-picker calendar-range">
+          <summary aria-label="${range}. Escolher uma data" class="agenda-stepper-range agenda-date-trigger"><span>${range}</span></summary>
+          ${datePanel()}
+        </details>
+        <span aria-live="polite" class="sr-only">${range}</span>
+        <div class="agenda-stepper-caption"><div class="calendar-status">
+          ${status.today ? '<span class="calendar-today">Hoje</span>' : ""}
+          <p aria-live="polite" class="calendar-summary">${status.count ?? 0} itens neste período</p>
+        </div></div>
+        <a aria-label="Período anterior" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=prev" rel="prev"><span aria-hidden="true" class="ui-button__icon">‹</span></a>
+        <a aria-label="Próximo período" class="ui-button ui-button--ghost ui-button--sm ui-icon-button" href="?date=next" rel="next"><span aria-hidden="true" class="ui-button__icon">›</span></a>
+        ${status.away ? '<a class="ui-button ui-button--ghost ui-button--sm agenda-stepper-today" href="?date=today"><span class="ui-button__label">Hoje</span></a>' : ""}
+      </nav>
     </header>
-    <nav aria-label="Lentes da agenda" class="ui-segmented agenda-lenses">
-      <a aria-current="page" class="ui-segmented__option" href="/pt-BR/app/calendar">Calendário</a>
-      <a class="ui-segmented__option" href="/pt-BR/app/calendar/plan">Planejar</a>
-      <a class="ui-segmented__option" href="/pt-BR/app/reminders">Lembretes</a>
-    </nav>
     <div class="calendar-toolbar">
       <nav aria-label="Formato" class="ui-segmented ui-segmented--sm calendar-orientation">
         ${option("day", "Dia")}${option("week", "Semana")}${option("month", "Mês")}${option("agenda", "Lista")}
@@ -224,22 +232,37 @@ function agendaHead(
     </div>`;
 }
 
-/** The day orientation, mirroring `calendar-view.tsx`'s `<ol className="calendar-days">`. */
+/**
+ * One day of the stream, mirroring `dayStream` in `calendar-view.tsx`: a
+ * heading over its rows, or — with nothing on it — one muted line.
+ */
+function dayMarkup(options: { label: string; today?: boolean; items: string[]; heading?: "h2" | "h3"; quiet?: boolean }): string {
+  const tag = options.heading ?? "h2";
+  const empty = options.items.length === 0;
+  return `<li class="calendar-day"${empty ? ' data-empty="true"' : ""}${options.today ? ' data-today="true"' : ""}>
+    <${tag} class="calendar-day-heading${options.quiet ? " sr-only" : ""}"><span class="calendar-day-name">${options.label}</span>${options.today ? '<span class="calendar-today">Hoje</span>' : ""}</${tag}>
+    ${empty
+      ? '<p class="ux-state-line calendar-empty" data-ux-state="empty"><span class="ux-state-line-text">Nada marcado</span></p>'
+      : `<ul class="calendar-day-items">${options.items.join("")}</ul>`}
+  </li>`;
+}
+
+/**
+ * The day orientation, mirroring `calendar-view.tsx`: the day is the page's
+ * subject, so its own heading is kept for structure and not drawn again; a day
+ * with nothing on it is the period's one empty line.
+ */
 function page(locale: Locale, items: string[]): string {
   const copy = COPY[locale];
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
-  <section aria-labelledby="cal" class="calendar">
-    ${agendaHead(copy, "sáb., 15 ago.", "day")}
-    <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
-    <ol class="calendar-days"><li class="calendar-day" data-today="true">
-      <h2>sáb., 15 ago.</h2>
-      ${items.length === 0
-        ? `<p class="calendar-empty">${copy.empty}</p>`
-        : `<ul class="calendar-day-items">${items.join("")}</ul>`}
-    </li></ol>
+  <section aria-labelledby="cal" class="calendar" data-orientation="day">
+    ${agendaHead(copy, "sáb., 15 de agosto", "day", "", false, { count: items.length, today: true })}
+    ${items.length === 0
+      ? `<p class="calendar-empty">${copy.empty}</p>`
+      : `<ol class="calendar-days">${dayMarkup({ label: "sábado, 15 de agosto", today: true, items, quiet: true })}</ol>`}
   </section></div></main></body></html>`;
 }
 
@@ -264,14 +287,25 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
   const days = ["seg., 10 ago.", "ter., 11 ago.", "qua., 12 ago.", "qui., 13 ago.", "sex., 14 ago.", "sáb., 15 ago.", "dom., 16 ago."];
   const lane = (name: string, shown: boolean) =>
     `<li><a data-lane="deadline" data-shown="${shown}" href="?lanes=x">${name}<span class="sr-only">${shown ? "mostrando" : "oculto"}</span></a></li>`;
+  /*
+    ADR-180 — the phone's week: the seven days on one line, then the days as
+    the stream. In the stream the busy day holds a full row (the list is where
+    a row keeps its caption and its dates) and the others are one muted line.
+  */
+  const fullDays = ["segunda-feira, 10 de agosto", "terça-feira, 11 de agosto", "quarta-feira, 12 de agosto", "quinta-feira, 13 de agosto", "sexta-feira, 14 de agosto", "sábado, 15 de agosto", "domingo, 16 de agosto"];
+  const strip = days.map((day, index) => {
+    const busy = index === busyIndex && items.length > 0;
+    return `<li${index === 5 ? ' data-today="true"' : ""}><a${index === 5 ? ' aria-current="date"' : ""} aria-label="${fullDays[index]}, ${busy ? `${items.length} itens` : "nada marcado"}" class="calendar-week-strip-day" data-has-items="${busy}" href="?date=2026-08-${10 + index}"><span class="calendar-week-strip-weekday">${day.split(",")[0]}</span><span class="calendar-week-strip-number">${10 + index}</span></a></li>`;
+  }).join("");
+  const stream = items.length === 0 ? "" : `<ol class="calendar-days">${fullDays.map((label, index) =>
+    dayMarkup({ label, today: index === 5, items: index === busyIndex ? items.map(() => task(locale)) : [] })).join("")}</ol>`;
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
-  <section aria-labelledby="cal" class="calendar">
-    ${agendaHead(copy, "seg., 10 ago. – dom., 16 ago.", "week", `${lane("Prazos", true)}${lane("Intenções", false)}`, true)}
+  <section aria-labelledby="cal" class="calendar" data-orientation="week">
+    ${agendaHead(copy, "10 – 16 de agosto", "week", `${lane("Prazos", true)}${lane("Intenções", false)}`, true, { count: items.length })}
     <p class="calendar-bound" role="status">${copy.atLatest}</p>
-    <p aria-live="polite" class="calendar-summary">${items.length} itens neste período</p>
     ${items.length === 0 ? `<p class="calendar-empty">${copy.empty}</p>` : ""}
     <div class="calendar-week-scroll"><table class="calendar-week">
       <caption class="sr-only">seg., 10 ago. – dom., 16 ago.</caption>
@@ -282,6 +316,10 @@ function weekPage(locale: Locale, items: string[], busyIndex = 2): string {
           ? `<ul class="calendar-day-items">${items.join("")}</ul>`
           : ""}</td>`).join("")}</tr></tbody>
     </table></div>
+    <div class="calendar-week-list">
+      <ol aria-label="Dias desta semana" class="calendar-week-strip">${strip}</ol>
+      ${stream}
+    </div>
   </section></div></main></body></html>`;
 }
 
@@ -384,14 +422,24 @@ for (const locale of ["pt-BR", "en"] as const) {
       const badge = target.locator(".calendar-item-repeats");
       await expect(badge).toBeVisible();
       await expect(badge).toHaveText(locale === "pt-BR" ? "Todo dia" : "Every day");
-      // It is drawn by a rule rather than by the user-agent default: a class
-      // matching nothing renders, passes and looks finished in a diff.
+      /*
+        ADR-180: it is words in the row's caption now, not a tinted chip — a
+        section is hairlines and text. Still drawn by a rule rather than by the
+        user-agent default (a class matching nothing renders, passes and looks
+        finished in a diff): it is told it may break, because the rule can be a
+        sentence, and it reads as the caption it is part of.
+      */
       const drawn = await badge.evaluate((node) => {
         const style = getComputedStyle(node);
-        return { border: style.borderTopWidth, background: style.backgroundColor };
+        const kind = getComputedStyle(node.parentElement!.querySelector(".calendar-item-lane")!);
+        return { wrap: style.overflowWrap, size: style.fontSize, kindSize: kind.fontSize, border: style.borderTopWidth };
       });
-      expect(drawn.border).not.toBe("0px");
-      expect(drawn.background).not.toBe("rgba(0, 0, 0, 0)");
+      expect(drawn.wrap).toBe("anywhere");
+      expect(drawn.size).toBe(drawn.kindSize);
+      expect(drawn.border).toBe("0px");
+      // And it is set apart from the kind before it by a point, not by a box.
+      const point = await target.locator(".calendar-item-lane").evaluate((node) => getComputedStyle(node, "::after").content);
+      expect(point).toContain("·");
     });
 
     test("a highly sensitive item withholds its title and keeps its date controls", async ({ page: target }) => {
@@ -589,7 +637,8 @@ function weekWithBar(): string {
 }
 
 test.describe("Life Brain D.3: a multi-day event is one bar", () => {
-  for (const width of [375, 1440]) {
+  // 768 and up: below it the week is the list of days, and the grid is not drawn.
+  for (const width of [768, 1440]) {
     test(`spans three columns and stays one line tall at ${width}px`, async ({ page: target }) => {
       await target.setViewportSize({ width, height: 900 });
       await target.setContent(weekWithBar(), { waitUntil: "load" });
@@ -667,12 +716,14 @@ test.describe("the week is a grid, not seven columns sized by their contents", (
 
   /*
     Life Brain D.1 (T2: "como se fosse no Google Calendar, que você realmente
-    vê a semana"). This test used to require the grid to scroll sideways at
-    768px and below — the old floor of 77rem on a phone. The week now fits:
-    seven columns on screen at every width, and nothing scrolls sideways.
+    vê a semana"): the whole week is on screen at every width and nothing
+    scrolls sideways. From 768px that is the grid's seven columns. Below it
+    (ADR-180) it is the seven days on one line — each a link into its day, a
+    full target — over the days as a list, because seven columns of 48px turned
+    every title into three hyphenated fragments.
   */
   test("the whole week fits the viewport: neither the page nor the grid scrolls sideways", async ({ page: target }) => {
-    for (const width of [375, 412, 768, 1024, 1440, 1920]) {
+    for (const width of [320, 375, 412, 768, 1024, 1440, 1920]) {
       await target.setViewportSize({ width, height: 800 });
       await openWeek(target, "pt-BR", [compact(), compact("Dentista")]);
 
@@ -685,14 +736,48 @@ test.describe("the week is a grid, not seven columns sized by their contents", (
       }));
       expect(overflow.page, `page scrolls horizontally at ${width}px`).toBeLessThanOrEqual(1);
       expect(overflow.container, `grid scrolls horizontally at ${width}px`).toBeLessThanOrEqual(1);
-      const columns = await target.locator(".calendar-week thead th").evaluateAll((cells) =>
-        cells.map((cell) => cell.getBoundingClientRect().right <= window.innerWidth + 1));
+      const days = width < 768 ? ".calendar-week-strip-day" : ".calendar-week thead th";
+      const columns = await target.locator(days).evaluateAll((cells) =>
+        cells.map((cell) => {
+          const box = cell.getBoundingClientRect();
+          return box.width > 0 && box.left >= -1 && box.right <= window.innerWidth + 1;
+        }));
       expect(columns, `a day falls off screen at ${width}px`).toEqual([true, true, true, true, true, true, true]);
     }
   });
 
-  test("a compact line shows its time and at most three lines of title on a phone", async ({ page: target }) => {
+  test("exactly one form of the week is live at any width", async ({ page: target }) => {
+    for (const [width, grid, list] of [[375, "none", "block"], [1440, "block", "none"]] as const) {
+      await target.setViewportSize({ width, height: 800 });
+      await openWeek(target, "pt-BR", [compact()]);
+      // `display: none`, so the other form is out of the accessibility tree too.
+      expect(await target.locator(".calendar-week-scroll").evaluate((node) => getComputedStyle(node).display), `grid at ${width}`).toBe(grid);
+      expect(await target.locator(".calendar-week-list").evaluate((node) => getComputedStyle(node).display), `list at ${width}`).toBe(list);
+    }
+  });
+
+  test("on a phone the seven days are full targets, today is marked by more than a colour, and the days follow as rows", async ({ page: target }) => {
     await target.setViewportSize({ width: 375, height: 800 });
+    await openWeek(target, "pt-BR", [compact()]);
+    const strip = target.locator(".calendar-week-strip-day");
+    await expect(strip).toHaveCount(7);
+    const heights = await strip.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+    const today = target.locator('.calendar-week-strip li[data-today="true"] .calendar-week-strip-day');
+    await expect(today).toHaveAttribute("aria-current", "date");
+    expect(await today.evaluate((node) => getComputedStyle(node).boxShadow)).not.toBe("none");
+    // A day with something on it carries a mark; an empty one does not.
+    const marks = await strip.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node, "::after").content !== "none"));
+    expect(marks).toEqual([false, false, true, false, false, false, false]);
+    // The stream under it: today's heading says so in a word, an empty day is one line.
+    await expect(target.locator('.calendar-week-list .calendar-day[data-today="true"] .calendar-today')).toHaveText("Hoje");
+    const empty = await target.locator('.calendar-week-list .calendar-day[data-empty="true"]').first().boundingBox();
+    expect(empty!.height).toBeLessThanOrEqual(32);
+    await expect(target.locator(".calendar-week-list .calendar-item")).toHaveCount(1);
+  });
+
+  test("a compact line shows its time and at most three lines of title in a narrow column", async ({ page: target }) => {
+    await target.setViewportSize({ width: 768, height: 800 });
     await openWeek(target, "pt-BR", [compact()]);
     const line = target.locator(".calendar-week .calendar-item").first();
     await expect(line.locator(".calendar-item-time")).toBeVisible();
@@ -704,7 +789,7 @@ test.describe("the week is a grid, not seven columns sized by their contents", (
   });
 
   test("a column's day is a 44px link into that day", async ({ page: target }) => {
-    await target.setViewportSize({ width: 375, height: 800 });
+    await target.setViewportSize({ width: 768, height: 800 });
     await openWeek(target, "pt-BR", [compact()]);
     const heads = target.locator(".calendar-week-head");
     await expect(heads).toHaveCount(7);
@@ -800,17 +885,19 @@ function monthPage(locale: Locale, busyCount = 0): string {
     `<tr>${cells.slice(week * 7, week * 7 + 7).map(cell).join("")}</tr>`).join("");
 
   const listDays = busyCount
-    ? `<ol class="calendar-days"><li class="calendar-day" data-today="true">`
-      + `<h3>sáb., 15 ago.<span class="calendar-today">${todayWord}</span></h3>`
-      + `<ul class="calendar-day-items">${Array.from({ length: busyCount }, (_u, i) => item(i)).join("")}</ul>`
-      + `</li></ol>`
+    ? `<ol class="calendar-days">${dayMarkup({
+      label: locale === "en" ? "Saturday, August 15" : "sábado, 15 de agosto",
+      today: true,
+      heading: "h3",
+      items: Array.from({ length: busyCount }, (_u, i) => item(i)),
+    }).replace(">Hoje<", `>${todayWord}<`)}</ol>`
     : `<p class="calendar-empty">${copy.empty}</p>`;
 
   return `<!doctype html><html lang="${locale}"><head><meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>${FONT_STUB}${css}</style></head><body><main>
   <div class="content-page calendar-page">
-  <section aria-labelledby="cal" class="calendar">
+  <section aria-labelledby="cal" class="calendar" data-orientation="month">
     ${agendaHead(copy, locale === "en" ? "August 2026" : "agosto de 2026", "month")}
     <div class="calendar-month-scroll"><table class="calendar-month">
       <caption class="sr-only">${locale === "en" ? "Month grid for August 2026" : "Grade do mês de agosto de 2026"}</caption>
@@ -943,5 +1030,189 @@ test.describe("2P-CALENDAR-001: the month is a real grid, and only one of its tw
     await expect(page.locator(".calendar-month thead th").first()).toHaveText("Mon");
     // Life Brain D.1: the range is the date picker's trigger.
     await expect(page.locator(".calendar-range > summary")).toHaveText("August 2026");
+  });
+});
+
+/**
+ * ADR-180 — the Agenda in the editorial language, measured.
+ *
+ * The period is the page's subject; a day is a heading over a hairline; a thing
+ * on it is a row between hairlines whose link covers it and whose one verb sits
+ * above that cover.
+ */
+test.describe("ADR-180: the period is the subject and a day is rows between hairlines", () => {
+  test("the period is the largest text on the page, in the reading face, and the name is a small line", async ({ page: target }) => {
+    for (const width of [375, 1440]) {
+      await target.setViewportSize({ width, height: 900 });
+      await open(target, "pt-BR", [task("pt-BR"), elapsed("pt-BR")]);
+      const sizes = await target.evaluate(() => {
+        const size = (selector: string) => parseFloat(getComputedStyle(document.querySelector(selector)!).fontSize);
+        return {
+          period: size(".agenda-stepper-range"),
+          name: size(".agenda-masthead-title"),
+          largest: Math.max(...[...document.querySelectorAll<HTMLElement>(".calendar-page *")]
+            .filter((node) => node.childElementCount === 0 && (node.textContent ?? "").trim() !== "" && node.getClientRects().length > 0)
+            .map((node) => parseFloat(getComputedStyle(node).fontSize))),
+          family: getComputedStyle(document.querySelector(".agenda-stepper-range")!).fontFamily,
+        };
+      });
+      expect(sizes.period, `period at ${width}`).toBe(sizes.largest);
+      expect(sizes.name, `name at ${width}`).toBeLessThan(sizes.period / 1.5);
+      expect(sizes.family).toContain("Georgia");
+    }
+  });
+
+  test("on a phone the period has a line to itself and the arrows end the caption's line", async ({ page: target }) => {
+    await target.setViewportSize({ width: 320, height: 800 });
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const [period, caption, previous, next] = await Promise.all([
+      target.locator(".agenda-date-trigger").boundingBox(),
+      target.locator(".agenda-stepper-caption").boundingBox(),
+      target.locator('.agenda-stepper a[rel="prev"]').boundingBox(),
+      target.locator('.agenda-stepper a[rel="next"]').boundingBox(),
+    ]);
+    expect(previous!.y).toBeGreaterThanOrEqual(period!.y + period!.height - 1);
+    expect(previous!.x).toBeGreaterThanOrEqual(caption!.x + caption!.width - 1);
+    expect(Math.abs(previous!.y - next!.y)).toBeLessThanOrEqual(1);
+    for (const box of [period, previous, next]) expect(box!.height).toBeGreaterThanOrEqual(44);
+    // One line at 320: the subject is not broken in two by its own controls.
+    expect(period!.height).toBeLessThanOrEqual(56);
+  });
+
+  test("with room, the arrows end the period's line and the caption runs under it", async ({ page: target }) => {
+    await target.setViewportSize({ width: 1440, height: 900 });
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const [period, caption, previous] = await Promise.all([
+      target.locator(".agenda-date-trigger").boundingBox(),
+      target.locator(".agenda-stepper-caption").boundingBox(),
+      target.locator('.agenda-stepper a[rel="prev"]').boundingBox(),
+    ]);
+    expect(previous!.y).toBeLessThan(period!.y + period!.height);
+    expect(caption!.y).toBeGreaterThanOrEqual(period!.y + period!.height - 1);
+  });
+
+  test("a row is time, words, caption and one verb — between hairlines, never a card", async ({ page: target }) => {
+    for (const width of [320, 375, 1440]) {
+      await target.setViewportSize({ width, height: 900 });
+      await open(target, "pt-BR", [task("pt-BR"), elapsed("pt-BR")]);
+      const row = target.locator(".calendar-item").first();
+      const [time, words, caption, verb, box] = await Promise.all([
+        row.locator(".calendar-item-time").boundingBox(),
+        row.locator(".calendar-item-body").boundingBox(),
+        row.locator(".calendar-item-meta").boundingBox(),
+        row.locator(".calendar-reschedule-summary").boundingBox(),
+        row.boundingBox(),
+      ]);
+      expect(time!.x + time!.width, `time before the words at ${width}`).toBeLessThanOrEqual(words!.x + 1);
+      expect(caption!.y, `caption under the words at ${width}`).toBeGreaterThanOrEqual(words!.y + words!.height - 1);
+      expect(Math.abs(caption!.x - words!.x), `caption on the words' edge at ${width}`).toBeLessThanOrEqual(1);
+      expect(verb!.x, `verb after the words at ${width}`).toBeGreaterThanOrEqual(words!.x + words!.width - 1);
+      expect(verb!.height, `verb target at ${width}`).toBeGreaterThanOrEqual(44);
+      expect(verb!.x + verb!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+      const drawn = await row.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return { top: style.borderTopWidth, left: style.borderLeftWidth, bottom: style.borderBottomWidth, radius: style.borderTopLeftRadius, background: style.backgroundColor };
+      });
+      expect(parseFloat(drawn.bottom)).toBeGreaterThan(0);
+      expect(parseFloat(drawn.top)).toBe(0);
+      expect(parseFloat(drawn.left)).toBe(0);
+      expect(parseFloat(drawn.radius)).toBe(0);
+      expect(drawn.background).toBe("rgba(0, 0, 0, 0)");
+    }
+  });
+
+  test("the words are in the reading face, the time in tabular figures, and nothing is monospaced", async ({ page: target }) => {
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const faces = await target.evaluate(() => ({
+      words: getComputedStyle(document.querySelector(".calendar-item-body")!).fontFamily,
+      caption: getComputedStyle(document.querySelector(".calendar-item-meta")!).fontFamily,
+      figures: getComputedStyle(document.querySelector(".calendar-item-time")!).fontVariantNumeric,
+      mono: [...document.querySelectorAll<HTMLElement>(".calendar-days *")]
+        .filter((node) => /mono/i.test(getComputedStyle(node).fontFamily)).length,
+    }));
+    expect(faces.words).toContain("Georgia");
+    expect(faces.caption).not.toContain("Georgia");
+    expect(faces.figures).toContain("tabular-nums");
+    expect(faces.mono).toBe(0);
+  });
+
+  test("the row is the link, and its dates stay their own target above it", async ({ page: target }) => {
+    await target.setViewportSize({ width: 375, height: 800 });
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const hit = await target.evaluate(() => {
+      const row = document.querySelector(".calendar-item")!;
+      const at = (selector: string) => {
+        const box = row.querySelector(selector)!.getBoundingClientRect();
+        const node = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+        return node?.closest("a, summary")?.className ?? "nothing";
+      };
+      return { time: at(".calendar-item-time"), caption: at(".calendar-item-meta"), verb: at(".calendar-reschedule-summary") };
+    });
+    expect(hit.time).toBe("calendar-item-link");
+    expect(hit.caption).toBe("calendar-item-link");
+    expect(hit.verb).toBe("calendar-reschedule-summary");
+    const link = await target.locator(".calendar-item-link").boundingBox();
+    expect(link!.height).toBeGreaterThanOrEqual(44);
+  });
+
+  test("open, the dates take the row's width under the words", async ({ page: target }) => {
+    await target.setViewportSize({ width: 320, height: 800 });
+    await open(target, "pt-BR", [task("pt-BR")]);
+    await target.locator(".calendar-reschedule-summary").click();
+    const [words, controls, row] = await Promise.all([
+      target.locator(".calendar-item-body").boundingBox(),
+      target.locator("details.calendar-reschedule").boundingBox(),
+      target.locator(".calendar-item").boundingBox(),
+    ]);
+    expect(controls!.y).toBeGreaterThanOrEqual(words!.y + words!.height - 1);
+    expect(Math.abs(controls!.x - words!.x)).toBeLessThanOrEqual(1);
+    expect(controls!.x + controls!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
+    await expect(target.locator('.calendar-reschedule input[type="date"]')).toBeVisible();
+  });
+
+  test("what has passed steps back, and still says so in words", async ({ page: target }) => {
+    await open(target, "pt-BR", [task("pt-BR"), elapsed("pt-BR")]);
+    const colours = await target.evaluate(() => [...document.querySelectorAll(".calendar-item")].map((row) =>
+      getComputedStyle(row.querySelector(".calendar-item-time")!).color));
+    expect(colours[0]).not.toBe(colours[1]);
+    await expect(target.locator('.calendar-item[data-elapsed="true"] .calendar-item-elapsed')).toHaveText("Já passou");
+    expect(await target.locator(".calendar-item-time").nth(1).evaluate((node) => getComputedStyle(node).textDecorationLine)).toBe("none");
+  });
+
+  test("today is a word in the caption of a single day, not a boxed chip", async ({ page: target }) => {
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const chip = target.locator(".calendar-status .calendar-today");
+    await expect(chip).toHaveText("Hoje");
+    const drawn = await chip.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { border: style.borderTopWidth, background: style.backgroundColor };
+    });
+    expect(drawn.border).toBe("0px");
+    expect(drawn.background).toBe("rgba(0, 0, 0, 0)");
+    // The day's own heading is in the document and not drawn a second time.
+    const heading = await target.locator(".calendar-day-heading").boundingBox();
+    expect(heading!.width).toBeLessThanOrEqual(1);
+  });
+
+  test("the orientation reads as words over a hairline, each a full target, the current one underlined", async ({ page: target }) => {
+    await target.setViewportSize({ width: 320, height: 800 });
+    await open(target, "pt-BR", [task("pt-BR")]);
+    const options = target.locator(".calendar-orientation .ui-segmented__option");
+    const heights = await options.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+    const drawn = await target.evaluate(() => {
+      const current = getComputedStyle(document.querySelector('.calendar-orientation [aria-current="page"]')!);
+      const other = getComputedStyle(document.querySelector('.calendar-orientation a:not([aria-current])')!);
+      return { current: current.borderBottomColor, other: other.borderBottomColor, background: current.backgroundColor, shadow: current.boxShadow };
+    });
+    expect(drawn.current).not.toBe(drawn.other);
+    expect(drawn.background).toBe("rgba(0, 0, 0, 0)");
+    expect(drawn.shadow).toBe("none");
+    // The filter keeps its name for a screen reader when only its icon is drawn.
+    await expect(target.locator(".calendar-filters > summary")).toHaveText("O que mostrar");
+    const filter = await target.locator(".calendar-filters > summary").boundingBox();
+    expect(filter!.height).toBeGreaterThanOrEqual(44);
+    const overflow = await target.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
   });
 });

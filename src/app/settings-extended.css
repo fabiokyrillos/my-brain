@@ -211,15 +211,10 @@
   line-height: 1.5;
 }
 
-/* The feed: a section of the same page rather than a second page. */
-.notification-history { display: grid; gap: var(--space-4); margin-top: var(--space-10); }
-.notification-history > h2 {
-  margin: 0;
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border-divider);
-  color: var(--text-primary);
-  font: var(--type-title-2);
-}
+/* The feed: a section of the same page rather than a second page. Its heading
+   is for the outline; the line that counts the unread notices opens it. */
+.notification-page > .ui-page-header { margin-bottom: 0; }
+.notification-history { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: var(--space-4); }
 
 /* ---- notifications: the controls ------------------------------------------ */
 
@@ -1125,43 +1120,43 @@
   font: var(--type-caption);
 }
 
-/* `2P-SETTINGS-008` — the notification history's states, as words with a shape.
+/* `2P-SETTINGS-008` — read and unread are words. Editorial calmo (ADR-180): the
+   word is the page's opening sentence and the heading over the notices already
+   read, so the per-row word is kept for assistive technology only.
 
-   The row's `unread`/`read` class used to be the whole signal. The badge is the
-   visible half of the repair; the announced summary above the list is the other
-   half, and neither is a hue on its own. */
-.notification-status-badge {
-  display: inline-flex;
+   The opening line: what is unanswered, in the reading face, over the rule the
+   rows hang from, with the one verb that answers all of them at its end. */
+.notification-group-head {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  color: var(--text-secondary);
-  font: var(--type-caption);
-}
-
-.notification-status-badge[data-status="unread"] {
-  border-color: var(--tone-information-line);
-  background: var(--tone-information-bg);
-  color: var(--tone-information-fg);
-  font-weight: 600;
+  justify-content: space-between;
+  gap: 0 var(--space-4);
+  min-height: var(--touch-target);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .notification-unread-summary {
-  margin: 0 0 var(--space-3);
-  color: var(--text-secondary);
-  font: var(--type-caption);
+  margin: 0;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  color: var(--text-primary);
+  font: var(--type-reading-lg);
+  line-height: 1.3;
 }
 
-/* The one discreet contextual entry the requirement allows. Discreet, and still
-   a real target: it is the only way back to the preferences from here. */
+/* The one discreet contextual entry the requirement allows: the page's last
+   line. Discreet, and still a real target — it is the only way back to the
+   preferences from here. */
+.notification-page-foot { margin: var(--space-8) 0 0; }
 .notification-preferences-link {
   display: inline-flex;
   align-items: center;
   min-height: var(--touch-target);
-  color: var(--link);
+  color: var(--text-secondary);
   font: var(--type-label);
 }
+.notification-preferences-link:hover { color: var(--text-primary); text-decoration: underline; }
 
 /* Life Brain A.6. On a phone the sections read as a list (`ListItem`'s shape:
    full-width rows between dividers); "Avançado" is a second, labelled group. */
@@ -1297,26 +1292,30 @@
   background: var(--background-subtle);
 }
 
-/* The bulk verbs above the list (Life Brain D.2). */
-.notification-bulk {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  margin: 0 0 var(--space-3);
-}
+/* The bulk verbs (Life Brain D.2), each a quiet text verb beside what it acts
+   on: no bar, no line of their own. */
+.notification-bulk-form { display: flex; flex: none; }
 
-.notification-bulk-verbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+.notification-bulk-verb {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--link);
+  font: var(--type-label);
+  cursor: pointer;
 }
+.notification-bulk-verb:hover:not(:disabled) { text-decoration: underline; }
+.notification-bulk-verb:disabled { color: var(--text-muted); cursor: progress; }
 
 .notification-bulk-outcome {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  min-height: 0;
+  justify-content: space-between;
+  gap: 0 var(--space-4);
 }
 
 .notification-bulk-message {
@@ -1427,114 +1426,209 @@
 }
 
 /* ------------------------------------------------------------------------- */
-/* Life Brain A.5 — the history row: two lines, one visible control          */
+/* Editorial calmo (ADR-180) — a notice on the Avisos page                    */
 /* ------------------------------------------------------------------------- */
 
-/* A list, not a stack of cards: dividers between rows, no border box per row.
-   Fifty notices fit in 3,500px at 390px (`IMPLEMENTATION_PLAN.md` §A.5). */
+/* Rows between hairlines. A row is what the notice is about, in the reading
+   face, over one caption; "Abrir" is its one link and its hit area is the row.
+   `position: relative` is what that hit area is measured against. */
 .notification-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  border-top: 1px solid var(--border-divider);
 }
 
 .notification-item {
+  position: relative;
   display: grid;
-  grid-template-columns: 8px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-  column-gap: var(--space-3);
-  min-height: var(--row-height);
+  column-gap: var(--space-2);
   padding: var(--space-2) 0;
   border-bottom: 1px solid var(--border-divider);
 }
-/* On a phone the controls are the row's height (44px), so the padding is what
-   decides whether fifty rows fit the 3,500px budget. */
-@media (max-width: 899px) {
-  .notification-item { min-height: 0; padding: var(--space-1) 0; }
-  .notification-item-meta .notification-status-badge { line-height: 18px; }
-}
 
-/* The dot is the third signal for unread, after the word and the weight —
-   never the only one (`2P-SETTINGS-008`). */
-.notification-item-dot {
-  width: 8px;
-  height: 8px;
+.notification-item:has(.notification-open-link:hover) { background: var(--background-subtle); }
+.notification-item:has(.notification-open-link:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* An unanswered notice: a mark before it (never the only signal — the opening
+   line says the word), its words across the row, and under them one line with
+   its verbs and "Abrir" — the notice as Hoje draws it. */
+.notification-item[data-status="unread"] {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: var(--space-3);
+  padding-top: var(--space-3);
+}
+.notification-item[data-status="unread"] .notification-item-main { grid-column: 2 / -1; }
+.notification-item[data-status="unread"] .notification-item-verbs { grid-column: 2; margin-top: var(--space-1); }
+.notification-item[data-status="unread"] .notification-open-link { align-self: start; margin-top: var(--space-1); }
+.notification-item[data-status="unread"]::before {
+  content: "";
+  align-self: start;
+  width: var(--space-2);
+  height: var(--space-2);
+  margin-top: var(--space-2);
   border-radius: var(--radius-full);
-  background: transparent;
+  background: var(--tone-attention-fg);
 }
-.notification-item[data-status="unread"] .notification-item-dot { background: var(--link); }
 
-.notification-item-main { display: grid; gap: 2px; min-width: 0; }
-.notification-item-title {
+
+.notification-item-main { min-width: 0; }
+
+.notification-item-subject {
   margin: 0;
-  font: var(--type-body);
-  font-weight: 500;
   color: var(--text-primary);
+  font: var(--type-reading);
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
-.notification-item[data-status="unread"] .notification-item-title { font-weight: 650; }
-
-.notification-item-meta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  font: var(--type-caption);
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.notification-item-meta > * { flex: none; }
-.notification-item-time { font-variant-numeric: tabular-nums; }
-.notification-open-link { min-height: var(--touch-target); display: inline-flex; align-items: center; padding: 0 var(--space-2); }
-.notification-item-meta .notification-item-body {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: var(--text-secondary);
-}
-
-.notification-item-trailing {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-.notification-item-trailing .notification-row-actions { gap: var(--space-1); }
-
-.notification-menu-trigger--icon {
-  display: inline-grid;
-  place-items: center;
-  width: var(--touch-target);
-  min-height: var(--touch-target);
-  padding: 0;
-}
-
-/* An open panel, or a message the row has to say, takes the whole width under
-   the row rather than squeezing into the trailing column. */
-.notification-item:has(.notification-verb-panel, .notification-row-outcome:not(:empty), .notice-open-outcome:not(:empty)) .notification-item-trailing {
-  grid-column: 2 / -1;
-  flex-wrap: wrap;
-}
-
+/* Already read: the same row, a step quieter — and, on a phone, one line of
+   subject, so fifty of them still fit Life Brain A.5's 3,500px. The whole of it
+   is one tap away, on the destination the row links to. */
+.notification-item:not([data-status="unread"]) .notification-item-subject { color: var(--text-secondary); }
 @media (max-width: 899px) {
-  .notification-item-title {
+  /* The controls are the row's height (44px), so the padding is what decides
+     whether fifty rows fit the budget. */
+  .notification-item:not([data-status="unread"]) { padding: var(--space-1) 0; }
+  .notification-item:not([data-status="unread"]) .notification-item-subject {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-
-  /* On a phone the menu is part of the flow (`2S-MOBILE-007`), so it too takes
-     the row's width when it opens. */
-  .notification-item:has(.notification-verb-menu-list) .notification-item-trailing {
-    grid-column: 2 / -1;
-    flex-wrap: wrap;
-  }
-
-  .notification-item-trailing .notification-menu-trigger--icon { flex: none; }
 }
+
+.notification-item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+.notification-item-kind:has(+ .notification-item-time)::after { content: "·"; margin: 0 var(--space-1); }
+.notification-item-time { font-variant-numeric: tabular-nums; }
+/* The state as a word on every row (`2P-SETTINGS-008`), for assistive
+   technology: the opening line and the "Já lidos" heading are where it is
+   drawn, once per group instead of once per row. */
+.notification-status-badge {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The row's one link. The anchor is the word; its hit area is the row. */
+.notification-open-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: 0 var(--space-2);
+  color: var(--link);
+  font: var(--type-label);
+}
+.notification-open-link::after { content: ""; position: absolute; inset: 0; }
+/* A read row is one quiet line: its link is still the whole row, and the word
+   is kept for assistive technology instead of drawn beside every subject. */
+.notification-item:not([data-status="unread"]) { column-gap: 0; }
+.notification-item:not([data-status="unread"]) .notification-item-verbs { margin-left: var(--space-2); }
+.notification-item:not([data-status="unread"]) .notification-open-link { padding: 0; }
+.notification-item:not([data-status="unread"]) .notification-open-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.notification-open-link:focus-visible { outline: none; }
+
+/* An unanswered notice's "⋯" sits at the row's start, so where the menu floats
+   (above a phone's width) it opens rightwards from it, not off the page. */
+.notification-item[data-status="unread"] .notification-verb-menu-list { left: 0; right: auto; }
+
+/* The verbs sit over the row's hit area, so pressing one never follows it. */
+.notification-item-verbs { position: relative; z-index: 1; min-width: 0; }
+/* No gap at all: the outcome region is a full-width item that is empty at rest,
+   and a gap would be paid for it on every row — in height, and in the width of
+   a read row's one "⋯". The visible verb carries the space after it, and what
+   opens under the controls carries its own margin. */
+.notification-item-verbs .notification-row-actions { gap: 0; }
+.notification-item-verbs .notification-row-actions > form { margin-right: var(--space-2); }
+.notification-item .notification-primary-action,
+.notification-item .notification-menu-trigger {
+  flex: none;
+  min-height: var(--touch-target);
+  border-color: var(--border-default);
+  padding: 0 var(--space-3);
+  font: var(--type-label);
+}
+
+.notification-item .notification-menu-trigger--icon {
+  display: inline-grid;
+  place-items: center;
+  width: var(--touch-target);
+  border-color: transparent;
+  background: none;
+  padding: 0;
+  color: var(--text-secondary);
+}
+
+/* A read notice with an open panel, or a message to say, takes the shape of an
+   unanswered one: its words across the row, the controls on the line under. */
+.notification-item:not([data-status="unread"]):has(.notification-verb-panel, .notification-row-outcome:not(:empty)) .notification-item-main { grid-column: 1 / -1; }
+.notification-item:not([data-status="unread"]):has(.notification-verb-panel, .notification-row-outcome:not(:empty)) .notification-item-verbs { grid-column: 1 / 3; }
+.notification-item:has(.notification-verb-panel, .notification-row-outcome:not(:empty)) .notification-open-link { align-self: start; }
+
+@media (max-width: 600px) {
+  /* On a phone the menu is part of the flow (`2S-MOBILE-007`). Its wrapper
+     dissolves so the trigger keeps its place on the verbs' line and the open
+     list takes the next one whole. */
+  .notification-item .notification-verb-menu { display: contents; }
+  .notification-item .notification-verb-menu-list { flex-basis: 100%; margin-top: var(--space-2); }
+  .notification-item:not([data-status="unread"]):has(.notification-verb-menu-list) .notification-item-main { grid-column: 1 / -1; }
+  .notification-item:not([data-status="unread"]):has(.notification-verb-menu-list) .notification-item-verbs { grid-column: 1 / 3; }
+  .notification-item:has(.notification-verb-menu-list) .notification-open-link { align-self: start; }
+}
+
+/* The notices already read: a heading over a rule that is also the control
+   that folds them, and — last, beside what it clears — "Limpar os lidos". */
+.notification-read { margin-top: var(--space-8); }
+/* With nothing unanswered above it, it follows the opening line directly. */
+.notification-bulk-outcome + .notification-read { margin-top: var(--space-4); }
+
+.notification-read-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-section);
+  cursor: pointer;
+  list-style: none;
+}
+.notification-read-summary::-webkit-details-marker { display: none; }
+.notification-read-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.notification-read-summary::after {
+  content: "";
+  width: var(--space-2);
+  height: var(--space-2);
+  margin-left: auto;
+  margin-right: var(--space-1);
+  border: solid var(--text-muted);
+  border-width: 0 1px 1px 0;
+  transform: rotate(45deg);
+}
+.notification-read[open] > .notification-read-summary::after { transform: rotate(-135deg); }
+
+.notification-read-count {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.notification-read > .notification-bulk-form { justify-content: flex-end; }
 
 /* ==========================================================================
    Life Brain E.1 (ADR-169) — Configurações redesenhada.

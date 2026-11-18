@@ -213,9 +213,10 @@ test.describe("the owner's device findings", () => {
 
       const measured = await page.evaluate(() => {
         const page_ = document.querySelector(".calendar-page");
-        // Life Brain A.4: the Agenda's compact header, which has no description
-        // on a phone — the lens control under it is measured in its place.
-        const heading = document.querySelector(".agenda-header h1");
+        // Life Brain A.4: the Agenda's header, which has no description — the
+        // lens control beside its name is measured in its place. ADR-180: the
+        // name is the masthead's small line.
+        const heading = document.querySelector(".agenda-masthead h1");
         const description = document.querySelector(".agenda-lenses");
         const left = (element: Element | null) =>
           element ? Math.round(element.getBoundingClientRect().left) : -1;
@@ -242,12 +243,24 @@ test.describe("the owner's device findings", () => {
       expect(measured.descriptionLeft).toBeGreaterThanOrEqual(12);
       // No sideways scroll: the grid and the controls stay inside the page.
       expect(measured.overflow, `${orientation} overflows by ${measured.overflow}px`).toBeLessThanOrEqual(1);
-      // The page title outranks the range label. It used to be the other way
-      // round, because `.calendar-header` had no rule at all.
+      /*
+        ADR-180 — the period is the page's subject, so it outranks the
+        destination's name, on purpose and by a rule.
+
+        This used to assert the opposite. In August the range was larger than
+        the title by accident — `.calendar-header` had no rule at all — and the
+        fix was to make the title win. The editorial pass turned that over
+        deliberately: "Agenda" is a small line beside the lenses and the period
+        is the largest text on the page, in the reading face. What must not
+        come back is the accident, so both sizes are required to be drawn by a
+        rule (neither is the 16px default) as well as ordered.
+      */
       expect(
-        measured.headingSize,
-        `h1 ${measured.headingSize}px vs range ${measured.rangeSize}px`,
-      ).toBeGreaterThan(measured.rangeSize);
+        measured.rangeSize,
+        `range ${measured.rangeSize}px vs h1 ${measured.headingSize}px`,
+      ).toBeGreaterThan(measured.headingSize);
+      expect(measured.headingSize).not.toBe(16);
+      expect(measured.rangeSize).not.toBe(16);
     });
   }
 
@@ -340,8 +353,15 @@ test.describe("the owner's device findings", () => {
       };
     });
 
+    /*
+      ADR-180. The period still has a line to itself on a phone, with the
+      arrows under it — now at the end of the caption's line, previous then
+      next. "Hoje" follows them and is drawn only when the period on screen does
+      not hold today: a link to the page being read is a control that does
+      nothing. This journey opens the current month, so it is normally absent.
+    */
     expect(pager.range, "the pager has no range label").not.toBeNull();
-    for (const [name, control] of [["prev", pager.prev], ["today", pager.today], ["next", pager.next]] as const) {
+    for (const [name, control] of [["prev", pager.prev], ["next", pager.next]] as const) {
       expect(control, `the pager has no ${name} control`).not.toBeNull();
       expect(
         control!.top,
@@ -349,8 +369,11 @@ test.describe("the owner's device findings", () => {
       ).toBeGreaterThanOrEqual(pager.range!.bottom - 1);
     }
     // Side by side, in reading order.
-    expect(pager.prev!.left, "prev is not left of today").toBeLessThan(pager.today!.left);
-    expect(pager.today!.left, "today is not left of next").toBeLessThan(pager.next!.left);
+    expect(pager.prev!.left, "prev is not left of next").toBeLessThan(pager.next!.left);
+    if (pager.today !== null) {
+      expect(pager.today.top).toBeGreaterThanOrEqual(pager.range!.bottom - 1);
+      expect(pager.next!.left, "next is not left of today").toBeLessThan(pager.today.left);
+    }
 
     // And nothing anywhere pushed the page sideways.
     const overflow = await page.evaluate(

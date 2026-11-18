@@ -27,15 +27,48 @@ export function AgendaHeader({
   lens,
   locale,
   actions,
+  period,
 }: {
   readonly headingId?: string;
   readonly lens: AgendaLens;
   readonly locale: Locale;
-  /** The header's action slot: the date stepper, or the lens's one action. */
+  /** The header's action slot: the lens's one action (Lembretes' composer). */
   readonly actions?: ReactNode;
+  /**
+   * ADR-180 — the period being shown, as the page's subject.
+   *
+   * A lens with a date (Calendário, Planejar) passes its stepper here instead
+   * of into `actions`. The destination's name then steps back to a small line
+   * beside the lenses, and the period — the thing the page is about — is the
+   * largest text on it, in the reading face.
+   */
+  readonly period?: ReactNode;
 }) {
   const copy = getAgendaHeaderCopy(locale);
   const lenses: readonly AgendaLens[] = ["calendar", "plan", "reminders"];
+  const lensControl = (
+    <SegmentedControl
+      className="agenda-lenses"
+      label={copy.lensesLabel}
+      options={lenses.map((candidate) => ({
+        value: candidate,
+        label: copy.lenses[candidate],
+        href: agendaLensHref(locale, candidate),
+      }))}
+      value={lens}
+    />
+  );
+  if (period !== undefined) {
+    return (
+      <header className="agenda-masthead">
+        <div className="agenda-masthead-top">
+          <h1 className="agenda-masthead-title"><span id={headingId}>{copy.title}</span></h1>
+          {lensControl}
+        </div>
+        {period}
+      </header>
+    );
+  }
   return (
     <>
       <PageHeader
@@ -44,16 +77,7 @@ export function AgendaHeader({
         size="compact"
         title={<span id={headingId}>{copy.title}</span>}
       />
-      <SegmentedControl
-        className="agenda-lenses"
-        label={copy.lensesLabel}
-        options={lenses.map((candidate) => ({
-          value: candidate,
-          label: copy.lenses[candidate],
-          href: agendaLensHref(locale, candidate),
-        }))}
-        value={lens}
-      />
+      {lensControl}
     </>
   );
 }
@@ -90,6 +114,7 @@ export type AgendaPickerTarget = {
  * region so moving says where it landed.
  */
 export function AgendaStepper({
+  caption,
   className,
   locale,
   next,
@@ -99,6 +124,12 @@ export function AgendaStepper({
   rangeLabel,
   today,
 }: {
+  /**
+   * The one line under the period: that it is today, what it holds, or what
+   * the page asks. Inside the stepper so that on a phone it shares its line
+   * with the arrows and the period keeps a line to itself.
+   */
+  readonly caption?: ReactNode;
   readonly className?: string;
   readonly locale: Locale;
   readonly next: AgendaStep;
@@ -106,21 +137,16 @@ export function AgendaStepper({
   readonly previous: AgendaStep;
   readonly rangeClassName?: string;
   readonly rangeLabel: string;
-  readonly today: AgendaStep;
+  /**
+   * Back to today. `null` when the period on screen already holds today: a
+   * link to the page being read is a control that does nothing.
+   */
+  readonly today: AgendaStep | null;
 }) {
   const copy = getAgendaHeaderCopy(locale);
   return (
     <nav aria-label={copy.stepperLabel} className={cn("agenda-stepper", className)}>
-      <ButtonLink
-        aria-disabled={previous.disabled ? "true" : undefined}
-        aria-label={previous.label}
-        className="ui-icon-button"
-        href={previous.href}
-        icon={<ChevronLeft />}
-        rel="prev"
-        size="sm"
-        variant="ghost"
-      />
+      {/* The period first: it is what is read; the arrows follow it (ADR-180). */}
       <AgendaDatePicker
         className={rangeClassName}
         hrefTemplate={picker.hrefTemplate}
@@ -130,6 +156,17 @@ export function AgendaStepper({
         min={picker.min}
         selected={picker.selected}
         today={picker.today}
+      />
+      {caption === undefined ? null : <div className="agenda-stepper-caption">{caption}</div>}
+      <ButtonLink
+        aria-disabled={previous.disabled ? "true" : undefined}
+        aria-label={previous.label}
+        className="ui-icon-button"
+        href={previous.href}
+        icon={<ChevronLeft />}
+        rel="prev"
+        size="sm"
+        variant="ghost"
       />
       <ButtonLink
         aria-disabled={next.disabled ? "true" : undefined}
@@ -141,7 +178,9 @@ export function AgendaStepper({
         size="sm"
         variant="ghost"
       />
-      <ButtonLink href={today.href} size="sm" variant="secondary">{today.label}</ButtonLink>
+      {today === null ? null : (
+        <ButtonLink className="agenda-stepper-today" href={today.href} size="sm" variant="ghost">{today.label}</ButtonLink>
+      )}
     </nav>
   );
 }

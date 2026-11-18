@@ -44,7 +44,7 @@ import { SlidersHorizontal } from "lucide-react";
 
 import { AgendaHeader, AgendaStepper } from "./agenda-header";
 import { AGENDA_DATE_TOKEN } from "./agenda-date-picker";
-import type { CalendarProjection } from "./calendar-contracts";
+import type { CalendarDayView, CalendarProjection } from "./calendar-contracts";
 import { CalendarItem } from "./calendar-item";
 import { CalendarOutcome } from "./calendar-outcome";
 import { spanRows, type SpanCell } from "./calendar-spans";
@@ -86,6 +86,47 @@ function formatDayLabel(date: string, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, {
     weekday: "short", day: "2-digit", month: "short", timeZone: "UTC",
   }).format(instant);
+}
+
+/**
+ * ADR-180 — a day's own heading in the stream: "quarta-feira, 18 de novembro".
+ * Same UTC-noon rule as `formatDayLabel`; no year, the page's subject has it
+ * when it matters.
+ */
+function formatDayHeading(date: string, locale: Locale): string {
+  const parsed = parseLocalDate(date);
+  if (!parsed) return date;
+  const instant = new Date(Date.UTC(parsed.year, parsed.month - 1, parsed.day, 12));
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long", day: "numeric", month: "long", timeZone: "UTC",
+  }).format(instant);
+}
+
+/**
+ * ADR-180 — the period, as the page's subject.
+ *
+ * One day reads "qua., 18 de novembro"; a span reads as a range the locale
+ * collapses itself ("16 – 22 de novembro"), with the year only when the two
+ * ends are in different ones. Always absolute, never "esta semana": a relative
+ * label is true for seven days and then wrong on every bookmark.
+ */
+function formatPeriodLabel(first: string, last: string, locale: Locale): string {
+  const start = parseLocalDate(first);
+  const end = parseLocalDate(last);
+  if (!start || !end) return first;
+  const from = new Date(Date.UTC(start.year, start.month - 1, start.day, 12));
+  if (first === last) {
+    return new Intl.DateTimeFormat(locale, {
+      weekday: "short", day: "numeric", month: "long", timeZone: "UTC",
+    }).format(from);
+  }
+  const to = new Date(Date.UTC(end.year, end.month - 1, end.day, 12));
+  return new Intl.DateTimeFormat(locale, {
+    day: "numeric",
+    month: "long",
+    year: start.year === end.year ? undefined : "numeric",
+    timeZone: "UTC",
+  }).formatRange(from, to);
 }
 
 /** Life Brain D.1 — the week column's short weekday ("seg."), from the date's own parts. */
@@ -219,10 +260,69 @@ export function CalendarView({
    */
   const rangeLabel = query.orientation === "month"
     ? formatMonthLabel(query.anchor, locale)
-    : projection.days.length === 1
-      ? formatDayLabel(projection.days[0].date, locale)
-      : `${formatDayLabel(projection.days[0].date, locale)} – `
-        + `${formatDayLabel(projection.days[projection.days.length - 1].date, locale)}`;
+    : formatPeriodLabel(projection.days[0].date, projection.days[projection.days.length - 1].date, locale);
+
+  /*
+   * ADR-180. Whether the period on screen holds today — a month's leading and
+   * trailing days do not count, they are context. When it does, "Hoje" in the
+   * stepper would be a link to the page being read, so it is not drawn.
+   */
+  const showsToday = projection.days.some((day) => day.isToday && day.inPeriod);
+  const singleDay = projection.days.length === 1 ? projection.days[0] : null;
+
+  const dayHref = (date: string) => calendarHref(locale, {
+    ...withOrientation(query, "day"),
+    anchor: parseLocalDate(date) ?? query.anchor,
+  });
+
+  /**
+   * The days as a stream (ADR-180): a heading over a hairline, then rows.
+   *
+   * One function for the day, the list, the phone's week and the phone's month,
+   * so a day reads the same wherever it is drawn. A day with nothing on it is
+   * one muted line — its name and "nada marcado" — never an empty box.
+   */
+  const dayStream = (days: readonly CalendarDayView[], Heading: "h2" | "h3", quietHeading = false) => (
+    <ol className="calendar-days">
+      {days.map((day) => (
+        <li
+          className="calendar-day"
+          data-empty={day.items.length === 0 ? "true" : undefined}
+          data-today={day.isToday ? "true" : undefined}
+          key={day.date}
+        >
+          {/* A single day is already named by the page's subject, so its heading
+              stays for structure and is not drawn a second time. */}
+          <Heading className={quietHeading ? "calendar-day-heading sr-only" : "calendar-day-heading"}>
+            <span className="calendar-day-name">{formatDayHeading(day.date, locale)}</span>
+            {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+          </Heading>
+          {day.items.length === 0 ? (
+            <UniversalStateLine
+              announce={false}
+              className="calendar-empty"
+              description={copy.states.emptyDay}
+              locale={locale}
+              state="empty"
+            />
+          ) : (
+            <ul className="calendar-day-items">
+              {day.items.map((item) => (
+                <CalendarItem
+                  dateBounds={dateBounds}
+                  item={item}
+                  key={item.id}
+                  locale={locale}
+                  rescheduleAction={recordingAction}
+                  timezone={projection.timezone}
+                />
+              ))}
+            </ul>
+          )}
+        </li>
+      ))}
+    </ol>
+  );
 
   /**
    * The grid, as rows of seven.
@@ -291,15 +391,16 @@ export function CalendarView({
       one wrapper rather than a sweep of margins.
     */
     <div className="content-page calendar-page">
-    <section aria-labelledby={headingId} className="calendar">
+    <section aria-labelledby={headingId} className="calendar" data-orientation={query.orientation}>
       {/*
-        Life Brain A.4 (`LB-A-007`). One compact header for the Agenda's three
-        lenses, with the date stepper in its action slot, replacing the title,
-        the description, the "Lista · Calendário · Planejar" strip and a
-        navigation row of their own. The stepper keeps the bounded range: at
-        either edge it is still a link and the bound notice below says why.
+        Life Brain A.4 (`LB-A-007`). One header for the Agenda's three lenses.
+        ADR-180 turned it over: the period on screen is the page's subject, in
+        the reading face, with the arrows as quiet controls on its line; the
+        destination's name is a small line beside the lenses. The stepper keeps
+        the bounded range: at either edge it is still a link and the bound
+        notice below says why.
 
-        Lembretes is a lens now, in the lens control under the title — the
+        Lembretes is a lens, in the lens control beside the name — the
         unconditional path to `/app/reminders` that the "Todos os lembretes"
         link used to be (`mobile-reachability-guard`).
       */}
@@ -307,8 +408,19 @@ export function CalendarView({
         headingId={headingId}
         lens="calendar"
         locale={locale}
-        actions={(
+        period={(
           <AgendaStepper
+            /*
+              One caption under the subject: that this is today, when it is,
+              and how much the period holds. The count is a live region, so
+              moving between periods says what was found.
+            */
+            caption={(
+              <div className="calendar-status">
+                {singleDay?.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
+                <p aria-live="polite" className="calendar-summary">{copy.summary(projection.itemCount)}</p>
+              </div>
+            )}
             className="calendar-navigation"
             locale={locale}
             next={{ href: calendarHref(locale, step(query, 1, today)), label: copy.navigation.next, disabled: bound.atLatest }}
@@ -321,7 +433,7 @@ export function CalendarView({
             previous={{ href: calendarHref(locale, step(query, -1, today)), label: copy.navigation.previous, disabled: bound.atEarliest }}
             rangeClassName="calendar-range"
             rangeLabel={rangeLabel}
-            today={{ href: calendarHref(locale, { ...query, anchor: today }), label: copy.navigation.today }}
+            today={showsToday ? null : { href: calendarHref(locale, { ...query, anchor: today }), label: copy.navigation.today }}
           />
         )}
       />
@@ -401,8 +513,6 @@ export function CalendarView({
       {projection.failedLanes.length > 0 ? (
         <p className="calendar-partial" role="status">{copy.states.partial(failed)}</p>
       ) : null}
-
-      <p aria-live="polite" className="calendar-summary">{copy.summary(projection.itemCount)}</p>
 
       {/*
         Above the days, not inside one: the day the operation was performed on
@@ -491,12 +601,16 @@ export function CalendarView({
                           {shown.length > 0 ? (
                             <ul className="calendar-day-items">
                               {shown.map((item) => (
+                                /*
+                                  ADR-180: a cell holds compact lines, as the
+                                  week's do. The row with its caption and its
+                                  dates is one tap away, in the day.
+                                */
                                 <CalendarItem
-                                  dateBounds={dateBounds}
+                                  density="compact"
                                   item={item}
                                   key={item.id}
                                   locale={locale}
-                                  rescheduleAction={recordingAction}
                                   timezone={projection.timezone}
                                 />
                               ))}
@@ -537,30 +651,7 @@ export function CalendarView({
                 locale={locale}
                 state="empty"
               />
-            ) : (
-              <ol className="calendar-days">
-                {monthDaysWithItems.map((day) => (
-                  <li className="calendar-day" data-today={day.isToday ? "true" : undefined} key={day.date}>
-                    <h3>
-                      {formatDayLabel(day.date, locale)}
-                      {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-                    </h3>
-                    <ul className="calendar-day-items">
-                      {day.items.map((item) => (
-                        <CalendarItem
-                          dateBounds={dateBounds}
-                          item={item}
-                          key={item.id}
-                          locale={locale}
-                          rescheduleAction={recordingAction}
-                          timezone={projection.timezone}
-                        />
-                      ))}
-                    </ul>
-                  </li>
-                ))}
-              </ol>
-            )}
+            ) : dayStream(monthDaysWithItems, "h3")}
           </div>
         </>
       ) : query.orientation === "week" ? (
@@ -628,34 +719,46 @@ export function CalendarView({
               </tbody>
             </table>
           </div>
+          {/*
+            ADR-180 — the phone's week. Seven columns at 390px gave each day
+            48px and every title three hyphenated fragments. A phone gets the
+            week's seven days on one line — which have something, which is
+            today — and under it the same days as the stream every other
+            orientation uses. Both are rendered and CSS shows one, with
+            `display: none`, exactly as the month does: one week in the
+            accessibility tree at any width.
+          */}
+          <div className="calendar-week-list">
+            <ol aria-label={copy.week.stripLabel} className="calendar-week-strip">
+              {projection.days.map((day) => (
+                <li data-today={day.isToday ? "true" : undefined} key={day.date}>
+                  <Link
+                    aria-current={day.isToday ? "date" : undefined}
+                    aria-label={copy.week.dayLabel(formatDayHeading(day.date, locale), day.items.length)}
+                    className="calendar-week-strip-day"
+                    data-has-items={day.items.length > 0 ? "true" : "false"}
+                    href={dayHref(day.date)}
+                  >
+                    <span className="calendar-week-strip-weekday">{formatWeekdayLabel(day.date, locale)}</span>
+                    <span className="calendar-week-strip-number">{parseLocalDate(day.date)?.day ?? day.date}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+            {projection.itemCount === 0 ? null : dayStream(projection.days, "h2")}
+          </div>
         </>
+      ) : projection.itemCount === 0 ? (
+        /* Nothing in the whole period: said once, not once per day. */
+        <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
+      ) : singleDay ? (
+        dayStream([singleDay], "h2", true)
       ) : (
-        <ol className="calendar-days">
-          {projection.days.map((day) => (
-            <li className="calendar-day" data-today={day.isToday ? "true" : undefined} key={day.date}>
-              <h2>
-                {formatDayLabel(day.date, locale)}
-                {day.isToday ? <span className="calendar-today">{copy.todayLabel}</span> : null}
-              </h2>
-              {day.items.length === 0 ? (
-                <UniversalStateLine className="calendar-empty" description={emptyMessage} locale={locale} state="empty" />
-              ) : (
-                <ul className="calendar-day-items">
-                  {day.items.map((item) => (
-                    <CalendarItem
-                      dateBounds={dateBounds}
-                      item={item}
-                      key={item.id}
-                      locale={locale}
-                      rescheduleAction={recordingAction}
-                      timezone={projection.timezone}
-                    />
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
-        </ol>
+        /*
+          The list is what is coming, so a day with nothing on it is not a row
+          — except today, which is said either way.
+        */
+        dayStream(projection.days.filter((day) => day.items.length > 0 || day.isToday), "h2")
       )}
     </section>
     </div>
