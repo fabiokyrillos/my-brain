@@ -80,6 +80,8 @@ test.describe("the account can see what is stored, take it, and read what it agr
     // The RSC assertion: the new Server Component rendered at all.
     await expect(page.getByRole("heading", { name: "Privacidade e dados" })).toBeVisible();
 
+    // Editorial calmo (ADR-180): the census is behind the row that summarises it.
+    await page.locator(".privacy-section details.setting-fact > summary").click();
     const census = page.locator(".privacy-census");
     await expect(census).toBeVisible();
     for (const label of [
@@ -178,7 +180,7 @@ test.describe("the account can see what is stored, take it, and read what it agr
     await expect(page.getByRole("button", { name: "Sair de todos os dispositivos" })).toBeVisible();
 
     // `2O-PRIVACY-008` — deletion is reached, never performed here.
-    await expect(page.getByRole("link", { name: "Ir para a exclusão da conta" })).toHaveAttribute(
+    await expect(page.getByRole("link", { name: /^Apagar a conta/ })).toHaveAttribute(
       "href",
       "/pt-BR/account/delete",
     );

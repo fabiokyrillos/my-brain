@@ -10,6 +10,7 @@ const base: SettingsSummaryInput = {
     quietStart: "22:00",
     quietEnd: "07:00",
     maxFollowupsPerDay: 3,
+    aiProfile: "quality",
   },
   automation: [
     { state: "suggest_only", eligible: false },
@@ -35,8 +36,8 @@ describe("the line under each group says what it is set to now (Life Brain E.1)"
   });
 
   it("states the quiet period and the daily cap", () => {
-    expect(settingsSummaries("pt-BR", base).day).toBe("Silêncio 22:00–07:00 · até 3 por dia");
-    expect(settingsSummaries("en", base).day).toBe("Quiet 22:00–07:00 · up to 3 a day");
+    expect(settingsSummaries("pt-BR", base).day).toBe("Silêncio das 22:00 às 07:00 · até 3 por dia");
+    expect(settingsSummaries("en", base).day).toBe("Quiet from 22:00 to 07:00 · up to 3 a day");
   });
 
   it("says it only suggests until a category is both allowed and eligible", () => {
@@ -48,7 +49,9 @@ describe("the line under each group says what it is set to now (Life Brain E.1)"
   });
 
   it("reports the key's state without naming anything about the key", () => {
-    expect(settingsSummaries("pt-BR", base).ai).toBe("Chave funcionando");
+    // Editorial calmo: a working key is named with the profile it serves; no key, no profile.
+    expect(settingsSummaries("pt-BR", base).ai).toBe("Chave funcionando · Qualidade máxima");
+    expect(settingsSummaries("en", { ...base, values: { ...base.values, aiProfile: "economy" } }).ai).toBe("Key working · Economy");
     expect(settingsSummaries("pt-BR", { ...base, credential: "absent" }).ai).toBe("Sem chave");
     expect(settingsSummaries("pt-BR", { ...base, credential: "invalid" }).ai).toBe("A chave parou de funcionar");
   });

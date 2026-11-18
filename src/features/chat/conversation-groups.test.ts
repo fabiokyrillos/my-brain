@@ -45,6 +45,21 @@ describe("the conversations menu groups by when each was last active (Life Brain
   it("keeps a row with an unreadable time instead of dropping it", () => {
     const groups = groupConversations([row("x", "not a date")], now, zone, "pt-BR", labels);
     expect(groups[0]?.items.map((item) => item.id)).toEqual(["x"]);
+    // And claims no time for it.
+    expect(groups[0]?.items[0]?.when).toBeUndefined();
+  });
+
+  it("gives each row one caption: the hour for today, the day for any other, in the owner's zone", () => {
+    const groups = groupConversations(
+      [row("a", "2026-11-16T12:05:00Z"), row("b", "2026-11-15T01:30:00Z")],
+      now,
+      zone,
+      "pt-BR",
+      labels,
+    );
+    expect(groups[0]?.items[0]?.when).toEqual({ at: "2026-11-16T12:05:00Z", label: "09:05" });
+    // 01:30 UTC on the 15th is the evening of the 14th in São Paulo.
+    expect(groups[1]?.items[0]?.when?.label).toBe("14 de nov. de 2026");
   });
 
   it("falls back to UTC for an unknown zone rather than throwing", () => {

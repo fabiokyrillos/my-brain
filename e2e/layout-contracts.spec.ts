@@ -2501,3 +2501,551 @@ test.describe("Planejar as two lists of rows (Editorial calmo)", () => {
     expect(view).toContain('<details className="planner-about" open={projection.capacity.overloaded}>');
   });
 });
+
+/*
+ * Conversar as correspondence (Editorial calmo, ADR-180).
+ *
+ * Mirrors `src/app/[locale]/app/chat/page.tsx`, `chat/[conversationId]/page.tsx`,
+ * `src/features/chat/chat-frame.tsx`, `chat-stream-context.tsx`,
+ * `src/features/capture/chat-composer.tsx`, `conversation-sources/source-list.tsx`
+ * and `conversation-cards/suggestion-row.tsx`. What is under test is geometry
+ * jsdom cannot see: nothing wider than the screen with a title that cannot
+ * break, no target under 44px, the field clear of the bottom bar, and the
+ * question marked by an edge rather than a fill.
+ */
+const CHAT_CSS = ["conversation-cards.css", "assistant.css", "memories.css"]
+  .map((file) => readFileSync(join(ROOT, "src", "app", file), "utf8"))
+  .join("\n");
+
+const CHAT_UNBREAKABLE = "dev_digital_bi.test_schema.nc_booking_population_2026_11_18_final";
+
+function chatSources(options: { open: boolean; sources: number; explained?: boolean }) {
+  const open = options.open ? " open" : "";
+  const row = (index: number) => `<li data-support="direct_record"><a class="conversation-source-chip" href="#">`
+    + `<span class="conversation-source-support sr-only">Você escreveu isto: </span><span class="conversation-source-type">Registro</span>`
+    + `<span class="conversation-source-freshness"> · <span class="sr-only">De </span><time datetime="2026-11-1${index}T12:00:00Z">1${index} de nov. de 2026</time></span></a></li>`;
+  const unavailable = `<li data-support="product_state"><span class="conversation-source-chip" data-unavailable="">`
+    + `<span class="conversation-source-support sr-only">O que eu guardo como verdadeiro: </span>`
+    + `<span class="conversation-source-type">Memória · Isto não está mais disponível para você</span></span></li>`;
+  const used = options.sources === 0 ? "" : `<details class="conversation-sources-used"${open}><summary>`
+    + `<span class="conversation-sources-title sr-only">O que eu usei: </span>${options.sources + 1} fontes</summary>`
+    + `<ul class="conversation-sources-list">${Array.from({ length: options.sources }, (_unused, index) => row(index)).join("")}${unavailable}</ul></details>`;
+  const insufficient = options.sources === 0
+    ? `<p class="conversation-sources-insufficient">Não encontrei nada seu sobre isso. O que respondi acima não vem dos seus registros, memórias, tarefas nem lembretes.</p>`
+    : "";
+  const where = `<details class="conversation-sources-where"${open}><summary>Onde procurei</summary>`
+    + `<p class="conversation-sources-reach">Procurei nos seus registros e memórias, e nos títulos das suas tarefas e lembretes.</p>`
+    + `<p class="chat-message-model">Modelo: gpt-5-mini</p></details>`;
+  const explanation = options.explained
+    ? `<details class="conversation-explanation"${open}><summary>Como cheguei aqui</summary><div class="conversation-explanation-body">`
+      + `<ul><li>Encontrei outras coisas suas, mas nenhuma perto o bastante do que você perguntou.</li></ul>`
+      + `<p class="conversation-explanation-correct-title">Se algo aqui está errado</p><p>Abra a fonte acima e corrija ou arquive lá.</p></div></details>`
+    : "";
+  return `<div class="message-sources"><div class="conversation-sources" data-evidence="${options.sources === 0 ? "insufficient" : "evidenced"}">`
+    + `${insufficient}${used}${where}${explanation}</div></div>`;
+}
+
+function chatTurn(role: "user" | "assistant", id: string, body: string, extra = "") {
+  return `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
+    + `<time datetime="2026-11-18T13:02:00.000Z">10:02</time></p>`
+    + `<div class="chat-message-body">${body}</div>${extra}</article>`;
+}
+
+function chatComposer() {
+  return `<div class="chat-dock"><section class="assistant-composer"><div class="sr-only" role="status"></div>`
+    + `<form class="assistant-composer-form"><label class="sr-only" for="chat-field">O que você quer dizer ao Brain?</label>`
+    + `<div class="assistant-composer-row"><textarea id="chat-field" name="composerText" placeholder="Pergunte ou registre algo…" rows="1"></textarea>`
+    + `<div class="voice-control"><button type="button" class="composer-mic">${ICON}<span class="sr-only">Gravar áudio</span></button></div>`
+    + `<button aria-label="Enviar" class="ui-button ui-button--primary ui-button--md ui-icon-button" type="submit"><span aria-hidden="true" class="ui-button__icon">${ICON}</span></button>`
+    + `</div><p class="assistant-composer-hint">Enter envia · Shift+Enter quebra a linha</p></form></section></div>`;
+}
+
+function chatMenu() {
+  const row = (title: string, when: string, current = false) => `<li class="chat-menu-row"><a href="#"${current ? ' aria-current="page"' : ""}>${title}</a>`
+    + `<time class="chat-menu-when" datetime="2026-11-18T13:00:00Z">${when}</time></li>`;
+  const group = (label: string, rows: string[]) => `<section class="chat-menu-group"><h2 class="chat-menu-group-title">${label}</h2><ul>${rows.join("")}</ul></section>`;
+  return `<nav aria-label="Conversas" class="chat-menu" id="chat-menu"><div class="chat-menu-head">`
+    + `<a class="chat-menu-new" href="#">${ICON}Nova conversa</a><button aria-label="Fechar conversas" class="chat-menu-close" type="button">${ICON}</button></div>`
+    + `<div class="chat-menu-search">${ICON}<label class="sr-only" for="chat-search">Buscar conversas</label><input id="chat-search" placeholder="Buscar conversas" type="search"></div>`
+    + `<div class="chat-menu-groups">`
+    + group("Hoje", [row("Contrato da Aurora", "11:40", true), row("O que tenho essa semana?", "08:12")])
+    + group("Últimos 7 dias", [
+      row("Viagem a Recife com a família em novembro e o que ainda falta reservar", "15 de nov. de 2026"),
+      row(CHAT_UNBREAKABLE, "14 de nov. de 2026"),
+      `<li class="chat-menu-row"><a href="#">Uma conversa encontrada pela busca, sem data</a></li>`,
+    ])
+    + `</div></nav><div aria-hidden="true" class="chat-menu-scrim"></div>`;
+}
+
+function chatSurface(stage: string, options: { menu?: boolean; title?: string } = {}) {
+  return `<div class="chat-surface" data-chat-surface="" data-menu="${options.menu ? "open" : "closed"}">${options.menu ? chatMenu() : ""}`
+    + `<div class="chat-column"><header class="chat-header">`
+    + `<button aria-controls="chat-menu" aria-expanded="${options.menu ? "true" : "false"}" aria-label="Mostrar conversas" class="chat-header-button" type="button">${ICON}</button>`
+    + `<h1 class="chat-header-title">${options.title ?? "Contrato da Aurora"}</h1>`
+    + `<a aria-label="Nova conversa" class="chat-header-button" href="#">${ICON}</a></header>`
+    + `<div class="chat-stage">${stage}</div>${chatComposer()}</div></div>`;
+}
+
+function chatThread(open: boolean) {
+  const answer = `<p>Pelo que está nos seus registros, faltam três coisas antes da assinatura:</p>`
+    + `<ol><li>Revisar a cláusula de rescisão com o texto que a Marina enviou na terça.</li>`
+    + `<li>Confirmar o valor em ${CHAT_UNBREAKABLE}.</li><li>Enviar a versão final até sexta-feira.</li></ol>`
+    + `<p>A tarefa está planejada para hoje e ainda não foi concluída.</p>`;
+  return `<div class="message-stream">`
+    + `<p class="chat-day"><time datetime="2026-11-18T13:02:00.000Z">18 de nov. de 2026</time></p>`
+    + chatTurn("user", "message-1", `<p>O que falta eu fazer antes de assinar ${CHAT_UNBREAKABLE}?</p>`)
+    + chatTurn("assistant", "message-2", answer, chatSources({ open, sources: 3, explained: true }))
+    + chatTurn("user", "message-3", `<p>Tem algo sobre o seguro do carro nesse contrato?</p>`)
+    + chatTurn("assistant", "message-4", `<p>Não há nada nos seus registros que ligue o seguro do carro ao contrato.</p>`, chatSources({ open, sources: 0 }))
+    + `<div class="chat-draft" data-chat-draft=""><article class="chat-message" data-draft-role="user"><p class="chat-message-meta"><span class="chat-message-speaker">Você</span></p>`
+    + `<div class="chat-message-body"><p>E o Daniel?</p></div></article><article aria-busy="true" class="chat-message" data-draft-role="assistant">`
+    + `<p class="chat-message-meta"><span class="chat-message-speaker">Brain</span></p><p class="chat-message-waiting" role="status">${ICON} Brain está pensando…</p></article></div>`
+    + `<div class="chat-outcome" data-chat-outcome=""></div></div>`;
+}
+
+function chatOutcome() {
+  return `<div class="message-stream">${chatTurn("user", "message-1", "<p>Oi</p>")}<div class="chat-outcome" data-chat-outcome="">`
+    + `<div aria-label="Resposta do Brain" class="assistant-composer-notice" data-route="memory_intent" role="region" tabindex="-1">`
+    + `<p class="assistant-composer-echo"><span>Você escreveu</span><q>Lembre que a Marina prefere receber contratos em PDF ${CHAT_UNBREAKABLE}</q></p>`
+    + `<h3>Quer que eu guarde isso?</h3><p>Nada foi salvo ainda. Confira o texto e confirme.</p>`
+    + `<form class="memory-proposal"><article class="conversation-card" data-card-type="memory" data-state="requires_confirmation"><header class="conversation-card-head">`
+    + `<span class="conversation-card-type">Memória</span><span class="conversation-card-state">Preciso da sua confirmação</span></header></article>`
+    + `<label for="proposal-content">Memória<textarea id="proposal-content" name="content" rows="3">A Marina prefere receber contratos em PDF.</textarea></label>`
+    + `<label for="proposal-kind">Tipo<select id="proposal-kind" name="kind"><option>Preferência</option></select></label>`
+    + `<div class="memory-proposal-actions"><button class="memory-proposal-confirm" type="submit">${ICON}Guardar memória</button>`
+    + `<button class="memory-proposal-discard" type="button">${ICON}Descartar</button></div></form></div></div></div>`;
+}
+
+function chatNew(options: { starters?: boolean } = {}) {
+  const chip = (question: string) => `<li><button aria-label="Escrever no campo: ${question}" class="ui-button ui-button--secondary ui-button--sm" data-seed-chip="fill" type="button">`
+    + `<span class="ui-button__label">${question}</span></button></li>`;
+  const questions = options.starters
+    ? ["Quando fui ao médico pela última vez?", "O que tenho essa semana?", "O que falei sobre a viagem?", "Quais exames estão pendentes?"]
+    : ["O prazo de Pagar a escola já passou. O que eu faço?", `O que ficou pendente com ${CHAT_UNBREAKABLE}?`, "Como está Aurora Participações?"];
+  return `<div class="chat-intro"><div class="chat-hello"><h2>O que você quer saber?</h2></div>`
+    + `<section class="conversational-questions conversational-questions-quiet" aria-label="Perguntas para responder agora" data-compact="">${ICON}`
+    + `<a href="#" class="conversational-questions-quiet-link">Você tem 2 perguntas pendentes · Ver perguntas</a></section>`
+    + `<div class="conversation-suggestions"><p class="conversation-suggestions-label">${options.starters ? "Experimente" : "Você pode me perguntar"}</p>`
+    + `<ul class="conversation-suggestions-list">${questions.map(chip).join("")}</ul></div></div>`
+    + `<div class="message-stream"><div class="chat-outcome" data-chat-outcome=""></div></div>`;
+}
+
+async function renderChat(page: Page, body: string, width: number, height: number) {
+  await render(page, body, width, height);
+  // The sheets arrive after first paint here, so a control's own transition
+  // would be measured mid-flight; in the product they are there from the start.
+  await page.addStyleTag({ content: `${CHAT_CSS}\n*{transition:none!important}` });
+  await page.waitForTimeout(40);
+}
+
+/** Every visible control of the surface narrower or shorter than a touch target, as "label:width×height". */
+async function chatShortTargets(page: Page) {
+  return page.evaluate((minimum) => {
+    const root = document.querySelector("[data-chat-surface]");
+    if (!root) return ["surface not found"];
+    return [...root.querySelectorAll<HTMLElement>("a, button, summary, textarea, select, input:not([type=hidden])")]
+      .filter((node) => node.getClientRects().length > 0 && node.checkVisibility({ visibilityProperty: true }))
+      .map((node) => {
+        const box = node.getBoundingClientRect();
+        return { label: (node.getAttribute("aria-label") ?? node.textContent ?? "").trim().slice(0, 24) || node.tagName, width: Math.round(box.width), height: Math.round(box.height) };
+      })
+      .filter((entry) => entry.height < minimum || entry.width < minimum)
+      .map((entry) => `${entry.label}:${entry.width}×${entry.height}`);
+  }, 44);
+}
+
+async function chatOverflow(page: Page) {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
+
+test.describe("Conversar as correspondence (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`a conversation: no sideways scroll and no target under 44px at ${width} CSS px, with every disclosure closed and open`, async ({ page }) => {
+      for (const open of [false, true]) {
+        await renderChat(page, chatSurface(chatThread(open)), width, 800);
+        expect(await chatOverflow(page), `sideways overflow, open=${open}`).toBeLessThanOrEqual(0);
+        expect(await chatShortTargets(page), `short targets, open=${open}`).toEqual([]);
+      }
+    });
+
+    test(`a new conversation: no sideways scroll and no target under 44px at ${width} CSS px`, async ({ page }) => {
+      for (const starters of [false, true]) {
+        await renderChat(page, chatSurface(chatNew({ starters }), { title: "Brain" }), width, 800);
+        expect(await chatOverflow(page), `sideways overflow, starters=${starters}`).toBeLessThanOrEqual(0);
+        expect(await chatShortTargets(page), `short targets, starters=${starters}`).toEqual([]);
+      }
+    });
+
+    test(`the conversations menu and a proposed memory: no sideways scroll and no target under 44px at ${width} CSS px`, async ({ page }) => {
+      await renderChat(page, chatSurface(chatThread(false), { menu: true }), width, 800);
+      expect(await chatOverflow(page), "sideways overflow, menu").toBeLessThanOrEqual(0);
+      expect(await chatShortTargets(page), "short targets, menu").toEqual([]);
+      await renderChat(page, chatSurface(chatOutcome()), width, 800);
+      expect(await chatOverflow(page), "sideways overflow, proposal").toBeLessThanOrEqual(0);
+      expect(await chatShortTargets(page), "short targets, proposal").toEqual([]);
+    });
+  }
+
+  test("the question is marked by an edge and its hour; the answer has nothing drawn around it", async ({ page }) => {
+    await renderChat(page, chatSurface(chatThread(false)), 390, 800);
+    const turns = await page.evaluate(() => {
+      const read = (selector: string) => {
+        const node = document.querySelector<HTMLElement>(selector)!;
+        const style = getComputedStyle(node);
+        const meta = node.querySelector<HTMLElement>(".chat-message-meta")!.getBoundingClientRect();
+        const speaker = node.querySelector<HTMLElement>(".chat-message-speaker")!.getBoundingClientRect();
+        return {
+          left: node.getBoundingClientRect().left,
+          width: node.getBoundingClientRect().width,
+          background: style.backgroundColor,
+          radius: style.borderTopLeftRadius,
+          edge: parseFloat(style.borderInlineStartWidth),
+          metaHeight: meta.height,
+          speakerWidth: speaker.width,
+        };
+      };
+      return { user: read('.chat-message[data-role="user"]'), assistant: read('.chat-message[data-role="assistant"]'), stream: document.querySelector(".message-stream")!.getBoundingClientRect().width };
+    });
+    // One column: both turns start at the same edge and run the full measure.
+    expect(Math.abs(turns.user.left - turns.assistant.left)).toBeLessThanOrEqual(1);
+    expect(turns.user.width).toBeGreaterThan(turns.stream * 0.95);
+    // No bubble on either.
+    for (const turn of [turns.user, turns.assistant]) {
+      expect(turn.background).toBe("rgba(0, 0, 0, 0)");
+      expect(turn.radius).toBe("0px");
+    }
+    expect(turns.user.edge).toBeGreaterThan(0);
+    expect(turns.assistant.edge).toBe(0);
+    // The question shows its hour and not the word "Você"; the answer shows neither.
+    expect(turns.user.metaHeight).toBeGreaterThan(10);
+    expect(turns.user.speakerWidth).toBeLessThanOrEqual(1);
+    expect(turns.assistant.metaHeight).toBeLessThanOrEqual(1);
+  });
+
+  test("under an answer there is one quiet line of closed disclosures, and an opened one takes the row", async ({ page }) => {
+    await renderChat(page, chatSurface(chatThread(false)), 390, 800);
+    const block = page.locator(".chat-message.assistant").first().locator(".conversation-sources");
+    const tops = await block.locator("> details > summary").evaluateAll((nodes) => nodes.map((node) => Math.round(node.getBoundingClientRect().top)));
+    expect(tops).toHaveLength(3);
+    expect(new Set(tops).size, "the three summaries share one line").toBe(1);
+    await expect(block.locator(".conversation-sources-list")).toBeHidden();
+    await expect(block.locator(".conversation-sources-reach")).toBeHidden();
+    await expect(block.locator(".chat-message-model")).toBeHidden();
+
+    await block.locator(".conversation-sources-used > summary").click();
+    const rows = await block.locator(".conversation-sources-list > li").evaluateAll((nodes) => nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      const link = node.querySelector("a")?.getBoundingClientRect();
+      return { width: box.width, height: box.height, linkWidth: link?.width ?? null };
+    }));
+    const measure = (await block.boundingBox())!.width;
+    expect(rows).toHaveLength(4);
+    for (const row of rows) {
+      expect(row.width).toBeGreaterThan(measure - 1);
+      expect(row.height).toBeGreaterThanOrEqual(44);
+      // The row is the link: where there is one, it spans the row.
+      if (row.linkWidth !== null) expect(row.linkWidth).toBeGreaterThan(measure - 1);
+    }
+    // The honest "I found nothing" is in the open on the answer that has it.
+    await expect(page.locator(".conversation-sources-insufficient")).toBeVisible();
+  });
+
+  test("the field is one line, clear of the bottom bar, and the shell's top bar steps aside", async ({ page }) => {
+    await renderChat(page, chatSurface(chatThread(false)), 390, 800);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.waitForTimeout(40);
+    const geometry = await page.evaluate(() => {
+      const box = (selector: string) => document.querySelector(selector)!.getBoundingClientRect();
+      const lastTurn = [...document.querySelectorAll(".chat-message")].at(-1)!.getBoundingClientRect();
+      return {
+        form: box(".assistant-composer-form"),
+        field: box(".assistant-composer-row > textarea"),
+        nav: box(".bottom-nav"),
+        topBar: getComputedStyle(document.querySelector(".top-bar")!).display,
+        lastTurnBottom: lastTurn.bottom,
+        viewport: innerHeight,
+      };
+    });
+    expect(geometry.topBar).toBe("none");
+    expect(geometry.form.bottom).toBeLessThanOrEqual(geometry.nav.top);
+    expect(geometry.form.top).toBeGreaterThan(geometry.viewport / 2);
+    expect(geometry.field.height).toBeLessThanOrEqual(48);
+    expect(geometry.form.height).toBeLessThanOrEqual(60);
+    // At the end of the thread the last turn is above the field, not under it.
+    expect(geometry.lastTurnBottom).toBeLessThanOrEqual(geometry.form.top);
+  });
+
+  test("a conversation in the menu is a row whose link is the whole row, with its caption inside", async ({ page }) => {
+    await renderChat(page, chatSurface(chatThread(false), { menu: true }), 390, 800);
+    const rows = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".chat-menu-row")].map((row) => {
+      const box = row.getBoundingClientRect();
+      const link = row.querySelector("a")!.getBoundingClientRect();
+      const when = row.querySelector(".chat-menu-when")?.getBoundingClientRect() ?? null;
+      const title = document.createRange();
+      title.selectNodeContents(row.querySelector("a")!);
+      return {
+        linkCoversRow: Math.abs(link.width - box.width) <= 1 && Math.abs(link.height - box.height) <= 2,
+        height: box.height,
+        captionInside: when === null ? null : when.top >= link.top && when.bottom <= link.bottom,
+        captionBelowTitle: when === null ? null : when.top >= title.getBoundingClientRect().bottom - 1,
+        right: box.right,
+        background: getComputedStyle(row.querySelector("a")!).backgroundColor,
+      };
+    }));
+    const menu = (await page.locator(".chat-menu").boundingBox())!;
+    expect(rows).toHaveLength(5);
+    for (const row of rows) {
+      expect(row.linkCoversRow).toBe(true);
+      expect(row.height).toBeGreaterThanOrEqual(44);
+      expect(row.right).toBeLessThanOrEqual(menu.x + menu.width);
+      // Where you are is weight and a rule, never a fill.
+      expect(row.background).toBe("rgba(0, 0, 0, 0)");
+      if (row.captionInside !== null) {
+        expect(row.captionInside).toBe(true);
+        expect(row.captionBelowTitle).toBe(true);
+      }
+    }
+  });
+
+  test("a suggestion is a row between hairlines, not a tinted box", async ({ page }) => {
+    await renderChat(page, chatSurface(chatNew(), { title: "Brain" }), 390, 800);
+    const chips = await page.locator(".conversation-suggestions-list > li > .ui-button").evaluateAll((nodes) => nodes.map((node) => {
+      const style = getComputedStyle(node);
+      const row = node.parentElement!.getBoundingClientRect();
+      return { background: style.backgroundColor, border: parseFloat(style.borderTopWidth), width: node.getBoundingClientRect().width, row: row.width, rule: parseFloat(getComputedStyle(node.parentElement!).borderBottomWidth) };
+    }));
+    expect(chips).toHaveLength(3);
+    for (const chip of chips) {
+      expect(chip.background).toBe("rgba(0, 0, 0, 0)");
+      expect(chip.border).toBe(0);
+      expect(chip.rule).toBeGreaterThan(0);
+      expect(Math.abs(chip.width - chip.row)).toBeLessThanOrEqual(1);
+    }
+    // The introduction steps aside once a turn is drawn in this screen.
+    await page.evaluate(() => { document.querySelector(".chat-outcome")!.innerHTML = '<div class="assistant-composer-notice"><h3>Resposta</h3></div>'; });
+    await expect(page.locator(".chat-intro")).toBeHidden();
+  });
+});
+
+/**
+ * Ajustes, recomposed (Editorial calmo, ADR-180).
+ *
+ * One fixture holding every kind of row the six groups are made of: the list
+ * of groups, a row whose control is its value (a text field, a select with a
+ * long value, a time, a number, a switch, a segmented choice), a row that is a
+ * link, a row with one verb, and the row that opens its editor in place
+ * (`.setting-fact`) around each of the editors that exist — the key form, a
+ * category's policy, the push preferences, the census. Measured on the two
+ * phone widths this file measures everything at, with the rows closed and
+ * with every one of them open.
+ */
+const SETTINGS_LONG = "Horário_de_Brasília_São_Paulo_e_Rio_de_Janeiro_(UTC−03:00)_sem_espaços";
+
+function settingsFact(options: { label: string; value: string; editor: string; className?: string; open: boolean; group?: string; heading?: "h2" | "h3" }) {
+  const tag = options.heading ?? "span";
+  return `<details class="setting-fact${options.className ? ` ${options.className}` : ""}"${options.group ? ` name="${options.group}"` : ""}${options.open ? " open" : ""}>
+    <summary class="setting-fact-summary"><${tag} class="setting-fact-label">${options.label}</${tag}><span class="setting-fact-value">${options.value}</span>
+      <span class="setting-fact-verb" data-when="closed">Alterar</span><span class="setting-fact-verb" data-when="open">Fechar</span></summary>
+    <div class="setting-fact-editor">${options.editor}</div></details>`;
+}
+
+function settingsRow(label: string, control: string, hint = "") {
+  return `<div class="settings-row"><span class="settings-row-copy"><label>${label}</label>${hint ? `<small>${hint}</small>` : ""}</span><span class="settings-row-control">${control}</span></div>`;
+}
+
+function settingsNav(active: string) {
+  const groups = [["general", "Você e o assistente", `Michael · ${SETTINGS_LONG} · Português`], ["day", "Seu dia e avisos", "Silêncio das 22:00 às 07:00 · até 5 por dia"],
+    ["autonomy", "O que ele faz sozinho", "Só sugere, em tudo"], ["ai", "IA e custos", "Chave funcionando · Qualidade máxima"], ["appearance", "Aparência", "Tema e instalar como app"]];
+  const item = ([key, name, summary]: string[]) => `<li><a class="settings-nav-link${key === active ? " active" : ""}" data-section="${key}" href="#">
+    <span class="settings-nav-copy"><span class="settings-nav-name">${name}</span><span class="settings-nav-summary">${summary}</span></span>${ICON.replace("<svg", '<svg class="settings-nav-chevron"')}</a></li>`;
+  return `<nav aria-label="Grupos dos ajustes" class="settings-nav"><ul class="settings-nav-list">${groups.map(item).join("")}</ul>
+    <ul class="settings-nav-list settings-nav-list-apart">${item(["privacy", "Privacidade e conta", "Baixar uma cópia, sessões, apagar a conta"])}</ul></nav>`;
+}
+
+function settingsBody(options: { root: boolean; open: boolean }) {
+  const { open } = options;
+  const form = `<form class="settings-form">
+    <section class="settings-group"><h2 class="settings-group-title">O assistente</h2><div class="settings-rows">
+      ${settingsRow("Nome do assistente", '<input type="text" value="Michael" />', "Como ele se chama nas telas e nas respostas.")}
+      ${settingsRow("Fuso horário", `<select><option>${SETTINGS_LONG}</option></select>`, "Define o que “hoje” e “amanhã” significam.")}
+      ${settingsRow("Período silencioso começa", '<input type="time" value="22:00" />')}
+      ${settingsRow("Máximo de acompanhamentos por dia", '<input type="number" value="5" />')}
+      <div class="settings-row"><span class="settings-row-copy"><label for="settings-fixture-switch">Permitir lembretes importantes durante o silêncio</label></span><span class="settings-row-control"><input class="settings-switch" id="settings-fixture-switch" role="switch" type="checkbox" checked /></span></div>
+      <div class="settings-row"><span class="settings-row-copy"><span class="settings-row-label">Idioma</span><small>Também no menu da conta.</small></span><span class="settings-row-control"><span class="settings-segmented" role="group"><a class="settings-segment active" href="#">Português</a><a class="settings-segment" href="#">English</a></span></span></div>
+    </div></section>
+    <section class="settings-group"><h2 class="settings-group-title">Qualidade e custo</h2><div class="settings-rows">
+      <fieldset class="ai-profile-fieldset settings-row settings-row-stack"><legend class="settings-row-legend">Perfil de custo e qualidade</legend>
+        <div class="settings-segmented">${["Qualidade máxima", "Equilibrado", "Econômico", "Personalizado"].map((name, index) => `<label class="settings-segment${index === 0 ? " active" : ""}"><input type="radio" name="aiProfile" /><span>${name}</span></label>`).join("")}</div>
+        <small class="settings-row-hint">Recomendado. Terra no chat e nas revisões; Luna na captura e nos arquivos.</small></fieldset>
+      <a class="settings-row settings-row-link" href="#"><span class="settings-row-copy"><strong>Custos de IA</strong><small>Quanto cada função gastou.</small></span>${ICON}</a>
+    </div></section>
+    <div aria-live="polite" class="settings-feedback-region"><p class="settings-receipt" data-state="saved" role="status">${ICON}<span>Salvo</span><button class="settings-receipt-undo" type="button">Desfazer</button></p></div>
+  </form>`;
+  const onboarding = `<section class="onboarding-restore"><form class="settings-row"><span class="settings-row-copy"><h2 class="settings-row-label">Guia de primeiros passos</h2><small>O guia está dispensado neste navegador.</small></span>
+    <button type="submit" class="setting-verb onboarding-restore-action">Mostrar o guia de novo</button></form></section>`;
+  const key = `<section class="byok-panel"><h2 class="settings-group-title">Sua chave da OpenAI</h2><p class="settings-group-note">O uso é cobrado diretamente na sua conta da OpenAI.</p><div class="settings-rows byok-body">
+    <div class="byok-pending"><div class="byok-pending-copy"><h3>Registros aguardando interpretação</h3><p class="byok-pending-count">3</p><p>Nada é interpretado automaticamente.</p></div>
+      <form><button class="setting-verb byok-pending-submit" type="submit">Interpretar registros pendentes</button></form></div>
+    ${settingsFact({ label: "Chave", className: "byok-key", open, value: `<span class="byok-state"><span class="byok-badge" data-status="active"><strong>Configurada</strong></span><span class="byok-identifier"><code>sk-proj:${SETTINGS_LONG}</code></span><span class="byok-validated">Validada em 2 de nov. de 2026</span></span>`,
+      editor: '<form class="byok-form"><label for="settings-fixture-key">Chave da API</label><input id="settings-fixture-key" type="password" placeholder="sk-…" /><p class="field-hint byok-hint">Cole a chave.</p><button class="byok-submit" type="submit">Substituir chave</button></form>' })}
+    <p role="status" data-state="success" class="byok-feedback">Chave substituída e validada.</p>
+    <div class="byok-danger"><form class="byok-remove"><button type="submit" class="danger byok-destructive">Remover chave</button></form></div>
+  </div><p class="byok-honesty">A chave é guardada criptografada.</p><p class="byok-costs-note">Os custos são estimativas.</p></section>`;
+  const automation = `<section class="automation-section"><h2>Automação por categoria</h2><p class="automation-posture">Hoje nenhuma categoria age sozinha.</p>
+    <details class="settings-how"${open ? " open" : ""}><summary>Como ele decide</summary><p class="automation-intro">Só onde você autorizar.</p><p class="automation-thresholds">Os mínimos estão assinados.</p></details>
+    <ul class="automation-list"><li class="automation-row">${settingsFact({ label: "Tarefas", heading: "h3", group: "automation-category", open,
+      value: `<span class="automation-state" data-reason="insufficient_calibration">Ainda não há exemplos revisados suficientes para confiar nesta categoria ${SETTINGS_LONG}.</span>`,
+      editor: '<p class="automation-risk">Reversível.</p><div class="automation-evidence"><p class="automation-evidence-label">Evidência revisada por você</p><dl class="automation-counts"><div><dt>revisados</dt><dd>34</dd></div><div><dt>aceitos</dt><dd>29</dd></div><div><dt>corrigidos</dt><dd>3</dd></div><div><dt>rejeitados</dt><dd>2</dd></div><div><dt>desfeitos</dt><dd>0</dd></div><div><dt>acerto</dt><dd>85,3%</dd></div></dl></div><form class="automation-form"><label>Política</label><select><option>Automática quando elegível</option></select><p class="automation-state-help">Armar não é autorizar.</p><button type="submit" class="automation-save">Salvar política</button></form>' })}</li></ul>
+    <details class="settings-how automation-history" open><summary class="automation-history-label">Cada mudança de política fica registrada e pode ser desfeita.</summary><ul class="automation-history-list"><li><span>Tarefas: de Apenas sugerir → Automática quando elegível</span><form><button type="submit" class="automation-undo">Desfazer</button></form></li></ul></details></section>`;
+  const push = `<section class="notification-settings"><div class="notification-panel"><h2>Notificações no aparelho</h2><p class="notification-benefit">O Brain pode avisar no aparelho.</p><p class="notification-promise">O aviso mostra só o título.</p></div>
+    <div class="notification-panel"><h3>Situação atual</h3><p class="notification-state-line" data-consent-state="granted" role="status">Você autorizou os avisos neste aparelho.</p></div>
+    <div class="notification-panel"><p class="quiet-state notification-no-prompt">Nada será perguntado.</p><div class="push-controls"><button class="push-action push-action-off" type="button">Desativar avisos neste aparelho</button>
+    ${settingsFact({ label: "O que avisa e quando", className: "push-preferences-fact", open, value: "Lembretes, Coisas para acompanhar, Revisões prontas · Assim que acontecer · silêncio das 22:00 às 07:00 · até 5 por dia",
+      editor: '<div class="push-preferences"><fieldset class="push-card"><legend>O que pode avisar</legend><div class="push-options"><label class="push-option"><input type="checkbox" checked />Lembretes</label><label class="push-option"><input type="checkbox" />Resumos</label></div></fieldset><fieldset class="push-card"><legend>Período silencioso</legend><div class="push-times"><label class="push-time">Começa às<input type="time" value="22:00" /></label><label class="push-time">Termina às<input type="time" value="07:00" /></label></div></fieldset><div class="push-card"><label class="push-cap">Máximo de avisos por dia<input type="number" value="5" /></label></div><div class="push-save"><button class="push-submit" type="button">Salvar preferências</button></div><p class="push-notice" role="status">Preferências salvas.</p></div>' })}
+    </div></div><p class="notification-inapp-note">Os detalhes completos continuam nesta página.</p></section>`;
+  const appearance = `<section class="appearance-section"><h2>Aparência</h2><p class="appearance-intro">Escolha como o produto é desenhado.</p><fieldset class="appearance-fieldset"><legend>Tema</legend><div class="appearance-options">
+    ${["Seguir o aparelho", "Claro", "Escuro"].map((name, index) => `<div class="appearance-option${index === 0 ? " active" : ""}"><input id="settings-fixture-theme-${index}" name="appearance" type="radio" /><span class="appearance-option-copy"><label for="settings-fixture-theme-${index}">${name}</label><small>Descrição.</small></span></div>`).join("")}
+    </div></fieldset><p class="appearance-scope">Fica guardado neste navegador.</p></section>
+    <section class="install-section">${settingsFact({ label: "Instalar como app", heading: "h2", open, value: "Na tela de início, como um aplicativo", editor: '<div class="install-body"><p class="install-intro">O My Brain pode ficar na tela de início.</p><dl class="install-steps"><div class="install-step"><dt>iPhone e iPad (Safari)</dt><dd>Toque no botão Compartilhar.</dd></div></dl><p class="install-caveat quiet-state">Instalar não ativa avisos.</p></div>' })}</section>`;
+  const privacy = `<section class="data-ai-section privacy-section"><h2>Privacidade e dados</h2><div class="settings-rows">
+    <div class="settings-row privacy-row"><div class="settings-row-copy"><h3 class="settings-row-label">Levar seus dados</h3><small>Um arquivo com tudo o que a exportação alcança.</small></div><div class="privacy-export"><form><button type="submit">Gerar exportação</button></form></div></div>
+    ${settingsFact({ label: "O que está guardado sobre você", heading: "h3", open, value: "8000 registros em 12 categorias", editor: `<p class="data-ai-intro">Contagens, nunca conteúdo.</p><ul class="privacy-census"><li><strong>Registros e interpretações ${SETTINGS_LONG}</strong><span>412 registros</span><a href="#">Ver</a></li><li><strong>Eventos de uso do produto</strong><span>5120 registros</span><span class="privacy-census-nosurface">sem página própria; aparece na exportação</span></li></ul>` })}
+    <div class="settings-row privacy-row"><div class="settings-row-copy"><h3 class="settings-row-label">Sessões</h3><span class="privacy-signed-in">Você está conectado como fabio.com.um.endereco.muito.longo@example-de-dominio-comprido.com.br.</span><small>Encerrar em todos os dispositivos revoga todas as sessões.</small></div><form class="privacy-sessions"><button type="submit">Sair de todos os dispositivos</button></form></div>
+    </div><details class="settings-how privacy-details"${open ? " open" : ""}><summary>Ver tudo por categoria e por quanto tempo guardamos</summary><ul class="privacy-withheld"><li><code>account_deletion_attempts</code> — contador de proteção contra abuso</li></ul></details></section>
+    <section class="data-ai-section"><h2>O que você aceitou</h2><p class="data-ai-intro">A versão aceita e a data.</p><ul class="privacy-consent"><li><strong>Termos de uso</strong><span>Versão 2026-08-01, aceita em 3 de agosto de 2026.</span><span>Em dia.</span><a href="#">Ler o documento</a></li></ul>
+      <div class="settings-rows"><div class="settings-row privacy-row"><div class="settings-row-copy"><h3 class="settings-row-label">Consentimentos opcionais</h3><small>Notificações são o único consentimento opcional hoje.</small></div><div class="privacy-revocation"><div><button type="button">Revogar notificações</button></div></div></div></div></section>
+    <section class="data-ai-section"><h2>Conta e dados</h2><p class="data-ai-intro">Cada item abre a própria página.</p><ul class="data-ai-doors"><li><a class="data-ai-door" href="#"><strong>Notificações</strong><span>O que o produto já enviou.</span></a></li><li><a class="data-ai-door" href="/pt-BR/account/delete"><strong>Apagar a conta</strong><span>Pede confirmação e sua senha.</span></a></li></ul></section>`;
+  return `<div class="settings-page"><header class="ui-page-header"><h1>Ajustes</h1></header><div class="settings-layout">${settingsNav("general")}
+    <section aria-label="Você e o assistente" class="settings-panel"${options.root ? ' data-root=""' : ""} id="settings-panel" tabindex="-1">
+      <a class="settings-back" href="#">${ICON}Ajustes</a><p aria-hidden="true" class="settings-panel-title">Você e o assistente</p><p class="settings-panel-summary">Como ele se chama, como responde, e o seu fuso horário.</p>
+      ${form}${onboarding}${key}${automation}${push}${appearance}${privacy}
+    </section></div></div>`;
+}
+
+/** Targets a thumb must hit; a checkbox, radio or switch is measured by the label that carries its hit area. */
+async function settingsShortTargets(page: Page) {
+  return page.evaluate((minimum) => {
+    const root = document.querySelector(".settings-page");
+    if (!root) return ["scope not found"];
+    const targets = [...root.querySelectorAll<HTMLElement>("a, button, summary, select, input:not([type=hidden])")].map((node) => {
+      if (node instanceof HTMLInputElement && ["checkbox", "radio"].includes(node.type)) {
+        return node.closest<HTMLElement>("label, .appearance-option") ?? (node.id ? root.querySelector<HTMLElement>(`label[for="${node.id}"]`) : null) ?? node;
+      }
+      return node;
+    });
+    return targets.filter((node) => node.getClientRects().length > 0)
+      .map((node) => ({ label: (node.textContent ?? "").trim().slice(0, 24) || node.tagName, height: Math.round(node.getBoundingClientRect().height) }))
+      .filter((entry) => entry.height < minimum)
+      .map((entry) => `${entry.label}:${entry.height}`);
+  }, TOUCH_TARGET);
+}
+
+test.describe("Ajustes as rows of facts (Editorial calmo)", () => {
+  for (const width of [390, 320]) {
+    test(`no sideways scroll and no target under 44px at ${width} CSS px — the list, a group closed, a group with every row open`, async ({ page }) => {
+      for (const [name, body] of [
+        ["the list of groups", settingsBody({ root: true, open: false })],
+        ["a group, rows closed", settingsBody({ root: false, open: false })],
+        ["a group, every row open", settingsBody({ root: false, open: true })],
+      ] as const) {
+        await render(page, body, width, 800);
+        expect(await sidewaysOverflow(page), name).toBeLessThanOrEqual(1);
+        expect(await settingsShortTargets(page), name).toEqual([]);
+      }
+    });
+  }
+
+  test("on a phone the list of groups is rows between hairlines, each saying what it is set to", async ({ page }) => {
+    await render(page, settingsBody({ root: true, open: false }), 390, 800);
+    await expect(page.locator(".settings-panel")).toBeHidden();
+    const row = page.locator('.settings-nav-link[data-section="ai"]');
+    await expect(row.locator(".settings-nav-summary")).toBeVisible();
+    const drawn = await row.evaluate((node) => {
+      const style = getComputedStyle(node);
+      const item = getComputedStyle(node.parentElement!);
+      return { radius: style.borderTopLeftRadius, background: style.backgroundColor, rule: item.borderBottomWidth };
+    });
+    expect(drawn.radius).toBe("0px");
+    expect(drawn.background).toBe("rgba(0, 0, 0, 0)");
+    expect(drawn.rule).toBe("1px");
+  });
+
+  test("a setting's control sits on its row, at the row's right edge — not under its label", async ({ page }) => {
+    await render(page, settingsBody({ root: false, open: false }), 390, 800);
+    const rows = page.locator(".settings-form .settings-rows > .settings-row:not(.settings-row-stack):not(.settings-row-link)");
+    const count = await rows.count();
+    expect(count).toBeGreaterThanOrEqual(5);
+    for (let index = 0; index < count; index += 1) {
+      const geometry = await rows.nth(index).evaluate((row) => {
+        const copy = row.querySelector(".settings-row-copy")!.getBoundingClientRect();
+        const control = row.querySelector(".settings-row-control")!.getBoundingClientRect();
+        const box = row.getBoundingClientRect();
+        return { beside: control.left >= copy.right - 1, flush: Math.abs(box.right - control.right) <= 1, card: getComputedStyle(row.parentElement!).borderTopWidth };
+      });
+      expect(geometry, `row ${index}`).toEqual({ beside: true, flush: true, card: "0px" });
+    }
+  });
+
+  test("a row opens its editor underneath itself, and a closed row's editor takes no room", async ({ page }) => {
+    await render(page, settingsBody({ root: false, open: false }), 390, 800);
+    const row = page.locator(".byok-key");
+    await expect(row.locator(".setting-fact-editor")).toBeHidden();
+    await expect(row.locator('.setting-fact-verb[data-when="closed"]')).toBeVisible();
+    await expect(row.locator('.setting-fact-verb[data-when="open"]')).toBeHidden();
+    const closed = (await row.boundingBox())!.height;
+    await row.locator("summary").click();
+    await expect(row.locator('.setting-fact-verb[data-when="open"]')).toBeVisible();
+    await expect(row.locator('.setting-fact-verb[data-when="closed"]')).toBeHidden();
+    const summary = (await row.locator("summary").boundingBox())!;
+    const editor = (await row.locator(".setting-fact-editor").boundingBox())!;
+    expect(editor.y).toBeGreaterThanOrEqual(summary.y + summary.height - 1);
+    expect((await row.boundingBox())!.height).toBeGreaterThan(closed);
+    // 16px, so iOS does not zoom the page when the field takes focus.
+    expect(await row.locator("input").evaluate((node) => parseFloat(getComputedStyle(node).fontSize))).toBeGreaterThanOrEqual(16);
+  });
+
+  test("the way out is the last row of the page, in the risk tone", async ({ page }) => {
+    await render(page, settingsBody({ root: false, open: false }), 390, 800);
+    const colours = await page.evaluate(() => {
+      const doors = [...document.querySelectorAll(".settings-panel .data-ai-door strong")];
+      return doors.map((node) => getComputedStyle(node).color);
+    });
+    expect(colours.at(-1)).not.toBe(colours[0]);
+    const last = await page.evaluate(() => {
+      const links = [...document.querySelectorAll<HTMLAnchorElement>(".settings-panel a")];
+      return links.at(-1)?.getAttribute("href");
+    });
+    expect(last).toBe("/pt-BR/account/delete");
+  });
+
+  test("the fixture still mirrors the markup the components emit", () => {
+    const read = (...path: string[]) => readFileSync(join(ROOT, "src", ...path), "utf8");
+    const fact = read("features", "settings", "setting-fact.tsx");
+    for (const name of ["setting-fact-summary", "setting-fact-label", "setting-fact-value", "setting-fact-verb", "setting-fact-editor"]) {
+      expect(fact, `the row lost ${name}`).toContain(`className="${name}"`);
+    }
+    expect(fact).toContain("<details");
+    const form = read("features", "profile", "settings-form.tsx");
+    for (const name of ["settings-group", "settings-group-title", "settings-rows", "settings-row", "settings-row-copy", "settings-row-control", "settings-feedback-region", "settings-receipt-undo"]) {
+      expect(form, `the form lost ${name}`).toContain(`className="${name}"`);
+    }
+    const nav = read("features", "settings", "settings-section-nav.tsx");
+    for (const name of ["settings-nav-copy", "settings-nav-name", "settings-nav-summary", "settings-nav-chevron"]) expect(nav).toContain(`className="${name}"`);
+    expect(nav, "the coloured icon tiles are back").not.toContain("settings-nav-icon");
+    for (const [file, uses] of [
+      [read("features", "byok", "credential-panel.tsx"), 'className="byok-key"'],
+      [read("features", "agent", "automation-section.tsx"), 'group="automation-category"'],
+      [read("features", "notifications", "push-controls.tsx"), 'className="push-preferences-fact"'],
+      [read("features", "pwa", "install-section.tsx"), "<SettingFact"],
+      [read("features", "privacy", "privacy-section.tsx"), "<SettingFact"],
+    ] as const) {
+      expect(file).toContain("<SettingFact");
+      expect(file).toContain(uses);
+    }
+    // One door to deletion: the group's last section, not also the privacy section.
+    expect(read("features", "privacy", "privacy-section.tsx")).not.toContain("/account/delete`");
+    const content = read("features", "settings", "settings-section-content.tsx");
+    expect(content.lastIndexOf("<AccountDataSection")).toBeGreaterThan(content.lastIndexOf("<DataAiSection"));
+  });
+});

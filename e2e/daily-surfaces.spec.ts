@@ -485,6 +485,14 @@ function pushControls(locale: Locale, state: PushState): string {
   return `<div class="push-controls">
     <button class="push-action push-action-off" type="button">${copy.disableAction}</button>
     <p class="push-notice" role="status">${copy.savedNotice}</p>
+    <details class="setting-fact push-preferences-fact">
+    <summary class="setting-fact-summary">
+      <span class="setting-fact-label">O que avisa e quando</span>
+      <span class="setting-fact-value">reminder, follow_up, review, digest · immediate · 22:30–07:00 · 3</span>
+      <span class="setting-fact-verb" data-when="closed">Alterar</span>
+      <span class="setting-fact-verb" data-when="open">Fechar</span>
+    </summary>
+    <div class="setting-fact-editor">
     <div class="push-preferences">
       <fieldset class="push-card">
         <legend>${copy.typesHeading}</legend>
@@ -516,7 +524,19 @@ function pushControls(locale: Locale, state: PushState): string {
         <button class="push-submit" type="button">${copy.savePreferences}</button>
       </div>
     </div>
+    </div>
+    </details>
   </div>`;
+}
+
+/**
+ * Editorial calmo (ADR-180): the preference controls are one row that opens in
+ * place. Closed, they have no box and are not on the tab order — so a test that
+ * measures or reaches them opens the row first, as the owner would.
+ */
+async function openPushPreferences(target: Page): Promise<void> {
+  await target.locator(".push-preferences-fact > summary").click();
+  await expect(target.locator(".push-preferences")).toBeVisible();
 }
 
 function notificationPage(locale: Locale, state: PushState = "granted"): string {
@@ -711,6 +731,9 @@ test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance sectio
      * only deliberately.
      */
     await open(page, notificationPage("pt-BR", "granted"));
+    await openPushPreferences(page);
+    // Back to the top of the document, so the walk still starts before the section.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
 
     /*
      * Tab STOPS, not elements, and the distinction is the whole assertion.
@@ -784,6 +807,9 @@ test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance sectio
     test(`every option row and action meets the touch minimum at ${width}px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await open(page, notificationPage("pt-BR", "granted"));
+      // Closed first: the row and its verb are themselves targets.
+      expect(await targetsUnder44(page), "a target is under 44px with the row closed").toEqual([]);
+      await openPushPreferences(page);
 
       const rows = page.locator(".push-option");
       const count = await rows.count();
@@ -815,6 +841,7 @@ test.describe("2M-NOTIFY-003 / 2M-MOBILE-005: the notification governance sectio
      * asserts that clicking the row's TEXT toggles the control.
      */
     await open(page, notificationPage("pt-BR", "granted"));
+    await openPushPreferences(page);
     const first = page.locator(".push-option").first();
     const input = first.locator("input");
     await expect(input).toBeChecked();

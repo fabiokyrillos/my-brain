@@ -1,7 +1,8 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getNotificationSettingsCopy } from "./copy";
+import { updateNotificationPreferences } from "./actions";
 import { PushControls } from "./push-controls";
 
 /**
@@ -164,5 +165,57 @@ describe("2M-NOTIFY-003 survives the reconciliation", () => {
     // and the existing enable control is what the user sees.
     expect(screen.queryByText(copy.deviceSilent)).toBeNull();
     expect(askedForPermission).not.toHaveBeenCalled();
+  });
+});
+
+describe("the preferences are one row that opens in place (Editorial calmo, ADR-180)", () => {
+  it("states the stored values on the closed row and keeps the controls off screen", () => {
+    mount();
+    const row = document.querySelector(".push-preferences-fact") as HTMLDetailsElement;
+    const summary = row.querySelector("summary")!;
+    expect(summary.textContent).toContain(copy.types.reminder);
+    expect(summary.textContent).toContain(copy.frequencies.immediate);
+    expect(summary.textContent).toContain("22:00");
+    expect(summary.textContent).toContain("07:00");
+    expect(summary.textContent).toContain("3");
+    expect(screen.getByRole("button", { name: copy.savePreferences })).not.toBeVisible();
+    row.open = true;
+    expect(screen.getByRole("button", { name: copy.savePreferences })).toBeVisible();
+  });
+
+  it("is absent without a granted consent, like the controls it holds", () => {
+    mount("revoked");
+    expect(document.querySelector(".push-preferences-fact")).toBeNull();
+  });
+
+  it("sends the same five values, and reports the save beside the save", async () => {
+    vi.mocked(updateNotificationPreferences).mockResolvedValue({ ok: true, state: "granted" } as never);
+    mount();
+    const row = document.querySelector(".push-preferences-fact") as HTMLDetailsElement;
+    row.open = true;
+    fireEvent.click(screen.getByLabelText(copy.types.review));
+    // An unsaved draft is not what the row claims is in force.
+    expect(row.querySelector("summary")!.textContent).not.toContain(copy.types.review);
+    fireEvent.click(screen.getByRole("button", { name: copy.savePreferences }));
+
+    const notice = await screen.findByText(copy.saved);
+    expect(row.querySelector(".setting-fact-editor")!.contains(notice)).toBe(true);
+    expect(updateNotificationPreferences).toHaveBeenCalledWith(
+      { enabledTypes: ["reminder", "review"], frequency: "immediate", quietStart: "22:00", quietEnd: "07:00", dailyCap: 3 },
+      "en",
+    );
+    expect(row.querySelector("summary")!.textContent).toContain(copy.types.review);
+  });
+
+  it("keeps a failed save's message beside the save, and the row's claim unchanged", async () => {
+    vi.mocked(updateNotificationPreferences).mockResolvedValue({ ok: false } as never);
+    mount();
+    const row = document.querySelector(".push-preferences-fact") as HTMLDetailsElement;
+    row.open = true;
+    fireEvent.click(screen.getByLabelText(copy.types.review));
+    fireEvent.click(screen.getByRole("button", { name: copy.savePreferences }));
+    const notice = await screen.findByText(copy.saveFailed);
+    expect(row.querySelector(".setting-fact-editor")!.contains(notice)).toBe(true);
+    expect(row.querySelector("summary")!.textContent).not.toContain(copy.types.review);
   });
 });

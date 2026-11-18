@@ -2,8 +2,10 @@ import { pendingTurn } from "@/features/chat/pending-turn";
 import { PendingTurnIndicator } from "@/features/chat/pending-turn-indicator";
 import { ChatFrame } from "@/features/chat/chat-frame";
 import { ChatDraftSlot, ChatStreamProvider } from "@/features/chat/chat-stream-context";
+import { Prose } from "@/features/chat/prose";
 import { loadConversationMenu } from "@/features/chat/conversation-menu";
 import { notFound } from "next/navigation";
+import { Fragment } from "react";
 import { runAssistantTurn } from "@/features/assistant/actions";
 import { Composer } from "@/features/capture/composer";
 import { transcribeRecording } from "@/features/capture/transcribe-action";
@@ -81,25 +83,34 @@ function ThreadMessage({
     && (sources.length > 0 || citations.evidence !== "unknown" || citations.legacy);
 
   /*
-    A transcript, not a chat log.
+    Correspondence, not a messenger (Editorial calmo, ADR-180).
 
-    The stream used to render as opposing bubbles — 82% width, the user's turn
-    right-aligned on a solid dark fill — which is the generic assistant layout
-    the direction exists to not be. Both halves are **sentences somebody wrote**,
-    so both are set in the reading face in one column, and what separates them is
-    a mono speaker line and a rule, exactly as an interview is set on paper.
+    Both halves are **sentences somebody wrote**, so both are set in the reading
+    face in one column. The question is the owner's: an ink rule on its leading
+    edge, and the hour it was asked. The answer is prose at the reading measure
+    with nothing around it — no bubble, no name, no stamp — and one quiet closed
+    line beneath: its sources, and where it looked.
 
-    `data-role` carries it. The `chat-message assistant`/`user` classes are kept
-    because three Playwright lanes address messages by them, and renaming them
-    to suit a stylesheet would have broken those for no gain.
+    The speaker and the instant stay in the document for assistive technology
+    on every turn; the stylesheet draws only the question's hour, because the
+    day is said once above the first turn of that day (`ThreadDay`).
+
+    The model that answered is bookkeeping: it is filed behind "Onde procurei"
+    with the reach sentence, and an answer that recorded no sources at all
+    shows none.
+
+    `data-role` carries the styling. The `chat-message assistant`/`user` classes
+    are kept because three Playwright lanes address messages by them.
   */
+  const copy = getAssistantCopy(locale);
   return (
     <article className={`chat-message ${role}`} data-role={role} id={messageAnchorId(messageId)}>
       <p className="chat-message-meta">
-        <span className="chat-message-speaker">{role === "user" ? getAssistantCopy(locale).speakerYou : agentName}</span>
-        <time dateTime={createdAt}>{formatInstant(createdAt, "dayAndTime", locale, timeZone)}</time>
+        <span className="chat-message-speaker">{role === "user" ? copy.speakerYou : agentName}</span>
+        <time dateTime={createdAt}>{formatInstant(createdAt, "time", locale, timeZone)}</time>
       </p>
-      <p className="chat-message-body">{content}</p>
+      {/* Owner content and model output, rendered as text — never markup. */}
+      <Prose className="chat-message-body" text={content} />
       {hasSourceBlock && (
         <div className="message-sources">
           <SourceList
@@ -109,11 +120,32 @@ function ThreadMessage({
             messageId={messageId}
             sources={sources}
             timeZone={timeZone}
-          />
+          >
+            {model ? (
+              <p className="chat-message-model">
+                {copy.modelDetail}: {model}
+              </p>
+            ) : null}
+          </SourceList>
         </div>
       )}
-      {model && <small>{model}</small>}
     </article>
+  );
+}
+
+/**
+ * The day, said once.
+ *
+ * Every turn used to carry its full date and hour on a line of its own. A
+ * conversation happens on a day: the day is a heading over a hairline above the
+ * first turn of it, so a thread resumed three weeks later still says so, and a
+ * thread held in one sitting says it once.
+ */
+function ThreadDay({ createdAt, label }: { createdAt: string; label: string }) {
+  return (
+    <p className="chat-day">
+      <time dateTime={createdAt}>{label}</time>
+    </p>
   );
 }
 
@@ -168,6 +200,9 @@ export default async function ConversationPage({
    * more batching, never the stored copy.
    */
   const turn = pendingTurn(messages, new Date());
+  // The owner's local day of each turn, as the heading says it; a turn whose
+  // day differs from the one before it opens a new day in the thread.
+  const days = messages.map((message) => formatInstant(message.created_at, "day", locale, timeZone));
   const parsed = messages.map((message) => parseCitations(message.citations));
   const [resolved, menu] = await Promise.all([
     Promise.all(parsed.map((citations) => resolveSources(supabase, user.id, citations, locale))),
@@ -188,20 +223,22 @@ export default async function ConversationPage({
 
       <div className="message-stream">
         {messages.map((message, index) => (
-          <ThreadMessage
-            agentName={agentName}
-            timeZone={timeZone}
-            citations={parsed[index]!}
-            content={message.content}
-            conversationId={conversationId}
-            createdAt={message.created_at}
-            key={message.id}
-            locale={locale}
-            messageId={message.id}
-            model={message.model}
-            role={message.role}
-            sources={resolved[index]!}
-          />
+          <Fragment key={message.id}>
+            {days[index] === days[index - 1] ? null : <ThreadDay createdAt={message.created_at} label={days[index]!} />}
+            <ThreadMessage
+              agentName={agentName}
+              timeZone={timeZone}
+              citations={parsed[index]!}
+              content={message.content}
+              conversationId={conversationId}
+              createdAt={message.created_at}
+              locale={locale}
+              messageId={message.id}
+              model={message.model}
+              role={message.role}
+              sources={resolved[index]!}
+            />
+          </Fragment>
         ))}
         {/*
           Life Brain E.5 part 1 (ADR-173): a question still being answered —

@@ -1,5 +1,5 @@
-import { Smartphone } from "lucide-react";
-
+import { getSettingsCopy } from "@/features/settings/copy";
+import { SettingFact } from "@/features/settings/setting-fact";
 import type { Locale } from "@/lib/preferences";
 
 import { getInstallCopy } from "./install-copy";
@@ -32,20 +32,25 @@ import { getInstallCopy } from "./install-copy";
  */
 export function InstallSection({ locale }: { locale: Locale }) {
   const copy = getInstallCopy(locale);
+  const settings = getSettingsCopy(locale);
 
   return (
-    <section className="settings-section install-section" aria-labelledby="install-heading">
-      <div className="settings-section-heading">
-        <span>
-          <Smartphone size={16} aria-hidden />
-        </span>
-        <div>
-          <h2 id="install-heading">{copy.title}</h2>
-          <p>{copy.intro}</p>
-        </div>
-      </div>
-
+    /*
+      Editorial calmo (ADR-180): one closed row. Installing is something a
+      reader does once, so the three platforms' gestures wait behind "Ver
+      como" instead of taking two screens under the theme choice.
+    */
+    <section className="install-section" aria-labelledby="install-heading">
+      <SettingFact
+        closeVerb={settings.close}
+        heading="h2"
+        label={copy.title}
+        labelId="install-heading"
+        value={settings.rows.installValue}
+        verb={settings.rows.installVerb}
+      >
       <div className="install-body">
+        <p className="install-intro">{copy.intro}</p>
         <ul className="install-benefits">
           {copy.benefits.map((benefit) => (
             <li key={benefit}>{benefit}</li>
@@ -70,6 +75,7 @@ export function InstallSection({ locale }: { locale: Locale }) {
         */}
         <p className="install-caveat quiet-state">{copy.caveat}</p>
       </div>
+      </SettingFact>
     </section>
   );
 }

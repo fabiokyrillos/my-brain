@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Clock, Hand, ShieldCheck, Sparkles, SunMoon, UserRound, type LucideIcon } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -24,15 +24,11 @@ import type { SettingsSummaries } from "./summary";
  * Em andamento) are no longer here — they are the "Dados e IA" doors inside
  * Privacidade e conta, which is where the approved mockup puts them, and one
  * door per destination is enough.
+ *
+ * Editorial calmo (ADR-180): a row is the group's name over what it is set to
+ * now, between hairlines. The six coloured icon tiles are gone — they said
+ * nothing the name does not, and colour is kept for attention and risk.
  */
-const ICONS: Readonly<Record<SettingsSection, LucideIcon>> = {
-  general: UserRound,
-  day: Clock,
-  autonomy: Hand,
-  ai: Sparkles,
-  appearance: SunMoon,
-  privacy: ShieldCheck,
-};
 
 export function SettingsSectionNav({ locale, summaries }: { locale: Locale; summaries: SettingsSummaries }) {
   const pathname = usePathname() ?? settingsSectionHref(locale, "general");
@@ -40,7 +36,6 @@ export function SettingsSectionNav({ locale, summaries }: { locale: Locale; summ
   const copy = getSettingsCopy(locale);
 
   const item = (section: SettingsSection) => {
-    const Icon = ICONS[section];
     const current = section === active;
     return (
       <li key={section}>
@@ -50,9 +45,6 @@ export function SettingsSectionNav({ locale, summaries }: { locale: Locale; summ
           data-section={section}
           href={settingsGroupHref(locale, section)}
         >
-          <span aria-hidden="true" className="settings-nav-icon">
-            <Icon size={17} />
-          </span>
           <span className="settings-nav-copy">
             <span className="settings-nav-name">{copy.sections[section].name}</span>
             <span className="settings-nav-summary">{summaries[section]}</span>

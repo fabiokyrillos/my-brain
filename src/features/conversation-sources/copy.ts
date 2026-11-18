@@ -25,6 +25,10 @@ export type ConversationSourcesLocale = (typeof conversationSourcesLocales)[numb
 
 export type ConversationSourcesCopy = {
   readonly title: string;
+  /** The closed line under an answer: how many sources it stands on. */
+  readonly sourcesSummary: (sources: number) => string;
+  /** The closed line that holds the reach sentence. */
+  readonly reachSummary: string;
   readonly supportKinds: Record<SupportKind, string>;
   /** `2K-SRC-006`. Names the two source types, and nothing wider. */
   readonly reach: string;
@@ -76,6 +80,8 @@ export type ConversationSourcesCopy = {
 const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
   "pt-BR": {
     title: "O que eu usei",
+    sourcesSummary: (sources) => (sources === 1 ? "1 fonte" : `${sources} fontes`),
+    reachSummary: "Onde procurei",
     supportKinds: {
       direct_record: "Você escreveu isto",
       product_state: "O que eu guardo como verdadeiro",
@@ -103,6 +109,8 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
   },
   en: {
     title: "What I used",
+    sourcesSummary: (sources) => (sources === 1 ? "1 source" : `${sources} sources`),
+    reachSummary: "Where I looked",
     supportKinds: {
       direct_record: "You wrote this",
       product_state: "What I keep as true",

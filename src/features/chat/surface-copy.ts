@@ -20,9 +20,8 @@ export type ChatSurfaceCopy = Readonly<{
   /** The group a search past the menu's limit adds (ADR-177). */
   olderGroup: string;
   groups: Readonly<{ today: string; yesterday: string; week: string; month: string }>;
-  /** The new-conversation screen. */
+  /** The new-conversation screen: the one question it asks. */
   hello: string;
-  helloDescription: (agent: string) => string;
 }>;
 
 const copy = {
@@ -39,7 +38,6 @@ const copy = {
     olderGroup: "Mais antigas",
     groups: { today: "Hoje", yesterday: "Ontem", week: "Últimos 7 dias", month: "Últimos 30 dias" },
     hello: "O que você quer saber?",
-    helloDescription: (agent) => `O ${agent} responde com o que você já registrou e diz de onde veio.`,
   },
   en: {
     openMenu: "Show conversations",
@@ -54,7 +52,6 @@ const copy = {
     olderGroup: "Older",
     groups: { today: "Today", yesterday: "Yesterday", week: "Previous 7 days", month: "Previous 30 days" },
     hello: "What do you want to know?",
-    helloDescription: (agent) => `${agent} answers from what you have recorded and says where it came from.`,
   },
 } satisfies Record<Locale, ChatSurfaceCopy>;
 

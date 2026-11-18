@@ -1,27 +1,29 @@
 /*
- * Conversar — the editorial frame (`04 - Desktop, Brain e apoio`, frame 07).
+ * Conversar — correspondence, not a messenger (Editorial calmo, ADR-180).
  *
- * ## What this replaces, and why it was wrong for this product
+ * ## The one distinction
  *
- * The thread rendered as opposing bubbles: `max-width: 82%`, the user's turn
- * `justify-self: end` on a solid `--text-primary` fill, both set in the UI face.
- * That is the generic assistant layout, and the direction exists to not be it —
- * but the objection is not aesthetic. **Both halves are sentences somebody
- * wrote**, which is the one distinction this whole redesign is built on: what
- * the owner or the Brain wrote in prose is set in Newsreader, and the machine's
- * labels around it are not. A bubble layout sets the prose in the label's face
- * and spends the width on alignment.
- *
- * So: one column, both turns in the reading face, a mono speaker line above
- * each, and a rule between them. An interview, as it is set on paper.
+ * **Both halves are sentences somebody wrote**, so both are set in the reading
+ * face, in one column, at the reading measure. What the machine adds around
+ * them — who, when, where it looked, which model — is bookkeeping: said once
+ * (the day), reduced to a caption (the hour of a question), or filed behind a
+ * closed line under the answer.
  *
  * ## What separates the two speakers
  *
- * Not colour, and not side. The question is marked by a rule on its leading
- * edge and set one step quieter; the answer runs at full ink and full measure
- * and carries its sources beneath it. A reader scanning the column sees the
- * answers, which is what they came for, and the questions read as the headings
- * they functionally are.
+ * Not colour, not side, not a fill. The question carries an ink rule on its
+ * leading edge and the hour it was asked; the answer is prose with nothing
+ * around it. A reader scanning the column reads the answers and takes the
+ * questions as the headings they functionally are.
+ *
+ * ## What this replaced
+ *
+ * Life Brain E.6 drew the owner's turn as a bubble on the right, the answer
+ * under a speaker line with a full date, its sources as a stack of chips, a
+ * sentence about where it looked and the model's name under every answer, and
+ * the composer as a raised card. The frame of that work stays: the screen is
+ * the conversation, the field is docked at the bottom, the other conversations
+ * are behind the menu.
  */
 
 body .side-rail { overflow-y: auto }
@@ -55,97 +57,177 @@ body .side-rail { overflow-y: auto }
 .chat-thread { max-width: 899px }
 .chat-thread > header { margin-bottom: var(--space-8) }
 
-/* One column. No `justify-self`, no percentage width, no fill. */
-.message-stream { display: grid; gap: 0; margin-bottom: var(--space-6) }
+/*
+ * One column whose track can shrink: a title or a source that cannot break
+ * must not size the thread to its own length (the page scrolled sideways at
+ * 320px on exactly that).
+ */
+.message-stream { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin-bottom: var(--space-6) }
 
-.chat-message {
-  padding: var(--space-6) 0;
-  border-top: 1px solid var(--border-default);
+/* The day, said once: a heading over a hairline above the first turn of it. */
+.chat-day {
+  margin: var(--space-8) 0 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-default);
+  font: var(--type-section);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
 }
-.message-stream > .chat-message:first-child { border-top: 0; padding-top: 0 }
+.message-stream > .chat-day:first-child { margin-top: 0 }
 
-/* The speaker line: who, and when. Mono, quiet, and never the subject. */
+.chat-message { min-width: 0; padding: var(--space-4) 0 0 }
+
+/*
+ * The speaker line. The name and the instant stay in the document on every
+ * turn; what is drawn is the hour of a question, and nothing on an answer.
+ */
 .chat-message-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-1);
   font: var(--type-caption);
   color: var(--text-muted);
 }
-.chat-message-speaker { text-transform: uppercase; letter-spacing: .08em; color: var(--text-secondary) }
+.chat-message-speaker,
+.chat-message[data-role="assistant"] .chat-message-meta,
+.chat-message[data-draft-role] .chat-message-meta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 
+/* A turn, as prose: paragraphs and lists read from the text's own lines. */
 .chat-message-body {
-  white-space: pre-wrap;
-  margin: 0;
   max-width: var(--width-reading);
   font: var(--type-reading);
   color: var(--text-primary);
+  /* Owner content and model output: one unbreakable identifier must not widen the page. */
+  overflow-wrap: anywhere;
 }
+.chat-message-body > * { margin: 0 }
+.chat-message-body > * + * { margin-top: var(--space-3) }
+.chat-message-body > p,
+.chat-message-body li { white-space: pre-wrap }
+.chat-message-body > ol,
+.chat-message-body > ul { display: grid; gap: var(--space-2); padding-inline-start: var(--space-6) }
+.chat-message-body > ol { list-style: decimal }
+.chat-message-body > ul { list-style: disc }
+.chat-message-body li::marker { color: var(--text-muted) }
 
 /*
- * The question, marked by an edge rather than by a side or a fill.
- *
- * Indented and set one step quieter, so a reader scanning the column reads the
- * answers and takes the questions as the headings they functionally are.
+ * The question: an ink rule on its leading edge, never a side or a fill. The
+ * space above it is what separates one exchange from the next.
  */
-.chat-message[data-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
-.chat-message[data-role="user"] .chat-message-body { color: var(--text-secondary) }
+.chat-message[data-role="user"],
+.chat-message[data-draft-role="user"] {
+  margin-top: var(--space-6);
+  padding: 0 0 0 var(--space-4);
+  border-inline-start: 2px solid var(--action-primary);
+}
+.chat-day + .chat-message[data-role="user"] { margin-top: var(--space-5) }
 
 /*
  * Life Brain E.5 part 2 (ADR-175): the streamed turn's draft, set exactly as a
- * persisted turn is. It sits between the thread and the composer, so it reads as
- * the thread's next turn; `data-draft-role` keeps it out of every selector that
+ * persisted turn is. `data-draft-role` keeps it out of every selector that
  * addresses persisted messages.
  */
-.chat-draft { display: grid; gap: 0; margin-bottom: var(--space-4) }
-.chat-message[data-draft-role="user"] { padding-inline-start: var(--space-4); border-inline-start: 3px solid var(--border-strong) }
-.chat-message[data-draft-role="user"] .chat-message-body { color: var(--text-secondary) }
+.chat-draft { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 }
 
-/* The model that answered — provenance, in the smallest register there is. */
-.chat-message > small { display: block; margin-top: var(--space-3); color: var(--text-muted); font: var(--type-caption) }
-
-/*
- * The sources under an answer.
- *
- * Each one is a link back to the record it came from, which is the
- * return-to-source the grounding contract promises. Since Life Brain E.7
- * (ADR-177) they are a row of chips under the answer, as in the approved
- * Conversar mockup, so the rule above them is gone; the chips style themselves
- * (`conversation-cards.css`), and the rules below reach only the other links
- * and headings the block can hold.
- */
-.message-sources { display: grid; gap: var(--space-2); margin-top: var(--space-3) }
-.message-sources strong:not(.sr-only) { display: flex; align-items: center; gap: var(--space-2); font: var(--type-section); letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary) }
-.message-sources a:not(.conversation-source-chip) {
-  display: block;
-  padding: var(--space-2) var(--space-3);
-  border-inline-start: 2px solid var(--border-default);
-  color: var(--text-secondary);
+/* "Thinking…", and a question that went unanswered: the interface speaking, so the UI face. */
+.chat-message-waiting,
+.chat-message[data-pending-turn] .chat-message-body {
+  margin: 0;
   font: var(--type-body);
-  line-height: 1.45;
+  color: var(--text-secondary);
 }
-.message-sources a:not(.conversation-source-chip):hover { border-inline-start-color: var(--action-primary); color: var(--text-primary) }
-
-@media (max-width: 600px) {
-  .chat-message { padding-block: var(--space-5) }
+.chat-message-waiting,
+.chat-message[data-pending-turn] .chat-message-body > p[role="status"] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-/* Life Brain A.1 — the four starter questions under the empty state. */
-.chat-starters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.chat-starters > .ui-button { white-space: normal; text-align: start; min-height: var(--control-md); }
+/* Under an answer: its sources and where it looked (`conversation-cards.css`). */
+.message-sources { max-width: var(--width-reading); margin-top: var(--space-1) }
+/* The model that answered — filed with where the answer looked. */
+.chat-message-model { margin: 0 0 var(--space-2); font: var(--type-caption); color: var(--text-secondary) }
 
 /*
- * Life Brain E.6 (ADR-176) — the Conversar surface.
+ * A turn's outcome that is not a streamed answer — a proposed memory, a
+ * failure — drawn in the thread, where answers are read. The composer portals
+ * it here (`chat-stream-context.tsx`); between turns the element is empty and
+ * takes no room.
+ */
+.chat-outcome:empty { display: none }
+.chat-outcome { display: grid; grid-template-columns: minmax(0, 1fr); margin-top: var(--space-6) }
+.chat-outcome .assistant-composer-notice,
+.chat-outcome .assistant-composer-notice[data-route] {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.chat-outcome .assistant-composer-notice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: var(--space-2) }
+/* What the owner wrote, set as their turn is. */
+.chat-outcome .assistant-composer-echo {
+  margin: 0 0 var(--space-4);
+  padding: 0 0 0 var(--space-4);
+  border-bottom: 0;
+  border-inline-start: 2px solid var(--action-primary);
+}
+.chat-outcome .assistant-composer-echo > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.chat-outcome .assistant-composer-echo > q { quotes: none; font: var(--type-reading); color: var(--text-primary) }
+/* What the agent says back: the question it asks, in the reading face. */
+.chat-outcome .assistant-composer-notice h3 { margin: 0 0 var(--space-1); font: var(--type-reading-lg); letter-spacing: 0; color: var(--text-primary) }
+.chat-outcome .assistant-composer-notice > p:not(.assistant-composer-echo) { max-width: var(--width-reading); font: var(--type-body); color: var(--text-secondary) }
+/* A failure is said in amber and in words; it is not a box. */
+.chat-outcome .assistant-composer-notice[data-route="knowledge_failed"] h3,
+.chat-outcome .assistant-composer-notice[data-route="invalid"] h3 { color: var(--tone-attention-fg) }
+
+/*
+ * The proposal inside it: one question, its two answers side by side. The
+ * dashed card and the tinted state card inside it are gone; "nothing is saved
+ * yet" is the sentence above, in words.
+ */
+.chat-outcome .memory-proposal,
+.chat-outcome .memory-proposal-closed {
+  max-width: var(--width-reading);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.chat-outcome .memory-proposal .conversation-card { padding: 0; border: 0; background: transparent }
+/* The field below is already labelled "Memória"; the state says the rest. */
+.chat-outcome .memory-proposal .conversation-card-type { display: none }
+.chat-outcome .memory-proposal textarea,
+.chat-outcome .memory-proposal select { border-color: var(--border-default); letter-spacing: 0; text-transform: none }
+.chat-outcome .memory-proposal textarea { font: var(--type-reading) }
+.chat-outcome .memory-proposal select { min-height: var(--touch-target); font: var(--type-body) }
+.chat-outcome .memory-proposal-actions { flex-wrap: nowrap; gap: var(--space-2) }
+.chat-outcome .memory-proposal-actions > button { flex: 0 1 auto; min-height: var(--touch-target); font: var(--type-label) }
+.chat-outcome .memory-proposal-discard { border-color: transparent; background: transparent; color: var(--text-secondary) }
+
+/*
+ * The Conversar surface (Life Brain E.6, ADR-176).
  *
- * The owner's reference is ChatGPT: the screen is the conversation. A sticky
- * header (menu ☰, title, new conversation), the thread or the
+ * A sticky header (menu ☰, title, new conversation), the thread or the
  * new-conversation screen filling the height and resting on the field, and
  * the field docked at the bottom. The other conversations are in the menu,
  * which covers the screen on a phone and sits beside the conversation on a
- * wide one. On a phone the shell's top bar steps aside here: search, language
- * and notices stay one tab away.
+ * wide one. On a phone the shell's top bar steps aside here: search and
+ * notices stay one tab away.
  */
 .chat-surface {
   display: grid;
@@ -165,14 +247,16 @@ body .side-rail { overflow-y: auto }
   min-height: 56px;
   padding: 0 var(--space-3);
   background: var(--background-canvas);
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-divider);
 }
+/* The title is the owner's first question, so it is set in the reading face. */
 .chat-header-title {
   flex: 1;
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font: 600 15px/1.3 var(--font-ui);
+  font: var(--type-reading);
+  line-height: 1.3;
   color: var(--text-primary);
   white-space: nowrap;
   text-overflow: ellipsis;
@@ -186,10 +270,10 @@ body .side-rail { overflow-y: auto }
   border: 0;
   border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
 }
-.chat-header-button:hover { background: var(--background-subtle) }
+.chat-header-button:hover { background: var(--background-subtle); color: var(--text-primary) }
 .chat-header-button[data-current] { color: var(--text-muted) }
 
 /* The conversation or the new-conversation screen, resting on the field. */
@@ -199,57 +283,68 @@ body .side-rail { overflow-y: auto }
   flex-direction: column;
   justify-content: flex-end;
   gap: var(--space-4);
-  width: min(760px, 100% - 2 * var(--gutter));
+  width: min(var(--width-reading), 100% - 2 * var(--gutter));
   margin: 0 auto;
-  padding-top: var(--space-6);
+  padding: var(--space-6) 0 var(--space-4);
 }
+.chat-surface .message-stream { margin-bottom: 0 }
 
-.chat-intro { display: grid; gap: var(--space-4) }
-/* A question streamed into the new-conversation screen takes its place. */
-.chat-stage:has([data-chat-draft]) .chat-intro { display: none }
-.chat-hello { display: grid; gap: var(--space-2) }
-.chat-hello h2 { margin: 0; font: 400 30px/1.15 var(--font-reading); letter-spacing: -.01em; color: var(--text-primary) }
-.chat-hello p { margin: 0; font: var(--type-body); color: var(--text-secondary); max-width: var(--width-reading) }
-.chat-intro .conversational-questions { margin: 0 }
+/*
+ * A new conversation: one question in the reading face, then — only if there
+ * is something — the open questions and a few suggestions, as rows.
+ */
+.chat-intro { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-6) }
+/* A turn drawn in this screen takes the introduction's place. */
+.chat-stage:has([data-chat-draft]) .chat-intro,
+.chat-stage:has(.chat-outcome:not(:empty)) .chat-intro { display: none }
+.chat-hello h2 { margin: 0; font: var(--type-display); letter-spacing: -.01em; color: var(--text-primary) }
 
+/* The agent's open questions: one quiet row that leads to where they are answered. */
+.chat-intro .conversational-questions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.chat-intro .conversational-questions > svg { flex: none; color: var(--text-muted) }
+.chat-intro .conversational-questions-quiet-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--text-primary);
+  font: var(--type-label);
+}
+.chat-intro .conversational-questions-quiet-link:hover { text-decoration: underline }
+
+/*
+ * The field: the one thing the screen asks. A single line that grows with
+ * what is written, pinned where the thumb is, with send as its one verb.
+ */
 .chat-dock {
   position: sticky;
   bottom: 0;
   z-index: var(--z-sticky);
-  width: min(760px, 100% - 2 * var(--gutter));
+  width: min(var(--width-reading), 100% - 2 * var(--gutter));
   margin: 0 auto;
   padding: var(--space-3) 0 var(--space-4);
   background: linear-gradient(to bottom, transparent, var(--background-canvas) var(--space-4));
 }
+.chat-dock .assistant-composer { margin: 0 }
 .chat-dock .assistant-composer-hint { display: none }
 
-/* The thread: the owner's turn on the right, the answer in the reading face. */
-.chat-surface .message-stream { margin-bottom: 0 }
-.chat-surface .chat-message { border-top: 0; padding: var(--space-3) 0 }
-.chat-surface .chat-message[data-role="user"],
-.chat-surface .chat-message[data-draft-role="user"] {
-  justify-self: end;
-  max-width: 85%;
-  margin: var(--space-3) 0;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-radius: 18px 18px var(--radius-sm) 18px;
-  background: var(--background-subtle);
-}
-.chat-surface .chat-message[data-role="user"] .chat-message-body,
-.chat-surface .chat-message[data-draft-role="user"] .chat-message-body { font: var(--type-body); color: var(--text-primary) }
-/* The speaker line stays for assistive technology; the side already says who. */
-.chat-surface .chat-message[data-role="user"] .chat-message-meta,
-.chat-surface .chat-message[data-draft-role="user"] .chat-message-meta {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* The conversations menu. */
+/*
+ * The conversations menu: rows between hairlines.
+ *
+ * A group is a heading over a hairline. A row is the title — the owner's own
+ * question, in the reading face — over one caption saying when; the link's box
+ * is the whole row, and the caption is drawn inside it without being part of
+ * its name.
+ */
 .chat-menu[hidden] { display: none }
 .chat-menu {
   position: sticky;
@@ -257,36 +352,32 @@ body .side-rail { overflow-y: auto }
   align-self: start;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   width: 300px;
   height: calc(100dvh - var(--header-height));
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-4) var(--space-3);
   overflow-y: auto;
-  border-right: 1px solid var(--border-default);
-  background: var(--background-subtle);
+  border-right: 1px solid var(--border-divider);
+  background: var(--background-canvas);
 }
-.chat-menu-head { display: flex; align-items: center; gap: var(--space-2) }
+.chat-menu-head { display: flex; align-items: center; gap: var(--space-2); min-height: 56px }
 .chat-menu-new {
   flex: 1;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--touch-target);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  background: var(--action-primary);
-  color: var(--action-primary-text);
-  font: 600 14px/1 var(--font-ui);
+  color: var(--text-primary);
+  font: var(--type-label);
+  font-weight: 600;
 }
+.chat-menu-new:hover { text-decoration: underline }
 .chat-menu-close { display: none }
 .chat-menu-search {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--background-surface);
+  border-bottom: 1px solid var(--border-default);
   color: var(--text-muted);
 }
 .chat-menu-search input {
@@ -296,57 +387,81 @@ body .side-rail { overflow-y: auto }
   border: 0;
   background: transparent;
   color: var(--text-primary);
-  font: var(--type-body);
+  font: var(--type-lead);
 }
 .chat-menu-search input:focus { outline: none }
-.chat-menu-search:focus-within { border-color: var(--border-strong); box-shadow: var(--focus-ring) }
-.chat-menu-groups { display: grid; gap: var(--space-3); padding-bottom: var(--space-6) }
-.chat-menu-group ul { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none }
+.chat-menu-search:focus-within { border-bottom-color: var(--text-primary); outline: 2px solid var(--focus-ring); outline-offset: 2px }
+.chat-menu-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-5); padding: var(--space-2) 0 var(--space-6) }
+.chat-menu-group ul { display: grid; grid-template-columns: minmax(0, 1fr); margin: 0; padding: 0; list-style: none }
 .chat-menu-group-title {
-  margin: var(--space-2) var(--space-2) var(--space-1);
+  margin: 0;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-default);
   font: var(--type-section);
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
-.chat-menu-group a {
+.chat-menu-row { position: relative; border-bottom: 1px solid var(--border-divider) }
+.chat-menu-row > a {
   display: block;
-  padding: var(--space-2) var(--space-3);
   min-height: var(--touch-target);
-  overflow: hidden;
-  border-radius: var(--radius-md);
+  padding: var(--space-3) 0;
   color: var(--text-primary);
-  font: var(--type-body);
-  line-height: calc(var(--touch-target) - 2 * var(--space-2));
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font: var(--type-reading-sm);
+  overflow-wrap: anywhere;
 }
-.chat-menu-group a:hover { background: var(--background-surface) }
-.chat-menu-group a[aria-current="page"] { background: var(--background-surface); font-weight: 600 }
-.chat-menu-empty, .chat-menu-note { margin: var(--space-2); font: var(--type-caption); color: var(--text-muted) }
+/* With a caption, the row keeps a line for it under the title. */
+.chat-menu-row > a:has(+ .chat-menu-when) { padding-bottom: calc(var(--space-3) + var(--space-5)) }
+.chat-menu-row > a:hover { text-decoration: underline }
+.chat-menu-when {
+  position: absolute;
+  left: 0;
+  bottom: var(--space-3);
+  font: var(--type-caption);
+  line-height: var(--space-4);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+/* Where you are: weight, and an ink rule on the leading edge — never a fill. */
+.chat-menu-row > a[aria-current="page"] { font-weight: 600 }
+.chat-menu-row:has(> a[aria-current="page"])::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--space-3));
+  top: var(--space-3);
+  bottom: var(--space-3);
+  width: 2px;
+  border-radius: var(--radius-full);
+  background: var(--action-primary);
+}
+.chat-menu-empty, .chat-menu-note { margin: 0; font: var(--type-caption); color: var(--text-muted) }
 .chat-menu-scrim { display: none }
+
+@media (min-width: 900px) {
+  .chat-hello h2 { font: var(--type-display) }
+}
 
 @media (max-width: 899px) {
   .app-frame:has([data-chat-surface]) .top-bar { display: none }
   .chat-surface {
     grid-template-columns: minmax(0, 1fr);
     min-height: 100dvh;
-    padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--mobilebar-height) + env(safe-area-inset-bottom, 0px));
   }
   .chat-header { padding: 0 var(--space-1) }
-  .chat-header-title { text-align: center }
   .chat-stage, .chat-dock { width: calc(100% - 2 * var(--space-4)) }
-  .chat-dock { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--space-2) }
-  .chat-hello h2 { font-size: 28px }
+  /* Clear of the fixed bottom bar and of the device inset below it. */
+  .chat-dock { bottom: calc(var(--mobilebar-height) + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--space-2) }
+  .chat-hello h2 { font: var(--type-title-1) }
   .chat-menu {
     position: fixed;
     inset: 0 auto 0 0;
     z-index: var(--z-dialog);
-    width: min(316px, 86vw);
+    width: min(340px, 88vw);
     height: 100dvh;
-    background: var(--background-canvas);
     box-shadow: var(--elevation-sheet);
-    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
   }
   .chat-menu-close {
     display: grid;
@@ -356,7 +471,7 @@ body .side-rail { overflow-y: auto }
     border: 0;
     border-radius: var(--radius-md);
     background: transparent;
-    color: var(--text-primary);
+    color: var(--text-secondary);
   }
   .chat-menu-scrim {
     display: block;

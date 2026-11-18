@@ -14,6 +14,8 @@
  * cada ajuste muda", where `CapabilitySummary` already says it in full.
  */
 
+import type { CredentialStatus } from "@/features/byok/credential-view";
+import type { AIRoutingProfile } from "@/lib/ai/model-routing";
 import type { Locale } from "@/lib/preferences";
 import type { SettingsSection } from "./sections";
 
@@ -54,7 +56,34 @@ export type SettingsCopy = Readonly<{
     readonly profile: string;
     readonly models: string;
   }>;
-  readonly language: Readonly<{ readonly label: string; readonly hint: string }>;
+  readonly language: Readonly<{ readonly label: string; readonly hint: string; readonly name: string }>;
+  /**
+   * Editorial calmo (ADR-180): a setting is a row that states its value and
+   * opens its editor in place. These are the row's verbs.
+   */
+  readonly change: string;
+  readonly close: string;
+  readonly view: string;
+  /** The words a closed row says about what is inside it. */
+  readonly rows: Readonly<{
+    readonly pushPreferences: string;
+    readonly pushSummary: (parts: Readonly<{ types: readonly string[]; frequency: string; quietStart: string; quietEnd: string; cap: number }>) => string;
+    readonly installValue: string;
+    readonly installVerb: string;
+    readonly stored: (rows: number, categories: number) => string;
+    readonly autonomyHow: string;
+  }>;
+  /** The four cost-and-quality profiles, by name (also on the list of groups). */
+  readonly profiles: Readonly<Record<AIRoutingProfile, string>>;
+  /** What each group is set to now, as one line under its name. */
+  readonly summaries: Readonly<{
+    readonly day: (quietStart: string, quietEnd: string, cap: number) => string;
+    readonly autonomyNone: string;
+    readonly autonomySome: (count: number) => string;
+    readonly credential: Readonly<Record<CredentialStatus, string>>;
+    readonly appearance: string;
+    readonly privacy: string;
+  }>;
   /** `2P-SETTINGS-007` — the sentence that names the group a save failed in. */
   readonly saveFailedIn: (section: string) => string;
   /** The one discreet link `2P-SETTINGS-008` allows on the notifications page. */
@@ -113,7 +142,28 @@ const copy: Readonly<Record<Locale, SettingsCopy>> = {
       profile: "Qualidade e custo",
       models: "Modelo por função",
     },
-    language: { label: "Idioma", hint: "O mesmo que o “EN” no topo da tela." },
+    language: { label: "Idioma", hint: "Também no menu da conta.", name: "Português" },
+    change: "Alterar",
+    close: "Fechar",
+    view: "Ver",
+    rows: {
+      pushPreferences: "O que avisa e quando",
+      pushSummary: ({ types, frequency, quietStart, quietEnd, cap }) =>
+        `${types.length > 0 ? types.join(", ") : "Nenhum tipo"} · ${frequency} · silêncio das ${quietStart} às ${quietEnd} · até ${cap} por dia`,
+      installValue: "Na tela de início, como um aplicativo",
+      installVerb: "Ver como",
+      stored: (rows, categories) => `${rows} ${rows === 1 ? "registro" : "registros"} em ${categories} categorias`,
+      autonomyHow: "Como ele decide",
+    },
+    profiles: { quality: "Qualidade máxima", balanced: "Equilibrado", economy: "Econômico", custom: "Personalizado" },
+    summaries: {
+      day: (quietStart, quietEnd, cap) => `Silêncio das ${quietStart} às ${quietEnd} · até ${cap} por dia`,
+      autonomyNone: "Só sugere, em tudo",
+      autonomySome: (count) => `Age sozinho em ${count} ${count === 1 ? "categoria" : "categorias"}`,
+      credential: { active: "Chave funcionando", invalid: "A chave parou de funcionar", removed: "Sem chave", absent: "Sem chave" },
+      appearance: "Tema e instalar como app",
+      privacy: "Baixar uma cópia, sessões, apagar a conta",
+    },
     saveFailedIn: (section) => `Não foi possível salvar em ${section}. Nada foi alterado — revise e tente novamente.`,
     notificationPreferencesLink: "Preferências de notificação",
   },
@@ -168,7 +218,28 @@ const copy: Readonly<Record<Locale, SettingsCopy>> = {
       profile: "Quality and cost",
       models: "Model per function",
     },
-    language: { label: "Language", hint: "The same as “PT” at the top of the screen." },
+    language: { label: "Language", hint: "Also in the account menu.", name: "English" },
+    change: "Change",
+    close: "Close",
+    view: "View",
+    rows: {
+      pushPreferences: "What alerts you, and when",
+      pushSummary: ({ types, frequency, quietStart, quietEnd, cap }) =>
+        `${types.length > 0 ? types.join(", ") : "No type"} · ${frequency} · quiet from ${quietStart} to ${quietEnd} · up to ${cap} a day`,
+      installValue: "On your home screen, like an app",
+      installVerb: "See how",
+      stored: (rows, categories) => `${rows} ${rows === 1 ? "record" : "records"} in ${categories} categories`,
+      autonomyHow: "How it decides",
+    },
+    profiles: { quality: "Maximum quality", balanced: "Balanced", economy: "Economy", custom: "Custom" },
+    summaries: {
+      day: (quietStart, quietEnd, cap) => `Quiet from ${quietStart} to ${quietEnd} · up to ${cap} a day`,
+      autonomyNone: "Only suggests, everywhere",
+      autonomySome: (count) => `Acts alone in ${count} ${count === 1 ? "category" : "categories"}`,
+      credential: { active: "Key working", invalid: "The key stopped working", removed: "No key", absent: "No key" },
+      appearance: "Theme and installing as an app",
+      privacy: "Take a copy, sessions, delete the account",
+    },
     saveFailedIn: (section) => `Could not save in ${section}. Nothing changed — review the fields and try again.`,
     notificationPreferencesLink: "Notification preferences",
   },

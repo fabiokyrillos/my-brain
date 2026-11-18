@@ -255,3 +255,36 @@ describe("CredentialPanel", () => {
     expect(screen.getByText(/authoritative figure is in your own OpenAI dashboard/)).toBeVisible();
   });
 });
+
+describe("the key is a fact that opens its form in place (Editorial calmo, ADR-180)", () => {
+  it("states the key's state on a closed row when a key is working", () => {
+    renderPanel(active);
+    const row = document.querySelector(".byok-key") as HTMLDetailsElement;
+    expect(row.open).toBe(false);
+    const summary = row.querySelector("summary")!;
+    expect(summary.querySelector(".byok-badge")?.getAttribute("data-status")).toBe("active");
+    expect(summary.querySelector("code")?.textContent).toBe(active.fingerprint);
+    expect(summary.querySelector("time")).not.toBeNull();
+    expect(document.getElementById("byok-api-key")).not.toBeVisible();
+    row.open = true;
+    expect(document.getElementById("byok-api-key")).toBeVisible();
+  });
+
+  it("arrives open when there is no working key, because entering one is what the page asks", () => {
+    renderPanel(absent);
+    expect((document.querySelector(".byok-key") as HTMLDetailsElement).open).toBe(true);
+    expect(document.getElementById("byok-api-key")).toBeVisible();
+    cleanup();
+    renderPanel(removed);
+    expect((document.querySelector(".byok-key") as HTMLDetailsElement).open).toBe(true);
+  });
+
+  it("keeps the outcome and the removal outside the editor, after the row", () => {
+    renderPanel(active);
+    const row = document.querySelector(".byok-key")!;
+    const danger = document.querySelector(".byok-danger")!;
+    expect(row.contains(danger)).toBe(false);
+    expect(row.compareDocumentPosition(danger) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(danger.querySelector("button")).toBeVisible();
+  });
+});

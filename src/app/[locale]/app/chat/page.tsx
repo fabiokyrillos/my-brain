@@ -132,9 +132,13 @@ export default async function ChatPage({
           <div className="chat-stage">
             {/* Hidden by CSS once a turn is being streamed into this screen. */}
             <div className="chat-intro">
+              {/*
+                Editorial calmo: the screen asks one thing. The sentence that
+                explained what the agent does under it is cut — the field and
+                the suggestions already say it.
+              */}
               <div className="chat-hello">
                 <h2>{surface.hello}</h2>
-                <p>{surface.helloDescription(agentName)}</p>
               </div>
 
               {askingAbout === null ? null : (
@@ -163,21 +167,27 @@ export default async function ChatPage({
                 the field is already seeded with it.
               */}
               {suggestions.length > 0 || askingAbout !== null ? null : (
-                <div className="chat-starters" role="group" aria-label={copy.startersLabel}>
-                  {copy.starters.map((question) => (
-                    <SeedChip
-                      fillLabel={chipCopy.fill(question)}
-                      /*
-                        The path with no JavaScript, and the behaviour this
-                        replaced: a full navigation that re-rendered the page to
-                        put four words in a field. Kept only as the degraded
-                        route, never as the one a hydrated page takes.
-                      */
-                      href={`/${locale}/app/chat?q=${encodeURIComponent(question)}`}
-                      key={question}
-                      question={question}
-                    />
-                  ))}
+                /* The same rows the derived suggestions are drawn as: a heading
+                   over a hairline, one question per row, the row is the control. */
+                <div className="conversation-suggestions" role="group" aria-labelledby="chat-starters-label">
+                  <p className="conversation-suggestions-label" id="chat-starters-label">{copy.startersLabel}</p>
+                  <ul className="conversation-suggestions-list">
+                    {copy.starters.map((question) => (
+                      <li key={question}>
+                        <SeedChip
+                          fillLabel={chipCopy.fill(question)}
+                          /*
+                            The path with no JavaScript, and the behaviour this
+                            replaced: a full navigation that re-rendered the page to
+                            put four words in a field. Kept only as the degraded
+                            route, never as the one a hydrated page takes.
+                          */
+                          href={`/${locale}/app/chat?q=${encodeURIComponent(question)}`}
+                          question={question}
+                        />
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>

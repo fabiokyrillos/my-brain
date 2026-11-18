@@ -54,7 +54,7 @@ function Group({ id, title, note, children }: { id: string; title: string; note?
   return <section aria-labelledby={id} className="settings-group">
     <h2 className="settings-group-title" id={id}>{title}</h2>
     {note ? <p className="settings-group-note">{note}</p> : null}
-    <div className="settings-card">{children}</div>
+    <div className="settings-rows">{children}</div>
   </section>;
 }
 
@@ -384,22 +384,22 @@ export function SettingsForm({
   const profiles: Array<{ id: AIRoutingProfile; title: string; description: string }> = [
     {
       id: "quality",
-      title: pt ? "Qualidade máxima" : "Maximum quality",
+      title: settingsCopy.profiles.quality,
       description: pt ? "Recomendado. Terra no chat e nas revisões; Luna na captura e nos arquivos." : "Recommended. Terra for chat and reviews; Luna for capture and files.",
     },
     {
       id: "balanced",
-      title: pt ? "Equilibrado" : "Balanced",
+      title: settingsCopy.profiles.balanced,
       description: pt ? "Luna no chat e nas revisões; Mini na captura e nos arquivos." : "Luna for chat and reviews; Mini for capture and files.",
     },
     {
       id: "economy",
-      title: pt ? "Econômico" : "Economy",
+      title: settingsCopy.profiles.economy,
       description: pt ? "GPT-5 mini em todas as funções que você pode escolher." : "GPT-5 mini for every function you can choose.",
     },
     {
       id: "custom",
-      title: pt ? "Personalizado" : "Custom",
+      title: settingsCopy.profiles.custom,
       description: pt ? "Você escolhe o modelo de cada função abaixo." : "You choose each function's model below.",
     },
   ];
@@ -475,7 +475,7 @@ export function SettingsForm({
     {section === "ai" ? <>
     <section aria-labelledby="settings-group-profile" className="settings-group">
       <h2 className="settings-group-title" id="settings-group-profile">{settingsCopy.groups.profile}</h2>
-      <div className="settings-card">
+      <div className="settings-rows">
         <fieldset className="ai-profile-fieldset settings-row settings-row-stack">
           <legend className="settings-row-legend">{pt ? "Perfil de custo e qualidade" : "Cost and quality profile"}</legend>
           <div className="settings-segmented">{profiles.map((profile) => <label key={profile.id} className={`settings-segment${aiProfile === profile.id ? " active" : ""}`}><input type="radio" name="aiProfile" value={profile.id} checked={aiProfile === profile.id} onChange={() => chooseProfile(profile.id)} /><span>{profile.title}</span></label>)}</div>
@@ -490,7 +490,7 @@ export function SettingsForm({
 
     <section aria-labelledby="settings-group-models" className="settings-group">
       <h2 className="settings-group-title" id="settings-group-models">{settingsCopy.groups.models}</h2>
-      <div className="settings-card ai-routes">
+      <div className="settings-rows ai-routes">
         <ModelSelect id="chat-model" name="chatModel" label={pt ? "Chat principal" : "Main chat"} description={pt ? "Respostas, contexto e conversa do dia a dia." : "Answers, context, and daily conversation."} value={routes.chatModel} onChange={changeRoute} />
         <ModelSelect id="extraction-model" name="extractionModel" label={pt ? "Captura e organização" : "Capture and organization"} description={pt ? "Lê o que você escreveu e propõe tarefas, pessoas e datas." : "Reads what you wrote and proposes tasks, people, and dates."} value={routes.extractionModel} onChange={changeRoute} />
         <ModelSelect id="review-model" name="reviewModel" label={pt ? "Revisões e resumos" : "Reviews and summaries"} description={pt ? "Revisões que você pede a partir dos seus registros." : "Reviews you ask for from your records."} value={routes.reviewModel} onChange={changeRoute} />
