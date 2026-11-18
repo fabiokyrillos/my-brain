@@ -63,6 +63,23 @@ function reversalSentence(
   }
 }
 
+/**
+ * What `chat` may print of a card's snippet, decided by the central contract.
+ *
+ * One function, so every place a conversation draws a card's content — this
+ * shell, and the source cards under an answer (`source-list.tsx`) — asks the
+ * same question of the same contract and cannot answer it differently.
+ */
+export function chatCardContent(card: ConversationCard, revealed = false) {
+  const revealKey = card.objectId ?? card.cardType;
+  return resolveContent(
+    "chat",
+    card.sensitivity,
+    revealKey,
+    revealed ? { revealed: new Set([revealKey]) } : NO_REVEALS,
+  );
+}
+
 export function ConversationCardView({
   card,
   locale,
@@ -76,13 +93,7 @@ export function ConversationCardView({
   const copy = getConversationCardsCopy(locale);
   const [revealed, setRevealed] = useState(false);
 
-  const revealKey = card.objectId ?? card.cardType;
-  const content = resolveContent(
-    "chat",
-    card.sensitivity,
-    revealKey,
-    revealed ? { revealed: new Set([revealKey]) } : NO_REVEALS,
-  );
+  const content = chatCardContent(card, revealed);
 
   const controls = mayRenderMutatingControl(card) ? children : null;
 

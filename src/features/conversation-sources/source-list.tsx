@@ -15,30 +15,45 @@
  * 4. **Reach** — records and memories, and nothing else. The limit is stated
  *    rather than hidden.
  *
- * ## One quiet line, closed (Editorial calmo, ADR-180; chips since ADR-177)
+ * ## Cards in the conversation, then one quiet line (Editorial calmo, ADR-180)
  *
- * Under the answer the block is a row of closed disclosures: how many sources
- * the answer stands on, and where it looked. Opened, each source is a row —
- * its type and its date, "Registro · 5 nov." — that opens the source. The
- * answer above already says what the source says; the row says where it came
- * from and takes the owner there. The support kind is read to assistive
- * technology inside the row's name, and an inference is drawn differently.
- * (`conversation-source-chip` is still the row's class name: three lanes
- * address it.) The honest "I found nothing" is never behind a disclosure.
+ * Under the answer, each source it cites is a card: the kind's glyph, what the
+ * source says, its kind and its date, and the whole card is the link to it. The
+ * first three are drawn; more fold behind "Mais N fontes". Where it looked and
+ * how it got there stay closed disclosures on one line beneath. (ADR-187 had
+ * folded the sources too, behind "N fontes"; the owner asked to see them.) The
+ * support kind is read to assistive technology inside the card's name, and an
+ * inference is drawn differently. The honest "I found nothing" is never behind
+ * a disclosure.
  *
- * A chip carries **no content** — no snippet — so this component still holds no
- * sensitivity logic of its own (`sensitivity-boundary.test.ts`): there is
- * nothing in it to mask. The `unavailable` shape is the card's own state,
- * decided by `resolve-sources.ts`, and an unavailable source has no link.
+ * What a card says is decided by the central contract, through the same
+ * function the card shell uses (`chatCardContent`) — this component names no
+ * level and makes no rule of its own (`sensitivity-boundary.test.ts`). The
+ * `unavailable` shape is the card's own state, decided by `resolve-sources.ts`:
+ * an unavailable source is one quiet line with no link, never a card.
  */
 
+import {
+  BellRing,
+  BrainCircuit,
+  BriefcaseBusiness,
+  Building2,
+  ChevronRight,
+  Files,
+  FolderKanban,
+  Inbox,
+  UsersRound,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { chatCardContent } from "@/features/conversation-cards/card";
 import {
   CONTINUITY_HANDLE_VERSION,
   serializeContinuityHandle,
 } from "@/features/conversation-cards/continuity";
+import type { ConversationCardType } from "@/features/conversation-cards/contracts";
 import { getConversationCardsCopy } from "@/features/conversation-cards/copy";
 import { ConversationAnswerShown } from "@/features/product-analytics/interaction-events";
 import type { Locale } from "@/lib/preferences";
@@ -49,16 +64,28 @@ import { getConversationSourcesCopy } from "./copy";
 import { ExplanationPanel } from "./explanation-panel";
 import type { ResolvedSource } from "./resolve-sources";
 
-function Freshness({ locale, occurredAt, timeZone }: { locale: Locale; occurredAt: string | null; timeZone: string }) {
+function Freshness({
+  lead = true,
+  locale,
+  occurredAt,
+  timeZone,
+}: {
+  /** Whether a separator opens it — false when it is the first thing on its line. */
+  lead?: boolean;
+  locale: Locale;
+  occurredAt: string | null;
+  timeZone: string;
+}) {
   const copy = getConversationSourcesCopy(locale);
+  const separator = lead ? " · " : "";
   if (occurredAt === null) {
     // Absent, never fabricated. A made-up date on a source is the preview's
     // first lie wearing a different costume.
-    return <span className="conversation-source-freshness"> · {copy.freshnessUnknown}</span>;
+    return <span className="conversation-source-freshness">{separator}{copy.freshnessUnknown}</span>;
   }
   return (
     <span className="conversation-source-freshness">
-      {" · "}
+      {separator}
       <span className="sr-only">{copy.freshnessLabel} </span>
       <time dateTime={occurredAt}>
         {formatInstant(occurredAt, "day", locale, timeZone)}
@@ -93,6 +120,99 @@ function openHref(
   return `${card.href}?from=${handle}`;
 }
 
+/** How many sources are drawn as cards before the rest fold behind one line. */
+export const VISIBLE_SOURCES = 3;
+
+/** The product's own glyph for each kind — the one its navigation uses for that place. */
+const KIND_ICON: Readonly<Record<ConversationCardType, LucideIcon>> = {
+  task: BriefcaseBusiness,
+  reminder: BellRing,
+  memory: BrainCircuit,
+  entry: Inbox,
+  person: UsersRound,
+  project: FolderKanban,
+  organization: Building2,
+  file: Files,
+};
+
+/**
+ * One source under an answer.
+ *
+ * A card the whole of which is the link: the kind's glyph, what the source says
+ * (two lines at most), one caption — its kind and its date — and a chevron. It
+ * carries no control of any kind: a source is something the answer pointed at,
+ * and `readOnlyPreviewCard` built it read-only (`2K-CARD-008`).
+ *
+ * What it says is asked of the same contract, through the same function, that
+ * the card shell asks (`chatCardContent`): content the contract masks is drawn
+ * as the masked sentence and never as text, and content it omits is not drawn.
+ * A source that carries no content at all — a task or a reminder, which the
+ * resolver reads content-free (ADR-146) — is titled by its kind alone.
+ *
+ * An unavailable source is not a card: one quiet line, with no link.
+ */
+function SourceItem({
+  continuity,
+  locale,
+  source,
+  timeZone,
+}: {
+  continuity: { conversationId: string; messageId: string } | null;
+  locale: Locale;
+  source: ResolvedSource;
+  timeZone: string;
+}) {
+  const copy = getConversationSourcesCopy(locale);
+  const cardCopy = getConversationCardsCopy(locale);
+  const { card } = source;
+  const type = cardCopy.types[card.cardType];
+  const support = <span className="conversation-source-support sr-only">{copy.supportKinds[source.support]}: </span>;
+
+  if (card.state === "unavailable") {
+    return (
+      <li data-support={source.support}>
+        <span className="conversation-source-chip" data-unavailable="">
+          {support}
+          <span className="conversation-source-type">{type} · {cardCopy.states.unavailable}</span>
+        </span>
+      </li>
+    );
+  }
+
+  const content = card.snippet === null ? null : chatCardContent(card);
+  const masked = content !== null && content.masked;
+  const said = content === null ? null : content.show ? card.snippet : masked ? cardCopy.masked : null;
+  const href = openHref(card, continuity);
+  const Icon = KIND_ICON[card.cardType];
+  const inner = (
+    <>
+      <span aria-hidden="true" className="conversation-source-icon">
+        <Icon size={20} strokeWidth={1.75} />
+      </span>
+      <span className="conversation-source-text">
+        {/* Owner content, rendered as text. Never an instruction (T-2K-05). */}
+        <span className="conversation-source-title" data-masked={masked ? "true" : undefined}>{said ?? type}</span>
+        <span className="conversation-source-caption">
+          {support}
+          {said === null ? null : <span className="conversation-source-type">{type}</span>}
+          <Freshness lead={said !== null} locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
+        </span>
+      </span>
+      {href === null ? null : <ChevronRight aria-hidden="true" className="conversation-source-chevron" size={18} />}
+    </>
+  );
+
+  return (
+    <li data-support={source.support}>
+      {href === null ? (
+        <span className="conversation-source-card" data-card-type={card.cardType}>{inner}</span>
+      ) : (
+        <Link className="conversation-source-card" data-card-type={card.cardType} href={href}>{inner}</Link>
+      )}
+    </li>
+  );
+}
+
 export function SourceList({
   children,
   citations,
@@ -116,7 +236,6 @@ export function SourceList({
   timeZone: string;
 }) {
   const copy = getConversationSourcesCopy(locale);
-  const cardCopy = getConversationCardsCopy(locale);
 
   /*
    * `2K-SRC-005`. Read from what **retrieval** found, never from
@@ -154,47 +273,28 @@ export function SourceList({
         <p className="conversation-sources-insufficient">{where.insufficient}</p>
       ) : sources.length === 0 ? null : (
         /*
-          Editorial calmo: one quiet line under the answer, closed. It says how
-          many sources the answer stands on; opened, each is a row that leads to
-          its record. They were a stack of chips, drawn open under every answer.
+          Cards, in the order the answer cited them (ADR-187 folded them behind
+          "N fontes"; the owner asked for them in the conversation). The first
+          three are drawn; the rest are one quiet line away.
         */
-        <details className="conversation-sources-used">
-          <summary>
-            <span className="conversation-sources-title sr-only">{copy.title}: </span>
-            {copy.sourcesSummary(sources.length)}
-          </summary>
+        <>
+          <p className="conversation-sources-title sr-only">{copy.title}</p>
           <ul className="conversation-sources-list">
-            {sources.map((source) => {
-              const href = openHref(source.card, continuity);
-              const unavailable = source.card.state === "unavailable";
-              const label = (
-                <>
-                  <span className="conversation-source-support sr-only">{copy.supportKinds[source.support]}: </span>
-                  <span className="conversation-source-type">
-                    {cardCopy.types[source.card.cardType]}
-                    {unavailable ? ` · ${cardCopy.states.unavailable}` : null}
-                  </span>
-                  {unavailable ? null : (
-                    <Freshness locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
-                  )}
-                </>
-              );
-              return (
-                <li data-support={source.support} key={source.key}>
-                  {href === null || unavailable ? (
-                    <span className="conversation-source-chip" data-unavailable={unavailable ? "" : undefined}>
-                      {label}
-                    </span>
-                  ) : (
-                    <Link className="conversation-source-chip" href={href}>
-                      {label}
-                    </Link>
-                  )}
-                </li>
-              );
-            })}
+            {sources.slice(0, VISIBLE_SOURCES).map((source) => (
+              <SourceItem continuity={continuity} key={source.key} locale={locale} source={source} timeZone={timeZone} />
+            ))}
           </ul>
-        </details>
+          {sources.length <= VISIBLE_SOURCES ? null : (
+            <details className="conversation-sources-more">
+              <summary>{copy.moreSources(sources.length - VISIBLE_SOURCES)}</summary>
+              <ul className="conversation-sources-list">
+                {sources.slice(VISIBLE_SOURCES).map((source) => (
+                  <SourceItem continuity={continuity} key={source.key} locale={locale} source={source} timeZone={timeZone} />
+                ))}
+              </ul>
+            </details>
+          )}
+        </>
       )}
 
       {/*

@@ -58,3 +58,9 @@ Rendered from the real pages with mocked loaders through the compiled stylesheet
 - Ten online specs were edited and not run.
 - `field-sizing` on iOS Safari; `<details name>` exclusivity in Safari and Firefox.
 - The new-conversation screen and the desktop thread changed least.
+
+## Follow-up, 2026-11-18: two sides and source cards (ADR-189)
+
+After using the thread the owner asked for the question on the right and the answer on the left, and for sources as cards in the conversation. He approved a [mockup](evidence/conversar-ajustes/chat-mockup-aprovado-mobile-dark.png); the result: [phone](evidence/conversar-ajustes/conversa-lados-depois-mobile.png) ([dark](evidence/conversar-ajustes/conversa-lados-depois-escuro-mobile.png), [before](evidence/conversar-ajustes/conversa-lados-antes-mobile.png)) · [desktop](evidence/conversar-ajustes/conversa-lados-depois-desktop.png) ([before](evidence/conversar-ajustes/conversa-lados-antes-cinco-desktop.png), a short thread pushed to the bottom).
+
+Deviation from the mockup: task and reminder cards are headed by their kind ("Tarefa", "Lembrete") and a date, not their title, because the resolver reads them content-free (ADR-146). `npm test` 613 files / 11,306 tests; typecheck, lint, build clean. Not verified: the signed-in app, real streaming; `online-agenda-answer` edited and not run.

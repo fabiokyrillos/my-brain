@@ -346,12 +346,13 @@
  */
 
 /*
- * Editorial calmo (ADR-180): one quiet line under the answer.
+ * Editorial calmo (ADR-180): cards in the conversation, then one quiet line.
  *
- * The block is a row of closed lines — "3 fontes", "Onde procurei", "Como
- * cheguei aqui" — each a native disclosure. An open one takes the row, so what
- * it holds reads at the full measure. The sources were a stack of chips drawn
- * open under every answer, with the reach sentence repeated beneath them.
+ * The sources an answer cites are cards under it, in sight (the owner's
+ * direction of 18 November 2026; ADR-187 had folded them behind "N fontes").
+ * Under them, closed lines — "Mais N fontes" when there are more than three,
+ * "Onde procurei", "Como cheguei aqui" — each a native disclosure. An open one
+ * takes the row, so what it holds reads at the full measure.
  */
 .conversation-sources {
   display: flex;
@@ -360,7 +361,6 @@
   column-gap: var(--space-5);
 }
 
-.conversation-sources-used,
 .conversation-sources-where,
 .conversation-sources > details { min-width: 0 }
 .conversation-sources > details[open] { flex: 1 1 100% }
@@ -401,49 +401,95 @@
   font: var(--type-caption);
 }
 
-/* The sources, opened: rows between hairlines, and the row is the link. */
+/* The sources: a stack of cards at the full width of the block. */
 .conversation-sources-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
   margin: 0 0 var(--space-2);
   padding: 0;
-  border-top: 1px solid var(--border-divider);
   list-style: none;
 }
+.conversation-sources > .conversation-sources-list { flex: 1 1 100% }
 
-.conversation-sources-list > li { border-bottom: 1px solid var(--border-divider) }
+/* The rest, one quiet line away: it opens under the three already drawn. */
+.conversation-sources > .conversation-sources-more { flex: 1 1 100% }
+.conversation-sources > .conversation-sources-more > summary { color: var(--link); font: var(--type-label) }
+.conversation-sources > .conversation-sources-more > summary:hover { color: var(--link-hover); text-decoration: underline }
+.conversation-sources-more > .conversation-sources-list { margin-top: var(--space-1) }
 
-.conversation-source-chip {
-  display: flex;
-  flex-wrap: wrap;
+/*
+ * A card is the link to what the answer cited: the kind's glyph in a tile,
+ * what the source says (two lines at most) over its kind and date, a chevron.
+ * Hairline, surface, and no control of its own (`2K-CARD-008`).
+ */
+.conversation-source-card {
+  display: grid;
+  grid-template-columns: var(--space-10) minmax(0, 1fr) auto;
   align-items: center;
-  min-height: var(--touch-target);
-  padding: var(--space-2) 0;
+  column-gap: var(--space-3);
+  min-height: var(--space-16);
+  padding: var(--space-3);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--background-surface);
   color: var(--text-primary);
-  font: var(--type-body);
   text-decoration: none;
-  /* The unavailable sentence is long: it wraps rather than widening the page. */
+}
+a.conversation-source-card:hover { border-color: var(--border-strong) }
+a.conversation-source-card:hover .conversation-source-title { text-decoration: underline; text-underline-offset: 3px }
+a.conversation-source-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px }
+
+.conversation-source-icon {
+  display: grid;
+  place-items: center;
+  width: var(--space-10);
+  height: var(--space-10);
+  border-radius: var(--radius-md);
+  background: var(--background-subtle);
+  color: var(--text-secondary);
+}
+
+.conversation-source-text { display: grid; gap: var(--space-1); min-width: 0 }
+
+.conversation-source-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font: var(--type-reading);
+  line-height: 1.35;
   overflow-wrap: anywhere;
 }
+/* The contract kept the text back: the sentence that says so, in the interface's voice. */
+.conversation-source-title[data-masked] { font: var(--type-body); font-style: italic; color: var(--text-secondary) }
 
-a.conversation-source-chip::after {
-  content: "›";
-  margin-inline-start: auto;
-  padding-inline-start: var(--space-3);
-  color: var(--text-muted);
-}
+.conversation-source-caption { font: var(--type-caption); color: var(--text-secondary); overflow-wrap: anywhere }
 
-a.conversation-source-chip:hover .conversation-source-type { text-decoration: underline }
+.conversation-source-chevron { color: var(--text-muted) }
 
-/* An inference is not something the owner wrote: a dashed rule, read aloud by its support kind. */
-.conversation-sources-list > li[data-support="inference"] { border-bottom-style: dashed }
+/* The kind, in the caption: the interface's word for what the source is. */
+.conversation-source-type { color: inherit }
+
+/* An inference is not something the owner wrote: a dashed edge, read aloud by its support kind. */
+.conversation-sources-list > li[data-support="inference"] > .conversation-source-card { border-style: dashed }
 
 .conversation-source-freshness {
-  /* `pre`, not `nowrap`: the separator's leading space is the first thing in a flex item. */
+  /* `pre`, not `nowrap`: the separator's leading space must survive. */
   white-space: pre;
   color: var(--text-secondary);
 }
 
+/* A source that can no longer be read: one quiet line, not a card, and no link. */
+.conversation-source-chip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--space-1) 0;
+  font: var(--type-caption);
+  /* The unavailable sentence is long: it wraps rather than widening the page. */
+  overflow-wrap: anywhere;
+}
 .conversation-source-chip[data-unavailable] { color: var(--text-muted) }
 
 /*

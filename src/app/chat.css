@@ -1,29 +1,27 @@
 /*
- * Conversar — correspondence, not a messenger (Editorial calmo, ADR-180).
- *
- * ## The one distinction
- *
- * **Both halves are sentences somebody wrote**, so both are set in the reading
- * face, in one column, at the reading measure. What the machine adds around
- * them — who, when, where it looked, which model — is bookkeeping: said once
- * (the day), reduced to a caption (the hour of a question), or filed behind a
- * closed line under the answer.
+ * Conversar — two sides, as in every conversation with an assistant
+ * (Editorial calmo, ADR-180; the owner's direction of 18 November 2026).
  *
  * ## What separates the two speakers
  *
- * Not colour, not side, not a fill. The question carries an ink rule on its
- * leading edge and the hour it was asked; the answer is prose with nothing
- * around it. A reader scanning the column reads the answers and takes the
- * questions as the headings they functionally are.
+ * Side. The owner's question sits on the right in a quiet filled shape, set in
+ * the UI face, its hour under it. The Brain's answer sits on the left with no
+ * shape at all: its name beside the product's mark, then prose in the reading
+ * face, larger than the interface around it.
+ *
+ * ## What the answer is about
+ *
+ * The sources it cites are cards under it — what each says, its kind and date,
+ * the card the link. Where it looked and how it got there are bookkeeping: one
+ * quiet line of closed disclosures. The day is said once.
  *
  * ## What this replaced
  *
- * Life Brain E.6 drew the owner's turn as a bubble on the right, the answer
- * under a speaker line with a full date, its sources as a stack of chips, a
- * sentence about where it looked and the model's name under every answer, and
- * the composer as a raised card. The frame of that work stays: the screen is
- * the conversation, the field is docked at the bottom, the other conversations
- * are behind the menu.
+ * The first editorial pass set the question as a quotation — an ink rule on its
+ * leading edge, in one column with the answer — and folded the sources behind
+ * "N fontes". The owner asked for the sides back and the sources in sight. The
+ * frame stays: the screen is the conversation, the field is docked at the
+ * bottom, the other conversations are behind the menu.
  */
 
 body .side-rail { overflow-y: auto }
@@ -64,32 +62,44 @@ body .side-rail { overflow-y: auto }
  */
 .message-stream { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; margin-bottom: var(--space-6) }
 
-/* The day, said once: a heading over a hairline above the first turn of it. */
+/* The day, said once: a small caption centred above the first turn of it. */
 .chat-day {
   margin: var(--space-8) 0 0;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--border-default);
-  font: var(--type-section);
+  text-align: center;
+  font: var(--type-eyebrow);
   letter-spacing: .06em;
   text-transform: uppercase;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 .message-stream > .chat-day:first-child { margin-top: 0 }
 
-.chat-message { min-width: 0; padding: var(--space-4) 0 0 }
+.chat-message { min-width: 0; padding: var(--space-5) 0 0 }
 
 /*
  * The speaker line. The name and the instant stay in the document on every
- * turn; what is drawn is the hour of a question, and nothing on an answer.
+ * turn. Drawn: the Brain's name beside the mark over an answer, and the hour
+ * under a question (`.chat-message-when`). Never drawn: "Você", and the hour
+ * of an answer.
  */
 .chat-message-meta {
-  margin: 0 0 var(--space-1);
-  font: var(--type-caption);
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  margin: 0 0 var(--space-2);
+  font: var(--type-label);
+  color: var(--text-secondary);
 }
-.chat-message-speaker,
-.chat-message[data-role="assistant"] .chat-message-meta,
-.chat-message[data-draft-role] .chat-message-meta {
+.chat-message-speaker { display: inline-flex; align-items: center; gap: var(--space-2) }
+.chat-message-speaker > .brand-mark {
+  width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-sm);
+  font: var(--type-reading-sm);
+  line-height: 1;
+}
+.chat-message[data-role="user"] .chat-message-meta,
+.chat-message[data-draft-role="user"] .chat-message-meta,
+.chat-message-meta > time {
+  align-self: flex-start;
   position: absolute;
   width: 1px;
   height: 1px;
@@ -101,7 +111,7 @@ body .side-rail { overflow-y: auto }
 /* A turn, as prose: paragraphs and lists read from the text's own lines. */
 .chat-message-body {
   max-width: var(--width-reading);
-  font: var(--type-reading);
+  font: var(--type-reading-lg);
   color: var(--text-primary);
   /* Owner content and model output: one unbreakable identifier must not widen the page. */
   overflow-wrap: anywhere;
@@ -117,16 +127,30 @@ body .side-rail { overflow-y: auto }
 .chat-message-body li::marker { color: var(--text-muted) }
 
 /*
- * The question: an ink rule on its leading edge, never a side or a fill. The
- * space above it is what separates one exchange from the next.
+ * The question: on the right, a quiet filled shape in the UI face, its corner
+ * toward the owner's edge squared off. The space above it is what separates one
+ * exchange from the next.
  */
 .chat-message[data-role="user"],
 .chat-message[data-draft-role="user"] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   margin-top: var(--space-6);
-  padding: 0 0 0 var(--space-4);
-  border-inline-start: 2px solid var(--action-primary);
+  padding: 0;
 }
 .chat-day + .chat-message[data-role="user"] { margin-top: var(--space-5) }
+.message-stream > .chat-message[data-role="user"]:first-child { margin-top: 0 }
+.chat-message[data-role="user"] > .chat-message-body,
+.chat-message[data-draft-role="user"] > .chat-message-body {
+  max-width: 82%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sheet);
+  border-end-end-radius: var(--radius-sm);
+  background: var(--background-subtle-strong);
+  font: var(--type-lead);
+}
+.chat-message-when { margin: var(--space-1) 0 0; font: var(--type-caption); color: var(--text-muted) }
 
 /*
  * Life Brain E.5 part 2 (ADR-175): the streamed turn's draft, set exactly as a
@@ -149,8 +173,12 @@ body .side-rail { overflow-y: auto }
   gap: var(--space-2);
 }
 
-/* Under an answer: its sources and where it looked (`conversation-cards.css`). */
-.message-sources { max-width: var(--width-reading); margin-top: var(--space-1) }
+/* Under an answer: its sources as cards, then where it looked (`conversation-cards.css`). */
+.message-sources { max-width: var(--width-reading); margin-top: var(--space-4) }
+/* On a wide screen the cards stop short of the prose's measure: they are what it points at, not more prose. */
+@media (min-width: 900px) {
+  .message-sources .conversation-sources-list { max-width: 80% }
+}
 /* The model that answered — filed with where the answer looked. */
 .chat-message-model { margin: 0 0 var(--space-2); font: var(--type-caption); color: var(--text-secondary) }
 
@@ -171,12 +199,13 @@ body .side-rail { overflow-y: auto }
   background: transparent;
 }
 .chat-outcome .assistant-composer-notice:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: var(--space-2) }
-/* What the owner wrote, set as their turn is. */
+/* What the owner wrote, set as their turn is: on the right, in its shape. The rest of the outcome is the Brain's, on the left. */
 .chat-outcome .assistant-composer-echo {
-  margin: 0 0 var(--space-4);
-  padding: 0 0 0 var(--space-4);
-  border-bottom: 0;
-  border-inline-start: 2px solid var(--action-primary);
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 var(--space-5);
+  padding: 0;
+  border: 0;
 }
 .chat-outcome .assistant-composer-echo > span {
   position: absolute;
@@ -186,7 +215,17 @@ body .side-rail { overflow-y: auto }
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.chat-outcome .assistant-composer-echo > q { quotes: none; font: var(--type-reading); color: var(--text-primary) }
+.chat-outcome .assistant-composer-echo > q {
+  max-width: 82%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-sheet);
+  border-end-end-radius: var(--radius-sm);
+  background: var(--background-subtle-strong);
+  quotes: none;
+  font: var(--type-lead);
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
 /* What the agent says back: the question it asks, in the reading face. */
 .chat-outcome .assistant-composer-notice h3 { margin: 0 0 var(--space-1); font: var(--type-reading-lg); letter-spacing: 0; color: var(--text-primary) }
 .chat-outcome .assistant-composer-notice > p:not(.assistant-composer-echo) { max-width: var(--width-reading); font: var(--type-body); color: var(--text-secondary) }
@@ -322,7 +361,8 @@ body .side-rail { overflow-y: auto }
   min-height: calc(100dvh - var(--header-height));
 }
 
-.chat-column { display: flex; flex-direction: column; min-width: 0 }
+/* Always the last track: with the menu closed it would otherwise fall into the menu's `auto` track and shrink to its content. */
+.chat-column { grid-column: -2 / -1; display: flex; flex-direction: column; min-width: 0 }
 
 .chat-header {
   position: sticky;
@@ -374,6 +414,15 @@ body .side-rail { overflow-y: auto }
   margin: 0 auto;
   padding: var(--space-6) 0 var(--space-4);
 }
+/*
+ * A conversation starts at the top, under the header, however short it is; it
+ * was pushed down onto the field, under an empty screen. Only a new
+ * conversation's introduction rests on the field. A long thread still opens at
+ * its end (`ChatDraftSlot` scrolls the window there).
+ */
+.chat-stage[data-thread],
+.chat-stage:has([data-chat-draft]),
+.chat-stage:has(.chat-outcome:not(:empty)) { justify-content: flex-start }
 .chat-surface .message-stream { margin-bottom: 0 }
 
 /*

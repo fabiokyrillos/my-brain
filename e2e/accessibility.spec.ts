@@ -527,7 +527,8 @@ function conversationResumed() {
 
 /**
  * Mirrors `src/features/conversation-sources/source-list.tsx` — slice 2K.4,
- * drawn as chips since Life Brain E.7 (ADR-177): one that opens, one unavailable.
+ * drawn as cards in the conversation since the owner's direction of
+ * 18 November 2026: one that opens, one unavailable (a quiet line, not a card).
  *
  * Both branches, side by side, because the requirement is that they be
  * **visually distinct**: an evidenced answer and one that found nothing used to
@@ -535,26 +536,28 @@ function conversationResumed() {
  * the difference it exists to protect.
  */
 function conversationSources() {
-  // Editorial calmo: the sources and the reach are behind closed disclosures in
-  // the product. Rendered **open** here, for the reason the explanation panel
-  // below is: axe cannot scan what is not in the accessibility tree.
+  // Editorial calmo: the sources are cards in sight; the reach is behind a
+  // closed disclosure in the product. Rendered **open** here, for the reason the
+  // explanation panel below is: axe cannot scan what is not in the accessibility tree.
   const reach = `<details class="conversation-sources-where" open><summary>Onde procurei</summary>`
     + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
     + `</details>`;
   const evidenced = `<div class="conversation-sources" data-evidence="evidenced">`
-    + `<details class="conversation-sources-used" open><summary>`
-    + `<span class="conversation-sources-title sr-only">O que eu usei: </span>2 fontes</summary>`
+    + `<p class="conversation-sources-title sr-only">O que eu usei</p>`
     + `<ul class="conversation-sources-list"><li data-support="direct_record">`
-    + `<a class="conversation-source-chip" href="#">`
-    + `<span class="conversation-source-support sr-only">Você escreveu isto: </span>`
+    + `<a class="conversation-source-card" data-card-type="entry" href="#">`
+    + `<span aria-hidden="true" class="conversation-source-icon"><svg width="20" height="20" viewBox="0 0 24 24"></svg></span>`
+    + `<span class="conversation-source-text"><span class="conversation-source-title">conversa com a Ana sobre o orçamento</span>`
+    + `<span class="conversation-source-caption"><span class="conversation-source-support sr-only">Você escreveu isto: </span>`
     + `<span class="conversation-source-type">Registro</span>`
     + `<span class="conversation-source-freshness"> · <span class="sr-only">De </span>`
-    + `<time datetime="2026-07-20T10:00:00Z">20 de jul.</time></span></a>`
+    + `<time datetime="2026-07-20T10:00:00Z">20 de jul.</time></span></span></span>`
+    + `<svg aria-hidden="true" class="conversation-source-chevron" width="18" height="18" viewBox="0 0 24 24"></svg></a>`
     + `</li><li data-support="product_state">`
     + `<span class="conversation-source-chip" data-unavailable="">`
     + `<span class="conversation-source-support sr-only">O que eu guardo como verdadeiro: </span>`
     + `<span class="conversation-source-type">Memória · Isto não está mais disponível para você</span></span>`
-    + `</li></ul></details>`
+    + `</li></ul>`
     + reach
     + `</div>`;
   const insufficient = `<div class="conversation-sources" data-evidence="insufficient">`
@@ -1371,27 +1374,30 @@ test("2L-MOBILE-009: the Work surfaces reflow at 200% zoom", async ({ page }) =>
 });
 
 /**
- * Conversar's editorial transcript — the frame that replaced the bubbles.
+ * Conversar's transcript — two sides, as the owner asked on 18 November 2026.
  *
  * Mirrors `src/app/[locale]/app/chat/[conversationId]/page.tsx`. Only the
- * geometry and the computed type are under test: the objection to the previous
- * layout was that it set the owner's and the Brain's **prose** in the UI face
- * and spent the width on alignment, and neither of those is visible to jsdom.
+ * geometry and the computed type are under test: the question on the right in
+ * a filled shape in the UI face, the answer on the left in the reading face,
+ * and neither of those is visible to jsdom.
  */
 function CHAT_TRANSCRIPT() {
+  const stamp = `<time datetime="2026-08-15T12:00:00.000Z">09:00</time>`;
   const message = (role: "user" | "assistant", body: string, id: string) =>
     `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
-    + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
-    + `<time datetime="2026-08-15T12:00:00.000Z">09:00</time></p>`
-    + `<div class="chat-message-body"><p>${body}</p></div>`
-    // Editorial calmo: the sources and the model are filed behind closed
-    // disclosures under the answer (`source-list.tsx`, and the thread's own
-    // `chat-message-model`).
+    + (role === "user"
+      ? `<p class="chat-message-meta"><span class="chat-message-speaker">Você</span></p>`
+        + `<div class="chat-message-body"><p>${body}</p></div><p class="chat-message-when">${stamp}</p>`
+      : `<p class="chat-message-meta"><span class="chat-message-speaker"><span aria-hidden="true" class="brand-mark">B</span>Brain</span>${stamp}</p>`
+        + `<div class="chat-message-body"><p>${body}</p></div>`)
+    // The sources are cards in sight; the model is filed behind "Onde procurei"
+    // (`source-list.tsx`, and the thread's own `chat-message-model`).
     + (role === "assistant"
       ? `<div class="message-sources"><div class="conversation-sources" data-evidence="evidenced">`
-        + `<details class="conversation-sources-used"><summary>1 fonte</summary>`
         + `<ul class="conversation-sources-list"><li data-support="direct_record">`
-        + `<a class="conversation-source-chip" href="/pt-BR/app/inbox/e1">Registro · 12 de ago. de 2026</a></li></ul></details>`
+        + `<a class="conversation-source-card" data-card-type="entry" href="/pt-BR/app/inbox/e1"><span class="conversation-source-text">`
+        + `<span class="conversation-source-title">A Marina pediu a cláusula revisada</span>`
+        + `<span class="conversation-source-caption">Registro · 12 de ago. de 2026</span></span></a></li></ul>`
         + `<details class="conversation-sources-where"><summary>Onde procurei</summary>`
         + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias.</p>`
         + `<p class="chat-message-model">Modelo: gpt-5-mini</p></details>`
@@ -1408,29 +1414,30 @@ function CHAT_TRANSCRIPT() {
     + `</div></div>`;
 }
 
-test.describe("Conversar reads as a transcript, not as a chat log", () => {
-  test("both turns run in one column at the full measure", async ({ page }) => {
+test.describe("Conversar has two sides, as every conversation with an assistant does", () => {
+  test("the question sits on the right and the answer runs from the left at the full measure", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await render(page, CHAT_TRANSCRIPT());
 
-    const [user, assistant] = await Promise.all([
-      page.locator('.chat-message[data-role="user"]').boundingBox(),
+    const [question, assistant, stream] = await Promise.all([
+      page.locator('.chat-message[data-role="user"] .chat-message-body').boundingBox(),
       page.locator('.chat-message[data-role="assistant"]').boundingBox(),
+      page.locator(".message-stream").boundingBox(),
     ]);
-    // No `justify-self: end`: the two turns start at the same edge.
-    expect(Math.abs(user!.x - assistant!.x)).toBeLessThanOrEqual(16);
-    // And neither is capped at a fraction of the column.
-    const stream = await page.locator(".message-stream").boundingBox();
+    // The question ends at the column's right edge and does not start at its left.
+    expect(Math.abs(question!.x + question!.width - (stream!.x + stream!.width))).toBeLessThanOrEqual(1);
+    expect(question!.x).toBeGreaterThan(stream!.x + 16);
+    // The answer starts at the left edge and is not capped at a fraction of the column.
+    expect(Math.abs(assistant!.x - stream!.x)).toBeLessThanOrEqual(1);
     expect(assistant!.width).toBeGreaterThan(stream!.width * 0.95);
   });
 
   /*
-    The load-bearing one. Both halves are sentences somebody wrote, so both are
-    set in the reading face — which is the single distinction the whole
-    direction is built on. The previous layout set them in the UI face and
-    distinguished the speakers by side and by fill instead.
+    The answer is the thing read, so it is set in the reading face; the
+    question is the owner's turn in the conversation, set in the UI face inside
+    its shape, as the owner's approved design draws it (18 November 2026).
   */
-  test("both turns are set in the reading face, and the labels are not", async ({ page }) => {
+  test("the answer is set in the reading face; the question and the labels are not", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await render(page, CHAT_TRANSCRIPT());
 
@@ -1455,23 +1462,24 @@ test.describe("Conversar reads as a transcript, not as a chat log", () => {
         speaker: family(".chat-message-speaker"),
       };
     });
-    expect(faces.userBody).toBe(faces.reading);
+    expect(faces.userBody).not.toBe(faces.reading);
     expect(faces.assistantBody).toBe(faces.reading);
     // The machine's label around the prose is emphatically not the reading face.
     expect(faces.speaker).not.toBe(faces.reading);
   });
 
-  test("the question is marked by an edge, never by a fill", async ({ page }) => {
+  test("the question is a quiet filled shape, not an inverted bubble and not a rule", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await render(page, CHAT_TRANSCRIPT());
 
     const user = await page.locator('.chat-message[data-role="user"]').evaluate((node) => {
-      const style = getComputedStyle(node);
-      return { background: style.backgroundColor, edge: style.borderInlineStartWidth };
+      const shape = getComputedStyle(node.querySelector(".chat-message-body")!);
+      return { edge: getComputedStyle(node).borderInlineStartWidth, background: shape.backgroundColor, color: shape.color, body: getComputedStyle(document.body).color };
     });
-    // The bubble filled this with `--text-primary` and inverted the text.
-    expect(user.background).toBe("rgba(0, 0, 0, 0)");
-    expect(parseFloat(user.edge)).toBeGreaterThan(0);
+    expect(user.background).not.toBe("rgba(0, 0, 0, 0)");
+    // The text keeps the page's ink: the old bubble filled with `--text-primary` and inverted it.
+    expect(user.color).toBe(user.body);
+    expect(parseFloat(user.edge)).toBe(0);
   });
 
   test("an answer carries its sources and the model that wrote it", async ({ page }) => {
