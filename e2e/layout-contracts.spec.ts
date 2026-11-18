@@ -3224,7 +3224,9 @@ test.describe("the signed-out pages as one calm column (Editorial calmo)", () =>
       const text = document.querySelector<HTMLElement>(".auth-consent span")!.getBoundingClientRect();
       return { size: Math.round(box.width), beside: box.right <= text.left, overlap: box.top < text.bottom && box.bottom > text.top };
     });
-    expect(measured).toEqual({ size: 20, beside: true, overlap: true });
+    // The control itself is the 44px target (2O-MOBILE-002 measures the input,
+    // not its label); the face drawn inside it is 20px.
+    expect(measured).toEqual({ size: 44, beside: true, overlap: true });
   });
 
   test("on desktop the column stays a reading measure, centred, and is not stretched to fill", async ({ page }) => {

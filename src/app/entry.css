@@ -196,14 +196,53 @@
   cursor: pointer;
 }
 
+/*
+ * The box is drawn at 20px and pressed at 44px. The input itself is the 44px
+ * square (2O-MOBILE-002 measures the control, not its label): a transparent
+ * border holds the room, and the face is what is left inside it. Still a real
+ * checkbox — `appearance: none`, never hidden — so focus, the tab order and
+ * the checked state are the browser's.
+ */
 .auth-column .auth-form .auth-consent input {
   flex: none;
-  width: var(--icon-md);
-  height: var(--icon-md);
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--touch-target);
+  height: var(--touch-target);
   min-height: 0;
-  margin: 0;
+  margin: 0 calc(var(--space-2) * -1) 0 calc(var(--space-3) * -1);
   padding: 0;
-  accent-color: var(--action-primary);
+  appearance: none;
+  -webkit-appearance: none;
+  border: var(--space-3) solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--background-surface) padding-box;
+  box-shadow: inset 0 0 0 1px var(--control-border);
+  cursor: pointer;
+}
+
+.auth-column .auth-form .auth-consent input::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  background: var(--action-primary-text);
+  clip-path: polygon(14% 52%, 0 66%, 38% 100%, 100% 22%, 86% 10%, 37% 72%);
+  transform: scale(0);
+}
+
+.auth-column .auth-form .auth-consent input:checked {
+  background: var(--action-primary) padding-box;
+  box-shadow: inset 0 0 0 1px var(--action-primary);
+}
+
+.auth-column .auth-form .auth-consent input:checked::before {
+  transform: scale(1);
+}
+
+.auth-column .auth-form .auth-consent input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: calc(var(--space-2) * -1);
 }
 
 /* The two documents, inside the sentence. Inline, so the padding widens what
