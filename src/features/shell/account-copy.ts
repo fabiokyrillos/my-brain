@@ -26,6 +26,19 @@ export type AccountCopy = {
   /** Rendered in place of a display name nobody supplied. */
   readonly accountFallback: string;
   readonly settings: string;
+  /**
+   * The language row (Editorial calmo, slice 7). The switch left the top bar
+   * of every page and became a row here, because a language is chosen once.
+   *
+   * Four pieces rather than one sentence, because the row draws them on two
+   * lines and marks `otherLanguage` with its own `lang`: it is written in the
+   * language it switches *to*, so a reader who landed in the wrong one can find
+   * the way back, and a screen reader pronounces it as that language.
+   */
+  readonly language: string;
+  readonly currentLanguage: string;
+  readonly switchLanguageTo: string;
+  readonly otherLanguage: string;
   readonly signOut: string;
   /** Announced while the sign-out round is in flight. */
   readonly signingOut: string;
@@ -41,6 +54,10 @@ const ptBR: AccountCopy = {
   signedInAs: "Conectado como",
   accountFallback: "Sua conta",
   settings: "Ajustes",
+  language: "Idioma",
+  currentLanguage: "Português",
+  switchLanguageTo: "Mudar para",
+  otherLanguage: "English",
   signOut: "Sair da conta",
   signingOut: "Saindo…",
   signOutFailed: "Não foi possível sair agora. Tente de novo.",
@@ -53,6 +70,10 @@ const en: AccountCopy = {
   signedInAs: "Signed in as",
   accountFallback: "Your account",
   settings: "Settings",
+  language: "Language",
+  currentLanguage: "English",
+  switchLanguageTo: "Switch to",
+  otherLanguage: "Português",
   signOut: "Sign out",
   signingOut: "Signing out…",
   signOutFailed: "We could not sign you out just now. Try again.",
@@ -63,4 +84,16 @@ export const accountCopy = { "pt-BR": ptBR, en } satisfies Record<Locale, Accoun
 
 export function getAccountCopy(locale: Locale): AccountCopy {
   return accountCopy[locale];
+}
+
+/**
+ * The language row's accessible name: its two visible lines, as one sentence.
+ *
+ * Stated rather than left to the row's text content, because the two lines are
+ * inline elements and a computed name would run them together with no space.
+ * It contains both visible strings verbatim, which is what WCAG 2.5.3 asks.
+ */
+export function languageRowLabel(locale: Locale): string {
+  const copy = accountCopy[locale];
+  return `${copy.language}: ${copy.currentLanguage}. ${copy.switchLanguageTo} ${copy.otherLanguage}`;
 }

@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AppShell } from "./app-shell";
 import { mobileBarCentreIndex, mobileBarSlots, mobileDemotedKeys } from "./capabilities";
 
@@ -21,7 +21,7 @@ import { mobileBarCentreIndex, mobileBarSlots, mobileDemotedKeys } from "./capab
 vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/pt-BR/app"),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: vi.fn(() => new URLSearchParams()),
   // Added when the shell began rendering the command palette (2I.4). The
   // palette's only effect is `router.push`, so a shell test that could not
   // construct it would be unable to assert the top bar at all.
@@ -31,6 +31,7 @@ vi.mock("next/navigation", () => ({
 afterEach(() => {
   cleanup();
   vi.mocked(usePathname).mockReturnValue("/pt-BR/app");
+  vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams() as never);
 });
 
 describe("AppShell", () => {
@@ -555,6 +556,87 @@ describe("AppShell", () => {
       render(<AppShell identity={identity} locale="en"><div>Content</div></AppShell>);
       expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(2);
       expect(screen.getAllByText("Signed in as")).toHaveLength(2);
+    });
+  });
+
+  /**
+   * Editorial calmo, slice 7 — the top bar a phone sees.
+   *
+   * It was four unlike controls pushed to the right edge (a bordered text
+   * button, a bare "EN", a bell, a tinted avatar) with nothing on the left. It
+   * is the brand, then three controls of one family.
+   */
+  describe("the top bar", () => {
+    const identity = { displayName: "Marina Duarte" };
+
+    it("leads with the brand, which goes to Hoje as the rail's brand does", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      const header = document.querySelector("header.top-bar") as HTMLElement;
+
+      expect(header.firstElementChild).toHaveClass("top-brand");
+      const brands = screen.getAllByRole("link", { name: "My Brain" });
+      // One on the rail and one in the bar: the stylesheet shows exactly one
+      // per viewport, the arrangement the account's two mounts already use.
+      expect(brands).toHaveLength(2);
+      for (const brand of brands) expect(brand).toHaveAttribute("href", "/pt-BR/app");
+      expect(header.contains(brands[1])).toBe(true);
+    });
+
+    it("then carries exactly three controls: search, notifications, the account", () => {
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+      const actions = document.querySelector(".top-bar > .top-actions") as HTMLElement;
+
+      // What can be pressed without opening anything, in DOM order — which is
+      // the visual order and the focus order, because nothing reorders it.
+      const controls = Array.from(
+        actions.querySelectorAll<HTMLElement>(":scope > button, :scope > a, :scope > .top-account > details > summary"),
+      );
+      expect(controls.map((control) => control.getAttribute("aria-label") ?? control.textContent)).toEqual([
+        expect.stringContaining("Buscar"),
+        "Notificações",
+        "Sua conta: Marina Duarte",
+      ]);
+      expect(actions.children, "something else joined the top bar's controls").toHaveLength(3);
+      // `2I-PALETTE-001`: still an explicit control with a name, not an icon
+      // with none — its words are in the DOM even where only the glyph is drawn.
+      expect(controls[0]).toHaveAttribute("data-palette-trigger", "true");
+      expect(controls[0].querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+    });
+
+    it("no longer carries the locale switch, which is a row of the account menu on both mounts", () => {
+      vi.mocked(usePathname).mockReturnValue("/pt-BR/app/inbox");
+      vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("view=needs-you") as never);
+      render(<AppShell identity={identity} locale="pt-BR"><div>Conteúdo</div></AppShell>);
+
+      const rows = screen.getAllByRole("link", { name: "Idioma: Português. Mudar para English" });
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        // Inside an account disclosure, and nowhere else.
+        expect(row.closest("details.account-menu"), "a language link outside the account menu").not.toBeNull();
+        // The page and the query, exactly, in the other language.
+        expect(row).toHaveAttribute("href", "/en/app/inbox?view=needs-you");
+      }
+      expect(rows.map((row) => row.closest("details")!.className)).toEqual([
+        "account-menu account-menu-rail",
+        "account-menu account-menu-header",
+      ]);
+
+      // Absent from the bar itself: nothing in it switches language without
+      // the account being opened first.
+      const actions = document.querySelector(".top-bar > .top-actions") as HTMLElement;
+      const direct = Array.from(actions.querySelectorAll("a")).filter((link) => link.closest("details") === null);
+      expect(direct.map((link) => link.getAttribute("href"))).toEqual(["/pt-BR/app/notifications"]);
+      expect(screen.queryByText("EN")).toBeNull();
+    });
+
+    it("switches back from English with the route intact", () => {
+      vi.mocked(usePathname).mockReturnValue("/en/app/work/task-1");
+      vi.mocked(useSearchParams).mockReturnValue(new URLSearchParams("from=today") as never);
+      render(<AppShell identity={identity} locale="en"><div>Content</div></AppShell>);
+
+      for (const row of screen.getAllByRole("link", { name: "Language: English. Switch to Português" })) {
+        expect(row).toHaveAttribute("href", "/pt-BR/app/work/task-1?from=today");
+      }
     });
   });
 

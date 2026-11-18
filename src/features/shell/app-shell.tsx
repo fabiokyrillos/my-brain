@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import Link from "next/link";
 import { signOut } from "@/features/auth/actions";
 import { CommandPalette } from "@/features/palette/command-palette";
@@ -6,7 +5,7 @@ import { getMessages } from "@/i18n/messages";
 import type { Locale } from "@/lib/preferences";
 import { AccountMenu } from "./account-menu";
 import type { AccountIdentity } from "./account-identity";
-import { LocaleSwitchLink, NavigationLinks, NotificationsLink } from "./navigation-links";
+import { NavigationLinks, NotificationsLink } from "./navigation-links";
 
 /**
  * Pure presentation over the shell's two navigations and its account surface.
@@ -26,8 +25,8 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const t = getMessages(locale);
-  // One element, mounted three times since slice 2P.5. See `account-menu.tsx`
-  // for why the surfaces may not have separate session models.
+  // One element, mounted twice: the rail's foot and the top bar. See
+  // `account-menu.tsx` for why the surfaces may not have separate session models.
   const account = (variant: "rail" | "overflow" | "header") => (
     <AccountMenu identity={identity} locale={locale} signOut={signOut} variant={variant} />
   );
@@ -66,7 +65,7 @@ export function AppShell({
       <aside className="side-rail">
         <Link href={`/${locale}/app`} className="brand" aria-label="My Brain">
           <span className="brand-mark">B</span>
-          <span>My Brain</span>
+          <span className="brand-name">My Brain</span>
         </Link>
         <nav aria-label={t.shell.mainNavigation} className="side-nav">
           <NavigationLinks locale={locale} />
@@ -80,6 +79,28 @@ export function AppShell({
       </aside>
       <div className="main-stage">
         <header className="top-bar">
+          {/*
+            Editorial calmo, slice 7 — the phone's top bar has an identity.
+
+            It was a cluster of four unlike controls pushed to the right edge
+            with nothing on the left. The brand now sits where the page's own
+            text starts and leads to Hoje, exactly as the rail's brand does; the
+            stylesheet hides it above the mobile breakpoint, where the rail
+            already carries it. Both are in the DOM on every viewport and one is
+            visible, the arrangement the account's two mounts already use.
+          */}
+          <Link href={`/${locale}/app`} className="top-brand" aria-label="My Brain">
+            <span className="brand-mark">B</span>
+            <span className="brand-name">My Brain</span>
+          </Link>
+          {/*
+            Three controls of one family — search, notifications, account — in
+            that order in the DOM, which is their visual and focus order.
+
+            The locale switch is not among them any more. A language is chosen
+            once, and it was a top-level control on every page; it is a row of
+            the account menu now, on both of that menu's mounts.
+          */}
           <div className="top-actions">
             {/*
               `2I-PALETTE-001`: an explicit control, not a keyboard secret.
@@ -88,9 +109,6 @@ export function AppShell({
               shortcut at all, so the button IS the entry point.
             */}
             <CommandPalette locale={locale} />
-            <Suspense fallback={<span aria-hidden="true">{locale === "pt-BR" ? "EN" : "PT"}</span>}>
-              <LocaleSwitchLink locale={locale} />
-            </Suspense>
             {/* A client component, because marking the current destination
                 needs the pathname and this shell reads nothing (UX-34). */}
             <NotificationsLink locale={locale} />

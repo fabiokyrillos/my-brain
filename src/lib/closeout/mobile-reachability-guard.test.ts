@@ -410,8 +410,19 @@ describe("the account moved to the header, and that is what freed the fifth slot
     // reaches it without opening anything.
     const topBar = shell.slice(shell.indexOf('className="top-actions"'), shell.indexOf("</header>"));
     expect(topBar).toContain("<CommandPalette");
-    expect(topBar).toContain("<LocaleSwitchLink");
     expect(topBar).toContain("<NotificationsLink");
+    /*
+      The locale switch left the top bar (Editorial calmo, slice 7): a language
+      is chosen once, and it was a top-level control on every page. It is a row
+      of the account menu — the one component both mounts render — so it is
+      still reachable on a phone without a second disclosure, from the same
+      control that reaches Ajustes and sign-out. Asserted in both directions:
+      gone from the bar, present in the menu, and present nowhere else in the
+      shell that could become a second implementation.
+    */
+    expect(shell, "the locale switch is back in the shell's own markup").not.toContain("<LocaleSwitchLink");
+    const menu = code("src/features/shell/account-menu.tsx");
+    expect(menu.match(/<LocaleSwitchLink\b/g) ?? [], "the account menu lost its language row").toHaveLength(1);
     expect(
       topBar,
       "the account left the mobile header — the fifth slot must go back to `more`",
