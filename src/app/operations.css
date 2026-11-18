@@ -42,10 +42,14 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
  * nothing at all.
  *
  * `max-width` rises to the reading measure plus the side column rather than
- * staying at 900px: at 900 the two columns would have been 520 and 300, and the
- * eleven-control grid would have collapsed to one per row.
+ * staying at 900px: at 900 the two columns would have been 520 and 300, which
+ * is too narrow for a row that carries a label, a value and its verb.
  */
 .task-detail-page{max-width:1180px}
+/* Grid children default to `min-width:auto`, which lets one long unbroken
+   value widen its column past the screen. Both columns may shrink instead. */
+.task-detail-primary,.task-detail-secondary{min-width:0}
+.task-detail-page>a.back-link{display:inline-flex;align-items:center;min-height:var(--touch-target)}
 .task-detail-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;padding-bottom:24px}
 .task-detail-header>.status-badge{flex:none;white-space:nowrap}
 .task-detail-header h1{font:500 clamp(30px,4vw,44px)/1.1 var(--font-reading);letter-spacing:-.035em;margin:8px 0 10px}
@@ -58,9 +62,6 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
     display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.9fr);
     gap:var(--space-8);align-items:start;
   }
-  /* The side column's first section has no rule above it: at the top of a
-     column a border reads as a box edge rather than as a separator. */
-  .task-detail-page:not(.task-detail-panel) .task-detail-secondary>.task-detail-section:first-child{border-top:0;padding-top:0}
 }
 
 /*
@@ -82,24 +83,95 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 .task-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:0 0 22px}
 .task-detail-actions .row-actions{display:flex;flex-wrap:wrap;gap:8px}
 .task-detail-actions .row-action{min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:9px 14px}
-.task-detail-section{border-top:1px solid var(--border-default);padding:22px 0}
-.task-detail-section h2{font: var(--type-lead);letter-spacing:-.01em;margin:0 0 16px}
-.task-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin:0}
-.task-field dt{color:var(--text-secondary);font:var(--type-eyebrow);letter-spacing:.08em;text-transform:uppercase;margin-bottom:5px}
-.task-field dd{margin:0;font: var(--type-body)}
-.task-relations{display:grid;gap:14px;margin:0}
-.task-relation-group dt{color:var(--text-secondary);font:var(--type-eyebrow);letter-spacing:.08em;text-transform:uppercase;margin-bottom:7px}
-.task-relation-group dd{display:flex;flex-wrap:wrap;gap:7px;margin:0}
-.task-relation{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid var(--border-strong);border-radius: var(--radius-full);background:var(--background-surface);color:var(--text-primary);font: var(--type-caption)}
-.task-relation:hover{border-color:var(--link);color:var(--link)}
-.task-relation-plain{color:var(--text-secondary);background:var(--background-subtle);border-style:dashed}
-.task-provenance{margin:12px 0;padding:16px 18px;border-left:3px solid var(--link);background:var(--background-subtle);color:var(--text-secondary);font: var(--type-reading);white-space:pre-wrap}
-.task-history{list-style:none;display:grid;gap:0;margin:0;padding:0}
-.task-history li{border-left:2px solid var(--border-default);margin-left:6px;padding:0 0 18px 18px;position:relative}
-.task-history li:before{content:"";position:absolute;left:-5px;top:5px;width:8px;height:8px;border-radius: var(--radius-full);background:var(--mark-decorative)}
-.task-history strong{display:block;font: var(--type-body)}
-.task-history p{margin:4px 0 0;color:var(--text-secondary);font: var(--type-caption);line-height:1.55}
-.task-history time{display:block;margin-top:4px;color:var(--text-secondary);font:var(--type-eyebrow)}
+/*
+ * The recomposed task detail (ADR-184) — Editorial calmo.
+ *
+ * A section is a heading over a hairline; what follows it is rows between
+ * hairlines, never boxed cards. So a section no longer draws a rule *above*
+ * itself: the heading's own underline is the separator, and two lines around
+ * one word read as a box.
+ */
+.task-detail-section{padding:0 0 var(--space-6)}
+.task-detail-section>h2{display:flex;align-items:center;min-height:var(--touch-target);margin:0 0 var(--space-3);border-bottom:1px solid var(--border-default);font:var(--type-section);color:var(--text-primary)}
+.task-detail-section .quiet-state{margin:0}
+
+/*
+ * One list of facts, each edited in place.
+ *
+ * A row at rest is label · value · one quiet verb. The label sits above the
+ * value on a phone and beside it once there is room; the value wraps rather
+ * than pushing the verb off the screen. `<dd>` is the grid so the verb and the
+ * opened editor stay inside the definition they belong to.
+ */
+.task-detail-section>h2:has(+.task-facts){margin-bottom:0}
+.task-facts{margin:0}
+.task-fact{display:grid;grid-template-columns:minmax(0,1fr);padding:var(--space-2) 0 0;border-bottom:1px solid var(--border-default)}
+.task-fact dt{color:var(--text-muted);font:var(--type-caption)}
+.task-fact dd{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:var(--space-4);min-height:var(--touch-target);margin:0;font:var(--type-body)}
+.task-fact-value{min-width:0;overflow-wrap:anywhere}
+.task-fact-value[data-empty]{color:var(--text-muted)}
+.task-fact-verb{display:inline-flex;align-items:center;min-height:var(--touch-target);border:0;background:none;padding:0;color:var(--link);font:var(--type-label);cursor:pointer}
+.task-fact-verb:hover{text-decoration:underline}
+.task-fact-verb:focus-visible{outline:3px solid var(--focus-ring);outline-offset:2px}
+/* Relations are places you can go, so they are links in a sentence — not pills,
+   which read as filters. A context has no page and stays plain text. */
+.task-relations{display:flex;flex-wrap:wrap;column-gap:var(--space-2)}
+.task-relation{display:inline-flex;align-items:center;min-height:var(--touch-target);color:var(--link)}
+.task-relation:not(:last-child)::after{content:","}
+a.task-relation:hover{text-decoration:underline}
+.task-relation-plain{color:var(--text-primary)}
+@media(min-width:601px){
+  .task-fact{grid-template-columns:9rem minmax(0,1fr);column-gap:var(--space-4);padding-top:0}
+  /* Pinned to the value's line, so it does not drift down when the row opens. */
+  .task-fact dt{display:flex;align-items:center;align-self:start;min-height:var(--touch-target)}
+}
+
+/*
+ * The opened row. Set beside its subject by a rule, the house way, rather than
+ * boxed: it is the same form every other surface mounts, under the value it
+ * changes. Fields are 16px so a phone does not zoom the page to focus one.
+ */
+.task-fact-editor{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-5);margin:var(--space-1) 0 var(--space-3);border-left:2px solid var(--border-strong);padding-left:var(--space-4)}
+.task-fact-form{min-width:0}
+.task-fact-form:has(select,textarea,input:not([type=hidden]),.ux-state-line){flex:1 1 100%}
+.task-fact-form form{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:var(--space-2)}
+.task-fact-form form:has(textarea){grid-template-columns:minmax(0,1fr);justify-items:start}
+.task-fact-form label{grid-column:1/-1;color:var(--text-muted);font:var(--type-caption)}
+/* On a row the label would repeat the row's own, one line above it. It stays
+   for assistive technology and leaves the screen. */
+.task-fact .task-fact-form label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.task-fact-form input,.task-fact-form select,.task-fact-form textarea{width:100%;min-width:0;min-height:var(--touch-target);border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);background:var(--background-surface);color:var(--text-primary);font:var(--type-lead)}
+.task-fact-form textarea{min-height:calc(var(--touch-target) * 2);resize:vertical}
+.task-fact-form input:focus-visible,.task-fact-form select:focus-visible,.task-fact-form textarea:focus-visible{outline:2px solid var(--link);outline-offset:1px}
+.task-fact-form .row-action{min-height:var(--touch-target);display:inline-flex;align-items:center;justify-content:center;padding:0 var(--space-4);font:var(--type-label)}
+.task-fact-form .ux-state-line{grid-column:1/-1;margin:0}
+/* Nothing to pick means nothing to apply: the line says so and the dead button goes. */
+.task-fact-form form:has(.ux-state-line) .row-action{display:none}
+
+/* The title's own verbs, tucked under the header they belong to. */
+.task-title-controls{margin-top:calc(var(--space-4) * -1);padding-bottom:var(--space-4)}
+.task-title-verbs{display:flex;flex-wrap:wrap;gap:0 var(--space-5)}
+.task-title-controls .task-fact-editor{margin-bottom:0}
+
+/* Leaving the task is the last thing on the column and the quietest: words in
+   the risk tone, not a card. Its confirmation is unchanged. */
+.task-detail-endnote{display:flex;flex-wrap:wrap;gap:0 var(--space-5);padding-bottom:var(--space-6)}
+.task-detail-section:has(+.task-detail-endnote){padding-bottom:var(--space-2)}
+.task-detail-endnote .row-action{min-height:var(--touch-target);border:0;background:none;padding:0;color:var(--text-secondary);font:var(--type-label)}
+.task-detail-endnote .row-action-destructive{color:var(--tone-risk-fg)}
+.task-detail-endnote .row-action:hover{background:none;text-decoration:underline}
+
+/* What you wrote, in the reading face, against a rule — not in a tinted box. */
+.task-provenance{margin:var(--space-3) 0 0;padding:0 0 0 var(--space-4);border-left:2px solid var(--border-strong);color:var(--text-primary);font:var(--type-reading);white-space:pre-wrap;overflow-wrap:anywhere}
+.task-origin{margin:var(--space-3) 0 0;color:var(--text-muted);font:var(--type-caption)}
+.task-detail-section .panel-view-all{margin-top:var(--space-1);font:var(--type-label)}
+
+/* The history is a footnote: one line at rest, rows when opened. */
+.task-history-section{border-top:1px solid var(--border-default);padding:0}
+.task-history{list-style:none;margin:0;padding:0}
+.task-history li{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--space-1) var(--space-4);padding:var(--space-3) 0;border-top:1px solid var(--border-default)}
+.task-history strong{font:var(--type-body);font-weight:500;overflow-wrap:anywhere}
+.task-history time{color:var(--text-muted);font:var(--type-caption)}
 .work-title-link strong{color:var(--text-primary)}
 .work-title-link:hover strong{color:var(--link);text-decoration:underline}
 
@@ -129,7 +201,8 @@ a.list-row:hover{border-color:var(--border-strong);box-shadow:var(--elevation-2)
 .task-control-target{margin:0 0 12px;font: var(--type-body);font-weight:650}
 .task-control-reason{margin:6px 0 0;color:var(--text-secondary);font: var(--type-caption);line-height:1.55}
 .task-detail-controls .work-action-result{margin-top:16px}
-@media(max-width:600px){.task-detail-header{flex-direction:column;gap:12px}.task-fields{grid-template-columns:1fr}.task-detail-actions .row-action{flex:1;justify-content:center}.task-control-list{grid-template-columns:1fr}}
+.task-detail-fields .work-action-result{margin:var(--space-3) 0}
+@media(max-width:600px){.task-detail-header{flex-direction:column;gap:12px}.task-detail-actions .row-action{flex:1;justify-content:center}.task-control-list{grid-template-columns:1fr}}
 
 /*
  * Home, as an operational surface (UX-02).
@@ -796,8 +869,11 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
      removed. `2L-EDIT-007`: the frame may change, the capabilities may not. */
   .task-detail-panel .task-detail-header{flex-direction:column;gap:var(--space-2);padding-bottom:var(--space-4)}
   .task-detail-panel .task-detail-header h1{font:500 26px/1.15 var(--font-reading);margin:var(--space-2) 0 var(--space-2)}
-  .task-detail-panel .task-detail-section{padding:var(--space-4) 0}
-  .task-detail-panel .task-fields{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--space-3)}
+  .task-detail-panel .task-detail-section{padding-bottom:var(--space-4)}
+  .task-detail-panel .task-history-section{padding:0}
+  /* The docked frame is a phone's width, so a row reads as it does on one. */
+  .task-detail-panel .task-fact{grid-template-columns:minmax(0,1fr);padding-top:var(--space-2)}
+  .task-detail-panel .task-fact dt{display:block;min-height:0}
   .task-detail-panel .task-control-list{grid-template-columns:1fr}
 }
 @media(max-width:1023px){

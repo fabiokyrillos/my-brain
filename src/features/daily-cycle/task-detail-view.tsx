@@ -5,11 +5,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { getWorkCopy } from "@/features/operations/copy";
 import { ProtectedContent } from "@/features/operations/protected-content";
-import { formatPlannedDay, getPlannedAtCopy } from "@/features/planning/planned-at";
 import { isDerivedLevel } from "@/features/sensitivity/task-derivation";
 import type { Locale } from "@/lib/preferences";
-import type { RelationSummary, WorkItemHumanState, WorkItemPriority } from "./contracts";
+import type { WorkItemHumanState } from "./contracts";
 import { describeHistoryEntry, getTaskDetailCopy } from "./task-detail-copy";
+import { taskFactsFor } from "./task-facts";
 import { TaskPanelClose } from "./task-panel-close";
 import type { TaskDetailProjection } from "./task-detail-projection";
 
@@ -29,56 +29,6 @@ const humanStateCopy: Record<WorkItemHumanState, { pt: string; en: string }> = {
   completed: { pt: "Concluída", en: "Completed" },
   cancelled: { pt: "Cancelada", en: "Cancelled" },
 };
-
-const priorityCopy: Record<WorkItemPriority, { pt: string; en: string }> = {
-  low: { pt: "Baixa", en: "Low" },
-  medium: { pt: "Média", en: "Medium" },
-  high: { pt: "Alta", en: "High" },
-  urgent: { pt: "Urgente", en: "Urgent" },
-};
-
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="task-field">
-      <dt>{label}</dt>
-      <dd>{children}</dd>
-    </div>
-  );
-}
-
-/**
- * Relations render as links, not as inert badges.
- *
- * On the Work list they are `<span class="status-badge">`, which is the
- * "looks actionable, is not" pattern UX-20 is about — a task's project is a
- * place the user can go.
- */
-function RelationGroup({
-  label,
-  items,
-  hrefFor,
-}: {
-  label: string;
-  items: readonly RelationSummary[];
-  hrefFor: (item: RelationSummary) => string | null;
-}) {
-  if (items.length === 0) return null;
-  return (
-    <div className="task-relation-group">
-      <dt>{label}</dt>
-      <dd>
-        {items.map((item) => {
-          const href = hrefFor(item);
-          return href ? (
-            <Link className="task-relation" href={href} key={item.id}>{item.label}</Link>
-          ) : (
-            <span className="task-relation task-relation-plain" key={item.id}>{item.label}</span>
-          );
-        })}
-      </dd>
-    </div>
-  );
-}
 
 export function TaskDetailView({
   locale,
@@ -123,10 +73,14 @@ export function TaskDetailView({
   /** The status controls, injected so this component holds no Server Action. */
   actions: ReactNode;
   /**
-   * The field-edit controls (Slice D2), injected for the same reason and kept a
-   * separate slot rather than folded into `actions`: they sit below the facts
-   * they change, because the answer to "what is this task" must not be pushed
-   * off the first screen by the ways to change it.
+   * The list of facts **with its editing in place** — `TaskDetailControls` in
+   * its `fields` frame — injected for the same reason.
+   *
+   * When it is given, it *is* the "Detalhes" section: it was handed the rows
+   * `taskFactsFor` builds, so this component prints no list of its own and a
+   * value is never on the page twice. When it is absent (a task that admits no
+   * edit, or a caller that mounts none) the same rows are printed here as a
+   * plain `<dl>`. Both readings come from one function, so they cannot drift.
    */
   controls?: ReactNode;
   agentName: string;
@@ -138,14 +92,13 @@ export function TaskDetailView({
   const dateTime = (value: string) =>
     new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short", timeZone: detail.timezone })
       .format(new Date(value));
-
-  const hasRelations =
-    task.projects.length > 0
-    || task.contexts.length > 0
-    || task.people.length > 0
-    || task.waitingOnPeople.length > 0
-    || Boolean(task.parent)
-    || (task.dependsOn?.length ?? 0) > 0;
+  /*
+    What "Origem" and "Criada em" used to say as two fields of the weight of the
+    due date. They are bookkeeping about where the task came from, so they are
+    one quiet line in the section that is about exactly that. "Última alteração"
+    is gone as a field: the history's first entry is that fact, with its author.
+  */
+  const originLine = `${task.origin === "brain" ? copy.origins.brain : copy.origins.you} · ${copy.provenance.createdPrefix} ${dateTime(detail.createdAt)}`;
 
   return (
     <div className={panel ? "content-page task-detail-page task-detail-panel" : "content-page task-detail-page"}>
@@ -197,66 +150,35 @@ export function TaskDetailView({
         wrappers stack and the reading order is unchanged, which is why the split
         can be pure CSS and costs the panel nothing.
 
-        The `<dl>` of facts stays in the *left* column with the controls that
-        change those facts. Sending it right would have put a due date in one
-        column and the field that sets it in the other.
+        The facts stay in the *left* column, and since the page was recomposed
+        (ADR-184) each one carries the control that changes it on its own row.
+        Sending them right would have put a due date in one column and the field
+        that sets it in the other.
       */}
       <div className="task-detail-body">
         <div className="task-detail-primary">
         {actions}
 
-        <section className="task-detail-section" aria-label={copy.sections.details}>
-          <h2>{copy.sections.details}</h2>
-          <dl className="task-fields">
-            <Field label={copy.fields.due}>
-              {task.dueAt
-                ? dateTime(task.dueAt)
-                : task.noDueReason ?? copy.fields.noDue}
-            </Field>
-            {/*
-              `2M-PLAN-001`. The label and the formatting both come from the
-              declaration, and the second is the substantive change: this field
-              rendered `dateTime(...)` — a day the user chose, presented as a time
-              they reserved, which is precisely what OD-2M-3 A says `planned_at`
-              is not. The field is now shown even when empty, because "no planned
-              day" is an answer and an absent row is not.
-            */}
-            <Field label={getPlannedAtCopy(locale).label}>
-              {formatPlannedDay(task.plannedAt, locale, detail.timezone) ?? getPlannedAtCopy(locale).none}
-            </Field>
-            <Field label={copy.fields.priority}>
-              {task.priority ? priorityCopy[task.priority][pt ? "pt" : "en"] : copy.none}
-            </Field>
-            <Field label={copy.fields.origin}>
-              {task.origin === "brain" ? copy.origins.brain : copy.origins.you}
-            </Field>
-            <Field label={copy.fields.created}>{dateTime(detail.createdAt)}</Field>
-            <Field label={copy.fields.updated}>{dateTime(detail.updatedAt)}</Field>
-            {detail.completedAt ? <Field label={copy.fields.completed}>{dateTime(detail.completedAt)}</Field> : null}
-            {detail.cancelledAt ? <Field label={copy.fields.cancelled}>{dateTime(detail.cancelledAt)}</Field> : null}
-          </dl>
-        </section>
-
-        {controls}
+        {controls ?? (
+          <section className="task-detail-section" aria-label={copy.sections.details}>
+            <h2>{copy.sections.details}</h2>
+            <dl className="task-facts">
+              {taskFactsFor(detail, locale, agentName).map((fact) => (
+                <div className="task-fact" key={fact.id}>
+                  <dt>{fact.label}</dt>
+                  <dd>
+                    <span className="task-fact-value" data-empty={fact.empty ? "true" : undefined}>
+                      {fact.value}
+                    </span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
         </div>
 
         <div className="task-detail-secondary">
-        <section className="task-detail-section" aria-label={copy.sections.relations}>
-          <h2>{copy.sections.relations}</h2>
-          {hasRelations ? (
-            <dl className="task-relations">
-              <RelationGroup label={copy.relations.projects} items={task.projects} hrefFor={(item) => `/${locale}/app/projects/${item.id}`} />
-              <RelationGroup label={copy.relations.contexts} items={task.contexts} hrefFor={() => null} />
-              <RelationGroup label={copy.relations.people} items={task.people} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
-              <RelationGroup label={copy.relations.waitingOn} items={task.waitingOnPeople} hrefFor={(item) => `/${locale}/app/people/${item.id}`} />
-              <RelationGroup label={copy.relations.parent} items={task.parent ? [task.parent] : []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
-              <RelationGroup label={copy.relations.dependsOn} items={task.dependsOn ?? []} hrefFor={(item) => `/${locale}/app/work/${item.id}`} />
-            </dl>
-          ) : (
-            <UniversalStateLine description={copy.relations.empty} locale={locale} state="empty" />
-          )}
-        </section>
-
         <section className="task-detail-section" aria-label={copy.sections.provenance}>
           <h2>{copy.sections.provenance}</h2>
           {detail.provenance ? (
@@ -276,6 +198,7 @@ export function TaskDetailView({
               >
                 <blockquote className="task-provenance">{detail.provenance.preview}</blockquote>
               </ProtectedContent>
+              <p className="task-origin">{originLine}</p>
               <Link className="panel-view-all" href={`/${locale}/app/inbox/${detail.provenance.entryId}`}>
                 {copy.provenance.openEntry}
               </Link>
@@ -283,6 +206,7 @@ export function TaskDetailView({
           ) : (
             <>
               <p className="quiet-state">{copy.provenance.manual}</p>
+              <p className="task-origin">{originLine}</p>
               {/*
                 `2L-PRIVACY-004`, stated exactly where a user could otherwise be
                 misled: this is the one screen that tells them the task came from
@@ -298,29 +222,37 @@ export function TaskDetailView({
           )}
         </section>
 
-        <section className="task-detail-section" aria-label={copy.sections.history}>
-          <h2>{copy.sections.history}</h2>
-          {detail.history.length ? (
-            <ol className="task-history">
-              {detail.history.map((entry) => (
-                <li key={entry.id}>
-                  <strong>{describeHistoryEntry(copy, entry)}</strong>
-                  {/*
-                    `audit_logs.reason` is deliberately not rendered. It is written
-                    by SQL as English prose — "Task created", "User created a task
-                    directly" — so showing it puts untranslated text in front of a
-                    Portuguese reader, and for a task every value it can hold only
-                    restates the action the sentence above already names.
-                    Localizing it would mean changing what the RPCs write, which is
-                    a schema-level decision and not this surface's to take.
-                  */}
-                  <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
-                </li>
-              ))}
-            </ol>
-          ) : (
-            <UniversalStateLine description={copy.history.empty} locale={locale} state="empty" />
-          )}
+        {/*
+          Collapsed at rest: it answers "what happened to this", which is asked
+          after everything above it. Native `<details>`, so the keyboard
+          operation and the expanded state cost no script — the same footnote the
+          record page uses for its earlier decisions.
+        */}
+        <section className="task-detail-section task-history-section" aria-label={copy.sections.history}>
+          <details className="record-footnote">
+            <summary><h2>{copy.sections.history}</h2></summary>
+            {detail.history.length ? (
+              <ol className="task-history">
+                {detail.history.map((entry) => (
+                  <li key={entry.id}>
+                    <strong>{describeHistoryEntry(copy, entry)}</strong>
+                    {/*
+                      `audit_logs.reason` is deliberately not rendered. It is written
+                      by SQL as English prose — "Task created", "User created a task
+                      directly" — so showing it puts untranslated text in front of a
+                      Portuguese reader, and for a task every value it can hold only
+                      restates the action the sentence above already names.
+                      Localizing it would mean changing what the RPCs write, which is
+                      a schema-level decision and not this surface's to take.
+                    */}
+                    <time dateTime={entry.occurredAt}>{dateTime(entry.occurredAt)}</time>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <UniversalStateLine description={copy.history.empty} locale={locale} state="empty" />
+            )}
+          </details>
         </section>
         </div>
       </div>

@@ -69,6 +69,18 @@ function renderDetail(value: TaskDetailProjection, locale: Locale = "pt-BR") {
   return render(<TaskDetailView agentName="Brain" locale={locale} detail={value} actions={<button type="button">Concluir</button>} />);
 }
 
+/**
+ * The history rests collapsed, so a test that reads it opens it first — the
+ * way a person would, and so that what is asserted is what they would see.
+ */
+function openHistory(name: string): HTMLElement {
+  const history = screen.getByRole("region", { name });
+  const disclosure = history.querySelector("details");
+  if (disclosure === null) throw new Error("the history is not behind a <details>");
+  disclosure.open = true;
+  return history;
+}
+
 describe("TaskDetailView", () => {
   /**
    * `2M-CAL-008`. Found by the deployment journey, which pressed a back link
@@ -105,20 +117,59 @@ describe("TaskDetailView", () => {
     });
   });
 
-  it("separates what the task is, what it relates to, where it came from and what happened to it", () => {
+  it("separates what the task is, where it came from and what happened to it", () => {
     renderDetail(detail());
 
+    // "Relações" is no longer a section of its own: a task's project is one of
+    // its facts, and it sits in the one list with the rest of them.
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Detalhes",
-      "Relações",
       "De onde veio",
       "Histórico desta tarefa",
     ]);
   });
 
+  it("lists every fact once, in one list, in the order they are read", () => {
+    renderDetail(detail());
+    const details = screen.getByRole("region", { name: "Detalhes" });
+
+    expect(within(details).getAllByRole("term").map((term) => term.textContent)).toEqual([
+      "Prazo",
+      "Dia planejado",
+      "Prioridade",
+      "Projetos",
+      "Contextos",
+      "Pessoas",
+      "Aguardando",
+    ]);
+    // Bookkeeping is not a fact of the weight of the due date.
+    expect(within(details).queryByText(/Criada em|Última alteração|Origem/)).toBeNull();
+  });
+
+  it("adds the parent, the dependencies and the closing instant only when there are any", () => {
+    renderDetail(
+      detail({
+        task: task({
+          parent: { id: "task-0", label: "Fechar a rodada" },
+          dependsOn: [{ id: "task-2", label: "Receber a minuta" }],
+        }),
+        completedAt: "2026-07-30T15:00:00.000Z",
+      }),
+    );
+    const details = screen.getByRole("region", { name: "Detalhes" });
+
+    expect(within(details).getAllByRole("term").map((term) => term.textContent).slice(7)).toEqual([
+      "Tarefa-mãe",
+      "Depende de",
+      "Concluída em",
+    ]);
+    expect(within(details).getByRole("link", { name: "Fechar a rodada" })).toHaveAttribute("href", "/pt-BR/app/work/task-0");
+    expect(within(details).getByRole("link", { name: "Receber a minuta" })).toHaveAttribute("href", "/pt-BR/app/work/task-2");
+  });
+
   it("makes every relation a link to the thing it names", () => {
     renderDetail(detail());
-    const relations = screen.getByRole("region", { name: "Relações" });
+    const relations = screen.getByRole("region", { name: "Detalhes" });
 
     expect(within(relations).getByRole("link", { name: "Aurora Participações" })).toHaveAttribute(
       "href",
@@ -132,7 +183,7 @@ describe("TaskDetailView", () => {
 
   it("renders a context as plain text, because contexts have no page to open", () => {
     renderDetail(detail());
-    const relations = screen.getByRole("region", { name: "Relações" });
+    const relations = screen.getByRole("region", { name: "Detalhes" });
 
     // A control that leads nowhere must not look like one that does (UX-20).
     expect(within(relations).queryByRole("link", { name: "Trabalho" })).toBeNull();
@@ -150,6 +201,15 @@ describe("TaskDetailView", () => {
     );
   });
 
+  it("says who made the task and when in one quiet line, not as two fields", () => {
+    renderDetail(detail());
+    const provenance = screen.getByRole("region", { name: "De onde veio" });
+
+    expect(
+      within(provenance).getByText("Sugerida pelo Brain e confirmada por você · criada em 20 de julho de 2026 às 07:00"),
+    ).toBeInTheDocument();
+  });
+
   it("says plainly when a task was created by hand rather than from a capture", () => {
     renderDetail(detail({ provenance: null }));
 
@@ -159,9 +219,23 @@ describe("TaskDetailView", () => {
     ).toBeInTheDocument();
   });
 
-  it("describes history as sentences and never as a raw action_type", () => {
+  it("keeps the history one line at rest, behind a native disclosure", () => {
     renderDetail(detail());
     const history = screen.getByRole("region", { name: "Histórico desta tarefa" });
+    const disclosure = history.querySelector("details");
+
+    expect(disclosure).not.toBeNull();
+    expect(disclosure).not.toHaveAttribute("open");
+    // The heading is the summary, so the outline still names the section.
+    expect(within(disclosure!.querySelector("summary")!).getByRole("heading", { name: "Histórico desta tarefa" })).toBeInTheDocument();
+    expect(within(history).getByText("Você alterou a tarefa")).not.toBeVisible();
+  });
+
+  it("describes history as sentences and never as a raw action_type", () => {
+    renderDetail(detail());
+    const history = openHistory("Histórico desta tarefa");
+
+    expect(within(history).getByText("Você alterou a tarefa")).toBeVisible();
 
     expect(within(history).getByText("Você alterou a tarefa")).toBeInTheDocument();
     expect(within(history).getByText("O Brain criou a tarefa")).toBeInTheDocument();
@@ -200,8 +274,12 @@ describe("TaskDetailView", () => {
       }),
     );
 
-    expect(screen.getByText("Nenhuma relação registrada.")).toBeInTheDocument();
-    expect(screen.getByText("Nenhuma alteração registrada ainda.")).toBeInTheDocument();
+    // An empty relation is still a row: "none" is an answer, and the row is
+    // where the control that fills it lives.
+    const details = screen.getByRole("region", { name: "Detalhes" });
+    expect(within(details).getAllByText("Nenhum")).toHaveLength(2);
+    expect(within(details).getAllByText("Ninguém")).toHaveLength(2);
+    expect(within(openHistory("Histórico desta tarefa")).getByText("Nenhuma alteração registrada ainda.")).toBeVisible();
   });
 
   it("renders the whole surface in English without leaking Portuguese", () => {
@@ -209,12 +287,11 @@ describe("TaskDetailView", () => {
 
     expect(screen.getAllByRole("region").map((region) => region.getAttribute("aria-label"))).toEqual([
       "Details",
-      "Relationships",
       "Where this came from",
       "History of this task",
     ]);
-    expect(screen.getByText("You changed the task")).toBeInTheDocument();
-    expect(screen.getByText("Suggested by Brain and confirmed by you")).toBeInTheDocument();
+    expect(within(openHistory("History of this task")).getByText("You changed the task")).toBeVisible();
+    expect(screen.getByText(/^Suggested by Brain and confirmed by you · created /)).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Detalhes|Relações|Histórico|Sugerida pelo Brain/);
   });
 
@@ -317,28 +394,49 @@ describe("TaskDetailView: withheld content (OD-2L-1 option B)", () => {
     understand on the right.
   */
   describe("composition", () => {
-    it("puts the fields beside the controls that change them, and the account beside neither", () => {
-      const { container } = render(
-        <TaskDetailView
-          actions={<button type="button">Concluir</button>}
-          agentName="Brain"
-          controls={<div data-testid="controls">controles</div>}
-          detail={detail()}
-          locale="en"
-        />,
-      );
+    it("puts the facts in the column you decide in, and the account in the other", () => {
+      const { container } = renderDetail(detail(), "en");
 
       const primary = container.querySelector(".task-detail-primary");
       const secondary = container.querySelector(".task-detail-secondary");
       expect(primary).not.toBeNull();
       expect(secondary).not.toBeNull();
 
-      // A due date in one column and the field that sets it in the other is the
-      // arrangement this split exists to avoid.
       expect(within(primary as HTMLElement).getByRole("region", { name: "Details" })).toBeVisible();
-      expect(within(primary as HTMLElement).getByTestId("controls")).toBeVisible();
+      expect(within(primary as HTMLElement).getByRole("button", { name: "Concluir" })).toBeVisible();
       expect(within(secondary as HTMLElement).getByRole("region", { name: "History of this task" })).toBeVisible();
       expect(within(secondary as HTMLElement).getByRole("region", { name: "Where this came from" })).toBeVisible();
+    });
+
+    /*
+      The injected controls ARE the list — they were handed the same rows — so
+      the view prints none of its own. A due date on the page twice, once to
+      read and once to change, is the arrangement the recomposition removed.
+    */
+    it("prints no list of its own when the controls carry the facts", () => {
+      const { container } = render(
+        <TaskDetailView
+          actions={null}
+          agentName="Brain"
+          controls={<section aria-label="Details" data-testid="controls">controles</section>}
+          detail={detail()}
+          locale="en"
+        />,
+      );
+
+      const primary = container.querySelector(".task-detail-primary") as HTMLElement;
+      expect(within(primary).getByTestId("controls")).toBeVisible();
+      expect(screen.getAllByRole("region", { name: "Details" })).toHaveLength(1);
+      expect(container.querySelector(".task-facts")).toBeNull();
+    });
+
+    it("draws both readings of the facts from one function", () => {
+      // The read-only list here and the editable one the surface injects must
+      // be the same rows, which is only true while neither writes its own.
+      const view = readFileSync(join(__dirname, "task-detail-view.tsx"), "utf8");
+      const surface = readFileSync(join(__dirname, "task-detail-surface.tsx"), "utf8");
+      expect(view).toMatch(/taskFactsFor\(detail, locale, agentName\)/);
+      expect(surface).toMatch(/facts=\{taskFactsFor\(detail, locale, agentName\)\}/);
     });
 
     /*

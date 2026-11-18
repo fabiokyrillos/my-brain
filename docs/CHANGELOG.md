@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-18 — The task detail is one list of facts, each edited in place (ADR-185)
+
+- `features/task-commands/task-detail-controls.tsx`: a fourth frame, `variant="fields"`, renders the task's facts as rows with one verb each (*Alterar* / *Definir* / *Adicionar*) that opens the field's existing control under the row. The per-control form is one function shared by every variant; nothing in the write path changed.
+- `features/daily-cycle/task-facts.tsx` (new) computes the rows; `task-detail-view.tsx` prints them plainly when no control is eligible. "Relações" and "Editar esta tarefa" are gone as sections; the history is a collapsed `<details>`; origin and creation are one caption.
+- `app/operations.css`: rows between hairlines; the opened editor is set against a rule beside it; `.task-fields`, `.task-field` and `.task-relation-group` are deleted. `RECORDED_UNSTYLED` falls to 32.
+- 3,700px → 1,495px at 390px with the same task. No migration. Record: `docs/reports/editorial-calmo/TAREFA.md`.
+
 ## 2026-11-18 — A suggested task is decided with one tap (ADR-184, continued)
 
 - `features/tasks/task-candidate-form.tsx`: one question per suggestion — *Criar tarefa*, *Ignorar* (writes `dismissed`), and *Mais opções* holding *Rejeitar sugestão* and *Manter como registro*. Each answer is one request for that candidate. The checkboxes, the four-option radio grid and "Resolver N sugestões" are gone. With two or more suggestions, *Criar as N tarefas* confirms all of them in one request — the only way to create two suggestions linked as parent or dependency, which the server accepts only together.

@@ -37,6 +37,8 @@ import { requireUser } from "@/lib/auth/require-user";
 import type { Locale } from "@/lib/preferences";
 
 import { getMissingTaskCopy } from "./copy";
+import { getTaskDetailCopy } from "./task-detail-copy";
+import { taskFactsFor } from "./task-facts";
 import { resolveTaskBackTarget } from "./task-return";
 import { loadTaskDetailProjection } from "./task-detail-projection";
 import { TaskDetailView } from "./task-detail-view";
@@ -108,6 +110,17 @@ export async function TaskDetailSurface({
     ? await loadCandidateRelationOptions(supabase, user.id)
     : { projects: [], contexts: [], people: [] };
 
+  const actions = detail.task.availableActions.length ? (
+    <div className="task-detail-actions">
+      <WorkItemActions
+        action={applyWorkItemAction}
+        locale={locale}
+        task={detail.task}
+        undoAction={undoWorkOperation}
+      />
+    </div>
+  ) : null;
+
   return (
     <TaskDetailView
       agentName={agentName}
@@ -116,18 +129,13 @@ export async function TaskDetailSurface({
       panel={panel}
       backHref={back.href}
       backDestination={back.destination}
-      actions={
-        detail.task.availableActions.length ? (
-          <div className="task-detail-actions">
-            <WorkItemActions
-              action={applyWorkItemAction}
-              locale={locale}
-              task={detail.task}
-              undoAction={undoWorkOperation}
-            />
-          </div>
-        ) : null
-      }
+      /*
+        With edit controls, the status actions are handed to them as `lead`
+        instead: the title's own verbs (rename, add a note) and the rows share
+        one component, and Concluir/Aguardar sit between the two. Without any,
+        the view places the actions itself. Either way they are rendered once.
+      */
+      actions={controls.length ? null : actions}
       controls={
         controls.length ? (
           <TaskDetailControls
@@ -137,6 +145,11 @@ export async function TaskDetailSurface({
             // picker's bounds are one value rather than two that could disagree
             // across hydration.
             dateBounds={dateBounds(new Date(), detail.timezone)}
+            // The same rows the view would print read-only, so the list with
+            // editing and the list without it are one list.
+            facts={taskFactsFor(detail, locale, agentName)}
+            heading={getTaskDetailCopy(locale, agentName).sections.details}
+            lead={actions}
             locale={locale}
             relationOptions={{
               project: relations.projects,
@@ -146,6 +159,7 @@ export async function TaskDetailSurface({
             taskId={taskId}
             title={detail.task.title}
             undoAction={undoWorkOperation}
+            variant="fields"
           />
         ) : null
       }

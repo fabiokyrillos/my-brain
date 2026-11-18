@@ -441,9 +441,11 @@ test("no surface scrolls horizontally", async ({ page }) => {
 /**
  * The recomposed task detail — `03-componentes.md`, and `2L-EDIT-007`.
  *
- * Mirrors the DOM `src/features/daily-cycle/task-detail-view.tsx` emits: the
- * header, the two wrappers, and one section in each. Only the geometry is under
- * test here, so the sections carry a heading and a line rather than every field.
+ * Mirrors the DOM `src/features/daily-cycle/task-detail-view.tsx` emits with the
+ * `fields` frame of `TaskDetailControls` injected (ADR-184): the header, the two
+ * wrappers, the title's verbs, the status actions, the one list of facts — a
+ * row at rest, a row open, a row with a long unbroken value — the cancellation,
+ * and on the other side the account and the collapsed history.
  */
 function taskDetailBody(options: { panel?: boolean } = {}) {
   const frame = options.panel
@@ -460,13 +462,21 @@ function taskDetailBody(options: { panel?: boolean } = {}) {
     </header>
     <div class="task-detail-body">
       <div class="task-detail-primary">
-        <div class="task-detail-actions"><div class="row-actions"><button class="row-action" type="button">Concluir</button></div></div>
-        <section class="task-detail-section" aria-label="Detalhes"><h2>Detalhes</h2><dl class="task-fields"><div class="task-field"><dt>Prazo</dt><dd>31 de julho de 2026</dd></div><div class="task-field"><dt>Dia planejado</dt><dd>Sem dia planejado</dd></div></dl></section>
-        <ul class="task-control-list"><li class="task-control"><form><label for="d">Prazo</label><input id="d" type="date"><button class="row-action" type="submit">Aplicar</button></form></li></ul>
+        <div class="task-detail-controls task-detail-fields">
+          <div class="task-title-controls"><div class="task-title-verbs"><button class="task-fact-verb" type="button" aria-expanded="false">Renomear</button><button class="task-fact-verb" type="button" aria-expanded="false">Acrescentar uma nota</button></div></div>
+          <div class="task-detail-actions"><div class="row-actions"><button class="row-action" type="button">Concluir</button></div></div>
+          <section class="task-detail-section" aria-label="Detalhes"><h2>Detalhes</h2><dl class="task-facts">
+            <div class="task-fact"><dt>Prazo</dt><dd><span class="task-fact-value">31 de julho de 2026 às 14:00</span><button class="task-fact-verb" type="button" aria-expanded="true" aria-controls="e-due" aria-label="Alterar prazo">Alterar</button>
+              <div class="task-fact-editor" id="e-due"><div class="task-fact-form"><form><label for="d">Prazo</label><input id="d" type="date"><button class="row-action" type="submit">Aplicar</button></form></div><div class="task-fact-form"><form><button class="row-action" type="submit">Tirar o prazo</button></form></div><button class="task-fact-verb" type="button">Fechar</button></div></dd></div>
+            <div class="task-fact"><dt>Dia planejado</dt><dd><span class="task-fact-value" data-empty="true">Sem dia planejado</span><button class="task-fact-verb" type="button" aria-expanded="false" aria-label="Definir dia planejado">Definir</button></dd></div>
+            <div class="task-fact"><dt>Projetos</dt><dd><span class="task-fact-value"><span class="task-relations"><a class="task-relation" href="#">Aurora Participações</a><a class="task-relation" href="#">${"Projeto".repeat(18)}</a></span></span><button class="task-fact-verb" type="button" aria-expanded="false" aria-label="Alterar projetos">Alterar</button></dd></div>
+          </dl></section>
+          <div class="task-detail-endnote"><div class="task-fact-form"><form><button class="row-action row-action-destructive" type="submit">Cancelar a tarefa</button></form></div></div>
+        </div>
       </div>
       <div class="task-detail-secondary">
-        <section class="task-detail-section" aria-label="Relações"><h2>Relações</h2><dl class="task-relations"><div class="task-relation-group"><dt>Projetos</dt><dd><a class="task-relation" href="#">Aurora Participações</a></dd></div></dl></section>
-        <section class="task-detail-section" aria-label="Histórico desta tarefa"><h2>Histórico desta tarefa</h2><ol class="task-history"><li><strong>Você alterou a tarefa</strong><time>29/07/2026</time></li></ol></section>
+        <section class="task-detail-section" aria-label="De onde veio"><h2>De onde veio</h2><p class="quiet-state">Esta tarefa nasceu de um registro seu.</p><blockquote class="task-provenance">Preciso revisar o contrato da Aurora antes da reunião.</blockquote><p class="task-origin">Criada por você · criada em 20 de julho de 2026 às 07:00</p><a class="panel-view-all" href="#">Abrir o registro original</a></section>
+        <section class="task-detail-section task-history-section" aria-label="Histórico desta tarefa"><details class="record-footnote"><summary><h2>Histórico desta tarefa</h2></summary><ol class="task-history"><li><strong>Você alterou a tarefa</strong><time>29/07/2026</time></li></ol></details></section>
       </div>
     </div>
   </div></div>`;
@@ -507,8 +517,8 @@ test.describe("the task detail composes into two columns without reordering them
   /*
     `2L-EDIT-007`. The panel is a frame, and a frame may not take a control
     away. The panel is narrow enough that the two-column split must not apply
-    to it — at 460px the side column would be 180px and the eleven-control grid
-    would collapse — so the wrapper is a plain block there.
+    to it — at 460px the side column would be 180px and a row could not hold its
+    label, value and verb — so the wrapper is a plain block there.
   */
   test("the docked panel is one column and still holds every control", async ({ page }) => {
     await render(page, taskDetailBody({ panel: true }), 1440, 900);
@@ -529,8 +539,66 @@ test.describe("the task detail composes into two columns without reordering them
       page.locator(".task-detail-secondary").boundingBox(),
     ]);
     expect(primary!.x).toBeCloseTo(secondary!.x, 0);
-    await expect(panel.locator("button[type=submit]")).toBeVisible();
+    // The opened row's own submit, the row verbs and the last control: the
+    // panel is a frame, and a frame may not take any of them away.
+    await expect(panel.locator(".task-fact-editor button[type=submit]").first()).toBeVisible();
+    await expect(panel.locator(".task-fact-verb").first()).toBeVisible();
+    await expect(panel.locator(".task-detail-endnote button[type=submit]")).toBeVisible();
     await expect(panel.locator(".task-detail-actions .row-action")).toBeVisible();
+  });
+
+  /*
+    The recomposition's own contracts (ADR-184). A row is label · value · verb,
+    and the three things that can go wrong with that are a value that pushes
+    the page sideways, a verb too small to hit, and an opened editor wider than
+    the row it opened under.
+  */
+  for (const width of [390, 320]) {
+    test(`nothing in the list of facts is wider than a ${width}px screen`, async ({ page }) => {
+      for (const body of [taskDetailBody(), taskDetailBody({ panel: true })]) {
+        await render(page, body, width, 800);
+        const overflow = await page.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          clientWidth: document.documentElement.clientWidth,
+        }));
+        expect(overflow.scrollWidth, `horizontal overflow at ${width}`).toBeLessThanOrEqual(overflow.clientWidth + 1);
+
+        const [row, editor] = await Promise.all([
+          page.locator(".task-fact").first().boundingBox(),
+          page.locator(".task-fact-editor").boundingBox(),
+        ]);
+        expect(editor!.x).toBeGreaterThanOrEqual(row!.x);
+        expect(editor!.x + editor!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
+      }
+    });
+  }
+
+  test("every control of the detail is a 44px target on a phone", async ({ page }) => {
+    await render(page, taskDetailBody(), 390, 844);
+    const small = await page.evaluate(() =>
+      [...document.querySelectorAll(".task-detail-page a, .task-detail-page button, .task-detail-page summary, .task-detail-page input")]
+        .filter((node) => (node as HTMLElement).offsetParent !== null)
+        .map((node) => ({ named: (node.textContent ?? "").trim().slice(0, 24) || node.tagName, height: node.getBoundingClientRect().height }))
+        .filter((box) => box.height < 44),
+    );
+    expect(small, JSON.stringify(small)).toEqual([]);
+  });
+
+  test("a field is 16px on a phone, so focusing it does not zoom the page", async ({ page }) => {
+    await render(page, taskDetailBody(), 390, 844);
+    const size = await page.locator(".task-fact-editor input[type=date]").evaluate((node) =>
+      Number.parseFloat(getComputedStyle(node).fontSize),
+    );
+    expect(size).toBeGreaterThanOrEqual(16);
+  });
+
+  test("the history rests as one line and the cancellation is not a card", async ({ page }) => {
+    await render(page, taskDetailBody(), 390, 844);
+    await expect(page.locator(".task-history")).toBeHidden();
+    const border = await page.locator(".task-detail-endnote .row-action").evaluate((node) =>
+      getComputedStyle(node).borderTopWidth,
+    );
+    expect(border).toBe("0px");
   });
 
   test("on a narrow viewport the panel is the surface and the list is removed", async ({ page }) => {

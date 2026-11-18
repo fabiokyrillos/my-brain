@@ -178,8 +178,14 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
 
    **37 -> 35, Life Brain E.1 (ADR-169).** The redesign of Configurações drew
    three of the privacy block's eight: `privacy-census` (a grid of numbers),
-   `privacy-census-nosurface` and `privacy-consent`. Five remain. */
-const RECORDED_UNSTYLED = 33;
+   `privacy-census-nosurface` and `privacy-consent`. Five remain.
+
+   **33 -> 32, the recomposed task detail (ADR-184).** `task-detail-primary`
+   left the census: the detail's two column wrappers had only ever been reached
+   through a descendant rule on one of them, and both now carry the `min-width:0`
+   a grid child needs for a long unbroken value to wrap instead of widening the
+   page. */
+const RECORDED_UNSTYLED = 32;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();
