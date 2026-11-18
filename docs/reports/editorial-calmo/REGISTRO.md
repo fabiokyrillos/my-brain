@@ -44,8 +44,22 @@ The "before" image has one mentioned person and the "after" two, so heights are 
 - `e2e/online-person-candidate-suggestions.spec.ts` was rewritten for the new controls and not run.
 - The task, event, memory, birthday and revision forms inside the page; the open technical disclosure; dark; `en`; the device.
 
+## Second step, 2026-11-18 — suggested tasks (branch `design/registro-tarefa-um-toque`)
+
+The task form took the same shape as the person one: a question, *Criar tarefa* · *Ignorar* · *Mais opções*, and the editor behind one link.
+
+- *Ignorar* writes `dismissed`, the neutral disposition. *Rejeitar sugestão* and *Manter como registro* are behind *Mais opções*, each with its one-line meaning.
+- *Criar as N tarefas* appears with two or more suggestions. It is the only way to create two suggestions linked as parent or dependency, because the server accepts that reference only when both are in the same request. Confirming such a task alone is stopped locally with a message that says so.
+- Closed, `CandidateEditor` is the link "Editar sugestão". Its card repeated the title, the description, the due date and the time zone under a question that had just said them; a notice that a due date could not be read stays visible.
+
+Image, same fixture plus two task suggestions, 390, light: [png](evidence/registro/tarefas-mobile.png).
+
+Verification: `npm test` 591 files / 10,835 tests; typecheck and lint clean; static specs 361 passed, 5 skipped.
+
+What changed in behaviour and is not recoverable from the screen: a mixed batch (create one suggestion and reject another in one request) no longer exists, and each tap is its own undo. Not verified: a real write; `e2e/editable-candidate-confirmation.spec.ts`, rewritten for the new controls and not run; the open editor inside the new row at phone width; whether the editor drops a reference to a sibling that was ignored after it was chosen.
+
 ## Left open
 
-- The task, event, memory and birthday candidates are still forms. Giving them the same one-question shape is the next step.
+- The event, memory and birthday candidates are still forms (tasks followed on 2026-11-18, above).
 - The mockup had *Corrigir* beside the reading; the revision editor is still reached where it was.
 - Only the latest tap's *Desfazer* is on screen.

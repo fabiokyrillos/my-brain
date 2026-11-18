@@ -204,16 +204,23 @@ describe("the person-candidate row's layout contract", () => {
     expect(actions, "three answers cannot fit one line at 320px").toContain("flex-wrap:wrap");
   });
 
-  it("leaves the task form's own rules untouched", () => {
+  it("has no shared layout class left to borrow from", () => {
     /*
-      The regression this must not cause. `.candidate-item` still belongs to
-      `task-candidate-form.tsx`, and its 24px indicator column and hidden
-      checkbox are correct **there** — the defect was reuse, not the rule.
+      This used to assert that `.candidate-item` — the task form's `<label>`,
+      with its 24px indicator column and hidden checkbox — was left untouched,
+      because the defect was reuse, not the rule. The task form has since become
+      rows too and dropped the checkbox, so the class has no owner: this row
+      must not emit it, and no rule may remain for a later component to pick up
+      by accident. Comments are stripped first; one still quotes the old rule.
     */
-    const css = stylesheet();
-    expect(ruleFor(css, ".candidate-item")).toContain("grid-template-columns:24px 1fr auto");
-    expect(ruleFor(css, ".candidate-item>input")).toContain("position:absolute");
-    expect(ruleFor(css, ".candidate-check")).toContain("width:21px");
+    const { container } = renderForm();
+    for (const element of container.querySelectorAll("[class]")) {
+      expect([...element.classList], "the person row emits the retired layout class")
+        .not.toContain("candidate-item");
+    }
+    const rules = stylesheet().replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(rules, "a `.candidate-item` rule is back").not.toMatch(/\.candidate-item(?![\w-])/);
+    expect(rules, "a `.candidate-check` rule is back").not.toMatch(/\.candidate-check(?![\w-])/);
   });
 });
 

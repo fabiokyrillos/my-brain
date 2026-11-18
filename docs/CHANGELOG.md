@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-18 — A suggested task is decided with one tap (ADR-184, continued)
+
+- `features/tasks/task-candidate-form.tsx`: one question per suggestion — *Criar tarefa*, *Ignorar* (writes `dismissed`), and *Mais opções* holding *Rejeitar sugestão* and *Manter como registro*. Each answer is one request for that candidate. The checkboxes, the four-option radio grid and "Resolver N sugestões" are gone. With two or more suggestions, *Criar as N tarefas* confirms all of them in one request — the only way to create two suggestions linked as parent or dependency, which the server accepts only together.
+- New local check: confirming alone a task whose edit names a sibling still on the page returns a message pointing at *Criar as N tarefas* instead of spending a request the server would refuse.
+- `app/operations.css`: the card is a row; the closed `CandidateEditor` is one link ("Editar sugestão") instead of a card repeating the title and the due date; rules with no consumer left (`.candidate-item`, `.candidate-check`, `.candidate-disposition*`) are deleted.
+- The request's fields, the operation-key logic, the Server Action and the database are unchanged. No migration. Lost on purpose: a mixed batch (create one, reject another) in a single request. Record: `docs/reports/editorial-calmo/REGISTRO.md`.
+
 ## 2026-11-17 — The record page is recomposed, and a person is decided with one tap (ADR-184)
 
 - `features/daily-cycle/entry-review.tsx`: the owner's text is the page's largest element; the reading is a remark under it; the state badge is drawn only for states other than `ready` and `needs_attention`; the explanatory sentences under each heading are removed; "Decisões anteriores" is a collapsed `<details>`. Document order and heading levels are unchanged.
