@@ -62,7 +62,7 @@ import { reachScope, type ParsedCitations } from "./contracts";
 import { formatInstant } from "@/lib/time/instant-format";
 import { getConversationSourcesCopy } from "./copy";
 import { ExplanationPanel } from "./explanation-panel";
-import type { ResolvedSource } from "./resolve-sources";
+import type { ResolvedSource, SourceWhen } from "./resolve-sources";
 
 function Freshness({
   lead = true,
@@ -90,6 +90,25 @@ function Freshness({
       <time dateTime={occurredAt}>
         {formatInstant(occurredAt, "day", locale, timeZone)}
       </time>
+    </span>
+  );
+}
+
+/**
+ * What a cited task or reminder says about time (ADR-190), in place of the
+ * date it was created: a deadline, a passed deadline in the accent, "done", or
+ * a reminder's hour.
+ */
+function When({ locale, timeZone, when }: { locale: Locale; timeZone: string; when: SourceWhen }) {
+  const copy = getConversationSourcesCopy(locale).when;
+  if (when.kind === "done") return <span className="conversation-source-freshness"> · {copy.done}</span>;
+  const at = <time dateTime={when.at}>{formatInstant(when.at, when.kind === "remind" ? "dayAndTime" : "day", locale, timeZone)}</time>;
+  const label = copy[when.kind];
+  return (
+    <span className="conversation-source-freshness" data-when={when.kind}>
+      {" · "}
+      {label === "" ? null : `${label} `}
+      {at}
     </span>
   );
 }
@@ -146,8 +165,8 @@ const KIND_ICON: Readonly<Record<ConversationCardType, LucideIcon>> = {
  * What it says is asked of the same contract, through the same function, that
  * the card shell asks (`chatCardContent`): content the contract masks is drawn
  * as the masked sentence and never as text, and content it omits is not drawn.
- * A source that carries no content at all — a task or a reminder, which the
- * resolver reads content-free (ADR-146) — is titled by its kind alone.
+ * A task or a reminder carries its title and what it says about time
+ * (ADR-190); a source with no content at all is titled by its kind alone.
  *
  * An unavailable source is not a card: one quiet line, with no link.
  */
@@ -195,7 +214,11 @@ function SourceItem({
         <span className="conversation-source-caption">
           {support}
           {said === null ? null : <span className="conversation-source-type">{type}</span>}
-          <Freshness lead={said !== null} locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
+          {source.when && said !== null && !masked ? (
+            <When locale={locale} timeZone={timeZone} when={source.when} />
+          ) : (
+            <Freshness lead={said !== null} locale={locale} occurredAt={source.occurredAt} timeZone={timeZone} />
+          )}
         </span>
       </span>
       {href === null ? null : <ChevronRight aria-hidden="true" className="conversation-source-chevron" size={18} />}

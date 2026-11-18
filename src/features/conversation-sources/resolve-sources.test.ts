@@ -173,7 +173,7 @@ describe("the read is bounded and owner-scoped", () => {
   });
 });
 
-describe("Life Brain B.1: a cited task resolves content-free (ADR-146)", () => {
+describe("a cited task resolves with its title, level and deadline (ADR-190, reversing ADR-146 Decision 1)", () => {
   const TASK = "55555555-5555-4555-8555-555555555555";
   const taskRef = { id: `task:${TASK}`, type: "task" as const, sourceId: TASK, support: "product_state" as const };
 
@@ -194,15 +194,60 @@ describe("Life Brain B.1: a cited task resolves content-free (ADR-146)", () => {
     return { supabase, columns };
   }
 
-  it("names a task that still exists and links to it, carrying no title", async () => {
-    const { supabase, columns } = recordingClient({ tasks: [{ id: TASK, created_at: "2026-10-28T12:00:00Z" }] });
+  const task = (overrides: Record<string, unknown> = {}) => ({
+    id: TASK,
+    title: "Responder a Ana sobre o orçamento",
+    status: "todo",
+    due_at: null,
+    planned_at: null,
+    source_entry_id: null,
+    created_at: "2026-10-28T12:00:00Z",
+    ...overrides,
+  });
+
+  it("names the task by its title and links to it", async () => {
+    const { supabase, columns } = recordingClient({ tasks: [task()] });
     const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
 
-    expect(source?.card).toMatchObject({ cardType: "task", state: "previewed", snippet: null, href: `/pt-BR/app/work/${TASK}` });
-    expect(source?.occurredAt).toBe("2026-10-28T12:00:00Z");
-    // Existence and a date only — the title and the source entry are never read,
-    // so there is no content to mask and no second sensitivity derivation.
-    expect(columns.tasks).toBe("id,created_at");
+    expect(source?.card).toMatchObject({
+      cardType: "task",
+      state: "previewed",
+      mutability: "read_only",
+      snippet: "Responder a Ana sobre o orçamento",
+      href: `/pt-BR/app/work/${TASK}`,
+    });
+    expect(columns.tasks).toBe("id,title,status,due_at,planned_at,source_entry_id,created_at");
+  });
+
+  it("carries the level derived from the task's source entry, so the card masks what the surface masks", async () => {
+    const { supabase, columns } = recordingClient({
+      tasks: [task({ source_entry_id: ENTRY })],
+      entries: [{ id: ENTRY, sensitivity: "highly_sensitive" }],
+    });
+    const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
+    expect(source?.card.sensitivity).toBe("highly_sensitive");
+    expect(columns.entries, "the source entry is read for more than its level").toBe("id,sensitivity");
+  });
+
+  it("fails closed when the task's source entry cannot be read", async () => {
+    const { supabase } = recordingClient({ tasks: [task({ source_entry_id: ENTRY })], entries: [] });
+    const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
+    expect(source?.card.sensitivity).toBe("highly_sensitive");
+  });
+
+  it("says a passed deadline, a coming one, a planned day, and done", async () => {
+    const cases: Array<[Record<string, unknown>, unknown]> = [
+      [{ due_at: "2026-08-08T12:00:00Z" }, { kind: "overdue", at: "2026-08-08T12:00:00Z" }],
+      [{ due_at: "2026-08-12T12:00:00Z" }, { kind: "due", at: "2026-08-12T12:00:00Z" }],
+      [{ planned_at: "2026-08-10T00:00:00Z" }, { kind: "planned", at: "2026-08-10T00:00:00Z" }],
+      [{ status: "done", due_at: "2026-08-08T12:00:00Z" }, { kind: "done" }],
+      [{}, null],
+    ];
+    for (const [overrides, expected] of cases) {
+      const { supabase } = recordingClient({ tasks: [task(overrides)] });
+      const [source] = await resolveSources(supabase as never, USER, citations(taskRef), "pt-BR", NOW);
+      expect(source?.when).toEqual(expected);
+    }
   });
 
   it("renders a task that is gone exactly like any other unreadable source", async () => {
@@ -213,7 +258,7 @@ describe("Life Brain B.1: a cited task resolves content-free (ADR-146)", () => {
   });
 });
 
-describe("Life Brain B.2: a cited reminder resolves content-free (ADR-147)", () => {
+describe("a cited reminder resolves with its title and hour (ADR-190)", () => {
   const REMINDER = "77777777-7777-4777-8777-777777777777";
   const reminderRef = { id: `reminder:${REMINDER}`, type: "reminder" as const, sourceId: REMINDER, support: "product_state" as const };
 
@@ -234,20 +279,28 @@ describe("Life Brain B.2: a cited reminder resolves content-free (ADR-147)", () 
     return { supabase, columns };
   }
 
-  it("names a reminder that still exists and links to its page, carrying no title", async () => {
-    const { supabase, columns } = recordingClient({ reminders: [{ id: REMINDER, created_at: "2026-11-02T12:00:00Z" }] });
+  it("names a reminder by its title, links to its page and says its hour", async () => {
+    const { supabase, columns } = recordingClient({
+      reminders: [{
+        id: REMINDER,
+        title: "Buy Ana's present",
+        status: "scheduled",
+        remind_at: "2027-04-28T12:00:00Z",
+        entry_id: null,
+        created_at: "2026-11-02T12:00:00Z",
+      }],
+    });
     const [source] = await resolveSources(supabase as never, USER, citations(reminderRef), "en", NOW);
 
     expect(source?.card).toMatchObject({
       cardType: "reminder",
       state: "previewed",
       mutability: "read_only",
-      snippet: null,
+      snippet: "Buy Ana's present",
       href: `/en/app/reminders/${REMINDER}`,
     });
-    expect(source?.occurredAt).toBe("2026-11-02T12:00:00Z");
-    // The task's terms: existence and a date, never the title or the entry.
-    expect(columns.reminders).toBe("id,created_at");
+    expect(source?.when).toEqual({ kind: "remind", at: "2027-04-28T12:00:00Z" });
+    expect(columns.reminders).toBe("id,title,status,remind_at,entry_id,created_at");
   });
 
   it("renders a reminder that is gone like any other unreadable source", async () => {

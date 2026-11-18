@@ -58,6 +58,14 @@ export type ConversationSourcesCopy = {
   readonly freshnessLabel: string;
   /** A row with no date. Absent, never fabricated. */
   readonly freshnessUnknown: string;
+  /** ADR-190 — what a cited task or reminder says about time, before its date. */
+  readonly when: {
+    readonly due: string;
+    readonly overdue: string;
+    readonly planned: string;
+    readonly done: string;
+    readonly remind: string;
+  };
   /**
    * `2K-EXPL-001` … `2K-EXPL-007` — how the answer was reached.
    *
@@ -102,6 +110,7 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     legacyUnknown: "Esta resposta é de antes de eu passar a anotar onde procurei.",
     freshnessLabel: "De",
     freshnessUnknown: "Sem data",
+    when: { due: "prazo", overdue: "atrasada desde", planned: "planejada para", done: "concluída", remind: "" },
     explanation: {
       summary: "Como cheguei aqui",
       weakMatches: "Encontrei outras coisas suas, mas nenhuma perto o bastante do que você perguntou — deixei todas de fora.",
@@ -131,6 +140,7 @@ const COPY: Record<ConversationSourcesLocale, ConversationSourcesCopy> = {
     legacyUnknown: "This answer predates my keeping track of where I looked.",
     freshnessLabel: "From",
     freshnessUnknown: "No date",
+    when: { due: "due", overdue: "overdue since", planned: "planned for", done: "done", remind: "" },
     explanation: {
       summary: "How I got here",
       weakMatches: "I found other things of yours, but none close enough to what you asked — I left them all out.",

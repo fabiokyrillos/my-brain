@@ -110,6 +110,68 @@ describe("2K-SRC-001/003: every rendered source is a card that says what it is a
     expect(card.querySelector(".conversation-source-caption")?.textContent).toMatch(/^O que eu guardo como verdadeiro: De \d/);
   });
 
+  it("names a cited task by its title and says a passed deadline in the accent (ADR-190)", () => {
+    const task: ResolvedSource = {
+      key: "task:t2",
+      support: "product_state",
+      card: readOnlyPreviewCard({
+        cardType: "task",
+        objectId: "t2",
+        snippet: "Responder a Ana sobre o orçamento",
+        sensitivity: "normal",
+        href: "/pt-BR/app/work/t2",
+      }),
+      occurredAt: "2026-07-01T10:00:00.000Z",
+      when: { kind: "overdue", at: "2026-07-20T15:00:00.000Z" },
+    };
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[task]} />);
+    const card = screen.getByRole("link");
+    expect(card.querySelector(".conversation-source-title")?.textContent).toBe("Responder a Ana sobre o orçamento");
+    const when = card.querySelector('[data-when="overdue"]');
+    expect(when?.textContent).toMatch(/atrasada desde \d/);
+    expect(card.querySelector("button, input, select")).toBeNull();
+  });
+
+  it("says a cited reminder's day and hour, and a done task without a date", () => {
+    const reminder: ResolvedSource = {
+      key: "reminder:r1",
+      support: "product_state",
+      card: readOnlyPreviewCard({ cardType: "reminder", objectId: "r1", snippet: "Comprar o presente da Ana", sensitivity: "normal", href: "/pt-BR/app/reminders/r1" }),
+      occurredAt: null,
+      when: { kind: "remind", at: "2027-04-28T12:00:00.000Z" },
+    };
+    const done: ResolvedSource = {
+      key: "task:t3",
+      support: "product_state",
+      card: readOnlyPreviewCard({ cardType: "task", objectId: "t3", snippet: "Pagar o condomínio", sensitivity: "normal", href: "/pt-BR/app/work/t3" }),
+      occurredAt: null,
+      when: { kind: "done" },
+    };
+    render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[reminder, done]} />);
+    const [first, second] = screen.getAllByRole("link");
+    expect(first?.querySelector('[data-when="remind"]')?.textContent).toMatch(/· .*09:00/);
+    expect(second?.querySelector(".conversation-source-caption")?.textContent).toMatch(/concluída$/);
+  });
+
+  it("does not print the time beside a masked task title", () => {
+    contract.masks = true;
+    try {
+      const task: ResolvedSource = {
+        key: "task:t4",
+        support: "product_state",
+        card: readOnlyPreviewCard({ cardType: "task", objectId: "t4", snippet: "Exame", sensitivity: "highly_sensitive", href: "/pt-BR/app/work/t4" }),
+        occurredAt: null,
+        when: { kind: "due", at: "2026-07-20T15:00:00.000Z" },
+      };
+      render(<SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[task]} />);
+      const card = screen.getByRole("link");
+      expect(card.textContent).not.toContain("Exame");
+      expect(card.querySelector("[data-when]")).toBeNull();
+    } finally {
+      contract.masks = false;
+    }
+  });
+
   it("draws at most three cards, and the rest behind one quiet \"Mais N fontes\" line", () => {
     const { container } = render(
       <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[1, 2, 3, 4, 5].map((index) => source(index))} />,

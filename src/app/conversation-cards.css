@@ -480,6 +480,9 @@ a.conversation-source-card:focus-visible { outline: 2px solid var(--focus-ring);
   color: var(--text-secondary);
 }
 
+/* A task whose deadline has passed says so in the accent (ADR-190). */
+.conversation-source-freshness[data-when="overdue"] { color: var(--accent) }
+
 /* A source that can no longer be read: one quiet line, not a card, and no link. */
 .conversation-source-chip {
   display: flex;

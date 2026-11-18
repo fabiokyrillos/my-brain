@@ -5,7 +5,7 @@
 - The owner's turn is right-aligned in a quiet filled shape with its hour under it; the answer is on the left under a *B · Brain* label (new `chat/agent-speaker.tsx`), in the reading face at 19px. The streamed draft and the thinking indicator carry the same label.
 - Every cited source is a card that is entirely a link: kind icon, snippet in two lines at most, kind · date, chevron. Up to three show; the rest are behind *Mais N fontes*. An unavailable source stays a quiet line. Cards hold no control (`2K-CARD-008`). Masking goes through the same `resolveContent("chat", …)` path as the card view (`chatCardContent`, extracted from `card.tsx`).
 - A short thread starts at the top of the page on desktop instead of sitting on the field; with the conversations menu closed the column is centred.
-- Task and reminder cards are headed by their kind, not their title: the resolver reads them content-free (ADR-146 Decision 1), and this change reads nothing new.
+- Task and reminder cards carry their title; a task says its deadline (a passed one in the accent), its planned day or that it is done, and a reminder its day and hour. `resolve-sources.ts` reads those columns and derives each card's level from its source entry with `deriveTaskSensitivity` (ADR-190, reversing ADR-146 Decision 1 for chat).
 - No Server Action, route handler, RPC, query, prompt or migration changed.
 
 ## 2026-11-18 — The remaining pages, recomposed (ADR-180, ADR-188)
