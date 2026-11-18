@@ -3,14 +3,26 @@ import Link from "next/link";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import { InterpretationReviewViewed } from "@/features/product-analytics/interaction-events";
 import { formatInstant } from "@/lib/time/instant-format";
-import { AlertTriangle, Clock3, Quote, Sparkles } from "lucide-react";
+import { AlertTriangle, Clock3, Sparkles } from "lucide-react";
 import type { AttentionItemView, AttentionReason, CandidateOutcomeView, EntryOutcomeView, InterpretationReviewView, OriginalEntryView } from "./contracts";
 import { getDailyCycleCopy, getEntryReviewSectionCopy, type DailyCycleLocale } from "./copy";
 
+/** Past this many characters the owner's text is set as text, not as a headline. */
+const LONG_ORIGINAL = 220;
+
 const errorShapedReasons: readonly AttentionReason[] = ["retry_processing", "resolve_consistency"];
+
+/** States that say something the page does not already say elsewhere. */
+const quietStates: readonly InterpretationReviewView["productState"][] = ["ready", "needs_attention"];
 
 /**
  * The record's own identity, at the top of the page.
+ *
+ * Since the 2026-11-17 recomposition it is one quiet line — "Você escreveu" and
+ * the instant — because the largest thing on the page is now the owner's own
+ * text, directly beneath. The state badge is drawn only when it adds something:
+ * "Pronto" above a block that says the record needs the owner was two answers
+ * to one question, and `needs_attention` is what that block already says.
  *
  * The `<h1>` is the record's **date and time**, which is what the architecture's
  * screen map names this page (`02-arquitetura-e-rotas.md`: *Detalhe do registro
@@ -35,14 +47,14 @@ export function ReviewIdentity({
   return (
     <header className="record-detail-head">
       <div>
+        <p className="record-detail-provenance">{pt ? "Você escreveu" : "You wrote"}</p>
         <h1>{occurredAtLabel}</h1>
-        <p className="record-detail-provenance">
-          {pt ? "original preservado" : "original preserved"}
-        </p>
       </div>
-      <span className={`entry-status entry-status-${view.productState}`}>
-        <Clock3 size={16} aria-hidden="true" />{statusCopy.label}
-      </span>
+      {quietStates.includes(view.productState) ? null : (
+        <span className={`entry-status entry-status-${view.productState}`}>
+          <Clock3 size={16} aria-hidden="true" />{statusCopy.label}
+        </span>
+      )}
     </header>
   );
 }
@@ -70,13 +82,9 @@ export function ReviewUnderstanding({
 
   return (
     <section className="review-understanding" aria-labelledby="review-understanding-title">
-      <div className="section-heading">
-        <Sparkles size={17} aria-hidden="true" />
-        <div>
-          <h2 id="review-understanding-title">{pt ? `O que o ${agentName} entendeu` : `What ${agentName} understood`}</h2>
-          <p>{pt ? "Uma leitura do seu texto. Nada aqui substitui o original." : "A reading of your text. Nothing here replaces the original."}</p>
-        </div>
-      </div>
+      {/* A label over a note, not a section heading with its own explanation:
+          the reading sits under the owner's words as a remark about them. */}
+      <h2 id="review-understanding-title">{pt ? `O que o ${agentName} entendeu` : `What ${agentName} understood`}</h2>
       <p className="review-understanding-body">{view.understanding}</p>
       {view.humanFields.length > 0 && (
         /*
@@ -134,17 +142,27 @@ export function ReviewAttention({
   );
 }
 
-export function ReviewNextActions({ locale, children }: { locale: DailyCycleLocale; children: ReactNode }) {
+/**
+ * The decisions this record is waiting for.
+ *
+ * `continuesAttention` is set when the attention block sits directly above:
+ * that block is then this one's visible heading, and a second heading beneath
+ * it would name the same thing twice. The `<h2>` stays in the document either
+ * way, so the outline does not depend on what happens to be pending.
+ */
+export function ReviewNextActions({
+  locale,
+  continuesAttention = false,
+  children,
+}: {
+  locale: DailyCycleLocale;
+  continuesAttention?: boolean;
+  children: ReactNode;
+}) {
   const pt = locale === "pt-BR";
   return (
     <section className="review-next-actions interpretation-actions phase-2b-task-actions" aria-label={pt ? "Próximas ações" : "Next actions"}>
-      <div className="section-heading">
-        <span aria-hidden="true">→</span>
-        <div>
-          <h2>{pt ? "Próximas ações" : "Next actions"}</h2>
-          <p>{pt ? "Nada vira tarefa ou pessoa sem sua confirmação." : "Nothing becomes a task or person without your confirmation."}</p>
-        </div>
-      </div>
+      <h2 className={continuesAttention ? "sr-only" : "record-section-title"}>{pt ? "Próximas ações" : "Next actions"}</h2>
       {children}
     </section>
   );
@@ -170,14 +188,12 @@ export function OriginalRecord({
   const copy = getEntryReviewSectionCopy(locale);
   return (
     <section className="original-entry review-original" aria-labelledby="review-original-title">
-      <div className="section-heading">
-        <Quote size={17} aria-hidden="true" />
-        <div>
-          <h2 id="review-original-title">{copy.originalTitle}</h2>
-          <p>{copy.originalNote}</p>
-        </div>
-      </div>
-      <p className="review-original-content">{original.content}</p>
+      {/* Named for the outline and for a screen reader; not drawn, because the
+          line above already says "Você escreveu" and the text is the page. */}
+      <h2 className="sr-only" id="review-original-title">{copy.originalTitle}</h2>
+      {/* A short record is set as the page's headline; a long one as text. The
+          threshold is a typographic choice, not a fact about the record. */}
+      <p className="review-original-content" data-length={original.content.length > LONG_ORIGINAL ? "long" : "short"}>{original.content}</p>
     </section>
   );
 }
@@ -204,13 +220,7 @@ export function EntryOutcomes({
 
   return (
     <section className="entry-outcomes" aria-labelledby="entry-outcomes-title">
-      <div className="section-heading">
-        <span aria-hidden="true">◆</span>
-        <div>
-          <h2 id="entry-outcomes-title">{copy.outcomesTitle}</h2>
-          <p>{copy.outcomesNote}</p>
-        </div>
-      </div>
+      <h2 className="record-section-title" id="entry-outcomes-title">{copy.outcomesTitle}</h2>
 
       {outcomes.isEmpty ? (
         /* Said rather than hidden: "nothing was created" is an answer to the
@@ -253,22 +263,20 @@ export function CandidateOutcomeHistory({
   const pt = locale === "pt-BR";
   return (
     <section className="candidate-outcome-history" aria-labelledby="candidate-outcome-history-title">
-      <div className="section-heading">
-        <span aria-hidden="true">✓</span>
-        <div>
-          <h2 id="candidate-outcome-history-title">{pt ? "Decisões anteriores" : "Previous decisions"}</h2>
-          <p>{pt ? "O histórico deste registro permanece visível." : "This record's history remains visible."}</p>
-        </div>
-      </div>
-      <ul>
-        {outcomes.map((outcome) => (
-          <li key={outcome.key}>
-            <strong>{outcome.title}</strong>
-            <span>{outcome.outcomeLabel}</span>
-            <time dateTime={outcome.resolvedAt}>{formatInstant(outcome.resolvedAt, "dayAndTime", locale, timeZone)}</time>
-          </li>
-        ))}
-      </ul>
+      {/* Collapsed: it answers "what happened before", which is asked after
+          everything above it. Still on the page, one tap away. */}
+      <details className="record-footnote">
+        <summary><h2 id="candidate-outcome-history-title">{pt ? "Decisões anteriores" : "Previous decisions"}</h2></summary>
+        <ul>
+          {outcomes.map((outcome) => (
+            <li key={outcome.key}>
+              <strong>{outcome.title}</strong>
+              <span>{outcome.outcomeLabel}</span>
+              <time dateTime={outcome.resolvedAt}>{formatInstant(outcome.resolvedAt, "dayAndTime", locale, timeZone)}</time>
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   );
 }
@@ -350,7 +358,7 @@ export function EntryReview({
           <ReviewAttention items={view.attentionItems} locale={locale} detail={slots.attentionDetail}>
             {slots.attentionAction}
           </ReviewAttention>
-          <ReviewNextActions locale={locale}>{slots.nextActions}</ReviewNextActions>
+          <ReviewNextActions continuesAttention={view.attentionItems.length > 0} locale={locale}>{slots.nextActions}</ReviewNextActions>
         </div>
 
         {/*

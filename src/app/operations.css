@@ -381,23 +381,21 @@ a.home-agenda-link:hover{background:var(--background-subtle)}
    itself has the room, and stack everywhere else. */
 .person-candidate-section{margin-top:18px}
 .candidate-list>.field-hint{margin:0 0 4px;color:var(--text-secondary);font:var(--type-caption);line-height:1.55}
-.person-candidate-item{container:person-candidate/inline-size;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;margin:0;border:1px solid var(--border-default);border-radius:var(--radius-lg);padding:14px}
+.person-candidate-list{margin:0;padding:0;list-style:none}.person-candidate-item{container:person-candidate/inline-size;display:grid;grid-template-columns:minmax(0,1fr);gap:var(--space-2);align-items:start;margin:0;border-bottom:1px solid var(--border-default);padding:var(--space-4) 0}
 /* Explicit, because auto-placement into a track meant for something else is the
    defect this block exists to fix. `min-width:0` so a long unbroken word cannot
    set a floor the column has to honour. */
 .person-candidate-item>*{grid-column:1;min-width:0}
-.person-candidate-item>legend{padding:0 6px;font:var(--type-caption);font-weight:800;color:var(--text-primary)}
+.person-candidate-question{margin:0;font:var(--type-reading);line-height:1.3;color:var(--text-primary);overflow-wrap:anywhere}.person-candidate-role{color:var(--text-secondary)}
 .person-candidate-evidence{margin:0;color:var(--text-secondary);font:var(--type-caption);line-height:1.55;overflow-wrap:break-word}
-.person-candidate-options{display:grid;gap:8px}
-.person-candidate-options label{display:flex;align-items:center;gap:9px;min-height:44px;padding:0 2px;cursor:pointer;font:var(--type-body);color:var(--text-primary)}
-.person-candidate-options input{flex:none;width:18px;height:18px;margin:0;cursor:pointer}
-.person-candidate-name{display:grid;gap:6px}
+.person-candidate-actions{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin-top:var(--space-1)}
+.person-candidate-actions .ui-button{min-height:44px}
+
+.person-candidate-name{display:grid;gap:6px}.person-candidate-name[hidden]{display:none}
 .person-candidate-name label{color:var(--text-secondary);font:var(--type-caption);overflow-wrap:break-word}
 .person-candidate-name input{width:100%;min-width:0;box-sizing:border-box;min-height:44px;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:10px 12px;background:var(--background-surface);color:var(--text-primary);font:var(--type-body);font-family:inherit}
 .person-candidate-name input:disabled{background:var(--background-subtle);color:var(--text-muted);cursor:not-allowed}
-@container person-candidate (min-width:380px){
-  .person-candidate-options{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-}
+
 
 /* Phase 2X.9: decision-first progressive disclosure review */
 .entry-review{display:grid;gap:18px;width:100%}
@@ -1182,3 +1180,63 @@ a.entry-outcome-title:focus-visible{outline:3px solid var(--focus-ring);outline-
 .list-stack .list-row{border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;box-shadow:none;padding:var(--space-4) 0}
 .list-stack a.list-row:hover{border-color:var(--border-default);box-shadow:none;background:var(--background-subtle)}
 .list-stack .list-row-main strong{overflow-wrap:anywhere}
+
+/*
+ * The record page, recomposed (`inbox/[entryId]`; ADR-180, owner 2026-11-17).
+ *
+ * It was six cards of equal weight, and what it asked of the owner was on the
+ * third screen. It now reads in one line of thought:
+ *
+ *   1. what you wrote — the largest thing on the page, with no box;
+ *   2. how it was read — a remark set against a rule beside it, not a section;
+ *   3. what it needs from you — the first section, and the only one in colour;
+ *   4. what it created — rows;
+ *   5. earlier decisions and the technical detail — two collapsed lines.
+ *
+ * What KEEPS a box is an error-shaped notice and the forms that are still
+ * forms (task, event and memory candidates). Scoped to `.record-detail`, so the blocks inside the
+ * technical disclosure are not reached.
+ */
+.record-detail .record-detail-head{align-items:center;padding-bottom:var(--space-2)}
+.record-detail .record-detail-head>div{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-1);min-width:0}
+.record-detail .record-detail-provenance{margin:0;font:var(--type-caption);letter-spacing:0;text-transform:none;color:var(--text-muted)}
+.record-detail .record-detail-provenance::after{content:" ·"}
+.record-detail .record-detail-head h1{font:var(--type-caption);letter-spacing:0;color:var(--text-muted)}
+.record-detail .record-detail-columns{gap:var(--space-8)}
+.record-detail .record-decision,.record-detail .record-explanation{gap:var(--space-8)}
+
+.record-detail .original-entry{border:0;border-radius:0;background:none;margin:0;padding:0;overflow:visible}
+.record-detail .review-original-content{margin:0;padding:0;border:0;font:var(--type-title-2);line-height:1.3;letter-spacing:-.01em;overflow-wrap:anywhere}
+.record-detail .review-original-content[data-length="long"]{font:var(--type-reading-lg);letter-spacing:0}
+
+/* Closer to the text it reads than a section would be: half the column's gap. */
+.record-detail .record-decision .review-understanding{margin-top:calc(var(--space-4) * -1);border:0;border-left:2px solid var(--border-strong);border-radius:0;background:none;padding:0 0 0 var(--space-4)}
+.record-detail .review-understanding>h2{margin:0 0 var(--space-1);font:var(--type-caption);font-weight:500;color:var(--text-muted)}
+.record-detail .review-understanding-body{margin:0;font:var(--type-reading-sm);color:var(--text-secondary)}
+.record-detail .review-facts{gap:var(--space-1) var(--space-4);margin-top:var(--space-2)}
+.record-detail .review-facts div{border:0;border-radius:0;background:none;padding:0;font:var(--type-caption)}
+
+.record-section-title{display:flex;align-items:center;min-height:var(--touch-target);margin:0;border-bottom:1px solid var(--border-default);font:var(--type-section);color:var(--text-primary)}
+.record-detail .attention-notice:not(.error-notice){display:block;margin:0;border:0;border-bottom:1px solid var(--border-default);border-radius:0;background:none;padding:0 0 var(--space-3);color:inherit}
+.record-detail .attention-notice:not(.error-notice)>svg{display:none}
+.record-detail .attention-notice:not(.error-notice) strong{display:block;font:var(--type-section);color:var(--tone-attention-fg)}
+.record-detail .attention-notice:not(.error-notice) p{color:var(--text-secondary)}
+.record-detail .notice-card{margin-bottom:0}
+.record-detail .review-next-actions{border:0;border-radius:0;background:none;margin:0;padding:0}
+.record-detail .review-attention+.review-next-actions{margin-top:calc(var(--space-4) * -1)}
+
+.record-detail .entry-outcomes{border:0;border-radius:0;background:none;margin:0;padding:0}
+.record-detail .entry-outcome-group{margin-top:var(--space-4)}
+.record-detail .entry-outcome-group ul{border-top:0}
+.record-detail .entry-outcome-title{font-weight:500}
+
+/* The two footnotes: one line each, opened by whoever wants them. */
+.record-detail .candidate-outcome-history,
+.record-detail .record-explanation>.technical-details{border:0;border-top:1px solid var(--border-default);border-radius:0;background:none;margin:0;padding:0;overflow:visible}
+.record-detail .candidate-outcome-history+.technical-details{margin-top:calc(var(--space-8) * -1)}
+.record-footnote>summary,
+.record-detail .record-explanation>.technical-details>summary{min-height:var(--touch-target);padding:var(--space-3) 0;cursor:pointer;color:var(--text-secondary);font:var(--type-label)}
+.record-footnote>summary h2{display:inline;margin:0;font:inherit;color:inherit}
+.record-footnote>ul{margin:0;padding:0;list-style:none}
+.record-footnote>ul li{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--space-1) var(--space-4);padding:var(--space-3) 0;border-top:1px solid var(--border-default);font:var(--type-caption);color:var(--text-secondary)}
+.record-footnote>ul li strong{flex:1 1 100%;font:var(--type-body);font-weight:500;color:var(--text-primary);overflow-wrap:anywhere}

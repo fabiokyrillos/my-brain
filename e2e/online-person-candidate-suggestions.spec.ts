@@ -93,20 +93,21 @@ test.describe("confirmable unmatched person suggestions", () => {
     await signInOnline(page, { email, locale: "pt-BR" });
     await page.goto(`/pt-BR/app/inbox/${entryId}`);
 
-    const people = page.getByRole("group", { name: "Pessoas mencionadas" });
+    // One question per person since 2026-11-17: a list of rows, each decided by
+    // a tap. NOT RE-RUN against a live environment after that change.
+    const people = page.getByRole("list", { name: "Pessoas mencionadas" });
     await expect(people).toBeVisible();
-    await expect(people.getByText(`Giovanna ${marker}`, { exact: true })).toBeVisible();
-    await expect(people.getByText(`Jaime ${marker}`, { exact: true })).toHaveCount(0);
-    await expect(people.getByRole("radio", { name: "Criar pessoa" })).not.toBeChecked();
+    await expect(people.getByRole("group", { name: `Pessoa mencionada: Giovanna ${marker}` })).toBeVisible();
+    await expect(people.getByRole("group", { name: `Pessoa mencionada: Jaime ${marker}` })).toHaveCount(0);
 
-    await people.getByRole("radio", { name: "Criar pessoa" }).check();
+    await people.getByRole("button", { name: "Mudar o nome" }).click();
     const name = people.getByLabel(`Nome para criar: Giovanna ${marker}`);
     await name.fill(`Giovanna Corrigida ${marker}`);
-    await people.getByRole("button", { name: "Salvar decisões sobre pessoas" }).click();
+    await people.getByRole("button", { name: "Criar pessoa" }).click();
     await expect(page.getByRole("status")).toContainText("1 pessoa criada");
 
-    await page.getByRole("button", { name: "Desfazer decisões" }).click();
+    await page.getByRole("button", { name: "Desfazer", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Alteração desfeita");
-    await expect(page.getByRole("group", { name: "Pessoas mencionadas" })).toContainText(`Giovanna ${marker}`);
+    await expect(page.getByRole("list", { name: "Pessoas mencionadas" })).toContainText(`Giovanna ${marker}`);
   });
 });

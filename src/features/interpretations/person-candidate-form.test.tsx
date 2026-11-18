@@ -35,74 +35,116 @@ function renderForm(overrides: Partial<React.ComponentProps<typeof PersonCandida
   };
 }
 
+function submitted(action: unknown, call = 0): FormData {
+  return vi.mocked(action as (state: unknown, formData: FormData) => unknown).mock.calls[call]?.[1] as FormData;
+}
+
 describe("PersonCandidateForm", () => {
-  it("renders no form when there are no pending candidates", () => {
+  it("renders nothing when there are no pending candidates", () => {
     renderForm({ candidates: [] });
-    expect(screen.queryByRole("group", { name: "Pessoas mencionadas" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Pessoas mencionadas" })).not.toBeInTheDocument();
   });
 
-  it("starts with no decision selected and keeps name editing disabled", () => {
+  it("asks one question per person, with its answers beside it and the name field at rest hidden", () => {
     renderForm();
-    expect(screen.getByRole("group", { name: "Pessoas mencionadas" })).toBeInTheDocument();
-    expect(screen.getAllByRole("radio").every((radio) => !(radio as HTMLInputElement).checked)).toBe(true);
-    expect(screen.getByLabelText("Nome para criar: Giovanna (Gigi)")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Salvar decisões sobre pessoas" })).toBeDisabled();
+    expect(screen.getByRole("list", { name: "Pessoas mencionadas" })).toBeInTheDocument();
+    const giovanna = screen.getByRole("group", { name: "Pessoa mencionada: Giovanna (Gigi)" });
+    expect(within(giovanna).getByText("Criar a pessoa “Giovanna (Gigi)”?")).toBeVisible();
+    expect(within(giovanna).getByRole("button", { name: "Criar pessoa" })).toBeEnabled();
+    expect(within(giovanna).getByRole("button", { name: "Ignorar" })).toBeEnabled();
+    expect(within(giovanna).getByRole("button", { name: "Mudar o nome" })).toHaveAttribute("aria-expanded", "false");
+    expect(within(giovanna).getByLabelText("Nome para criar: Giovanna (Gigi)")).not.toBeVisible();
+    // The batch control is gone: there is nothing left to save separately.
+    expect(screen.queryByRole("button", { name: /Salvar decisões/ })).toBeNull();
+    expect(screen.queryAllByRole("radio")).toHaveLength(0);
   });
 
-  it("submits independent create and ignore decisions with an edited name", async () => {
+  it("writes one decision per tap, and only that person's", async () => {
+    const user = userEvent.setup();
+    const { action } = renderForm();
+    const jaime = screen.getByRole("group", { name: "Pessoa mencionada: Jaime" });
+
+    await user.click(within(jaime).getByRole("button", { name: "Ignorar" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    const formData = submitted(action);
+    expect(JSON.parse(String(formData.get("resolutions")))).toEqual([{ candidateIndex: 1, disposition: "rejected" }]);
+    // The envelope the server checks is unchanged from the form it replaced.
+    expect(formData.get("entryId")).toBe("72f1f8af-8b90-4f1d-9916-ec6d983fd4c6");
+    expect(formData.get("expectedInterpretationId")).toBe("94f6c9d0-2f4e-4a2e-8f2c-9b2a3c4d5e6f");
+    expect(formData.get("operationKey")).toBe("6118fb25-2f80-432a-aa96-0e76d924862e");
+    expect(formData.get("locale")).toBe("pt-BR");
+  });
+
+  it("creates with the name as edited, and says so in the question before it is tapped", async () => {
     const user = userEvent.setup();
     const { action } = renderForm();
     const giovanna = screen.getByRole("group", { name: "Pessoa mencionada: Giovanna (Gigi)" });
-    const jaime = screen.getByRole("group", { name: "Pessoa mencionada: Jaime" });
 
-    await user.click(within(giovanna).getByRole("radio", { name: "Criar pessoa" }));
+    await user.click(within(giovanna).getByRole("button", { name: "Mudar o nome" }));
     const name = within(giovanna).getByLabelText("Nome para criar: Giovanna (Gigi)");
+    expect(name).toBeVisible();
     await user.clear(name);
+    // An empty name cannot be created; ignoring is still possible.
+    expect(within(giovanna).getByRole("button", { name: "Criar pessoa" })).toBeDisabled();
+    expect(within(giovanna).getByRole("button", { name: "Ignorar" })).toBeEnabled();
     await user.type(name, "Giovanna");
-    await user.click(within(jaime).getByRole("radio", { name: "Ignorar menção" }));
-    await user.click(screen.getByRole("button", { name: "Salvar decisões sobre pessoas" }));
+    expect(within(giovanna).getByText("Criar a pessoa “Giovanna”?")).toBeVisible();
+    await user.click(within(giovanna).getByRole("button", { name: "Criar pessoa" }));
 
     await waitFor(() => expect(action).toHaveBeenCalledOnce());
-    const submitted = vi.mocked(action).mock.calls[0]?.[1] as FormData;
-    expect(JSON.parse(String(submitted.get("resolutions")))).toEqual([
+    expect(JSON.parse(String(submitted(action).get("resolutions")))).toEqual([
       { candidateIndex: 0, disposition: "confirmed", resolvedName: "Giovanna" },
-      { candidateIndex: 1, disposition: "rejected" },
     ]);
   });
 
+  it("uses a new operation key for the next decision once one has been written", async () => {
+    const user = userEvent.setup();
+    const { action } = renderForm();
+
+    await user.click(within(screen.getByRole("group", { name: "Pessoa mencionada: Jaime" })).getByRole("button", { name: "Ignorar" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    await user.click(within(screen.getByRole("group", { name: "Pessoa mencionada: Giovanna (Gigi)" })).getByRole("button", { name: "Criar pessoa" }));
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(2));
+
+    expect(submitted(action, 1).get("operationKey")).not.toBe(submitted(action, 0).get("operationKey"));
+  });
+
+  it("offers to undo what a tap wrote", async () => {
+    const user = userEvent.setup();
+    renderForm({ undoAction: vi.fn(async () => ({ status: "success" as const, message: "Desfeito." })) });
+
+    await user.click(within(screen.getByRole("group", { name: "Pessoa mencionada: Jaime" })).getByRole("button", { name: "Ignorar" }));
+
+    expect(await screen.findByText("Decisões salvas.")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Desfazer" })).toBeVisible();
+  });
+
   it("uses English accessible copy", () => {
-    renderForm({ locale: "en", candidates: [candidates[0]] });
-    expect(screen.getByRole("group", { name: "People mentioned" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Create person" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Ignore mention" })).toBeInTheDocument();
+    renderForm({ locale: "en", candidates: [candidates[0]!] });
+    expect(screen.getByRole("list", { name: "People mentioned" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create person" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Ignore" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Change the name" })).toBeInTheDocument();
   });
 });
 
 /**
  * The layout contract, asserted where CI can see it.
  *
- * The owner reported this card at ~440px: the evidence in an extremely narrow
- * column wrapping one word per line, `Criar pessoa` colliding with it, the form
- * illegible. The cause was **one layout class shared by two different shapes**.
+ * The owner once reported this card at ~440px with its evidence wrapping one
+ * word per line and its name field invisible. The cause was **one layout class
+ * shared by two different shapes**: `.candidate-item` describes the task form's
+ * `<label>` (a hidden checkbox, a 24px indicator, a copy block), and its rule
+ * `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}` hid
+ * this component's text input.
  *
- * `.candidate-item` describes the task form's `<label>` — a visually hidden
- * checkbox, a 24px check indicator, a copy block — so it declares
- * `grid-template-columns:24px 1fr auto` together with
- * `.candidate-item>input{position:absolute;opacity:0;pointer-events:none}`.
- * This component put that class on a `<fieldset>` whose children are a legend,
- * an evidence paragraph, two radio options, a name label and a text input.
- * Measured at a 440px viewport before the fix: the evidence occupied a **24px**
- * column at **1.00 word per line**, the name label likewise, and the text input
- * was `position:absolute; opacity:0; pointer-events:none` — **invisible and
- * unreachable**, a functional defect and not only a visual one.
- *
- * The geometry is measured with a real engine in `e2e/layout-contracts.spec.ts`
- * (four widths, long evidence, long name, several candidates, both decision
- * states, keyboard, print) — jsdom implements no grid algorithm. These
- * assertions are about the **declarations**, and they live here because that
- * Playwright file does not run in CI.
+ * The card has since become a row with buttons (owner, 2026-11-17), and the
+ * same contract holds for the new shape. The geometry is measured with a real
+ * engine in `e2e/layout-contracts.spec.ts`; these assertions are about the
+ * **declarations**, and they live here because that file does not run in CI.
  */
-describe("the person-candidate card's layout contract", () => {
+describe("the person-candidate row's layout contract", () => {
   const stylesheet = () =>
     readFileSync(join(__dirname, "..", "..", "app", "operations.css"), "utf8").replace(/\r\n/g, "\n");
 
@@ -114,18 +156,18 @@ describe("the person-candidate card's layout contract", () => {
 
   it("emits its own classes and never the task form's layout class", () => {
     const { container } = renderForm();
-    const cards = [...container.querySelectorAll(".person-candidate-item")];
-    expect(cards).toHaveLength(2);
-    for (const card of cards) {
-      expect(card.querySelectorAll(":scope > .person-candidate-evidence")).toHaveLength(1);
-      expect(card.querySelectorAll(":scope > .person-candidate-options")).toHaveLength(1);
-      expect(card.querySelectorAll(":scope > .person-candidate-name")).toHaveLength(1);
-      // The two options are grouped, not scattered across the fieldset.
-      expect(card.querySelectorAll(".person-candidate-options input[type='radio']")).toHaveLength(2);
-      // And the name field is a real child of its own wrapper, not a bare
-      // direct child of the fieldset, which is what the hiding rule caught.
-      expect(card.querySelectorAll(".person-candidate-name input[type='text']")).toHaveLength(1);
-      expect(card.querySelectorAll(":scope > input")).toHaveLength(0);
+    const rows = [...container.querySelectorAll(".person-candidate-item")];
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.querySelectorAll(":scope > .person-candidate-question")).toHaveLength(1);
+      expect(row.querySelectorAll(":scope > .person-candidate-evidence")).toHaveLength(1);
+      expect(row.querySelectorAll(":scope > .person-candidate-actions")).toHaveLength(1);
+      expect(row.querySelectorAll(":scope > .person-candidate-name")).toHaveLength(1);
+      expect(row.querySelectorAll(".person-candidate-actions button")).toHaveLength(3);
+      // The name field is a child of its own wrapper, not a bare direct child
+      // of the row, which is what the hiding rule caught.
+      expect(row.querySelectorAll(".person-candidate-name input[type='text']")).toHaveLength(1);
+      expect(row.querySelectorAll(":scope > input")).toHaveLength(0);
     }
     expect(container.querySelectorAll(".candidate-item"), "the task form's layout class came back")
       .toHaveLength(0);
@@ -133,47 +175,38 @@ describe("the person-candidate card's layout contract", () => {
 
   it("gives every child the main column explicitly, and lets it shrink", () => {
     const css = stylesheet();
-    const card = ruleFor(css, ".person-candidate-item");
-    expect(card, "the card lost its single-column grid").toContain("grid-template-columns:minmax(0,1fr)");
-    expect(card, "a fixed leading track was reserved again").not.toMatch(/grid-template-columns:\s*\d/);
+    const row = ruleFor(css, ".person-candidate-item");
+    expect(row, "the row lost its single-column grid").toContain("grid-template-columns:minmax(0,1fr)");
+    expect(row, "a fixed leading track was reserved again").not.toMatch(/grid-template-columns:\s*\d/);
+    expect(row, "the row is a card again").not.toContain("border-radius");
     const child = ruleFor(css, ".person-candidate-item>*");
     expect(child, "children are auto-placed again").toContain("grid-column:1");
     expect(child, "a long unbroken word can set the column's floor").toContain("min-width:0");
   });
 
-  it("keeps the name field visible, clickable and full width", () => {
-    // The exact three properties the shared rule had imposed on it.
-    const rule = ruleFor(stylesheet(), ".person-candidate-name input");
+  it("keeps the name field visible, clickable and full width when it is asked for", () => {
+    const css = stylesheet();
+    const rule = ruleFor(css, ".person-candidate-name input");
     expect(rule).toContain("width:100%");
     expect(rule).toContain("min-width:0");
     expect(rule).toMatch(/min-height:44px/);
     expect(rule, "the field is styled as a box-sizing:content-box control")
       .toContain("box-sizing:border-box");
+    // `display:grid` on the wrapper would otherwise defeat the `hidden` attribute.
+    expect(ruleFor(css, ".person-candidate-name[hidden]")).toContain("display:none");
   });
 
-  it("gives each option a real touch target", () => {
-    const rule = ruleFor(stylesheet(), ".person-candidate-options label");
-    expect(rule).toMatch(/min-height:44px/);
-    expect(rule, "the radio and its text are not on one line").toContain("display:flex");
-  });
-
-  it("splits the options on the container's width, not the viewport's", () => {
-    // The card renders in the decision column, which is wide on desktop and
-    // full width on a phone — the viewport does not describe it.
+  it("gives each answer a real touch target, and lets the answers wrap", () => {
     const css = stylesheet();
-    expect(ruleFor(css, ".person-candidate-item"), "the card is not a query container")
-      .toMatch(/container:\s*person-candidate\/inline-size/);
-    const query = css.indexOf("@container person-candidate (min-width:380px)");
-    expect(query, "the two-column state is gone").toBeGreaterThan(-1);
-    expect(ruleFor(css, ".person-candidate-options", query)).toContain("grid-template-columns:repeat(2,minmax(0,1fr))");
-    // Stacked is the base, so a browser without container queries is readable.
-    expect(ruleFor(css, ".person-candidate-options"), "stacked is not the base")
-      .not.toContain("grid-template-columns");
+    expect(ruleFor(css, ".person-candidate-actions .ui-button")).toMatch(/min-height:44px/);
+    const actions = ruleFor(css, ".person-candidate-actions");
+    expect(actions).toContain("display:flex");
+    expect(actions, "three answers cannot fit one line at 320px").toContain("flex-wrap:wrap");
   });
 
   it("leaves the task form's own rules untouched", () => {
     /*
-      The regression this fix must not cause. `.candidate-item` still belongs to
+      The regression this must not cause. `.candidate-item` still belongs to
       `task-candidate-form.tsx`, and its 24px indicator column and hidden
       checkbox are correct **there** — the defect was reuse, not the rule.
     */

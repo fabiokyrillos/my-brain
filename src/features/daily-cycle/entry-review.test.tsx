@@ -247,14 +247,17 @@ describe("EntryOutcomes", () => {
 
 describe("CandidateOutcomeHistory", () => {
   it("renders localized entry-local outcomes and never exposes internal disposition values", () => {
-    render(<CandidateOutcomeHistory timeZone={OWNER_TIME_ZONE} locale="pt-BR" outcomes={[
+    const { container } = render(<CandidateOutcomeHistory timeZone={OWNER_TIME_ZONE} locale="pt-BR" outcomes={[
       { key: "1", title: "Ligar para Marina", outcomeLabel: "Tarefa criada", resolvedAt: "2026-07-22T12:00:00.000Z" },
       { key: "2", title: "Revisar rascunho", outcomeLabel: "Sugestão rejeitada", resolvedAt: "2026-07-22T12:01:00.000Z" },
       { key: "3", title: "Preferência de contato", outcomeLabel: "Mantida como registro", resolvedAt: "2026-07-22T12:02:00.000Z" },
       { key: "4", title: "Lembrete duplicado", outcomeLabel: "Sugestão dispensada", resolvedAt: "2026-07-22T12:03:00.000Z" },
     ]} />);
 
+    // It rests collapsed — one line at the foot of the page — and opens on demand.
     expect(screen.getByRole("heading", { name: "Decisões anteriores" })).toBeVisible();
+    expect(screen.getByText("Tarefa criada")).not.toBeVisible();
+    container.querySelector("details")!.open = true;
     expect(screen.getByText("Tarefa criada")).toBeVisible();
     expect(screen.getByText("Sugestão rejeitada")).toBeVisible();
     expect(screen.getByText("Mantida como registro")).toBeVisible();
