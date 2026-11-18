@@ -73,7 +73,10 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
     await signIn(page);
 
     await page.goto("/pt-BR/app/memories");
-    // The mental model is stated before the rows, not implied by them.
+    // The mental model is one press away, after the rows (ADR-180): it was a
+    // box above them on every visit. NOT RUN since that change — this lane
+    // needs the hosted project and real credentials.
+    await page.locator("details.memory-explainer > summary").click();
     await expect(page.getByText("Uma memória é um fato ou preferência sua")).toBeVisible();
 
     await page.getByRole("textbox").first().fill(content);
@@ -125,7 +128,9 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
     await expect(lifecycleFeedback).toHaveText("Memória arquivada.", { timeout: 30_000 });
 
     await page.reload();
-    await expect(page.locator(".memory-state")).toHaveText("Arquivada");
+    // The state is the retrieval line's own attribute now; the badge beside the
+    // sentence only repeated its first word (ADR-180). NOT RUN since that change.
+    await expect(page.locator(".memory-retrieval-line")).toHaveAttribute("data-memory-state", "archived");
     await expect(page.getByText("Arquivada: não é mais usada nas respostas.")).toBeVisible();
     await expect(page.getByRole("heading", { name: /\(corrigida\)/, level: 1 })).toBeVisible();
     await expect(page.locator(".memory-facts")).not.toContainText("Sem prazo");
@@ -134,7 +139,9 @@ test.describe("a memory becomes inspectable, correctable and archivable", () => 
     await page.getByRole("button", { name: "Reativar" }).click();
     await expect(lifecycleFeedback).toHaveText("Memória reativada.", { timeout: 30_000 });
     await page.reload();
-    await expect(page.locator(".memory-state")).toHaveText("Em vigor");
+    // NOT RUN since the recomposition (ADR-180): same fact, read off the line.
+    await expect(page.locator(".memory-retrieval-line")).toHaveAttribute("data-memory-state", "active");
+    await expect(page.getByText("Em vigor: pode ser usada nas respostas agora.")).toBeVisible();
   });
 
   test("a memory relates to a person, and the relation is navigable", async ({ page }) => {

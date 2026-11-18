@@ -400,3 +400,64 @@ describe("opening the page writes nothing", () => {
     expect(Object.keys(stub.calls)).toEqual(["from", "select", "eq"]);
   });
 });
+
+/*
+ * Editorial calmo (ADR-180): the page is a written document — its title, one
+ * line of facts, the text, then where it came from and what else can be opened.
+ */
+describe("the review reads as a document", () => {
+  it("opens on the title, then the text, then the sources, then the links", async () => {
+    const { container } = await mount();
+    const order = [
+      screen.getByRole("heading", { level: 1 }),
+      container.querySelector(".review-content")!,
+      screen.getByRole("region", { name: "Fontes" }),
+      screen.getByRole("link", { name: "Ver este período no calendário" }),
+    ];
+    for (let index = 1; index < order.length; index += 1) {
+      expect(
+        Boolean(order[index - 1]!.compareDocumentPosition(order[index]!) & Node.DOCUMENT_POSITION_FOLLOWING),
+        `part ${index} is out of order`,
+      ).toBe(true);
+    }
+  });
+
+  it("names the text and the links for assistive technology without drawing a label over either", async () => {
+    await mount();
+    for (const name of ["Conteúdo", "Ações"]) {
+      const heading = screen.getByRole("heading", { level: 2, name });
+      expect(heading.className, `${name} is drawn`).toContain("sr-only");
+      expect(screen.getByRole("region", { name })).toBeInTheDocument();
+    }
+    // "Fontes" is the one section heading on screen.
+    expect(screen.getByRole("heading", { level: 2, name: "Fontes" }).className).not.toContain("sr-only");
+  });
+
+  it("puts the period, the state and when it was written on one line of facts", async () => {
+    const { container } = await mount();
+    const meta = container.querySelector<HTMLElement>(".review-detail-meta")!;
+    expect(within(meta).getByText(/10 de agosto de 2026/)).toBeInTheDocument();
+    expect(within(meta).getByText("Concluída").getAttribute("data-tone")).toBe("positive");
+    expect(within(meta).getByText(/Gerada em/)).toBeInTheDocument();
+  });
+
+  it("keeps how it was produced one press away, closed at rest", async () => {
+    const { container } = await mount();
+    const technical = container.querySelector<HTMLDetailsElement>("details.review-detail-technical")!;
+    expect(technical.open).toBe(false);
+    expect(technical.firstElementChild?.tagName).toBe("SUMMARY");
+    expect(technical.firstElementChild?.textContent).toBe("Detalhes técnicos");
+    // Nothing was dropped: the stored span, the model and the kind are inside.
+    expect([...technical.querySelectorAll("dt")].map((term) => term.textContent)).toEqual(["Período gravado", "Modelo", "Tipo"]);
+    expect(within(technical).getByText("gpt-5.6-terra")).toBeInTheDocument();
+  });
+
+  it("still offers both ways on from the page, as plain links", async () => {
+    await mount();
+    const actions = screen.getByRole("region", { name: "Ações" });
+    expect(within(actions).getAllByRole("link").map((link) => link.getAttribute("href"))).toEqual([
+      expect.stringContaining("/pt-BR/app/calendar?date=2026-08-10"),
+      "/pt-BR/app/reviews?period=week",
+    ]);
+  });
+});

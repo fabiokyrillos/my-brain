@@ -37,6 +37,8 @@ export type ReviewDetailCopy = {
   readonly sourceUnavailable: string;
   /** The heading above the resolved list. */
   readonly sourcesListHeading: string;
+  /** The disclosure over the stored span, the model and the kind. */
+  readonly technicalSummary: string;
   readonly periodLabel: string;
   readonly modelLabel: string;
   readonly modelUnknown: string;
@@ -62,6 +64,7 @@ const PT_BR: ReviewDetailCopy = {
   sourceKind: (type) => ({ entry: "Registro", task: "Tarefa", memory: "Memória", reminder: "Lembrete" })[type],
   sourceOpen: (kind, when) => (when ? `Abrir ${kind.toLowerCase()} de ${when}` : `Abrir ${kind.toLowerCase()}`),
   sourceUnavailable: "Não está mais disponível",
+  technicalSummary: "Detalhes técnicos",
   periodLabel: "Período gravado",
   modelLabel: "Modelo",
   modelUnknown: "Não registrado",
@@ -89,6 +92,7 @@ const EN: ReviewDetailCopy = {
   sourceKind: (type) => ({ entry: "Record", task: "Task", memory: "Memory", reminder: "Reminder" })[type],
   sourceOpen: (kind, when) => (when ? `Open ${kind.toLowerCase()} from ${when}` : `Open ${kind.toLowerCase()}`),
   sourceUnavailable: "No longer available",
+  technicalSummary: "Technical details",
   periodLabel: "Stored period",
   modelLabel: "Model",
   modelUnknown: "Not recorded",

@@ -5,7 +5,6 @@ import type { NavigationKey } from "@/features/shell/capabilities";
 
 export type LibraryCopy = {
   readonly title: string;
-  readonly intro: string;
   readonly searchLink: string;
   /*
    * `empty` and `open` were declared here from the start and read by nothing —
@@ -15,19 +14,16 @@ export type LibraryCopy = {
    * of them was believed to be live. What the overview genuinely needs is below,
    * and each field there has a call site in the same commit that declares it.
    */
-  readonly recentLabel: string;
   readonly descriptions: Readonly<Partial<Record<NavigationKey, string>>>;
   /** The lens strip's accessible name. */
   readonly lensesLabel: string;
   /** The first lens — Brain itself, rather than one of its parts. */
   readonly overviewLens: string;
   /**
-   * What the overview says when a domain has no rows *and* recency is supported
-   * — distinct from `noRecency`, which says the surface never shows them.
+   * What the overview says when a domain has no rows *and* recency is supported.
+   * A domain with no recency source says its `descriptions` sentence instead.
    */
   readonly nothingYet: string;
-  /** Said where a count exists but a recent list is deliberately not offered. */
-  readonly noRecency: string;
   /**
    * Said where the recent read itself failed.
    *
@@ -88,13 +84,10 @@ const copy: Record<Locale, LibraryCopy> = {
       called Brain — a place sharing a name with an actor, the collision
       `2I-SHELL-002` removed between "Início" and "Hoje" and UX-06 removed
       between "Brain" and "Conversar". The route is still `library`; only the
-      name changed. The intro still says what the *Brain* knows: that is the
-      actor, and this is where it keeps it.
+      name changed.
     */
     title: "Memória",
-    intro: "Tudo que o Brain sabe sobre o seu mundo, em um lugar só.",
     searchLink: "Buscar em tudo",
-    recentLabel: "Recentes",
     descriptions: {
       memories: "O que o Brain lembra sobre você.",
       people: "Quem faz parte da sua vida.",
@@ -113,7 +106,6 @@ const copy: Record<Locale, LibraryCopy> = {
     lensesLabel: "Lentes da Memória",
     overviewLens: "Visão geral",
     nothingYet: "Nada aqui ainda.",
-    noRecency: "Sem lista recente por aqui.",
     recentUnavailable: "Não foi possível ler os recentes agora. Isso não quer dizer que não existam.",
     countUnavailable: "Não foi possível contar agora.",
     holdsHeading: "O que o Brain guarda",
@@ -151,9 +143,7 @@ const copy: Record<Locale, LibraryCopy> = {
   },
   en: {
     title: "Memory",
-    intro: "Everything the Brain knows about your world, in one place.",
     searchLink: "Search everything",
-    recentLabel: "Recent",
     descriptions: {
       memories: "What the Brain remembers about you.",
       people: "The people in your life.",
@@ -167,7 +157,6 @@ const copy: Record<Locale, LibraryCopy> = {
     lensesLabel: "Memory lenses",
     overviewLens: "Overview",
     nothingYet: "Nothing here yet.",
-    noRecency: "No recent list here.",
     recentUnavailable: "The recent items could not be read right now. That does not mean there are none.",
     countUnavailable: "Could not count right now.",
     holdsHeading: "What the Brain holds",

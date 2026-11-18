@@ -6,23 +6,29 @@
  * is here is only what those two do not already say.
  */
 
-/* The mental model, stated once above the list. Quiet enough not to compete
-   with the rows, present enough to be read on a first visit. */
+/* The mental model, one press away at the foot of the list. It was a tinted
+   box above the rows on every visit; a returning owner read past it each time. */
 .memory-explainer {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 20px;
-  padding: 14px 16px;
-  border: 1px solid var(--border-default);
-  border-left: 3px solid var(--link);
-  border-radius: var(--radius-md);
-  background: var(--background-elevated);
+  margin: var(--space-8) 0 0;
+  border-top: 1px solid var(--border-default);
 }
 
+.memory-explainer > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  cursor: pointer;
+  color: var(--text-secondary);
+  font: var(--type-label);
+}
+
+.memory-explainer > summary:hover { color: var(--text-primary); }
+.memory-explainer > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
 .memory-explainer > p {
-  margin: 0;
+  max-width: var(--width-reading);
+  margin: 0 0 var(--space-3);
   font: var(--type-body);
-  line-height: 1.55;
   color: var(--text-secondary);
 }
 
@@ -94,34 +100,98 @@
   font-weight: 700;
 }
 
-/* The rows are links now (UX-20): they were `<article>` elements styled as
-   interactive with nothing to activate. `color: inherit` keeps them reading as
-   rows rather than as a stack of blue links. */
+/*
+ * Memórias by segment (Life Brain E.4, ADR-172): a heading over a rule with the
+ * segment's size, then its rows between hairlines.
+ */
+.memory-segments {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-8);
+}
+
+/* A grid child: the zero minimum is what lets a long unbroken memory wrap. */
+.memory-segment { min-width: 0; }
+
+.memory-segment-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  margin: 0;
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-section);
+}
+
+.memory-segment-count {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * A row is the memory's own sentence, set in the reading face, over one quiet
+ * line: what kind it is, what it relates to and where it came from.
+ * `position: relative` is what the title's stretched hit area is measured
+ * against.
+ */
 .memory-row {
-  color: inherit;
-  text-decoration: none;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  border-bottom: 1px solid var(--border-divider);
 }
 
-.memory-row:hover {
-  border-color: var(--border-strong);
-  background: var(--background-subtle);
+.memory-row:has(.memory-row-title:hover),
+.memory-row:has(.work-title-link:hover) { background: var(--background-subtle); }
+
+.memory-row-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-3);
+  color: var(--text-muted);
+  font: var(--type-caption);
+  /* Clicks on the caption fall through to the row's link; the source link and
+     a reveal control keep their own. */
+  pointer-events: none;
 }
 
-.memory-row:focus-visible {
-  outline: 2px solid var(--link);
-  outline-offset: 2px;
+.memory-row-foot .provenance-note { margin: 0; color: inherit; }
+/* "Origem:" before every row's source said the same word a dozen times; the
+   sentence after it already names itself. Kept for assistive technology. */
+.memory-row-foot .provenance-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
+.memory-row-foot .provenance-note a {
+  position: relative;
+  min-height: var(--touch-target);
+  padding: 0;
+  pointer-events: auto;
+}
+/* An unsourced row has no link to give the line its height. */
+.memory-row-foot .provenance-note:not([data-provenance="sourced"]) { display: flex; align-items: center; min-height: var(--touch-target); }
 
-.memory-row-chevron {
-  flex: none;
-  color: var(--mark-decorative);
-}
+.memory-row .work-protected-toggle { position: relative; }
+
+.memory-row-important { color: var(--text-primary); font-weight: 600; }
 
 .memory-related-hint {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  margin-left: 8px;
   color: var(--text-muted);
 }
 
@@ -138,11 +208,6 @@
   white-space: nowrap;
 }
 
-.memory-state-active {
-  color: var(--tone-success-fg);
-  background: var(--tone-success-bg);
-}
-
 .memory-state-archived {
   color: var(--tone-archived-fg);
   background: var(--tone-archived-bg);
@@ -153,55 +218,198 @@
   background: var(--tone-attention-bg);
 }
 
-/* Detail: the memory itself is the heading, and it is owner prose up to 4000
-   characters. It wraps rather than truncating — a memory the owner cannot read
-   in full is one they cannot decide about. */
-.memory-content-heading {
+/* ---- The memory's own page -------------------------------------------------
+ *
+ * Editorial calmo (ADR-180). The memory's sentence is the subject, at reading
+ * size; under it a line saying whether it is in use; then its facts as rows,
+ * the two verbs, where it came from, and — collapsed or quiet at the foot — what
+ * changed and the way to delete it.
+ */
+.memory-detail > .back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin-bottom: var(--space-4);
+}
+
+.memory-hero { margin-bottom: var(--space-8); }
+.memory-hero > div { min-width: 0; }
+
+/* Owner prose up to 4000 characters. It wraps rather than truncating — a memory
+   the owner cannot read in full is one they cannot decide about. */
+.memory-detail .memory-content-heading {
+  margin: var(--space-2) 0 0;
+  max-width: var(--width-reading);
+  font: var(--type-title-2);
+  line-height: 1.3;
+  letter-spacing: -.01em;
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
 
-.memory-retrieval-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin: 10px 0 0;
+.memory-detail .memory-content-heading[data-length="long"] {
+  font: var(--type-reading-lg);
+  letter-spacing: 0;
+}
+
+.memory-detail .memory-retrieval-line {
+  margin: var(--space-3) 0 0;
   font: var(--type-body);
   color: var(--text-secondary);
 }
 
-/* The facts grid. `auto-fit` with a floor keeps the pairs side by side on a
-   desktop and stacked on a phone with no breakpoint of its own. */
-.memory-facts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 14px 20px;
-  margin: 22px 0;
-  padding: 18px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
+/* A section is a heading over a rule. */
+.memory-section { margin-top: var(--space-8); }
+
+.memory-section > h2 {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin: 0;
+  border-bottom: 1px solid var(--border-default);
+  font: var(--type-section);
+  color: var(--text-primary);
 }
+
+/*
+ * The facts: one row each between hairlines, label over value on a phone and
+ * beside it from 700px — the task page's list of facts, read-only here because
+ * the edit form under it changes them together.
+ */
+.memory-facts { margin: 0; }
 
 .memory-facts > div {
   display: grid;
-  gap: 4px;
-  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--space-2) 0 0;
+  border-bottom: 1px solid var(--border-divider);
 }
 
 .memory-facts dt {
-  font: var(--type-eyebrow);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
   color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 .memory-facts dd {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
   margin: 0;
   font: var(--type-body);
   /* Person and project names are owner content and can be long. */
   overflow-wrap: anywhere;
+}
+
+.memory-facts dd[data-empty] { color: var(--text-muted); }
+
+.memory-facts dd a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+}
+
+@media (min-width: 700px) {
+  .memory-facts > div {
+    grid-template-columns: 9rem minmax(0, 1fr);
+    column-gap: var(--space-4);
+    padding-top: 0;
+  }
+
+  .memory-facts dt {
+    display: flex;
+    align-items: center;
+    min-height: var(--touch-target);
+  }
+}
+
+/*
+ * The two verbs under the facts: quiet text controls on one line, the way the
+ * task page offers "Renomear". They were a full-width bordered button over a
+ * second bordered button, the heaviest things on a page whose subject is a
+ * sentence.
+ */
+.memory-detail .memory-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-6);
+  margin: var(--space-2) 0 0;
+}
+
+.memory-detail .memory-controls > .entity-edit-form { flex: 1 1 100%; }
+.memory-detail .memory-controls > .entity-edit-feedback { flex: 1 1 100%; margin: 0; }
+
+.memory-detail .memory-controls .entity-edit-open,
+.memory-detail .memory-lifecycle-button {
+  width: auto;
+  min-height: var(--touch-target);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+  color: var(--link);
+  font: var(--type-label);
+}
+
+.memory-detail .memory-controls .entity-edit-open:hover,
+.memory-detail .memory-lifecycle-button:hover:not(:disabled) { background: none; text-decoration: underline; }
+
+/* The archive form joins the line; its sentence takes the next one whole. */
+.memory-detail .memory-lifecycle { display: contents; }
+.memory-detail .memory-lifecycle-hint,
+.memory-detail .memory-lifecycle .entity-edit-feedback { flex: 1 1 100%; }
+
+/* Where it came from: the owner's words behind a rule, then the one link. */
+.memory-origin-source {
+  margin: var(--space-4) 0 0;
+  border-left: 2px solid var(--border-strong);
+  padding-left: var(--space-4);
+}
+
+.memory-origin-source blockquote {
+  margin: 0;
+  max-width: var(--width-reading);
+  font: var(--type-reading);
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.memory-origin-source figcaption {
+  margin-top: var(--space-1);
+  font: var(--type-caption);
+  color: var(--text-muted);
+}
+
+/* The heading above already says "Origem"; the note keeps the label for
+   assistive technology and for every other surface that mounts it. */
+.memory-origin .provenance-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.memory-origin .provenance-note { margin: var(--space-1) 0 0; font: var(--type-body); }
+.memory-origin .provenance-note:not([data-provenance="sourced"]) { margin-top: var(--space-3); color: var(--text-muted); }
+.memory-origin .provenance-note a { min-height: var(--touch-target); padding: 0; text-decoration: none; font: var(--type-label); }
+.memory-origin .provenance-note a:hover { text-decoration: underline; }
+
+.memory-detail .entity-changes { margin-top: var(--space-8); border-top: 1px solid var(--border-default); padding-top: 0; }
+
+/* Deletion is the page's last and quietest line; still a full target. */
+.memory-detail .entity-danger-zone { margin-top: 0; border-top: 1px solid var(--border-divider); }
+.memory-detail .entity-danger-zone .button {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--tone-risk-fg);
+  font: var(--type-label);
 }
 
 .memory-controls {
@@ -373,10 +581,6 @@
 }
 
 @media (max-width: 600px) {
-  .memory-facts {
-    padding: 15px;
-  }
-
   .memory-proposal-actions > button {
     flex: 1 1 100%;
     justify-content: center;
@@ -398,10 +602,9 @@
 .memory-conflict {
   display: grid;
   gap: var(--space-2);
-  margin: var(--space-4) 0;
+  margin: 0;
   padding: var(--space-4) var(--space-5);
   border-left: 3px solid var(--tone-attention-fg);
-  border-radius: var(--radius-md);
   background: var(--tone-attention-bg);
 }
 
@@ -442,21 +645,35 @@
    branch would leave every sensitive memory below the minimum — which is the
    half a screenshot of a test account never shows.
 
-   `.memory-row-chevron-link` had **no rule in any stylesheet**, so it was drawn
-   at the icon's intrinsic 16px. That is §85's finding recurring on a third
-   surface, and it is why the class-coverage guard exists now.
+   The chevron link that used to end the row — a second target for the same
+   destination, drawn at the icon's intrinsic 16px until this rule — left with
+   the editorial recomposition: the row itself is the link.
    ------------------------------------------------------------------------- */
 .memory-row-title,
 .memory-row .work-title-link {
   display: flex;
   align-items: center;
   min-height: var(--touch-target);
+  /* Air above the sentence only: the caption line under it is already a full
+     target tall, so the two read as one row. */
+  padding-top: var(--space-2);
+  color: var(--text-primary);
+  font: var(--type-reading);
+  line-height: 1.4;
+  text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
-.memory-row-chevron-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: var(--touch-target);
-  min-height: var(--touch-target);
+/* The row is the link: the anchor stays around the sentence, and its hit area
+   covers the row. */
+.memory-row-title::after,
+.memory-row .work-title-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
 }
+
+.memory-row-title:focus-visible,
+.memory-row .work-title-link:focus-visible { outline: none; }
+.memory-row:has(.memory-row-title:focus-visible),
+.memory-row:has(.work-title-link:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

@@ -6,6 +6,11 @@
    as one subject with a history under it rather than as a stack of identical
    boxes.
 
+   Editorial calmo (ADR-180) took that the rest of the way: nothing here is a
+   card. The period opens on its name and one sentence of counts; a section is
+   a heading over a rule; a task, a capture and a written review are each a row
+   between hairlines, and a row that leads somewhere is the link.
+
    Every colour is a token. Every measure is a token. The two media queries sit
    AFTER the base rules they override, because a query with no added specificity
    placed above them loses to a later base rule and the layout silently stops
@@ -24,7 +29,7 @@
   grid-auto-flow: column;
   grid-auto-columns: minmax(96px, auto);
   gap: var(--space-1);
-  margin: var(--space-5) 0 var(--space-8);
+  margin: 0 0 var(--space-8);
   padding: var(--space-1);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-full);
@@ -92,18 +97,46 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Parte A — the current period
+   The page's own name
    --------------------------------------------------------------------------- */
-.day-review-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-5);
-  flex-wrap: wrap;
-  margin-bottom: var(--space-6);
+.reviews-header.ui-page-header { margin: 0 0 var(--space-5); }
+
+/* The page's one promise — reviews are on demand — stays on screen on a phone
+   too. The shared compact header hides its description there; this page's is
+   not a description of the page but the sentence `2M-REVIEW-007` asks the
+   surface to make, so it is kept, one step quieter. */
+.reviews-header.ui-page-header .ui-page-header__description {
+  display: block;
+  color: var(--text-secondary);
+  font: var(--type-body);
 }
 
-.day-review-heading { min-width: 0; max-width: var(--width-reading); }
+/* ---------------------------------------------------------------------------
+   Parte A — the current period
+   --------------------------------------------------------------------------- */
+/* A grid child of the page: without a zero minimum, one long unbroken title
+   would widen the surface instead of wrapping. */
+.day-review-page { min-width: 0; }
+
+.day-review-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-5);
+  flex-wrap: wrap;
+}
+
+.day-review-heading { min-width: 0; }
+
+/* An `<h2>` under the page's `<h1>`, and the largest thing on the surface: the
+   period is the subject. A heading level is a statement about the outline, not
+   about how large the text is. */
+.day-review-title {
+  margin: 0;
+  color: var(--text-primary);
+  font: var(--type-title-1);
+  letter-spacing: -.01em;
+}
 
 /* The span sits directly under the period's name, in the muted voice metadata
    uses everywhere else — so it identifies the period without competing with the
@@ -111,269 +144,381 @@
 .day-review-range {
   margin: var(--space-1) 0 0;
   color: var(--text-secondary);
-  font: var(--type-label);
-}
-
-.day-review-description {
-  margin: var(--space-3) 0 0;
-  color: var(--text-secondary);
   font: var(--type-body);
 }
 
-/* `2M-REVIEW-007`'s promise. It used to render through the empty-state line,
-   which put a "nothing here" treatment on a sentence that is a guarantee rather
-   than an absence. */
-.day-review-promise {
-  margin: var(--space-2) 0 0;
-  color: var(--text-muted);
-  font: var(--type-caption);
+/* Hoje · Amanhã: two words on a line, the current one underlined and heavier —
+   never colour alone. Each is a full target. */
+.day-review-scope-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+.day-review-scope-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  text-decoration: none;
+}
+
+.day-review-scope-nav a:hover { color: var(--text-primary); }
+
+.day-review-scope-nav a[aria-current="page"] {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 6px;
+}
+
+/* The closing's one sentence: the counts, in the reading face, directly under
+   the period's name. They are the sentence; everything below is the working
+   out. */
+.day-review-synthesis { margin-top: var(--space-4); }
+
+.day-review-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.day-review-counts li { color: var(--text-primary); font: var(--type-reading-lg); }
+
+/* One line with marks between the counts where there is room; on a phone each
+   count is its own line and needs no mark (a mark that wraps starts a line). */
+@media (min-width: 701px) {
+  .day-review-counts li + li::before { content: "·"; margin-right: var(--space-3); color: var(--mark-decorative); }
+}
+
+/* A count over a source that failed is not a small count — it is an unknown
+   one, so the sentence that says so carries a rule and full ink rather than
+   sitting in the muted register the disclaimers use. */
+.day-review-partial {
+  margin: var(--space-3) 0 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--tone-attention-line);
+  color: var(--text-primary);
+  font: var(--type-body);
 }
 
 .day-review-all-read {
-  margin: var(--space-3) 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--text-muted);
   font: var(--type-caption);
 }
 
 /* ---------------------------------------------------------------------------
-   Parte A is ONE column with dividers, not a stack of identical cards.
-
-   Round two gave `.day-review-page > section` `.home-section`'s card treatment,
-   which fixed a real defect — the sections had run together with no boundary at
-   all. It over-corrected: seven bordered white surfaces of equal weight, one per
-   section, is exactly the *"coleção extensa de caixas idênticas"* the owner then
-   asked not to have. Measured on a phone, the page ran to 6 885px.
-
-   A divider draws the same boundary and claims none of the importance. The one
-   section that keeps a card is the one that DOES something — it carries the
-   generate controls and the period's written reviews — so the card now means
-   "there are actions here" rather than "this is a section".
-
-   `.day-review-page > section` is (0,1,1), so a bare `.day-review-generated`
-   could never win regardless of order. The exception is written at (0,2,1).
+   A section is a heading over a rule — the same line for the period's written
+   reviews, its four lists and what could not be read.
    --------------------------------------------------------------------------- */
-.day-review-page > section {
-  border: 0;
-  border-bottom: 1px solid var(--border-divider);
-  border-radius: 0;
-  background: transparent;
-  padding: var(--space-5) 0;
-}
+.day-review-generated,
+.day-review-section,
+.day-review-unreadable { margin-top: var(--space-8); }
 
-.day-review-page > section > h3 {
-  margin: 0 0 var(--space-3);
-  color: var(--text-secondary);
-  font: var(--type-label);
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-}
-
-/* The schedule is a footnote about a preference, not a peer of the day's own
-   facts. It kept a full section's weight while saying the least. */
-.day-review-schedule p {
+.day-review-generated > h3,
+.day-review-section > h3,
+.day-review-unreadable > h3 {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
   margin: 0;
-  color: var(--text-muted);
-  font: var(--type-caption);
-}
-
-.day-review-page > section.day-review-generated {
-  margin-top: var(--space-6);
-  padding: var(--space-6);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-}
-
-.day-review-page > section.day-review-generated > h3 {
-  margin: 0;
+  border-bottom: 1px solid var(--border-default);
   color: var(--text-primary);
-  font: var(--type-title-2);
-  letter-spacing: -.01em;
-  text-transform: none;
+  font: var(--type-section);
 }
 
-/* ---------------------------------------------------------------------------
-   The written reviews of this period, and the controls that write them
-   --------------------------------------------------------------------------- */
-.day-review-generated {
-  margin-top: var(--space-8);
-  padding: var(--space-6);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-}
+/* A section's empty or unreadable sentence, with a row's breathing room. */
+.day-review-generated > .ux-state-line,
+.day-review-section > .ux-state-line,
+.day-review-generated > p[role="status"],
+.day-review-section > p[role="status"],
+.day-review-unreadable > div { margin: 0; padding: var(--space-3) 0; }
 
-.day-review-generated > h3 {
-  margin: 0;
-  font: var(--type-title-2);
-  letter-spacing: -.01em;
-}
+.day-review-unreadable ul { margin: 0; padding: 0; list-style: none; }
 
-.day-review-generate-lead {
-  margin: var(--space-2) 0 var(--space-5);
-  max-width: var(--width-reading);
-  color: var(--text-secondary);
-  font: var(--type-caption);
-}
-
-/* One, two or four controls depending on the tab, so the row is sized by its
-   content rather than by a fixed four-column grid that leaves gaps. */
+/* The control that writes this period's review, and one caption saying that
+   pressing it changes nothing else. Sized by its content, not stretched. */
 .review-buttons {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: 0;
+  margin: var(--space-4) 0 0;
 }
 
-.review-buttons > .review-action { flex: 1 1 220px; }
+/* The generate control is a full target by rule, not by the accident of its
+   icon and padding adding up to one. */
+.review-buttons .review-action button { min-height: var(--touch-target); }
 
-.review-list {
-  display: grid;
-  gap: 0;
-  margin: var(--space-5) 0 0;
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border-divider);
-}
-
-/* Editorial calmo (ADR-180): a written review is a row between hairlines, not a
-   tinted card inside the panel that already holds the list. */
-.review-card {
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4) 0;
-  border: 0;
-  border-bottom: 1px solid var(--border-divider);
-  border-radius: 0;
-  background: none;
-}
-
-.review-card:last-child {
-  border-bottom: 0;
-  padding-bottom: 0;
-}
-
-.review-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-  min-width: 0;
-}
-
-.review-card-head > div { min-width: 0; }
-
-.review-card h3,
-.review-card h4 {
-  margin: var(--space-1) 0 0;
-  font: var(--type-title-2);
-  font-size: 18px;
-  overflow-wrap: anywhere;
-}
-
-.review-card-period {
-  color: var(--text-secondary);
-  font: var(--type-eyebrow);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-
-.review-card-range {
+.day-review-generate-lead {
   margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
+  max-width: var(--width-reading);
+  color: var(--text-muted);
   font: var(--type-caption);
 }
 
-.review-open {
-  display: inline-flex;
-  align-items: center;
-  justify-self: start;
-  min-height: 44px;
-  padding: 0 var(--space-5);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--background-surface);
+/* ---------------------------------------------------------------------------
+   The lists: what was completed, intended, due and captured
+   --------------------------------------------------------------------------- */
+.day-review-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/*
+ * One task or capture, one row. The title is the link; under it one caption
+ * line carries the row's state on the left and its one verb — "Ações" — on the
+ * right. The caption and the disclosure share the second grid row, so opening
+ * the disclosure grows the row downward and moves nothing above it.
+ */
+.day-review-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  border-bottom: 1px solid var(--border-divider);
+}
+
+.day-review-item-head {
+  min-width: 0;
   color: var(--text-primary);
-  font: var(--type-label);
-  font-weight: 700;
+  font: var(--type-body);
+  overflow-wrap: anywhere;
+}
+
+.day-review-item-head a {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  padding: var(--space-1) 0;
+  color: inherit;
   text-decoration: none;
 }
 
-.review-open:hover { background: var(--background-subtle); }
+.day-review-item-head a:hover { text-decoration: underline; }
+.day-review-item-head a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
-.review-open:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
+/* A row's own state, in "intenções" and "prazos" only — those are the two
+   sections where a row may be either, and the word is the difference between a
+   list of what the period held and a list of what it left. The word carries it;
+   the open one also takes the attention ink. */
+.day-review-state {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--text-muted);
+  font: var(--type-caption);
+  /* Under the disclosure's summary, which shares this row; the summary keeps
+     the whole line as its target. */
+  pointer-events: none;
 }
+
+.day-review-item[data-open="true"] .day-review-state { color: var(--tone-attention-fg); }
+
+/* A row with no verbs has no summary to share the line with, so its state is a
+   plain caption under the title rather than a 44px band. */
+.day-review-item:not(:has(.day-review-actions)) .day-review-state {
+  min-height: 0;
+  margin: calc(var(--space-1) * -1) 0 var(--space-3);
+}
+
+.day-review-actions {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.day-review-actions-summary {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* Safari draws its own triangle through a pseudo-element the standard rule
+   above does not reach, so the marker is removed in both grammars. */
+.day-review-actions-summary::-webkit-details-marker { display: none; }
+.day-review-actions-summary:hover { text-decoration: underline; }
+.day-review-actions-summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.day-review-actions[open] > .day-review-actions-summary { color: var(--text-primary); }
+
+.day-review-actions > .day-review-verbs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+  border-left: 2px solid var(--border-strong);
+  padding-left: var(--space-4);
+}
+
+/* The verbs' own control list and form are laid out in `calendar.css`: those
+   classes belong to `TaskDetailControls`, and this sheet may only dress what
+   the reviews surfaces themselves render. */
+.day-review-verb input[type="date"],
+.day-review-verb select { max-width: 100%; }
+
+/* When a capture was written down: the row's caption. */
+.day-review-item-meta {
+  margin: calc(var(--space-1) * -1) 0 var(--space-3);
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   The schedule note: a preference read back, and the promise that nothing runs
+   from it. The surface's footnote — caption-sized, after everything the period
+   itself contained.
+   --------------------------------------------------------------------------- */
+.day-review-schedule {
+  margin-top: var(--space-8);
+  border-top: 1px solid var(--border-default);
+  padding-top: var(--space-3);
+}
+
+.day-review-schedule > h3 {
+  margin: 0 0 var(--space-1);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  font-weight: 600;
+}
+
+.day-review-schedule p {
+  max-width: var(--width-reading);
+  margin: 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
+}
+
+/* `2M-REVIEW-007`'s promise: a guarantee about the two preferences above it,
+   set apart from them by a line of air. */
+.day-review-schedule .day-review-promise { margin-top: var(--space-2); }
+
+/* ---------------------------------------------------------------------------
+   Written reviews as rows — this period's, and the history's
+   --------------------------------------------------------------------------- */
+.review-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-4);
+  border-bottom: 1px solid var(--border-divider);
+}
+
+/* The dates over the kind: on one tab the dates are what tells two rows apart. */
+.review-row-link {
+  display: grid;
+  align-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--row-comfortable);
+  padding: var(--space-2) 0;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.review-row-link:hover .review-row-range { text-decoration: underline; }
+.review-row-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.review-row-range { font: var(--type-body); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.review-row-kind { color: var(--text-muted); font: var(--type-caption); }
+
+/* The state, as a word. `neutral` has no rule: muted is what neutral means. */
+.review-row-status { color: var(--text-muted); font: var(--type-caption); white-space: nowrap; }
+.review-row-status[data-tone="warning"] { color: var(--tone-attention-fg); }
 
 /* ---------------------------------------------------------------------------
    Parte B — the history
 
-   Deliberately quieter than Parte A: rows separated by dividers rather than
-   boxed as cards, because history is reference and the current period is the
-   subject. A page of identical bordered boxes is what "excessivamente longa"
-   looks like.
+   Reference, under the period that is the subject: a stronger rule opens it and
+   its heading is set in the reading face, which is what tells a second block
+   from one more section of the first.
    --------------------------------------------------------------------------- */
-.review-history-list {
-  display: grid;
-  margin: var(--space-4) 0 var(--space-6);
-  padding: 0;
-  list-style: none;
-  border-top: 1px solid var(--border-divider);
+.reviews-history {
+  margin-top: var(--space-12);
+  border-top: 1px solid var(--border-strong);
+  padding-top: var(--space-4);
 }
 
-/* Three columns for the row's three children — the text, the state badge and
-   the way in. Two columns with an explicitly placed third child put the badge
-   and the link in the same cell, which is a collision the browser resolves by
-   overlapping them. */
-.review-history-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+.reviews-history > h2 {
+  margin: 0 0 var(--space-2);
+  color: var(--text-primary);
+  font: var(--type-reading-lg);
+  line-height: 1.3;
+}
+
+.review-history-list { margin-bottom: var(--space-6); border-top: 1px solid var(--border-divider); }
+
+/* ---------------------------------------------------------------------------
+   A review's own page — a written document: its title, one line of facts, the
+   text at the reading measure, then where it came from and what else can be
+   opened.
+   --------------------------------------------------------------------------- */
+.review-detail > .back-link {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2) var(--space-4);
-  padding: var(--space-4) 0;
-  border-bottom: 1px solid var(--border-divider);
+  min-height: var(--touch-target);
+  margin-bottom: var(--space-4);
 }
 
-.review-history-item > div { min-width: 0; }
+.review-hero { margin-bottom: var(--space-8); }
 
-.review-history-item h3 {
-  margin: var(--space-1) 0 0;
-  font: var(--type-title-2);
-  font-size: 17px;
+.review-hero h1 {
+  margin: var(--space-2) 0 0;
+  font: var(--type-display);
+  letter-spacing: -.02em;
   overflow-wrap: anywhere;
 }
 
-/* ---------------------------------------------------------------------------
-   A review's own page
-   --------------------------------------------------------------------------- */
-.review-detail-range {
-  margin: var(--space-2) 0 0;
-  color: var(--text-secondary);
-  font: var(--type-lead);
-}
-
-.review-detail-meta {
+.review-hero .review-detail-meta {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  margin: var(--space-4) 0 0;
-  color: var(--text-secondary);
+  gap: 0 var(--space-2);
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
   font: var(--type-caption);
 }
 
-.review-detail-content,
-.review-detail-sources,
-.review-detail-actions { margin-top: var(--space-8); }
+/* The period takes the first line whole, in the body size: it is what the
+   document is about. The state and the date it was written share the next. */
+.review-detail-range { flex: 1 1 100%; color: var(--text-secondary); font: var(--type-body); }
+.review-detail-status + span::before { content: "·"; margin-right: var(--space-2); color: var(--mark-decorative); }
+.review-detail-status[data-tone="warning"] { color: var(--tone-attention-fg); }
 
-.review-detail-content > h2,
-.review-detail-sources > h2,
-.review-detail-actions > h2 {
-  margin: 0 0 var(--space-4);
-  font: var(--type-title-2);
-  letter-spacing: -.01em;
+/* The document itself. `min-width: 0` so a long unbroken token wraps inside
+   the reading measure rather than widening the page. */
+.review-detail-content { min-width: 0; }
+
+.review-detail-sources,
+.review-detail-actions { margin-top: var(--space-10); }
+
+.review-detail-sources > h2 {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  margin: 0 0 var(--space-3);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font: var(--type-section);
 }
 
 /* The rendered Markdown. Capped at the reading measure so an 8 000-character
@@ -387,23 +532,25 @@
 .review-content > h3,
 .review-content > h4,
 .review-content > h5 {
-  margin: var(--space-6) 0 var(--space-2);
+  margin: var(--space-8) 0 var(--space-2);
   color: var(--text-primary);
-  letter-spacing: -.01em;
 }
 
-.review-content > h3 { font: var(--type-title-2); }
-/* `--type-section` computes to 13px, which under a 28px serif h3 read as a
-   caption rather than as the next level down. The scale is set here so the
-   document's own outline is legible as an outline. */
-.review-content > h4 { font: var(--type-lead); font-weight: 650; }
+/* The document's own outline, one step under the page title each: a serif
+   heading, then a sans one, then a label. `--type-section` computes to 13px,
+   which under a serif heading read as a caption rather than as the next level
+   down. */
+.review-content > h3 { font: var(--type-title-2); letter-spacing: -.01em; }
+.review-content > h4 { font: var(--type-heading); margin-top: var(--space-6); }
 .review-content > h5 { font: var(--type-label); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 
 .review-content > :first-child { margin-top: 0; }
 
+/* The text is the page's subject, so it takes full ink: it was set in the
+   secondary grey, which made the one thing to read the faintest thing here. */
 .review-content p {
   margin: 0 0 var(--space-4);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font: var(--type-reading);
 }
 
@@ -418,17 +565,17 @@
 .review-content ol {
   margin: 0 0 var(--space-4);
   padding-left: var(--space-6);
-  color: var(--text-secondary);
+  color: var(--text-primary);
   font: var(--type-reading);
   list-style-position: outside;
 }
 
 .review-content ul { list-style-type: disc; }
 .review-content ol { list-style-type: decimal; }
-.review-content li { margin-bottom: var(--space-1); }
+.review-content li { margin-bottom: var(--space-2); }
 .review-content li::marker { color: var(--text-muted); }
 
-.review-content strong { color: var(--text-primary); font-weight: 700; }
+.review-content strong { color: var(--text-primary); font-weight: 600; }
 
 .review-content code {
   padding: 2px 6px;
@@ -438,6 +585,21 @@
 }
 
 .review-content-link { color: var(--link); }
+
+/* How the review was produced, one press away. */
+.review-detail-technical { margin-top: var(--space-2); }
+
+.review-detail-technical > summary {
+  display: flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-label);
+  cursor: pointer;
+}
+
+.review-detail-technical > summary:hover { color: var(--text-primary); }
+.review-detail-technical > summary:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* `.review-source-facts`, NOT `.review-facts`.
 
@@ -449,18 +611,18 @@
    interface; this one had an owner. */
 .review-source-facts {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   margin: 0 0 var(--space-4);
   max-width: var(--width-reading);
 }
 
 .review-source-facts dt {
-  color: var(--text-secondary);
-  font: var(--type-label);
+  color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 .review-source-facts dd {
-  margin: var(--space-1) 0 0;
+  margin: 0;
   color: var(--text-primary);
   font: var(--type-body);
   overflow-wrap: anywhere;
@@ -469,66 +631,43 @@
 .review-detail-unlinked,
 .review-detail-past {
   max-width: var(--width-reading);
-  margin: var(--space-4) 0 0;
+  margin: var(--space-3) 0 0;
   color: var(--text-muted);
   font: var(--type-caption);
 }
 
+/* What else can be opened from here: quiet links on one line, each a full
+   target. They were two bordered buttons under an "Ações" heading. */
+.review-detail-actions { border-top: 1px solid var(--border-default); }
+
 .review-action-links {
-  display: grid;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-6);
+  margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.review-regenerate {
-  padding: var(--space-5);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-subtle);
+.review-action-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--touch-target);
+  color: var(--link);
+  font: var(--type-label);
+  text-decoration: none;
 }
+
+.review-action-links a:hover { text-decoration: underline; }
+.review-action-links a:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+.review-regenerate > .review-buttons { margin-top: var(--space-2); }
 
 .review-regenerate > p {
-  margin: 0 0 var(--space-4);
+  margin: var(--space-2) 0 0;
   max-width: var(--width-reading);
-  color: var(--text-secondary);
+  color: var(--text-muted);
   font: var(--type-caption);
-}
-
-/* ---------------------------------------------------------------------------
-   Narrow viewports. Placed last, per the note at the top of this file.
-   --------------------------------------------------------------------------- */
-@media (max-width: 700px) {
-  /* Three equal columns rather than content-sized ones, so "Semana" cannot make
-     "Dia" and "Mês" narrower than a comfortable target. `display: grid` (not
-     inline-grid) makes the strip full width, which is what gives each tab room. */
-  .review-tabs {
-    display: grid;
-    grid-auto-flow: row;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
-  }
-
-  .review-tab { padding: 0 var(--space-2); font-size: 15px; }
-
-  .day-review-header { flex-direction: column; gap: var(--space-4); }
-
-  .day-review-generated { padding: var(--space-5) var(--space-4); }
-
-  .review-buttons > .review-action { flex: 1 1 100%; }
-
-  /* The badge and the link move under the title instead of competing with it for
-     a row that is not wide enough for three things. */
-  .review-history-item {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: start;
-    justify-items: start;
-  }
-
-  .review-card-head { flex-direction: column; gap: var(--space-2); }
-
-  .review-open { width: 100%; justify-content: center; }
 }
 
 /* Cited items — `OD-2Q-5`, signed as option C.
@@ -544,29 +683,26 @@
    lists inherit each other's rules. A class name is an interface, and this
    repository has already paid once for taking one that had an owner. */
 .review-cited-heading {
-  margin: 0 0 var(--space-3);
-  color: var(--text-secondary);
-  font: var(--type-label);
+  margin: var(--space-4) 0 0;
+  color: var(--text-muted);
+  font: var(--type-caption);
 }
 
 .review-cited-list {
-  display: grid;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-5);
+  margin: 0 0 var(--space-2);
   padding: 0;
   max-width: var(--width-reading);
   list-style: none;
 }
 
-/* `auto auto 1fr` rather than three equal columns: the kind and the date are
-   short and fixed, and the link takes the remaining measure so its target stays
-   comfortably above the 44px minimum on a phone. */
+/* The kind and the date are the row's caption and the link is the row: `auto
+   auto 1fr` on one line where there is room, and the caption over the link on a
+   phone (below). */
 .review-cited-row {
   display: grid;
-  grid-template-columns: auto auto 1fr;
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
+  column-gap: var(--space-3);
   border-bottom: 1px solid var(--border-divider);
 }
 
@@ -575,51 +711,73 @@
    list whose rows differed by kind — or by classification — would disclose
    something the row itself refuses to say. */
 .review-cited-kind {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  padding: 2px var(--space-3);
-  color: var(--text-secondary);
-  font: var(--type-eyebrow);
-  white-space: nowrap;
-}
-
-.review-cited-when {
   color: var(--text-secondary);
   font: var(--type-caption);
   white-space: nowrap;
 }
 
+.review-cited-when {
+  color: var(--text-muted);
+  font: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .review-cited-link {
-  min-height: 44px;
+  min-height: var(--touch-target);
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   color: var(--link);
-  font: var(--type-body);
+  font: var(--type-label);
+  text-decoration: none;
   overflow-wrap: anywhere;
 }
 
-.review-cited-link:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+.review-cited-link:hover { text-decoration: underline; }
+.review-cited-link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 /* Removed, unreadable and foreign all render this, identically. It is text and
    never an anchor: a link to a record that is gone is the broken link this
    phase exists to remove. */
 .review-cited-gone {
-  min-height: 44px;
+  min-height: var(--touch-target);
   display: inline-flex;
   align-items: center;
+  justify-self: end;
   color: var(--text-muted);
   font: var(--type-caption);
 }
 
-/* One column on a phone, so the kind, the date and the link stack rather than
-   squeezing the link's target below the touch minimum. Placed AFTER the base
-   rules it overrides — a media query above them adds no specificity and is
-   silently dead, which this repository has already recorded once. */
-@media (max-width: 600px) {
-  .review-cited-row {
-    grid-template-columns: 1fr;
-    gap: var(--space-1);
-    align-items: start;
+/* ---------------------------------------------------------------------------
+   Narrow viewports. Placed last, per the note at the top of this file: a media
+   query above the base rules it overrides adds no specificity and is silently
+   dead, which this repository has already recorded once.
+   --------------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  /* Three equal columns rather than content-sized ones, so "Semana" cannot make
+     "Dia" and "Mês" narrower than a comfortable target. `display: grid` (not
+     inline-grid) makes the strip full width, which is what gives each tab room. */
+  .review-tabs {
+    display: grid;
+    grid-auto-flow: row;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
   }
-  .review-cited-kind { justify-self: start; }
+
+  .review-tab { padding: 0 var(--space-2); font-size: 15px; }
+
+  .review-hero h1 { font: var(--type-title-1); }
+}
+
+@media (max-width: 600px) {
+  /* The caption on its own line and the link under it, at the row's left edge
+     where a thumb expects it. */
+  .review-cited-row {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-top: var(--space-2);
+  }
+
+  .review-cited-link,
+  .review-cited-gone { grid-column: 1 / -1; justify-self: start; }
 }

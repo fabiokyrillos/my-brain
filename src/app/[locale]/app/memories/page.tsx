@@ -1,4 +1,4 @@
-import { ChevronRight, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -33,7 +33,10 @@ import { requireSupabaseData } from "@/lib/supabase/result";
  *
  * - **The rows are links.** They were `<article>` elements styled as list rows
  *   with nothing to activate — UX-20's "styled as interactive, inert". There is
- *   a detail page now, so the affordance is honest rather than removed.
+ *   a detail page now, so the affordance is honest rather than removed. Since
+ *   the editorial recomposition (ADR-180) a row is the memory's own sentence in
+ *   the reading face with one quiet line under it, and the state is said only
+ *   where the memory is not in force.
  * - **`confidence` is gone.** The page rendered
  *   `Math.round(Number(memory.confidence) * 100)}%` as the row's only metadata.
  *   Every hand-written memory stores `1`, so the column read "100%" beside every
@@ -152,17 +155,6 @@ export default async function MemoriesPage({
 
       <BrainLensTabs active="memories" locale={locale} />
 
-      {/*
-        The mental model, said once at the top rather than implied by the rows
-        (UX-10). Two sentences: what a memory is, and how it differs from the
-        record list next door — which is the distinction the owner could not make
-        from anything the product previously showed them.
-      */}
-      <section className="memory-explainer">
-        <p>{copy.whatIsIt}</p>
-        <p>{copy.howItDiffers}</p>
-      </section>
-
       {items.length ? (
         <div aria-label={copy.segmentsLabel} className="memory-segments" role="group">
         {groups.map((group) => (
@@ -171,7 +163,7 @@ export default async function MemoriesPage({
           {copy.segments[group.segment]}
           <span className="memory-segment-count">{group.items.length}</span>
         </h2>
-        <div className="list-stack">
+        <ul className="memory-list">
           {group.items.map((memory) => {
             const index = positionOf.get(memory.id) ?? 0;
             const state = memoryLifecycleState(memory, now);
@@ -180,33 +172,46 @@ export default async function MemoriesPage({
             const provenance = deriveClaimProvenance(memory.source_entry_id, resolvableEntryIds);
             return (
               /*
-                A `div` rather than a `Link` wrapping the whole row, because the
-                reveal control is a `<button>` and a button inside an anchor is
-                invalid markup that gives the row two conflicting activations.
-                The Work list hit this exact problem first and answered it the
-                same way: `ProtectedContent` carries the `href`, so the title —
-                masked or not — is what opens the memory.
+                The memory's own sentence is the row, and the row is the link.
+
+                Not a `Link` wrapping the row: the reveal control is a
+                `<button>` and the source is its own link, and neither may sit
+                inside an anchor. `ProtectedContent` carries the `href`, so the
+                title — masked or not — is what opens the memory, and
+                `memories.css` stretches that one anchor's hit area over the
+                row. The separate chevron link the row used to end with is gone
+                with it: a second target for the same destination, named only
+                "Memórias".
               */
-              <div className="list-row memory-row" key={memory.id}>
-                <div className="list-row-main">
-                  <ProtectedContent
-                    href={href}
-                    locale={locale}
-                    revealKey={`memory-row-${memory.id}`}
-                    sensitivity={deriveSubjectSensitivity(memory.id, memoryLevels)}
-                    surface="memory"
-                  >
-                    <Link className="memory-row-title" href={href}><strong>{memory.content}</strong></Link>
-                  </ProtectedContent>
-                  <p>
-                    {copy.kinds[asMemoryKind(memory.kind)]}
-                    {related ? (
-                      <span className="memory-related-hint">
-                        <Link2 aria-hidden="true" size={12} />
-                        {memory.person_id !== null ? copy.relatedPerson : copy.relatedProject}
-                      </span>
-                    ) : null}
-                  </p>
+              <li className="memory-row" key={memory.id}>
+                <ProtectedContent
+                  href={href}
+                  locale={locale}
+                  revealKey={`memory-row-${memory.id}`}
+                  sensitivity={deriveSubjectSensitivity(memory.id, memoryLevels)}
+                  surface="memory"
+                >
+                  <Link className="memory-row-title" href={href}>{memory.content}</Link>
+                </ProtectedContent>
+                <div className="memory-row-foot">
+                  {/*
+                    The state is said where it is the exception. A list of
+                    memories is a list of what is in force; "Em vigor" on every
+                    row was a badge that could only repeat itself, and it hid
+                    the two rows that are NOT being used. The memory's own page
+                    always names its state.
+                  */}
+                  {state === "active" ? null : (
+                    <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
+                  )}
+                  {memory.important ? <span className="memory-row-important">{copy.importantBadge}</span> : null}
+                  <span>{copy.kinds[asMemoryKind(memory.kind)]}</span>
+                  {related ? (
+                    <span className="memory-related-hint">
+                      <Link2 aria-hidden="true" size={12} />
+                      {memory.person_id !== null ? copy.relatedPerson : copy.relatedProject}
+                    </span>
+                  ) : null}
                   {/*
                     Per row, because unlike the relation panels on the person
                     page every row here genuinely has a different answer.
@@ -223,19 +228,10 @@ export default async function MemoriesPage({
                     subject={provenanceCopy.memorySubject(index + 1)}
                   />
                 </div>
-                <div className="list-meta">
-                  {/* The state is the row's headline fact: it is the difference
-                      between a memory the assistant is using and one it is not. */}
-                  <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
-                  {memory.important ? <span className="status-badge">{copy.importantBadge}</span> : null}
-                  <Link aria-label={copy.title} className="memory-row-chevron-link" href={href}>
-                    <ChevronRight aria-hidden="true" className="memory-row-chevron" size={16} />
-                  </Link>
-                </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
         </section>
         ))}
         </div>
@@ -250,6 +246,18 @@ export default async function MemoriesPage({
       )}
 
       <PaginationLinks locale={locale} path="memories" page={page} hasNext={hasNext} />
+
+      {/*
+        The mental model (UX-10): what a memory is, and how it differs from the
+        record list next door. It stood above the list as a tinted box on every
+        visit; the header's one sentence already says what this page holds, so
+        the longer account is one press away, after the memories themselves.
+      */}
+      <details className="memory-explainer">
+        <summary>{copy.explainerSummary}</summary>
+        <p>{copy.whatIsIt}</p>
+        <p>{copy.howItDiffers}</p>
+      </details>
     </div>
   );
 }

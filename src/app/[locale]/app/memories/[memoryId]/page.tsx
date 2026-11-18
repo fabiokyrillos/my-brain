@@ -1,4 +1,4 @@
-import { ArrowLeft, BrainCircuit } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { UniversalStateLine } from "@/features/experience/universal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -34,6 +34,12 @@ import { getOwnerTimeZone } from "@/features/profile/owner-timezone";
 import { formatInstant } from "@/lib/time/instant-format";
 import { isLocale } from "@/lib/preferences";
 import { requireSupabaseData } from "@/lib/supabase/result";
+
+/**
+ * Past this length the heading steps down to the body reading size: a sentence
+ * reads as a title, a paragraph set at title size is a wall.
+ */
+const LONG_MEMORY_CHARS = 140;
 
 /**
  * The memory detail surface (UX-10).
@@ -213,8 +219,14 @@ export default async function MemoryDetailPage({
       </Link>
       <ReturnToConversation from={from} locale={locale} />
 
-      <header className="entity-hero">
-        <BrainCircuit size={28} />
+      {/*
+        Editorial calmo (ADR-180): the memory's own sentence is the page's
+        subject, at reading size — it was a 62px display heading beside an icon,
+        which made a two-line fact fill the first screen. One line under it says
+        whether the assistant is using it, in words; the state badge that stood
+        beside that sentence only repeated its first word.
+      */}
+      <header className="entity-hero memory-hero">
         <div>
           <p className="eyebrow">{copy.kinds[kind].toUpperCase()}</p>
           {/* The memory itself is the heading. It is owner prose and can be up
@@ -226,7 +238,7 @@ export default async function MemoryDetailPage({
               divergence slice 2L.1 found on Hoje, one entity over. The mask is
               not a refusal — the owner set this level themselves and the reveal
               is one explicit, local act away. */}
-          <h1 className="memory-content-heading">
+          <h1 className="memory-content-heading" data-length={memory.content.length > LONG_MEMORY_CHARS ? "long" : undefined}>
             <ProtectedContent
               locale={locale}
               revealKey={`memory-content-${memory.id}`}
@@ -236,27 +248,7 @@ export default async function MemoryDetailPage({
               {memory.content}
             </ProtectedContent>
           </h1>
-          <p className="memory-retrieval-line">
-            <span className={`memory-state memory-state-${state}`}>{copy.states[state]}</span>
-            {retrieval}
-          </p>
-          {/*
-            Rendered by the shared component rather than as a row in the facts
-            list below, which is also why that row is gone: the list's own label
-            is "Origem", `ProvenanceNote` renders "Origem", and a page that
-            printed both would be labelling one fact twice.
-
-            `subject` is a NEUTRAL POSITIONAL label, never the memory's text —
-            that text is exactly what `ProtectedContent` may be withholding two
-            lines above, and an `aria-label` carrying it would hand the masked
-            string to assistive technology.
-          */}
-          <ProvenanceNote
-            href={sourceHref}
-            locale={locale}
-            provenance={provenance}
-            subject={getProvenanceCopy(locale).memorySubject(1)}
-          />
+          <p className="memory-retrieval-line" data-memory-state={state}>{retrieval}</p>
         </div>
       </header>
 
@@ -291,128 +283,144 @@ export default async function MemoryDetailPage({
         </section>
       ) : null}
 
-      <dl className="memory-facts">
-        <div>
-          <dt>{copy.relatedPerson}</dt>
-          <dd>
-            {person ? (
-              <Link href={`/${locale}/app/people/${person.id}`}>{person.name}</Link>
-            ) : (
-              copy.relatedNone
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.relatedProject}</dt>
-          <dd>
-            {project ? (
-              <Link href={`/${locale}/app/projects/${project.id}`}>{project.name}</Link>
-            ) : (
-              copy.relatedNone
-            )}
-          </dd>
-        </div>
-        {/*
-          `2N-KNOWS-004` asks for THREE facts — when it was recorded, from when
-          it is in force, and until when — and the page used to show two labels.
-          `valid_from` fell back to `created_at` under the label "Vale desde",
-          so a memory with no start date read as though it began the day it was
-          typed, and the recording time was never shown as itself.
-
-          They are different facts and the difference is the interesting one: a
-          memory recorded in March can be in force from January. Each is now
-          labelled as what it is, and an absent boundary says it is absent
-          rather than borrowing another column's value.
-        */}
-        <div>
-          <dt>{copy.recordedAt}</dt>
-          <dd>{formatInstant(memory.created_at, "dayAndTime", locale, timeZone)}</dd>
-        </div>
-        <div>
-          <dt>{copy.validFrom}</dt>
-          <dd>
-            {memory.valid_from
-              ? formatInstant(memory.valid_from, "dayAndTime", locale, timeZone)
-              : copy.validFromAlways}
-          </dd>
-        </div>
-        <div>
-          <dt>{copy.validUntil}</dt>
-          <dd>{memory.valid_until ? formatInstant(memory.valid_until, "dayAndTime", locale, timeZone) : copy.validAlways}</dd>
-        </div>
-      </dl>
-
       {/*
-        Gated on `isOpenable` rather than on `sourceEntry` again. The two agree
-        today and would drift the moment the contract gained a condition,
-        leaving a page that shows a source section under a line that calls the
-        claim unsourced — the same "one question asked two ways" the person
-        page's diff review caught in slice 2N.1.
+        The facts, as a quiet list of rows rather than a boxed grid. A relation
+        the memory does not have is not a fact about it, so the person and
+        project rows appear only when there is one — the edit form below is
+        where one is chosen.
       */}
-      {isOpenable(provenance) && sourceEntry ? (
-        <section className="entity-timeline">
-          <h2>{copy.provenance}</h2>
-          <div className="timeline-list">
-            <article>
-              <span className="timeline-dot" />
-              <div>
-                <ProtectedContent
-                  href={`/${locale}/app/inbox/${sourceEntry.id}`}
-                  locale={locale}
-                  revealKey={`memory-source-${sourceEntry.id}`}
-                  sensitivity={sourceSensitivity}
-                  surface="memory"
-                >
-                  <Link href={`/${locale}/app/inbox/${sourceEntry.id}`}>
-                    <strong>{sourceEntry.original_content}</strong>
-                  </Link>
-                </ProtectedContent>
-                <small>{formatInstant(sourceEntry.occurred_at, "dayAndTime", locale, timeZone)}</small>
-              </div>
-            </article>
-          </div>
-        </section>
-      ) : null}
+      <section aria-labelledby="memory-facts-heading" className="memory-section">
+        <h2 id="memory-facts-heading">{copy.factsHeading}</h2>
+        <dl className="memory-facts">
+          {person ? (
+            <div>
+              <dt>{copy.relatedPerson}</dt>
+              <dd><Link href={`/${locale}/app/people/${person.id}`}>{person.name}</Link></dd>
+            </div>
+          ) : null}
+          {project ? (
+            <div>
+              <dt>{copy.relatedProject}</dt>
+              <dd><Link href={`/${locale}/app/projects/${project.id}`}>{project.name}</Link></dd>
+            </div>
+          ) : null}
+          {/*
+            `2N-KNOWS-004` asks for THREE facts — when it was recorded, from when
+            it is in force, and until when — and the page used to show two labels.
+            `valid_from` fell back to `created_at` under the label "Vale desde",
+            so a memory with no start date read as though it began the day it was
+            typed, and the recording time was never shown as itself.
 
-      <MemoryEditForm
-        action={updateMemory}
-        fields={{
-          id: memory.id,
-          content: memory.content,
-          kind,
-          important: memory.important,
-          personId: memory.person_id,
-          projectId: memory.project_id,
-        }}
-        lifecycleAction={setMemoryLifecycle}
-        locale={locale}
-        people={people}
-        projects={projects}
-        state={state}
-      />
+            They are different facts and the difference is the interesting one: a
+            memory recorded in March can be in force from January. Each is
+            labelled as what it is, and an absent boundary says it is absent
+            rather than borrowing another column's value.
+          */}
+          <div>
+            <dt>{copy.validFrom}</dt>
+            <dd data-empty={memory.valid_from ? undefined : "true"}>
+              {memory.valid_from
+                ? formatInstant(memory.valid_from, "dayAndTime", locale, timeZone)
+                : copy.validFromAlways}
+            </dd>
+          </div>
+          <div>
+            <dt>{copy.validUntil}</dt>
+            <dd data-empty={memory.valid_until ? undefined : "true"}>
+              {memory.valid_until ? formatInstant(memory.valid_until, "dayAndTime", locale, timeZone) : copy.validAlways}
+            </dd>
+          </div>
+          <div>
+            <dt>{copy.recordedAt}</dt>
+            <dd>{formatInstant(memory.created_at, "dayAndTime", locale, timeZone)}</dd>
+          </div>
+        </dl>
+
+        <MemoryEditForm
+          action={updateMemory}
+          fields={{
+            id: memory.id,
+            content: memory.content,
+            kind,
+            important: memory.important,
+            personId: memory.person_id,
+            projectId: memory.project_id,
+          }}
+          lifecycleAction={setMemoryLifecycle}
+          locale={locale}
+          people={people}
+          projects={projects}
+          state={state}
+        />
+      </section>
 
       {/*
-        The trail of corrections, below the form that makes them — the same band
-        the person and project workspaces carry, mounted rather than rewritten.
-        It is a *history*, not a revision list: `memories` is edited in place and
-        has no revision table, and this writes and rewrites nothing.
+        Where it came from: the owner's own words when the source can be read,
+        and one link to it. `ProvenanceNote` is the shared component, so the
+        wording for an unsourced memory is the one every surface uses; its
+        "Origem" label is hidden visually here (`memories.css`) because the
+        heading above it already says it.
+
+        `subject` is a NEUTRAL POSITIONAL label, never the memory's text — that
+        text is exactly what `ProtectedContent` may be withholding above, and an
+        `aria-label` carrying it would hand the masked string to assistive
+        technology.
+
+        The quotation is gated on `isOpenable` rather than on `sourceEntry`
+        alone. The two agree today and would drift the moment the contract
+        gained a condition, leaving a page that quotes a source under a line
+        that calls the claim unsourced.
+      */}
+      <section aria-labelledby="memory-origin-heading" className="memory-section memory-origin">
+        <h2 id="memory-origin-heading">{copy.provenance}</h2>
+        {isOpenable(provenance) && sourceEntry ? (
+          <figure className="memory-origin-source">
+            <blockquote>
+              <ProtectedContent
+                locale={locale}
+                revealKey={`memory-source-${sourceEntry.id}`}
+                sensitivity={sourceSensitivity}
+                surface="memory"
+              >
+                {sourceEntry.original_content}
+              </ProtectedContent>
+            </blockquote>
+            <figcaption>{formatInstant(sourceEntry.occurred_at, "dayAndTime", locale, timeZone)}</figcaption>
+          </figure>
+        ) : null}
+        <ProvenanceNote
+          href={sourceHref}
+          locale={locale}
+          provenance={provenance}
+          subject={getProvenanceCopy(locale).memorySubject(1)}
+        />
+      </section>
+
+      {/*
+        The trail of corrections — a *history*, not a revision list: `memories`
+        is edited in place and has no revision table, and this writes and
+        rewrites nothing. Collapsed and near the foot, the way the person and
+        project pages carry theirs: what changed is a detail for whoever wants
+        it, not something the page opens with.
       */}
       <section className="entity-changes" id="changes">
-        <h2>{entityCopy.recentChanges}</h2>
-        <SectionOriginNote locale={locale} origin="derived" />
-        <p className="section-explainer">{copy.changesExplainer}</p>
-        {boundedChanges.items.length ? (
-          <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
-        ) : <UniversalStateLine description={copy.changesEmpty} locale={locale} state="empty" />}
-        <BoundedNotice list={boundedChanges} locale={locale} />
+        <details className="entity-changes-disclosure">
+          <summary><h2>{entityCopy.recentChanges}</h2></summary>
+          <SectionOriginNote locale={locale} origin="derived" />
+          <p className="section-explainer">{copy.changesExplainer}</p>
+          {boundedChanges.items.length ? (
+            <HistoryList copy={historyCopy} events={boundedChanges.items} formatDateTime={formatDateTime} locale={locale} />
+          ) : <UniversalStateLine description={copy.changesEmpty} locale={locale} state="empty" />}
+          <BoundedNotice list={boundedChanges} locale={locale} />
+        </details>
       </section>
 
       {/*
         `2N-CORRECT-002` keeps archiving and removal distinct, and this is the
-        surface where the distinction stops being free: the two controls now sit
-        on one page. It is placed AFTER the edit form, below archive, so the
-        reversible action is the one in reach and the irreversible one has to be
-        travelled to — and `deletion/copy.ts` never describes it as archiving.
+        surface where the distinction stops being free: the two controls sit on
+        one page. It is placed LAST, well below archive, so the reversible
+        action is the one in reach and the irreversible one has to be travelled
+        to — and `deletion/copy.ts` never describes it as archiving.
       */}
       <section className="entity-danger-zone">
         <DeleteEntityControl locale={locale} entityType="memory" entityId={memory.id} />

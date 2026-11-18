@@ -57,6 +57,7 @@ import { CalendarOutcome } from "@/features/calendar/calendar-outcome";
 import { ProtectedContent } from "@/features/operations/protected-content";
 import type { TaskUndoHandler } from "@/features/operations/undo-affordance";
 import { recordDayReviewActionApplied } from "@/features/product-analytics/interaction-events";
+import { ReviewRows } from "@/features/reviews/review-rows";
 import type { TaskDetailCommandState } from "@/features/task-commands/detail-action-state";
 import type { TaskDetailDateBounds, TaskDetailRelationOptions } from "@/features/task-commands/task-detail-controls";
 import { TaskDetailControls, type TaskDetailCommandHandler } from "@/features/task-commands/task-detail-controls";
@@ -212,17 +213,15 @@ export function DayReviewView({
         key={item.taskId}
       >
         <div className="day-review-item-head">
-          {source === "completed" ? null : (
-            // Word first, tint second — `04-estados.md`, and the reason nothing
-            // on this surface depends on colour alone.
-            <span className="day-review-state">
-              {open ? copy.synthesis.stateOpen : copy.synthesis.stateDone}
-            </span>
-          )}
           {/*
             The title is never rendered directly. `surface="calendar"` because
             the day review shares this phase's governed surface — a second
             surface name would be a vocabulary entry nothing declared.
+
+            The title is the way to the task. `href` alone only linked the
+            MASKED label, so an ordinary row named a task and led nowhere; the
+            anchor is the protected child, and a masked row still renders the
+            contract's own link in its place.
           */}
           <ProtectedContent
             href={item.href}
@@ -231,9 +230,19 @@ export function DayReviewView({
             sensitivity={item.sensitivity}
             surface="calendar"
           >
-            {item.title}
+            <a href={item.href}>{item.title}</a>
           </ProtectedContent>
         </div>
+        {source === "completed" ? null : (
+          // The row's caption, in words — `04-estados.md`: nothing on this
+          // surface depends on colour alone. It was a tinted pill ahead of the
+          // title, which made the state the first thing read on every row; the
+          // task is the row, and whether it is still open is what is said
+          // about it.
+          <span className="day-review-state">
+            {open ? copy.synthesis.stateOpen : copy.synthesis.stateDone}
+          </span>
+        )}
         {/*
           The row's actions, behind a disclosure (owner report of 2026-08-20).
 
@@ -257,7 +266,8 @@ export function DayReviewView({
           **Nothing is removed and nothing moves behind a gesture.** The same
           five verbs, the same command path, the same confirmation rules — one
           press away, keyboard-operable, and announced by the native
-          `<summary>`'s own expanded state.
+          `<summary>`'s own expanded state. The summary is the row's one
+          visible verb, at the end of the caption line (`reviews.css`).
         */}
         {item.verbs.length > 0 ? (
           <details className="day-review-actions">
@@ -315,20 +325,21 @@ export function DayReviewView({
       parts → `<h2>` the history below it.
     */
     <section aria-labelledby="day-review-title" className="day-review-page">
+      {/*
+        Editorial calmo (ADR-180). The period's name and its dates, and nothing
+        else: the eyebrow repeated the tab, the description explained what a
+        review is, and the scheduling promise was said here, in the page's lead
+        and again in the schedule section. It is said once now, in that section.
+      */}
       <header className="day-review-header">
         <div className="day-review-heading">
-          <p className="eyebrow">{copy.eyebrow(projection.tab)}</p>
           <h2 className="day-review-title" id="day-review-title">{copy.title(projection.scope, projection.tab)}</h2>
           {/*
-            The span, next to the name of the period rather than buried in a
-            section below it. `periodRange` is formatted by the page from the
-            window the projection actually read, so the dates on screen and the
-            dates the queries used cannot disagree.
+            `periodRange` is formatted by the page from the window the
+            projection actually read, so the dates on screen and the dates the
+            queries used cannot disagree.
           */}
           <p className="day-review-range">{periodRange}</p>
-          <p className="day-review-description">{copy.description(projection.scope, projection.tab)}</p>
-          {/* `2M-REVIEW-007`, re-asserted on the surface that makes the promise. */}
-          <p className="day-review-promise">{copy.nothingScheduled}</p>
         </div>
         {/*
           The day/next-day control belongs to the **Dia** tab and only to it.
@@ -356,12 +367,13 @@ export function DayReviewView({
       <CalendarOutcome locale={locale} outcome={outcome} undoAction={undoAction} />
 
       {/*
-        The closing's one-line reading, and the pendências under it.
+        The closing's one-line reading — the first thing the period says.
 
         The surface listed five sections and left the reader to count four of
         them to answer "how did the day go". A closing states the day and then
-        shows its parts — so this is first, and everything below it is the
-        working out.
+        shows its parts. The heading names the region for assistive technology
+        and is not drawn: the counts are the sentence, directly under the
+        period's own name.
 
         **Every number is a count over the projection's own arrays.** No score,
         no proportion, no target and no "productive": `2M-REVIEW-002` forbids
@@ -371,7 +383,7 @@ export function DayReviewView({
         footnote.
       */}
       <section aria-label={copy.synthesis.heading(projection.tab)} className="day-review-synthesis">
-        <h3>{copy.synthesis.heading(projection.tab)}</h3>
+        <h3 className="sr-only">{copy.synthesis.heading(projection.tab)}</h3>
         {synthesis.quiet ? (
           <UniversalStateLine description={copy.synthesis.quiet(projection.tab)} locale={locale} state="empty" />
         ) : (
@@ -408,39 +420,53 @@ export function DayReviewView({
         {/*
           The pendências are **not listed here**, and that is deliberate.
 
-          Every one of them is already a row in "Intenções do dia" or "Prazos do
-          dia" below, with the verbs its own status admits. A second list would
-          be the repetition `2J-HOJE-004` removed from Hoje for the same reason —
-          *the same task in two lists on one screen, where the second copy always
+          Every one of them is already a row in "Intenções" or "Prazos" below,
+          with the verbs its own status admits. A second list would be the
+          repetition `2J-HOJE-004` removed from Hoje for the same reason — *the
+          same task in two lists on one screen, where the second copy always
           carries less than the first* — and here it would carry less in the way
           that matters most: no controls, or a second set of them competing for
           the same operation key.
-
-          So the count is stated here and the rows say their own state where they
-          already are, which is what `data-open` on the row is for.
         */}
       </section>
 
-      <section aria-label={copy.schedule.heading} className="day-review-schedule">
-        <h3>{copy.schedule.heading}</h3>
-        {/* `2M-REVIEW-006`. The three preferences, read — and said back. */}
-        <p>
-          {projection.schedule.dailyAt === null
-            ? copy.schedule.dailyUnknown
-            : projection.schedule.dailyTimeReached
-              ? copy.schedule.dailyAfter(projection.schedule.dailyAt)
-              : copy.schedule.dailyBefore(projection.schedule.dailyAt)}
-        </p>
-        <p>
-          {projection.schedule.weeklyAt === null || projection.schedule.weeklyWeekday === null
-            ? copy.schedule.weeklyUnknown
-            : projection.schedule.weeklyDayReached
-              ? copy.schedule.weeklyToday(projection.schedule.weeklyAt)
-              : copy.schedule.weekly(
-                copy.weekdays[projection.schedule.weeklyWeekday],
-                projection.schedule.weeklyAt,
-              )}
-        </p>
+      {/*
+        The written reviews of **this** period, and the controls that write them
+        — second on the surface, because reading the period's review or asking
+        for one is what the owner opens this page to do. It stood at the foot,
+        in a card, below every list.
+
+        - Each tab carries only its own generate controls (`generateControls`) —
+          one for Dia, two for Semana, one for Mês.
+        - A written review links to its **own page**.
+        - It is a list, because `generateReview` stores `period_end` as the day
+          it ran, so a week can hold several snapshots of itself. They belong
+          together, newest first, not scattered into "anteriores".
+      */}
+      <section aria-label={copy.generatedHeading(projection.tab)} className="day-review-generated" data-source="generated">
+        <h3>{copy.generatedHeading(projection.tab)}</h3>
+        {projection.sourceStates.generated === "unavailable" ? (
+          <p role="status">{copy.unavailable(copy.generatedHeading(projection.tab))}</p>
+        ) : projection.generated.length === 0 ? (
+          <UniversalStateLine description={emptyCopy.generated} locale={locale} state="empty" />
+        ) : (
+          /*
+           * `2M-REVIEW-008`. Every field comes from `toReviewSummaryView` — the
+           * `review_summary` presentation contract — and `ReviewRows` adds no
+           * formatting of its own to a stored review's period or status. It
+           * adds no *words* either: the content is not read into this
+           * projection at all, so a row cannot leak what the OD-2J-1 disclosure
+           * withholds.
+           */
+          <ReviewRows
+            baseHref={reviewsHref}
+            className="review-list"
+            openLabel={copy.openReview}
+            reviews={projection.generated}
+          />
+        )}
+        <div className="review-buttons">{generateControls}</div>
+        <p className="day-review-generate-lead">{copy.generateLead}</p>
       </section>
 
       {/*
@@ -490,15 +516,17 @@ export function DayReviewView({
           <ul>
             {projection.captured.map((capture) => (
               <li className="day-review-item" key={capture.entryId}>
-                <ProtectedContent
-                  href={capture.href}
-                  locale={locale}
-                  revealKey={capture.entryId}
-                  sensitivity={capture.sensitivity}
-                  surface="calendar"
-                >
-                  {capture.excerpt}
-                </ProtectedContent>
+                <div className="day-review-item-head">
+                  <ProtectedContent
+                    href={capture.href}
+                    locale={locale}
+                    revealKey={capture.entryId}
+                    sensitivity={capture.sensitivity}
+                    surface="calendar"
+                  >
+                    <a href={capture.href}>{capture.excerpt}</a>
+                  </ProtectedContent>
+                </div>
                 <p className="day-review-item-meta">
                   {formatInstant(capture.capturedAt, "time", locale, projection.timezone)}
                 </p>
@@ -509,72 +537,35 @@ export function DayReviewView({
       </section>
 
       {/*
-        The written reviews of **this** period, and the controls that write them.
+        `2M-REVIEW-006` and `-007`: the preferences read back, and the promise
+        that nothing runs from them — together, once, as the surface's footnote.
 
-        Three things changed here and each answers a complaint the owner made:
-
-        - The four generate buttons used to sit in a row of their own below the
-          history, describing no period. They are `generateControls` now, in the
-          section about the period they write, and each tab carries only its own
-          — one for Dia, two for Semana, one for Mês.
-        - The card used to render one review and then link to `/app/reviews`,
-          the page it was already on. It now links to the review's **own page**.
-        - It is a list, because `generateReview` stores `period_end` as the day
-          it ran, so a week can hold several snapshots of itself. They belong
-          together, newest first, not scattered into "anteriores".
+        It is a note about a preference, not a peer of the period's own facts,
+        and it stood between the synthesis and the first list with a section's
+        full weight. It stays on screen rather than behind a disclosure: the
+        promise is one the surface makes to whoever is looking at it, and a
+        guarantee that has to be opened is not being made.
       */}
-      <section aria-label={copy.generatedHeading(projection.tab)} className="day-review-generated" data-source="generated">
-        <h3>{copy.generatedHeading(projection.tab)}</h3>
-        <p className="day-review-generate-lead">{copy.generateLead}</p>
-        <div className="review-buttons">{generateControls}</div>
-        {projection.sourceStates.generated === "unavailable" ? (
-          <p role="status">{copy.unavailable(copy.generatedHeading(projection.tab))}</p>
-        ) : projection.generated.length === 0 ? (
-          <UniversalStateLine description={emptyCopy.generated} locale={locale} state="empty" />
-        ) : (
-          /*
-           * `2M-REVIEW-008`. Every field here comes from `toReviewSummaryView` —
-           * the `review_summary` presentation contract — and this surface adds
-           * no formatting of its own to a stored review's period or status. It
-           * adds no *words* either: the content is not read into this projection
-           * at all, so a card cannot leak what the OD-2J-1 disclosure withholds.
-           */
-          <ul className="review-list">
-            {projection.generated.map((review) => (
-              <li className="review-card" key={review.id}>
-                <div className="review-card-head">
-                  <div>
-                    <span className="review-card-period">{review.periodLabel}</span>
-                    <h4>{review.title}</h4>
-                    <p className="review-card-range">{review.periodLabelRange}</p>
-                  </div>
-                  <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
-                </div>
-                {/*
-                  An accessible name that says WHICH review.
-
-                  Several of these can stand on one screen — a week holds a
-                  review and a plan, and a regenerated period holds a
-                  snapshot per day — and a list of links all named "Abrir
-                  revisão" is a list a screen reader cannot tell apart.
-
-                  The name is built from the **period label and range**,
-                  which are structural, and never from the review's words:
-                  those are what the OD-2J-1 disclosure withholds, and an
-                  `aria-label` carrying them would hand the withheld string
-                  straight to assistive technology.
-                */}
-                <a
-                  aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
-                  className="review-open"
-                  href={`${reviewsHref}/${review.id}`}
-                >
-                  {copy.openReview}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+      <section aria-label={copy.schedule.heading} className="day-review-schedule">
+        <h3>{copy.schedule.heading}</h3>
+        <p>
+          {projection.schedule.dailyAt === null
+            ? copy.schedule.dailyUnknown
+            : projection.schedule.dailyTimeReached
+              ? copy.schedule.dailyAfter(projection.schedule.dailyAt)
+              : copy.schedule.dailyBefore(projection.schedule.dailyAt)}
+        </p>
+        <p>
+          {projection.schedule.weeklyAt === null || projection.schedule.weeklyWeekday === null
+            ? copy.schedule.weeklyUnknown
+            : projection.schedule.weeklyDayReached
+              ? copy.schedule.weeklyToday(projection.schedule.weeklyAt)
+              : copy.schedule.weekly(
+                copy.weekdays[projection.schedule.weeklyWeekday],
+                projection.schedule.weeklyAt,
+              )}
+        </p>
+        <p className="day-review-promise">{copy.nothingScheduled}</p>
       </section>
     </section>
   );

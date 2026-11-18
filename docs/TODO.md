@@ -135,7 +135,14 @@ Design and page-by-page plan: `docs/initiatives/editorial-calmo/DESIGN.md`. Reco
 - Redraw the four Hoje baselines of the screenshot lane through `visual-baselines.yml`, and look at the page on the owner's device.
 - ~~`NeedsAttentionLeadCard` and the `.attention-lead*` rules have no call site left; remove them.~~ — **done 2026-11-18.**
 - ~~The notice verbs are 34px tall from 601px up.~~ — **done 2026-11-18:** 44px at every width on Hoje.
-- Slices 2–7: shared row and section-heading primitives, then Registros/Tarefas/Lembretes, the entity lists, Avisos/Histórico/Perguntas/Revisões/Busca, the detail pages, the shell.
+- ~~Slices 3–7~~ — **done 2026-11-17/18** (records under `docs/reports/editorial-calmo/`: `LISTAS`, `PAGINAS`, `REGISTRO`, `TAREFA`, `SHELL`, `MEMORIA-E-REVISOES`; ADR-184, ADR-185). Slice 2 (shared row and section-heading primitives in `src/components/ui`) was NOT done: every page carries its own rules.
+- **Nothing in this pass was seen on the owner's device or signed in**, except the four pages of the screenshot lane. Every recomposed page needs his own look, on the iPhone, in dark as well.
+- **One-tap decisions were never run against a database.** `online-person-candidate-suggestions`, `editable-candidate-confirmation`, `task-detail-commands`, `online-mobile-navigation`, `online-memories` and `intelligent-capture` were rewritten for the new controls and not run. Run them against a live environment.
+- The onboarding card on Hoje ("Um caminho até o primeiro resultado", new accounts) is still boxes inside a box.
+- An event suggestion declined with *Agora não* returns on reload: no server-side decline exists.
+- On the Memória overview the lens strip sits above an index of the same seven destinations (a guard requires the strip); "Nova organização" sits at the overview's foot.
+- Stale specs found and left alone: `e2e/life-brain-b7-conversation.spec.ts:140` fails on both projects; `online-phase-2o-mobile-accessibility.spec.ts` asserts the palette trigger is under 44px, which is untrue; `e2e/layout-contracts.spec.ts` still mirrors the old Hoje `<h1>`.
+- Not touched by this pass: Conversar, Agenda, Avisos, Histórico, Busca's own page, Ajustes, the auth pages, Custos, Jobs.
 
 ## Life Brain — OPENED 2026-10-30 (ADR-145) — tracks A–E merged (E.8 #391, ADR-179 #392); LB-M1…M4, `202611060108` and `202611090109` applied hosted (109 = 109); owner decisions LB-OD-1…9 all DECIDED
 

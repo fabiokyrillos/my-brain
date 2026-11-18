@@ -1,4 +1,4 @@
-import { ArrowLeft, ScrollText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -147,14 +147,19 @@ export default async function ReviewDetailPage({
         {copy.back}
       </Link>
 
+      {/*
+        Editorial calmo (ADR-180): a written document opens on its title. The
+        kind sits over it, and the period, the state and when it was written
+        follow as one quiet line — they were three stacked lines and a badge
+        beside an icon.
+      */}
       <header className="entity-hero review-hero">
-        <ScrollText size={28} />
         <div>
           <p className="eyebrow">{review.periodLabel.toUpperCase()}</p>
           <h1>{review.title}</h1>
-          <p className="review-detail-range">{formatReviewPeriodRange(window, locale)}</p>
           <p className="review-detail-meta">
-            <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
+            <span className="review-detail-range">{formatReviewPeriodRange(window, locale)}</span>
+            <span className="review-detail-status" data-tone={review.statusTone}>{review.statusLabel}</span>
             <span>{copy.generatedAt(formatInstant(row.generated_at, "dayAndTime", locale, timezone) ?? "—")}</span>
           </p>
         </div>
@@ -187,7 +192,9 @@ export default async function ReviewDetailPage({
         reader's simply does not come back.
       */}
       <section aria-labelledby="review-content" className="review-detail-content">
-        <h2 id="review-content">{copy.contentHeading}</h2>
+        {/* Names the region; not drawn — the title above already opens the
+            document, and a "Conteúdo" label over the text said nothing. */}
+        <h2 className="sr-only" id="review-content">{copy.contentHeading}</h2>
         {blocks.length === 0 ? (
           <UniversalStateLine description={copy.contentEmpty} locale={locale} state="empty" />
         ) : (
@@ -219,23 +226,31 @@ export default async function ReviewDetailPage({
             <ReviewSourcesList copy={copy} locale={locale} rows={sources.rows} timezone={timezone} />
           </>
         ) : null}
-        <dl className="review-source-facts">
-          <div>
-            <dt>{copy.periodLabel}</dt>
-            <dd>{review.periodLabelRange}</dd>
-          </div>
-          <div>
-            <dt>{copy.modelLabel}</dt>
-            <dd>{typeof row.model === "string" && row.model ? row.model : copy.modelUnknown}</dd>
-          </div>
-          <div>
-            <dt>{copy.kindLabel}</dt>
-            <dd>{review.periodLabel}</dd>
-          </div>
-        </dl>
         {sources.rows.length === 0 ? (
           <p className="review-detail-unlinked">{copy.sourcesNotLinked}</p>
         ) : null}
+        {/*
+          How the review was produced — the stored span, the model and the
+          kind. Bookkeeping: true and worth keeping, not worth three labelled
+          rows on every visit. One press away.
+        */}
+        <details className="review-detail-technical">
+          <summary>{copy.technicalSummary}</summary>
+          <dl className="review-source-facts">
+            <div>
+              <dt>{copy.periodLabel}</dt>
+              <dd>{review.periodLabelRange}</dd>
+            </div>
+            <div>
+              <dt>{copy.modelLabel}</dt>
+              <dd>{typeof row.model === "string" && row.model ? row.model : copy.modelUnknown}</dd>
+            </div>
+            <div>
+              <dt>{copy.kindLabel}</dt>
+              <dd>{review.periodLabel}</dd>
+            </div>
+          </dl>
+        </details>
       </section>
 
       {/*
@@ -251,17 +266,17 @@ export default async function ReviewDetailPage({
         stored review names no task.
       */}
       <section aria-labelledby="review-actions" className="review-detail-actions">
-        <h2 id="review-actions">{copy.actionsHeading}</h2>
+        <h2 className="sr-only" id="review-actions">{copy.actionsHeading}</h2>
         <ul className="review-action-links">
-          <li><Link className="row-action" href={periodHref}>{copy.openPeriod}</Link></li>
-          <li><Link className="row-action" href={tabHref}>{copy.openTab(review.tab)}</Link></li>
+          <li><Link href={periodHref}>{copy.openPeriod}</Link></li>
+          <li><Link href={tabHref}>{copy.openTab(review.tab)}</Link></li>
         </ul>
         {isCurrent ? (
           <div className="review-regenerate">
-            <p>{copy.regenerateExplainer}</p>
             <div className="review-buttons">
               <ReviewButton action={generateReview} locale={locale} period={review.periodType} />
             </div>
+            <p>{copy.regenerateExplainer}</p>
           </div>
         ) : (
           <p className="review-detail-past">{copy.regenerateUnavailable}</p>

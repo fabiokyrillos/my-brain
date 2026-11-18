@@ -347,7 +347,10 @@ test.describe("converged daily journey — capture, review, and confirmation", (
     await page.getByRole("button", { name: "Resumo do dia" }).click();
     await expect(page.getByRole("status")).toHaveText("Revisão concluída.", { timeout: 120_000 });
     await page.reload();
-    await expect(page.locator(".review-card")).toHaveCount(1);
+    // A written review is a row of the period's own section now (ADR-180); the
+    // card it used to be is gone. NOT RUN since that change — this journey needs
+    // a linked Supabase project and a live model.
+    await expect(page.locator(".day-review-generated .review-row")).toHaveCount(1);
   });
 
   test("Files uploads and analyzes a private attachment", async () => {

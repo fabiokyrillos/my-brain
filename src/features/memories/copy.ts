@@ -25,6 +25,8 @@ type MemoryCopy = {
   /** What this thing is, said once, where the owner first meets it. */
   readonly title: string;
   readonly intro: string;
+  /** The question the collapsed mental-model account answers. */
+  readonly explainerSummary: string;
   readonly whatIsIt: string;
   readonly howItDiffers: string;
   /** When the assistant may use it — the honest version, matching the filter. */
@@ -89,6 +91,8 @@ type MemoryCopy = {
    * recorded in March can be in force from January; those are different
    * questions and each label now answers only its own.
    */
+  /** The heading over the memory's facts on its own page. */
+  readonly factsHeading: string;
   readonly recordedAt: string;
   readonly validFrom: string;
   /** An absent start boundary, said as absent rather than filled in. */
@@ -195,6 +199,7 @@ const copy = {
   "pt-BR": {
     title: "Memórias",
     intro: "O que continua valendo depois que a conversa acaba.",
+    explainerSummary: "O que é uma memória?",
     whatIsIt:
       "Uma memória é um fato ou preferência sua que permanece verdadeiro ao longo do tempo, guardado para que você não precise repetir.",
     howItDiffers:
@@ -235,6 +240,7 @@ const copy = {
     restored: "Memória reativada.",
     archiveExplainer:
       "Arquivar encerra a validade e tira a memória das respostas. Nada é apagado: o texto e a origem continuam aqui.",
+    factsHeading: "Detalhes",
     recordedAt: "Registrada em",
     validFrom: "Vale desde",
     validFromAlways: "Sem data de início",
@@ -321,6 +327,7 @@ const copy = {
   en: {
     title: "Memories",
     intro: "What stays true after the conversation ends.",
+    explainerSummary: "What is a memory?",
     whatIsIt:
       "A memory is a fact or preference of yours that stays true over time, kept so you never have to repeat it.",
     howItDiffers:
@@ -361,6 +368,7 @@ const copy = {
     restored: "Memory reactivated.",
     archiveExplainer:
       "Archiving ends the validity and takes the memory out of answers. Nothing is deleted: the text and its origin stay here.",
+    factsHeading: "Details",
     recordedAt: "Recorded on",
     validFrom: "Valid from",
     validFromAlways: "No start date",
