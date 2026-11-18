@@ -128,11 +128,12 @@ export function PersonCandidateForm({
             const name = nameOf(candidate);
             const isRenaming = renaming.has(candidate.candidateIndex);
             /*
-              `person-candidate-item`, not `candidate-item`. The two are
-              different shapes and must not share a layout class: the task
-              form's `.candidate-item` is a `<label>` holding a visually hidden
-              checkbox, and its rules hide any direct `<input>` child — which is
-              what once made this card's name field invisible and unclickable.
+              `person-candidate-item`, its own class. It once borrowed the task
+              form's `.candidate-item`, a `<label>` holding a visually hidden
+              checkbox whose rules hid any direct `<input>` child — which made
+              this card's name field invisible and unclickable. That class is
+              retired now (the task form became rows too); a layout class is
+              still never shared between two different shapes.
             */
             return (
               <li key={candidate.candidateIndex}>

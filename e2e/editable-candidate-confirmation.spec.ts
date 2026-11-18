@@ -38,9 +38,10 @@ const localized = {
     people: "Pessoas",
     waitingOn: "Aguardando por",
     decision: (title: string) => `Decisão para: ${title}`,
-    dispositions: ["Criar tarefa", "Rejeitar sugestão", "Manter como registro", "Dispensar sugestão"],
-    submit: "Resolver 4 sugestões",
-    success: "4 sugestões resolvidas. 1 tarefa criada.",
+    answers: ["Criar tarefa", "Rejeitar sugestão", "Manter como registro", "Ignorar"],
+    moreOptions: "Mais opções",
+    created: "1 sugestão resolvida. 1 tarefa criada.",
+    closed: "1 sugestão resolvida. Nenhuma tarefa criada.",
     history: "Decisões anteriores",
     outcomes: ["Tarefa criada", "Sugestão rejeitada", "Mantida como registro", "Sugestão dispensada"],
     undo: "Desfazer decisões",
@@ -64,9 +65,10 @@ const localized = {
     people: "People",
     waitingOn: "Waiting on",
     decision: (title: string) => `Decision for: ${title}`,
-    dispositions: ["Create task", "Reject suggestion", "Keep as record", "Dismiss suggestion"],
-    submit: "Resolve 4 suggestions",
-    success: "4 suggestions resolved. 1 task created.",
+    answers: ["Create task", "Reject suggestion", "Keep as record", "Ignore"],
+    moreOptions: "More options",
+    created: "1 suggestion resolved. 1 task created.",
+    closed: "1 suggestion resolved. No tasks created.",
     history: "Previous decisions",
     outcomes: ["Task created", "Suggestion rejected", "Kept as record", "Suggestion dismissed"],
     undo: "Undo decisions",
@@ -312,7 +314,7 @@ async function runDispositionJourney(
 
   await assertNeedsAttention(page, fixture, locale, true);
   await page.goto(`/${locale}/app/inbox/${fixture.entryId}`);
-  await expect(page.locator('input[name="candidateIndex"]')).toHaveCount(4);
+  await expect(page.locator(".task-candidate-decision-card")).toHaveCount(4);
 
   const confirmedEditor = page.getByRole("group", { name: text.candidate(candidateTitles[0]) });
   await expect(confirmedEditor).toBeVisible();
@@ -326,14 +328,31 @@ async function runDispositionJourney(
   await confirmedEditor.getByRole("listbox", { name: text.people }).selectOption({ label: `${fixture.prefix} person A` });
   await confirmedEditor.getByRole("listbox", { name: text.waitingOn }).selectOption({ label: `${fixture.prefix} person B` });
 
+  /*
+   * NOT RUN SINCE IT WAS REWRITTEN. This spec needs a live environment and the
+   * change that rewrote it was made without one — verify it on the next online
+   * run before trusting it.
+   *
+   * The form no longer has a batch submit or disposition radios: each
+   * suggestion is one question answered by one tap, so the four outcomes are
+   * now four requests (and four undo operations) instead of one. *Criar tarefa*
+   * and *Ignorar* (= dismissed) are on the row; *Rejeitar sugestão* and *Manter
+   * como registro* sit behind *Mais opções*. A decided row leaves the list at
+   * once, which is what tells one tap's result from the next — three of the
+   * four acknowledgements read the same.
+   */
   for (let index = 0; index < candidateTitles.length; index += 1) {
     const decision = page.getByRole("group", { name: text.decision(candidateTitles[index]) });
     await expect(decision).toBeVisible();
-    await decision.getByRole("radio", { name: text.dispositions[index] }).check();
+    if (index === 1 || index === 2) {
+      await decision.getByRole("button", { name: text.moreOptions }).click();
+    }
+    await decision.getByRole("button", { name: text.answers[index], exact: true }).click();
+    await expect(decision).toHaveCount(0);
+    await expect(page.getByText(index === 0 ? text.created : text.closed, { exact: true })).toBeVisible();
   }
 
-  await page.getByRole("button", { name: text.submit }).click();
-  await expect(page.getByText(text.success, { exact: true })).toBeVisible();
+  await expect(page.locator(".task-candidate-decision-card")).toHaveCount(0);
   await expect(page.getByRole("button", { name: text.undo })).toBeVisible();
 
   const { data: tasks, error: tasksError } = await owner
@@ -433,10 +452,20 @@ async function runDispositionJourney(
 
   await page.goto(`/${locale}/app/inbox/${fixture.entryId}`);
   await page.reload();
-  await page.getByRole("button", { name: text.undo }).click();
-  await expect(page.getByText(text.undone, { exact: true })).toBeVisible();
-  await page.reload();
-  await expect(page.locator('input[name="candidateIndex"]')).toHaveCount(4);
+  /*
+   * NOT RUN SINCE IT WAS REWRITTEN (see the note in the decision loop above).
+   * One undo used to reverse the whole batch. Four taps are four operations, and
+   * the page offers the most recent one still available, so undoing everything
+   * is now one undo per decision, newest first.
+   */
+  for (let remaining = candidateTitles.length; remaining > 0; remaining -= 1) {
+    await page.getByRole("button", { name: text.undo }).click();
+    await expect(page.getByText(text.undone, { exact: true })).toBeVisible();
+    await page.reload();
+    await expect(page.locator(".task-candidate-decision-card"))
+      .toHaveCount(candidateTitles.length - remaining + 1);
+  }
+  await expect(page.locator(".task-candidate-decision-card")).toHaveCount(4);
   for (const title of candidateTitles) {
     await expect(page.getByRole("group", { name: text.decision(title) })).toBeVisible();
   }
