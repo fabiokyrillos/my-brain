@@ -73,7 +73,9 @@ describe("EventCandidateForm", () => {
     // The answered question leaves; the other one is still asked.
     await waitFor(() => expect(screen.queryByRole("group", { name: "Evento sugerido: Viagem a Lisboa" })).toBeNull());
     expect(row("Dentista")).toBeVisible();
-    expect(screen.getByRole("status")).toHaveTextContent("1 evento na agenda.");
+    // Awaited: the row leaves and the result line arrives in separate commits,
+    // and under a loaded runner the second can land a tick after the first.
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("1 evento na agenda."));
   });
 
   it("uses a new operation key for the next event, because the database binds a key to its indexes", async () => {
