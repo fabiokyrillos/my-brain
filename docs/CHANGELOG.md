@@ -1,5 +1,12 @@
 # Technical Changelog
 
+## 2026-11-18 — Memória and Revisões, recomposed (ADR-180, slices 4–6)
+
+- **Memória overview** (`library/page.tsx`, `brain.css`): search is the first control; the seven domains are an index of rows (name, count, latest items on one line; the row is the link) instead of a grid of bordered tiles; areas and ideas are rows.
+- **Memories** (`memories/page.tsx`, `memories/[memoryId]/page.tsx`, `memories.css`): a row is the memory's own sentence over one caption; the explainer is a closed disclosure after the list. On the detail page the sentence is the subject, the facts are rows (person and project only when set), the origin is quoted, the changes are collapsed. An active memory carries no state word in the list; "Programada" and "Arquivada" do.
+- **Revisões** (`day-review-view.tsx`, new `reviews/review-rows.tsx`, `reviews/[reviewId]/page.tsx`, `reviews.css`): the day opens with its counts and its written review; task titles and captures are links; a written review is a row. The review's page is a document first — full ink at the reading measure — with sources as a quiet list and the technical details collapsed.
+- `RECORDED_UNSTYLED` 32 → 26. `calendar.css` loses the day-review rules that `reviews.css` now owns. No Server Action, RPC, projection or migration changed. Record: `docs/reports/editorial-calmo/MEMORIA-E-REVISOES.md`.
+
 ## 2026-11-18 — The shell: a brand and three controls on a phone; the language is in the account menu (ADR-180, slice 7)
 
 - `features/shell/app-shell.tsx`: on a phone the top bar is the brand (linking to Hoje) and three 44px line icons — search, notifications, account. It is sticky at phone widths, with a hairline that appears on scroll in CSS only.
