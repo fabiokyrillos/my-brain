@@ -589,6 +589,25 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
 }
 
 /*
+ * The day review's verbs borrow `TaskDetailControls`, whose list and form are
+ * this phase's shared classes — so their layout inside a review row is set
+ * here, not in `reviews.css`, which dresses only what the reviews surfaces
+ * render themselves.
+ */
+.day-review-verb .task-control-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2, 0.5rem);
+}
+
+.day-review-verb .task-control form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1, 0.25rem);
+}
+
+/*
  * `2P-CALENDAR-001` — the month, in two presentations that are never both live.
  *
  * ## Why both are in the DOM, and why that is not a duplication
@@ -844,7 +863,9 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
 }
 
 /*
- * The planner and the day review, slices 2M.2 and 2M.3.
+ * The planner, slice 2M.2. (The day review's rules left for `reviews.css` with
+ * the editorial recomposition, ADR-180; what follows describes why the planner
+ * stayed.)
  *
  * In this stylesheet rather than in two new ones because both are this phase's
  * surfaces and both reuse the calendar's controls; a `planner.css` and a
@@ -856,80 +877,11 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
  * of overflowing, and controls that stay inside the narrowest column a 320 CSS
  * px viewport produces.
  */
-.planner-page section,
-.day-review-page section {
+.planner-page section {
   margin-block: var(--space-4, 1rem);
 }
 
-/*
- * The day review's sections, as surfaces (owner report of 2026-08-20).
- *
- * Eight sections — how the day went, the schedule, what could not be read, what
- * was completed, the day's intentions, its deadlines, what was captured, and
- * the generated review — ran as one undifferentiated column of small bold
- * headings with no boundary between them. Nothing told the eye where one
- * finished and the next began, which is most of *"espaçamento e hierarquia
- * visual ruins"*.
- *
- * The treatment is `.home-section`'s, deliberately: a bordered, rounded surface
- * on the page background. It is what Hoje already uses for exactly this job, so
- * Revisões stops being the one redesigned page that looks like a document.
- *
- * `.day-review-page > section` only — the nested `<section>`s inside a card
- * would otherwise draw a box inside a box.
- */
-.day-review-page > section {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  background: var(--background-surface);
-  padding: var(--space-5) var(--space-5);
-}
-
-/*
- * A row's actions, closed by default.
- *
- * Same shape as `.calendar-reschedule`, which is the disclosure this product
- * already uses to put `TaskDetailControls` one press away instead of always on
- * screen. 44px because the summary is the control.
- */
-.day-review-actions {
-  margin-top: var(--space-2);
-}
-
-.day-review-actions-summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-full);
-  background: var(--background-surface);
-  color: var(--text-secondary);
-  font: var(--type-label);
-  cursor: pointer;
-  list-style: none;
-}
-
-/* Safari draws its own triangle through a pseudo-element the standard rule
-   above does not reach, so the marker is removed in both grammars. */
-.day-review-actions-summary::-webkit-details-marker { display: none; }
-
-.day-review-actions-summary:hover {
-  border-color: var(--border-strong);
-  color: var(--text-primary);
-}
-
-.day-review-actions[open] > .day-review-actions-summary {
-  background: var(--background-subtle-strong);
-  color: var(--text-primary);
-}
-
-.day-review-actions > .day-review-verbs {
-  margin-top: var(--space-3);
-}
-
-.planner-list ul,
-.day-review-section ul {
+.planner-list ul {
   display: flex;
   flex-direction: column;
   gap: var(--space-3, 0.75rem);
@@ -937,8 +889,7 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   list-style: none;
 }
 
-.planner-item,
-.day-review-item {
+.planner-item {
   display: flex;
   flex-direction: column;
   gap: var(--space-1, 0.25rem);
@@ -999,8 +950,8 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
  * The checkbox and the title on one line: the label is the 44px target, the
  * box sits centred in it, and the title starts where the box ends.
  */
-/* `.planner-list` for specificity: the shared `.planner-item-head,
-   .day-review-item-head` rule below would otherwise wrap the box onto a line of
+/* `.planner-list` for specificity: the `.planner-item-head` rule below would
+   otherwise wrap the box onto a line of
    its own — which is what the signed-in iPhone capture showed. */
 .planner-list .planner-item-head { flex-wrap: nowrap; align-items: flex-start; }
 .planner-item-title { flex: 1; min-width: 0; }
@@ -1035,8 +986,7 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   background: none;
 }
 
-.planner-item-head,
-.day-review-item-head {
+.planner-item-head {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1044,15 +994,13 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   min-width: 0;
 }
 
-.planner-item-meta,
-.day-review-item-meta {
+.planner-item-meta {
   margin: 0;
   font-size: 0.75rem;
   color: var(--text-muted);
 }
 
-.planner-day-nav,
-.day-review-scope-nav {
+.planner-day-nav {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -1064,8 +1012,7 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
  * either surface, so they carry the minimum themselves rather than inheriting a
  * size from the text that happens to be inside them.
  */
-.planner-day-nav a,
-.day-review-scope-nav a {
+.planner-day-nav a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
@@ -1073,85 +1020,6 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
   justify-content: center;
   padding-inline: var(--space-2, 0.5rem);
 }
-
-.day-review-scope-nav a[aria-current="page"] {
-  font-weight: 600;
-  text-decoration: underline;
-}
-
-.day-review-verbs {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2, 0.5rem);
-}
-
-.day-review-verb .task-control-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2, 0.5rem);
-}
-
-.day-review-verb .task-control form {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1, 0.25rem);
-}
-
-.day-review-verb input[type="date"],
-.day-review-verb select {
-  max-width: 100%;
-}
-
-/*
- * The day review's own heading — an `<h2>` under the page's `<h1>`.
- *
- * It renders inside `/app/reviews`, which owns the page's `<h1>`. The size is
- * kept: a heading level is a statement about the document outline, not about how
- * large the text is, and shrinking it would have changed the reading hierarchy
- * to fix a semantics problem.
- */
-.day-review-title { margin: 0; font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
-
-/*
- * The sections inside the review, now `<h3>`.
- *
- * Sized here rather than left to the browser default, which would have made a
- * demoted heading *look* demoted — the outline moved, the hierarchy on the page
- * did not.
- */
-.day-review-page section > h3 { margin: 0 0 var(--space-2); font: var(--type-heading); color: var(--text-primary); }
-
-/*
- * `/app/reviews` — the page around the review.
- *
- * The surface holds two things that are genuinely different in kind: today's
- * closing, which is a reading of records that already exist, and the history of
- * reviews the assistant generated when asked. The header names the page, and
- * each of the two is a titled section under it, so the outline says which is
- * which instead of leaving the reader to infer it from a gap.
- */
-.reviews-header { margin-bottom: var(--space-6); }
-.reviews-header h1 { margin: var(--space-2) 0 0; font: 500 clamp(38px,5vw,60px)/1 var(--font-reading); letter-spacing: -.04em; }
-.reviews-lead { margin: var(--space-2) 0 0; color: var(--text-secondary); font: var(--type-lead); max-width: var(--width-reading); }
-.reviews-history { margin-top: var(--space-8); }
-.reviews-history > h2 { margin: 0 0 var(--space-4); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
-.reviews-history-lead { margin: calc(var(--space-4) * -1) 0 var(--space-4); color: var(--text-secondary); font: var(--type-body); max-width: var(--width-reading); }
-
-/*
- * The stored review's status, in colour as well as in words.
- *
- * `review-presentation.ts` has emitted `statusTone` — positive, neutral,
- * warning — since Phase 2J, and `page.tsx` has rendered it as `data-tone` on
- * the badge. **No rule ever selected it.** All three statuses painted on the
- * same neutral wash, so "Pode estar desatualizada" and "Concluída" were one
- * object with different text: a producer with no consumer, and the second one
- * this session has found.
- *
- * `neutral` deliberately has no rule — the base wash is what neutral means.
- */
-.status-badge[data-tone="positive"] { background: var(--tone-success-bg); color: var(--tone-success-fg); }
-.status-badge[data-tone="warning"] { background: var(--tone-attention-bg); color: var(--tone-attention-fg); }
 
 /*
  * The planner's orientation band — capacity and conflicts, side by side.
@@ -1202,65 +1070,6 @@ a.agenda-date-day:hover { background: var(--background-subtle-strong); }
 
 /* The two lists' own headings, matched to the band above them. */
 .planner-list > h2 { margin: 0 0 var(--space-3); font: var(--type-title-2); letter-spacing: -.01em; color: var(--text-primary); }
-
-/*
- * The closing's synthesis — `/app/reviews`, above the five sections.
- *
- * The surface listed the day's parts and left the reader to count four of them
- * to answer "how did the day go". This states it first; everything below is the
- * working out. The counts are set in the reading face because they are the
- * sentence, and the labels around them are not.
- */
-.day-review-synthesis { border-block-end: 1px solid var(--border-default); padding-block-end: var(--space-4); }
-.day-review-counts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.day-review-counts li { font: var(--type-reading); color: var(--text-primary); }
-
-/* A count over a source that failed is not a small count — it is an unknown
-   one, so the sentence that says so carries a rule and full ink rather than
-   sitting in the muted register the disclaimers use. */
-.day-review-partial {
-  margin: var(--space-3) 0 0;
-  padding-inline-start: var(--space-3);
-  border-inline-start: 3px solid var(--tone-attention-line);
-  color: var(--text-primary);
-  font: var(--type-body);
-}
-
-/*
- * A row's own state, in "intenções" and "prazos" only — those are the two
- * sections where a row may be either, and the word is the difference between a
- * list of what the day held and a list of what it left.
- *
- * There is no separate pendências list, deliberately: every open item is
- * already a row here with the verbs its status admits, and a second list would
- * be `2J-HOJE-004`'s repetition with the second copy carrying less.
- */
-.day-review-state {
-  flex: none;
-  align-self: center;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-full);
-  background: var(--background-subtle);
-  color: var(--text-secondary);
-  font: var(--type-mono);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-}
-.day-review-item[data-open="true"] .day-review-state {
-  background: var(--tone-attention-bg);
-  color: var(--tone-attention-fg);
-}
-.day-review-item[data-open="false"] .day-review-state {
-  background: var(--tone-success-bg);
-  color: var(--tone-success-fg);
-}
 
 /*
  * `2P-CALENDAR-001` — the phone gets a legible month, not a squeezed one.

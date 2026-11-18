@@ -123,3 +123,14 @@ describe("BrainLensTabs", () => {
     ).toHaveLength(BRAIN_LENSES.length);
   });
 });
+
+describe("a surface that places the organization form itself", () => {
+  it("does not repeat it under the strip when asked not to", () => {
+    // The overview mounts the same form at its own foot (`library/page.tsx`),
+    // so the strip there is followed by what the Brain holds.
+    render(<BrainLensTabs active="overview" locale="pt-BR" quickCreate={false} />);
+    expect(screen.queryByRole("button", { name: /nova organização/i })).toBeNull();
+    // The strip itself is untouched.
+    expect(within(screen.getByRole("navigation", { name: "Lentes da Memória" })).getAllByRole("link")).toHaveLength(BRAIN_LENSES.length);
+  });
+});

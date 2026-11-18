@@ -88,7 +88,6 @@ const COPY = {
     plannerTitle: "Agenda",
     plannedEmpty: "Nada planejado para este dia ainda.",
     reviewTitle: "Hoje",
-    reviewDescription: "O que este dia realmente conteve, montado a partir dos seus próprios registros.",
     reviewsPageTitle: "Revisões",
     reviewsPageLead: "Gere uma revisão quando quiser; nada é executado por horário configurado.",
     reviewsHistory: "Dias anteriores",
@@ -121,7 +120,6 @@ const COPY = {
     plannerTitle: "Agenda",
     plannedEmpty: "Nothing planned for this day yet.",
     reviewTitle: "Today",
-    reviewDescription: "What this day actually contained, composed from your own records.",
     reviewsPageTitle: "Reviews",
     reviewsPageLead: "Generate a review when you choose; nothing runs from a configured schedule.",
     reviewsHistory: "Previous days",
@@ -221,8 +219,10 @@ function reviewRow(options: { locale: Locale; masked?: boolean; open?: boolean }
         <ul class="task-control-list">${controlMarkup({ action, label: "Aplicar", kind: controlKind, value })}</ul>
       </div>
     </div>`;
+  // The title, then the state as the row's caption, then the one verb.
   return `<li class="day-review-item"${options.open === undefined ? "" : ` data-open="${options.open}"`}>
-    <div class="day-review-item-head">${state}${body}</div>
+    <div class="day-review-item-head">${body}</div>
+    ${state}
     <details class="day-review-actions">
       <summary class="day-review-actions-summary">Ações</summary>
       <div class="day-review-verbs">
@@ -301,11 +301,21 @@ function plannerPage(locale: Locale, rows: string[]): string {
  */
 function reviewPage(locale: Locale, rows: string[], options: { unreadable?: boolean } = {}): string {
   const copy = COPY[locale];
+  const reviewRows = (listClass: string, id: string, range: string) => `<ul class="review-rows ${listClass}">
+        <li class="review-row">
+          <a aria-label="Abrir revisão: Resumo do dia, ${range}" class="review-row-link" href="/pt-BR/app/reviews/${id}">
+            <span class="review-row-range">${range}</span>
+            <span class="review-row-kind">Resumo do dia</span>
+          </a>
+          <span class="review-row-status" data-tone="positive">Concluída</span>
+        </li>
+      </ul>`;
   return shell(locale, `<div class="content-page reviews-page">
-    <header class="reviews-header">
-      <p class="eyebrow">FECHAMENTO SOB DEMANDA</p>
-      <h1>${copy.reviewsPageTitle}</h1>
-      <p class="reviews-lead">${copy.reviewsPageLead}</p>
+    <header class="ui-page-header ui-page-header--compact reviews-header">
+      <div class="ui-page-header__text">
+        <h1 class="ui-page-header__title">${copy.reviewsPageTitle}</h1>
+        <p class="ui-page-header__description">${copy.reviewsPageLead}</p>
+      </div>
     </header>
     <nav aria-label="Período" class="review-tabs">
       <a aria-current="page" class="review-tab" href="?period=day">Dia</a>
@@ -315,11 +325,8 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
     <section aria-labelledby="day-review-title" class="day-review-page">
     <header class="day-review-header">
       <div class="day-review-heading">
-        <p class="eyebrow">FECHAMENTO DO DIA</p>
         <h2 class="day-review-title" id="day-review-title">${copy.reviewTitle}</h2>
         <p class="day-review-range">terça-feira, 11 de agosto de 2026</p>
-        <p class="day-review-description">${copy.reviewDescription}</p>
-        <p class="day-review-promise">${copy.nothingScheduled}</p>
       </div>
       <nav aria-label="Dia da revisão" class="day-review-scope-nav">
         <a aria-current="page" href="?period=day&amp;scope=day">Hoje</a>
@@ -328,15 +335,17 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
     </header>
     <div aria-live="polite" class="calendar-outcome" role="status"></div>
     <section aria-label="${copy.synthesisHeading}" class="day-review-synthesis">
-      <h3>${copy.synthesisHeading}</h3>
+      <h3 class="sr-only">${copy.synthesisHeading}</h3>
       <ul class="day-review-counts"><li>${copy.synthesisCompleted}</li><li>${copy.synthesisOpen}</li><li>${copy.synthesisCaptured}</li></ul>
       ${options.unreadable
         ? `<p class="day-review-partial" role="status">${copy.synthesisPartial}</p>`
         : '<p class="day-review-all-read">Todas as fontes desta revisão foram lidas.</p>'}
     </section>
-    <section aria-label="Seu horário de revisão" class="day-review-schedule">
-      <h3>Seu horário de revisão</h3>
-      <p>Já passou das 22:00, o horário que você escolheu para revisar o dia.</p>
+    <section aria-label="Revisão deste dia" class="day-review-generated" data-source="generated">
+      <h3>Revisão deste dia</h3>
+      ${reviewRows("review-list", "r1", "11/08/2026 — 11/08/2026")}
+      <div class="review-buttons"><div class="review-action"><form><button type="submit">Resumo do dia</button></form></div></div>
+      <p class="day-review-generate-lead">Cada botão pede ao Brain uma síntese escrita deste período.</p>
     </section>
     ${options.unreadable
       ? `<section aria-label="${copy.unreadableHeading}" class="day-review-unreadable">
@@ -352,44 +361,75 @@ function reviewPage(locale: Locale, rows: string[], options: { unreadable?: bool
       <h3>Registros capturados</h3>
       <ul>
         <li class="day-review-item">
-          <a href="/pt-BR/app/inbox/e1">Anotei uma ideia</a>
+          <div class="day-review-item-head"><a href="/pt-BR/app/inbox/e1">Anotei uma ideia</a></div>
           <p class="day-review-item-meta">14:00</p>
         </li>
       </ul>
     </section>
-    <section aria-label="Revisão deste dia" class="day-review-generated" data-source="generated">
-      <h3>Revisão deste dia</h3>
-      <p class="day-review-generate-lead">Cada botão pede ao Brain uma síntese escrita deste período.</p>
-      <div class="review-buttons"><div class="review-action"><form><button type="submit">Resumo do dia</button></form></div></div>
-      <ul class="review-list">
-        <li class="review-card">
-          <div class="review-card-head">
-            <div>
-              <span class="review-card-period">Resumo do dia</span>
-              <h4>Resumo diário</h4>
-              <p class="review-card-range">11/08/2026 — 11/08/2026</p>
-            </div>
-            <span class="status-badge" data-tone="positive">Concluída</span>
-          </div>
-          <a class="review-open" href="/pt-BR/app/reviews/r1">Abrir revisão</a>
-        </li>
-      </ul>
+    <section aria-label="Seu horário de revisão" class="day-review-schedule">
+      <h3>Seu horário de revisão</h3>
+      <p>Já passou das 22:00, o horário que você escolheu para revisar o dia.</p>
+      <p class="day-review-promise">${copy.nothingScheduled}</p>
     </section>
     </section>
     <section aria-labelledby="reviews-history" class="reviews-history">
       <h2 id="reviews-history">${copy.reviewsHistory}</h2>
-      <p class="reviews-history-lead">Revisões diárias que você já gerou.</p>
-      <ul class="review-history-list">
-        <li class="review-history-item">
-          <div>
-            <span class="review-card-period">Resumo do dia</span>
-            <h3>Resumo diário</h3>
-            <p class="review-card-range">10/08/2026 — 10/08/2026</p>
-          </div>
-          <span class="status-badge" data-tone="positive">Concluída</span>
-          <a class="review-open" href="/pt-BR/app/reviews/r0">Abrir revisão</a>
-        </li>
+      ${reviewRows("review-history-list", "r0", "10/08/2026 — 10/08/2026")}
+    </section>
+  </div>`);
+}
+
+/**
+ * A review's own page, mirroring `src/app/[locale]/app/reviews/[reviewId]/page.tsx`:
+ * the title, one line of facts, the rendered text, the cited items, the
+ * technical details closed, and the links at the foot.
+ */
+function reviewDetailPage(): string {
+  const cited = (kind: string, when: string, last: string) => `<li class="review-cited-row">
+          <span class="review-cited-kind" data-kind="entry">${kind}</span>
+          <span class="review-cited-when">${when}</span>
+          ${last}
+        </li>`;
+  return shell("pt-BR", `<div class="content-page entity-detail review-detail">
+    <a class="back-link" href="/pt-BR/app/reviews?period=week">Voltar para Revisões</a>
+    <header class="entity-hero review-hero"><div>
+      <p class="eyebrow">REVISÃO DA SEMANA</p>
+      <h1>Revisão semanal</h1>
+      <p class="review-detail-meta">
+        <span class="review-detail-range">10 de agosto de 2026 — 16 de agosto de 2026</span>
+        <span class="review-detail-status" data-tone="positive">Concluída</span>
+        <span>Gerada em 13 de ago. de 2026, 18:00</span>
+      </p>
+    </div></header>
+    <section aria-labelledby="review-content" class="review-detail-content">
+      <h2 class="sr-only" id="review-content">Conteúdo</h2>
+      <div class="review-content">
+        <h3>Revisão da semana</h3>
+        <p>A semana foi de fechamento: três entregas saíram e duas ficaram para a próxima.</p>
+        <h4>Entregas</h4>
+        <ul><li><strong>Contrato</strong> fechado, com um-identificador-muito-comprido-sem-espaços-que-precisa-quebrar-dentro-da-medida.</li></ul>
+      </div>
+    </section>
+    <section aria-labelledby="review-sources" class="review-detail-sources">
+      <h2 id="review-sources">Fontes</h2>
+      <p class="section-explainer">Esta revisão foi escrita a partir dos seus registros e das suas tarefas.</p>
+      <h3 class="review-cited-heading">Itens citados</h3>
+      <ul class="review-cited-list">
+        ${cited("Registro", "11 de ago. de 2026", '<a class="review-cited-link" href="/pt-BR/app/inbox/e1">Abrir registro de 11 de ago. de 2026</a>')}
+        ${cited("Tarefa", "—", '<span class="review-cited-gone">Não está mais disponível</span>')}
       </ul>
+      <details class="review-detail-technical">
+        <summary>Detalhes técnicos</summary>
+        <dl class="review-source-facts"><div><dt>Modelo</dt><dd>gpt-5.6-terra</dd></div></dl>
+      </details>
+    </section>
+    <section aria-labelledby="review-actions" class="review-detail-actions">
+      <h2 class="sr-only" id="review-actions">Ações</h2>
+      <ul class="review-action-links">
+        <li><a href="/pt-BR/app/calendar">Ver este período no calendário</a></li>
+        <li><a href="/pt-BR/app/reviews?period=week">Ver revisões semanais</a></li>
+      </ul>
+      <p class="review-detail-past">Este período já passou.</p>
     </section>
   </div>`);
 }
@@ -522,6 +562,19 @@ async function noHorizontalScroll(target: Page): Promise<void> {
   const overflow = await target.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, "the page scrolls horizontally").toBeLessThanOrEqual(1);
+}
+
+/**
+ * Every link, button and summary on screen that a thumb could not hit: under
+ * 44 CSS px tall. Content inside a closed `<details>` has no box and is skipped
+ * — the page is measured as it opens.
+ */
+async function targetsUnder44(page: Page): Promise<{ text: string; height: number }[]> {
+  return page.evaluate(() =>
+    [...document.querySelectorAll<HTMLElement>("a, button, summary")]
+      .filter((node) => node.getClientRects().length > 0)
+      .map((node) => ({ text: (node.textContent ?? "").trim().slice(0, 24), height: Math.round(node.getBoundingClientRect().height) }))
+      .filter((target) => target.height < 44));
 }
 
 for (const locale of ["pt-BR", "en"] as const) {
@@ -1129,14 +1182,82 @@ test.describe("the review states the day before it shows its parts", () => {
     const done = page.locator('.day-review-item[data-open="false"] .day-review-state');
     await expect(open_).toHaveText("em aberto");
     await expect(done).toHaveText("concluída");
-    const [openBg, doneBg] = await Promise.all([
-      open_.evaluate((node) => getComputedStyle(node).backgroundColor),
-      done.evaluate((node) => getComputedStyle(node).backgroundColor),
+    // The word carries the state; the open one also takes the attention ink.
+    // (It was a tinted pill, and this compared the two washes.)
+    const [openInk, doneInk] = await Promise.all([
+      open_.evaluate((node) => getComputedStyle(node).color),
+      done.evaluate((node) => getComputedStyle(node).color),
     ]);
-    expect(openBg).not.toBe(doneBg);
+    expect(openInk).not.toBe(doneInk);
     // Both rows still carry every verb the taxonomy admits — the marker is a
     // label, never a capability gate.
     await expect(page.locator('.day-review-item[data-open="true"] .day-review-verb')).toHaveCount(5);
+  });
+
+  /*
+    Editorial calmo (ADR-180): reading the period's review, or asking for one,
+    is what the page is opened for — so that section follows the counts, ahead
+    of the four lists, and the schedule note closes the surface.
+  */
+  test("the period's written review comes before its lists, and the schedule note after them", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR", open: true })]));
+    const y = async (selector: string) => (await page.locator(selector).first().boundingBox())!.y;
+    const [synthesis, generated, firstList, schedule, history] = await Promise.all([
+      y(".day-review-synthesis"), y(".day-review-generated"), y(".day-review-section"), y(".day-review-schedule"), y(".reviews-history"),
+    ]);
+    expect(synthesis).toBeLessThan(generated);
+    expect(generated).toBeLessThan(firstList);
+    expect(firstList).toBeLessThan(schedule);
+    expect(schedule).toBeLessThan(history);
+  });
+
+  test("a written review's row is the link, named by its period", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR" })]));
+    const link = page.locator(".review-history-list").getByRole("link", { name: /Abrir revisão/ });
+    await expect(link).toHaveAttribute("href", "/pt-BR/app/reviews/r0");
+    await expect(link).toHaveAttribute("aria-label", /10\/08\/2026/);
+    const row = await page.locator(".review-history-list .review-row").boundingBox();
+    const box = await link.boundingBox();
+    // The link spans the row up to the state word, at a row's full height.
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+    expect(box!.width).toBeGreaterThan(row!.width * 0.6);
+  });
+
+  for (const width of [390, 320] as const) {
+    test(`Revisões fits ${width} CSS px, with full touch targets`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await open(page, reviewPage("pt-BR", [reviewRow({ locale: "pt-BR", open: true }), reviewRow({ locale: "pt-BR", open: false })]));
+      await noHorizontalScroll(page);
+      expect(await targetsUnder44(page)).toEqual([]);
+    });
+
+    test(`a review's own page fits ${width} CSS px, with full touch targets`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 844 });
+      await open(page, reviewDetailPage());
+      await noHorizontalScroll(page);
+      expect(await targetsUnder44(page)).toEqual([]);
+      // The technical details are closed at rest and open from the keyboard.
+      const technical = page.locator("details.review-detail-technical");
+      await expect(technical.locator("dl")).toBeHidden();
+      await technical.locator("summary").focus();
+      await page.keyboard.press("Enter");
+      await expect(technical.locator("dl")).toBeVisible();
+    });
+  }
+
+  test("a review's text is set in the reading face at full ink, inside the reading measure", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open(page, reviewDetailPage());
+    const text = await page.locator(".review-content p").first().evaluate((node) => {
+      const style = getComputedStyle(node);
+      const title = getComputedStyle(document.querySelector("h1")!);
+      return { ink: style.color, titleInk: title.color, width: node.getBoundingClientRect().width, size: parseFloat(style.fontSize) };
+    });
+    expect(text.ink).toBe(text.titleInk);
+    expect(text.width).toBeLessThanOrEqual(700);
+    expect(text.size).toBeGreaterThanOrEqual(17);
   });
 
   test("reflows at 320 CSS px with the counts intact", async ({ page }) => {

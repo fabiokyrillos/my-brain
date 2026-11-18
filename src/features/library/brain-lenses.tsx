@@ -30,7 +30,20 @@ import { BRAIN_LENSES, type BrainLensKey } from "./lenses";
  * expected key from each route file's own directory and fails on a mismatch. A
  * guard that reads the filesystem cannot drift the way a mount site can.
  */
-export function BrainLensTabs({ active, locale }: { active: BrainLensKey; locale: Locale }) {
+export function BrainLensTabs({
+  active,
+  locale,
+  quickCreate = true,
+}: {
+  active: BrainLensKey;
+  locale: Locale;
+  /**
+   * `false` where the surface mounts the organization form itself. The overview
+   * does: it places the form at its foot, so the strip is followed by what the
+   * Brain holds rather than by a control about one domain.
+   */
+  quickCreate?: boolean;
+}) {
   const copy = getLibraryCopy(locale);
   const messages = getMessages(locale);
   // `NavigationKey` is wider than the label record — `jobs` is context-only and
@@ -65,7 +78,7 @@ export function BrainLensTabs({ active, locale }: { active: BrainLensKey; locale
       header, which stays on the page it was used on. Not repeated on
       Organizações itself, whose header already offers it.
     */}
-    {active === "organizations" ? null : (
+    {active === "organizations" || !quickCreate ? null : (
       <div className="brain-quick-create">
         <EntityCreateForm action={createOrganization} kind="organization" locale={locale} />
       </div>

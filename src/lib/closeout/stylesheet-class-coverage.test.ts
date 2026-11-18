@@ -184,8 +184,15 @@ export function unstyledElements(source: string, defined: ReadonlySet<string>): 
    left the census: the detail's two column wrappers had only ever been reached
    through a descendant rule on one of them, and both now carry the `min-width:0`
    a grid child needs for a long unbroken value to wrap instead of widening the
-   page. */
-const RECORDED_UNSTYLED = 32;
+   page.
+
+   **32 -> 26, Memória and Revisões recomposed (ADR-180).** Six elements that no
+   rule reached left with the cards, wrappers and icons the recomposition
+   removed from the memory list, the memory page and the review rows. Nothing
+   was added to the census: the four classes the recomposition introduced
+   without a rule of their own (`memory-segment`, `review-detail-content`,
+   `day-review-page`, `day-review-promise`) each got one. */
+const RECORDED_UNSTYLED = 26;
 
 describe("no surface is drawn entirely by the user-agent default", () => {
   const defined = definedClasses();

@@ -855,32 +855,3 @@
   color: var(--text-secondary);
   font: var(--type-label);
 }
-
-/* Life Brain E.4 (ADR-172): Memórias by segment — a small heading with its
-   count over each segment's rows. */
-.memory-segments {
-  display: grid;
-  gap: var(--space-6);
-}
-
-.memory-segment {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.memory-segment-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  margin: 0 0 0 var(--space-1);
-  color: var(--text-muted);
-  font: var(--type-section);
-  letter-spacing: var(--eyebrow-tracking);
-  text-transform: uppercase;
-}
-
-.memory-segment-count {
-  color: var(--text-muted);
-  font: var(--type-caption);
-  letter-spacing: 0;
-}

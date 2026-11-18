@@ -1,6 +1,9 @@
+import { Search } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/ui";
+import { createOrganization } from "@/features/entities/actions";
+import { EntityCreateForm } from "@/features/entities/entity-create-form";
 import { BrainLensTabs } from "@/features/library/brain-lenses";
 import { getLibraryCopy } from "@/features/library/copy";
 import { loadAreaCounts, loadIdeas } from "@/features/areas/area-page";
@@ -20,10 +23,10 @@ import type { Locale } from "@/lib/preferences";
  *
  * ## What changed, and what deliberately did not
  *
- * This was a grid of eight doors with a number on each. It is now the **visão
- * geral** of a unified space: the lens strip that says Brain has parts and which
- * one you are in, and a panel per domain that says what is behind the door
- * rather than only that a door exists.
+ * This was a grid of eight doors with a number on each, then a grid of bordered
+ * panels. It is now the **visão geral** of a unified space as an index: search
+ * first, then one row per domain saying what is behind the door — its count
+ * and the latest things in it — rather than only that a door exists.
  *
  * **No new data model** (`2I-LIB-002`) and **no dashboard** (`2I-LIB-007`): the
  * counts are navigation aids — they tell you whether a door leads anywhere — the
@@ -40,8 +43,8 @@ import type { Locale } from "@/lib/preferences";
  *
  * Four of the five domains with a recency source have a detail route; `files`
  * has none. A list where four items open something and the fifth silently does
- * not is worse than one where none does, and the panel's own door is one line
- * above every row. The rows are here to answer *is my stuff in there*, which is
+ * not is worse than one where none does, and the row they sit in is itself the
+ * door to the domain. The rows are here to answer *is my stuff in there*, which is
  * what an overview owes and what `2I-LIB-003` allows.
  *
  * ## Sensitivity
@@ -92,25 +95,115 @@ export default async function LibraryPage({
 
   return (
     <div className="brain-page">
-      {/* Life Brain A.5: the shared compact header; the search link is its action. */}
-      <PageHeader
-        actions={(
-          <Link className="brain-search-link" href={`/${locale}/app/search`}>
-            {text.searchLink}
-          </Link>
-        )}
-        className="brain-head"
-        description={text.intro}
-        size="compact"
-        title={text.title}
-      />
+      {/*
+        Editorial calmo (ADR-180): the overview is for two things — finding
+        something the Brain holds, and seeing what it learned last. So the way
+        to look comes first, as the widest control on the page, and what follows
+        is an index of rows instead of a column of equal cards.
+      */}
+      <PageHeader className="brain-head" size="compact" title={text.title} />
 
-      <BrainLensTabs active="overview" locale={locale} />
+      <Link className="brain-search" href={`/${locale}/app/search`}>
+        <Search aria-hidden="true" size={18} />
+        {text.searchLink}
+      </Link>
 
       {/*
-        Life Brain A.5: Memória opens with the owner's areas of life — the
-        contexts the reading files records under (C.1). Doors, not a dashboard:
-        no count (see `life-areas.ts`), each one the area's own page.
+        The organization form leaves the strip on this one surface: under the
+        lenses it was the second thing the overview said, about one domain out
+        of seven. It is the page's last line here, same form and same action.
+      */}
+      <BrainLensTabs active="overview" locale={locale} quickCreate={false} />
+
+      {/*
+        One row per domain: its name, how much it holds, and the latest things
+        in it as the row's context. The whole row opens the domain — the name is
+        the link and its hit area is stretched over the row (`brain.css`), which
+        keeps the reveal control of a masked label a sibling of the anchor
+        rather than a button inside one.
+      */}
+      <section aria-labelledby="brain-holds-heading" className="brain-holds">
+        <h2 id="brain-holds-heading">{text.holdsHeading}</h2>
+        <ul className="brain-domains">
+          {domains.map((domain) => {
+            const surface = domain.recentSurface;
+            return (
+              <li className="brain-domain" key={domain.key}>
+                <div className="brain-domain-head">
+                  <h3>
+                    <Link href={domain.href}>{navLabels[domain.key]}</Link>
+                  </h3>
+                  {/*
+                    Three states, never two. A domain with no countable table
+                    shows nothing; one whose count failed says so; one that
+                    counted shows the figure. Collapsing the first two would
+                    report an outage for a domain that simply has no table.
+                  */}
+                  {domain.countSupported ? (
+                    domain.count === null ? (
+                      <span className="brain-domain-unavailable">{text.countUnavailable}</span>
+                    ) : (
+                      <span className="brain-domain-count">{domain.count}</span>
+                    )
+                  ) : null}
+                </div>
+                {domain.recencySupported ? (
+                  /*
+                    Three arms, not two. A failed read used to reach the
+                    `nothingYet` branch and print a positive claim about the
+                    owner's own data — the shape this surface refuses for the
+                    count and, until an independent review found it, did not
+                    refuse for the rows.
+                  */
+                  domain.recentFailed ? (
+                    <p className="brain-domain-quiet" role="note">{text.recentUnavailable}</p>
+                  ) : domain.recent.length ? (
+                    <ul className="brain-recent">
+                      {domain.recent.map((row) => (
+                        <li key={row.id}>
+                          {row.sensitivity && surface ? (
+                            /*
+                              No `describedAs`: the label IS the protected
+                              content here, and passing it would defeat the
+                              mask through the control's accessible name --
+                              the same call the Work list and the memory
+                              listing make.
+                            */
+                            <ProtectedContent
+                              locale={locale}
+                              revealKey={`brain-recent-${domain.key}-${row.id}`}
+                              sensitivity={row.sensitivity}
+                              surface={surface}
+                            >
+                              <span>{row.label}</span>
+                            </ProtectedContent>
+                          ) : (
+                            <span>{row.label}</span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="brain-domain-quiet">{text.nothingYet}</p>
+                  )
+                ) : (
+                  /*
+                    A domain with no recency source says what it is for. The
+                    sentence that used to stand here described the page ("no
+                    recent list here") instead of the domain.
+                  */
+                  <p className="brain-domain-quiet">{text.descriptions[domain.key]}</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </section>
+
+      {/*
+        Life Brain A.5: the owner's areas of life — the contexts the reading
+        files records under (C.1). Each is the area's own page; the count is
+        the timeline's own (C.4), absent when it could not be read.
       */}
       <section aria-labelledby="brain-areas-heading" className="brain-areas">
         <h2 id="brain-areas-heading">{text.areas.heading}</h2>
@@ -179,84 +272,9 @@ export default async function LibraryPage({
         )}
       </section>
 
-      <section className="brain-holds">
-        <h2>{text.holdsHeading}</h2>
-        <ul className="brain-domains">
-          {domains.map((domain) => {
-            const surface = domain.recentSurface;
-            return (
-              <li key={domain.key}>
-                <article className="brain-domain">
-                  <div className="brain-domain-head">
-                    <h3>
-                      <Link href={domain.href}>{navLabels[domain.key]}</Link>
-                    </h3>
-                    {/*
-                      Three states, never two. A domain with no countable table
-                      shows nothing; one whose count failed says so; one that
-                      counted shows the figure. Collapsing the first two would
-                      report an outage for Relações on every render.
-                    */}
-                    {domain.countSupported ? (
-                      domain.count === null ? (
-                        <span className="brain-domain-unavailable">{text.countUnavailable}</span>
-                      ) : (
-                        <span className="brain-domain-count">{domain.count}</span>
-                      )
-                    ) : null}
-                  </div>
-                  <p className="brain-domain-note">{text.descriptions[domain.key]}</p>
-                  {domain.recencySupported ? (
-                    /*
-                      Three arms, not two. A failed read used to reach the
-                      `nothingYet` branch and print a positive claim about the
-                      owner's own data — the shape this surface refuses for the
-                      count and, until an independent review found it, did not
-                      refuse for the rows.
-                    */
-                    domain.recentFailed ? (
-                      <p className="brain-domain-quiet" role="note">{text.recentUnavailable}</p>
-                    ) : domain.recent.length ? (
-                      <>
-                        <p className="brain-recent-label">{text.recentLabel}</p>
-                        <ul className="brain-recent">
-                          {domain.recent.map((row) => (
-                            <li key={row.id}>
-                              {row.sensitivity && surface ? (
-                                /*
-                                  No `describedAs`: the label IS the protected
-                                  content here, and passing it would defeat the
-                                  mask through the control's accessible name --
-                                  the same call the Work list and the memory
-                                  listing make.
-                                */
-                                <ProtectedContent
-                                  locale={locale}
-                                  revealKey={`brain-recent-${domain.key}-${row.id}`}
-                                  sensitivity={row.sensitivity}
-                                  surface={surface}
-                                >
-                                  <span>{row.label}</span>
-                                </ProtectedContent>
-                              ) : (
-                                <span>{row.label}</span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    ) : (
-                      <p className="brain-domain-quiet">{text.nothingYet}</p>
-                    )
-                  ) : (
-                    <p className="brain-domain-quiet">{text.noRecency}</p>
-                  )}
-                </article>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <div className="brain-page-foot">
+        <EntityCreateForm action={createOrganization} kind="organization" locale={locale} />
+      </div>
     </div>
   );
 }

@@ -103,6 +103,8 @@ test.describe("Brain's lenses are one space", () => {
     await signInOnline(page, { email: EMAIL, locale: "pt-BR", appOrigin: testInfo.project.use.baseURL });
 
     await page.goto("/pt-BR/app/library");
+    // A domain is a row now (ADR-180), still `.brain-domain` and still holding
+    // exactly one link — its name. NOT RUN since that change.
     const panels = page.locator(".brain-domain");
     // Eight domains, one panel each. A page that rendered none would satisfy
     // every per-panel assertion below by never running one.

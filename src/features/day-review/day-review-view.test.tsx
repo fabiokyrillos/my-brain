@@ -325,3 +325,76 @@ describe("2M-PRIVACY: every title goes through the protection component", () => 
     expect(screen.getByText("Task t1")).toBeTruthy();
   });
 });
+
+/*
+ * Editorial calmo (ADR-180) — the order the surface speaks in, and what a row is.
+ */
+describe("the surface opens on the period, then its review, then its lists", () => {
+  /** Document order of two nodes: true when `first` comes before `second`. */
+  const precedes = (first: Element, second: Element) =>
+    Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it("puts the written review and its generate control ahead of the four lists", () => {
+    mount({ planned: [item("t1")] });
+    const generated = screen.getByRole("region", { name: copy.generatedHeading("day") });
+    const synthesis = screen.getByRole("region", { name: copy.synthesis.heading("day") });
+    const completed = screen.getByRole("region", { name: copy.sections.completed });
+    expect(precedes(synthesis, generated)).toBe(true);
+    expect(precedes(generated, completed)).toBe(true);
+  });
+
+  it("closes with the schedule note, which carries the promise once", () => {
+    mount({ planned: [item("t1")] });
+    const schedule = screen.getByRole("region", { name: copy.schedule.heading });
+    const captured = screen.getByRole("region", { name: copy.sections.captured });
+    expect(precedes(captured, schedule)).toBe(true);
+    expect(within(schedule).getByText(copy.nothingScheduled)).toBeTruthy();
+    expect(screen.getAllByText(copy.nothingScheduled)).toHaveLength(1);
+  });
+
+  it("names the synthesis for assistive technology without drawing a heading over it", () => {
+    mount();
+    const heading = screen.getByRole("heading", { level: 3, name: copy.synthesis.heading("day") });
+    expect(heading.className).toContain("sr-only");
+  });
+
+  it("keeps the outline: the period is the only level-two heading here", () => {
+    mount({ planned: [item("t1")] });
+    expect(screen.getAllByRole("heading", { level: 2 }).map((node) => node.textContent)).toEqual([copy.title("day", "day")]);
+  });
+});
+
+describe("a task row is its title, a caption and one verb", () => {
+  it("makes the title the way to the task", () => {
+    // `href` on the protection component only linked the MASKED label, so an
+    // ordinary row named a task and led nowhere.
+    mount({ planned: [item("t1")] });
+    expect(screen.getByRole("link", { name: "Task t1" }).getAttribute("href")).toBe("/en/app/work/t1");
+  });
+
+  it("makes a capture's excerpt the way to the record", () => {
+    mount({
+      captured: [{ entryId: "e1", excerpt: "A thought", capturedAt: "2026-08-11T15:00:00.000Z", sensitivity: UNDETERMINED, href: "/en/app/inbox/e1" }],
+    } as Partial<DayReviewProjection>);
+    expect(screen.getByRole("link", { name: "A thought" }).getAttribute("href")).toBe("/en/app/inbox/e1");
+  });
+
+  it("says the state in words after the title, and the title first", () => {
+    const { container } = mount({ planned: [item("t1")] });
+    const row = container.querySelector(".day-review-item")!;
+    expect(row.getAttribute("data-open")).toBe("true");
+    const state = row.querySelector(".day-review-state")!;
+    expect(state.textContent).toBe(copy.synthesis.stateOpen);
+    const title = within(row as HTMLElement).getByRole("link", { name: "Task t1" });
+    expect(Boolean(title.compareDocumentPosition(state) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true);
+  });
+
+  it("keeps the verbs closed at rest, behind the row's one visible control", () => {
+    const { container } = mount({ planned: [item("t1")] });
+    const disclosure = container.querySelector<HTMLDetailsElement>("details.day-review-actions")!;
+    expect(disclosure.open).toBe(false);
+    expect(disclosure.querySelector("summary")!.textContent).toBe(copy.rowActions);
+    // Nothing was removed: every verb the status admits is inside it.
+    expect(disclosure.querySelectorAll(".day-review-verb")).toHaveLength(dayReviewVerbsFor("todo").length);
+  });
+});

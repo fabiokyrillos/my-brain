@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import { PageHeader } from "@/components/ui";
 import { generateReview } from "@/features/agent/actions";
 import { UniversalStateView } from "@/features/experience/universal-state";
 import { ReviewButton } from "@/features/agent/forms";
@@ -11,6 +11,7 @@ import { reviewPeriodWindow } from "@/features/day-review/period-window";
 import { DayReviewOpened } from "@/features/product-analytics/interaction-events";
 import { formatReviewPeriodRange } from "@/features/reviews/period-format";
 import { parseReviewTab, periodTypesFor, REVIEW_TABS } from "@/features/reviews/review-periods";
+import { ReviewRows } from "@/features/reviews/review-rows";
 import { ReviewTabs } from "@/features/reviews/review-tabs";
 import { loadReviewListProjection } from "@/features/reviews/review-list";
 import { PaginationLinks } from "@/features/shell/pagination-links";
@@ -157,11 +158,19 @@ export default async function ReviewsPage({
     */}
     {tab === "day" ? <DayReviewOpened locale={locale} scope={scope} /> : null}
 
-    <header className="reviews-header">
-      <p className="eyebrow">{pt ? "FECHAMENTO SOB DEMANDA" : "ON-DEMAND REVIEW"}</p>
-      <h1>{pt ? "Revisões" : "Reviews"}</h1>
-      <p className="reviews-lead">{pt ? "Gere uma revisão quando quiser; nada é executado por horário configurado." : "Generate a review when you choose; nothing runs from a configured schedule."}</p>
-    </header>
+    {/*
+      The page's name and its one promise. The eyebrow above the name said the
+      same thing as the sentence under it, and the day review repeated it a
+      third time in its own header; the sentence stays here, where
+      `phase-2m-inert-preferences-guard.test.ts` reads it in both locales, and
+      the day review says it once more only inside its schedule note.
+    */}
+    <PageHeader
+      className="reviews-header"
+      description={pt ? "Gere uma revisão quando quiser; nada é executado por horário configurado." : "Generate a review when you choose; nothing runs from a configured schedule."}
+      size="compact"
+      title={copy.pageTitle}
+    />
 
     {/*
       The tab strip — the page's primary navigation, immediately under its own
@@ -215,7 +224,8 @@ export default async function ReviewsPage({
 
     {/*
       Parte B. Below the current period, visually quieter, and holding only what
-      the owner's decision names: type, period, state, and "Abrir revisão".
+      the owner's decision names: type, period, state, and a way in — the row
+      itself, named "Abrir revisão" (`ReviewRows`).
 
       There is **no preview and no expander**. `ReviewBody` used to mount per row
       and disclose the summary inside the list; under OD-2J-1 every summary is
@@ -226,31 +236,13 @@ export default async function ReviewsPage({
     */}
     <section aria-labelledby="reviews-history" className="reviews-history">
       <h2 id="reviews-history">{copy.historyHeading(tab)}</h2>
-      <p className="reviews-history-lead">{copy.historyLead(tab)}</p>
       {items.length ? (
-        <ul className="review-history-list">
-          {items.map((review) => (
-            <li className="review-history-item" key={review.id}>
-              <div>
-                <span className="review-card-period">{review.periodLabel}</span>
-                <h3>{review.title}</h3>
-                <p className="review-card-range">{review.periodLabelRange}</p>
-              </div>
-              <span className="status-badge" data-tone={review.statusTone}>{review.statusLabel}</span>
-              {/* Named by period, for the reason the card above is: a list of
-                  links all called "Abrir revisão" is one a screen reader
-                  cannot tell apart. Structural labels only — never the
-                  review's words. */}
-              <Link
-                aria-label={`${copy.openReview}: ${review.periodLabel}, ${review.periodLabelRange}`}
-                className="review-open"
-                href={`/${locale}/app/reviews/${review.id}`}
-              >
-                {copy.openReview}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <ReviewRows
+          baseHref={`/${locale}/app/reviews`}
+          className="review-history-list"
+          openLabel={copy.openReview}
+          reviews={items}
+        />
       ) : (
         <UniversalStateView
           description={copy.historyEmptyDescription(tab)}

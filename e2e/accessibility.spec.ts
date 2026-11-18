@@ -330,10 +330,10 @@ function searchSurface() {
  * Brain since it entered the rail — which is what a hand-written mirror does when
  * nothing re-derives it, and is why the guard beside it now pins the strip too.
  *
- * Three panels rather than eight, and each covers a different arm: a counted
- * domain with recent rows, a counted domain that deliberately shows none, and an
- * uncountable one. A fixture with three identical panels would measure one case
- * three times.
+ * Three rows rather than seven, and each covers a different arm: a counted
+ * domain with recent labels, a counted domain with no recency source (it says
+ * what it is for), and one whose count could not be read. A fixture with three
+ * identical rows would measure one case three times.
  */
 function brainSurface() {
   /*
@@ -355,7 +355,6 @@ function brainSurface() {
     "Áreas da vida",
     "Memórias",
     "Arquivos",
-    "Relações",
   ];
   // Life Brain D.2: the strip sits in a frame that fades the edge hiding tabs.
   const strip = `<div class="brain-lenses-frame" data-overflow-start="false" data-overflow-end="true"><nav class="brain-lenses" aria-label="Lentes do Brain">`
@@ -367,40 +366,38 @@ function brainSurface() {
       .join("")
     + `</nav></div>`;
 
+  // Editorial calmo (ADR-180): a domain is a row — its name (the link, its hit
+  // area stretched over the row), its count and one line of context.
   const panels = [
-    `<li><article class="brain-domain"><div class="brain-domain-head">`
+    `<li class="brain-domain"><div class="brain-domain-head">`
       + `<h3><a href="#">Pessoas</a></h3><span class="brain-domain-count">12</span></div>`
-      + `<p class="brain-domain-note">Quem faz parte da sua vida.</p>`
-      + `<p class="brain-recent-label">Recentes</p>`
       + `<ul class="brain-recent"><li><span>Marina Duarte</span></li>`
-      + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar o painel vizinho</span></li>`
-      + `</ul></article></li>`,
-    `<li><article class="brain-domain"><div class="brain-domain-head">`
+      + `<li><span>Um nome muito comprido que precisa ser cortado sem empurrar a linha vizinha para fora da tela</span></li>`
+      + `</ul></li>`,
+    `<li class="brain-domain"><div class="brain-domain-head">`
       + `<h3><a href="#">Áreas da vida</a></h3><span class="brain-domain-count">3</span></div>`
-      + `<p class="brain-domain-note">Áreas da sua vida.</p>`
-      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
-    `<li><article class="brain-domain"><div class="brain-domain-head">`
-      + `<h3><a href="#">Relações</a></h3></div>`
-      + `<p class="brain-domain-note">Como essas coisas se ligam.</p>`
-      + `<p class="brain-domain-quiet">Sem lista recente por aqui.</p></article></li>`,
+      + `<p class="brain-domain-quiet">Áreas da sua vida.</p></li>`,
+    `<li class="brain-domain"><div class="brain-domain-head">`
+      + `<h3><a href="#">Arquivos</a></h3><span class="brain-domain-unavailable">Não foi possível contar agora.</span></div>`
+      + `<p class="brain-domain-quiet">Nada aqui ainda.</p></li>`,
   ];
 
-  // Life Brain A.5: the shared compact header, and the areas of life above the
-  // domain panels (mirrors `library/page.tsx`).
+  // Mirrors `library/page.tsx`: the compact header, search as the first
+  // control, the strip, the index of domains, then the areas and the ideas.
   return `<div class="brain-page"><header class="ui-page-header ui-page-header--compact brain-head">`
-    + `<div class="ui-page-header__text"><h1 class="ui-page-header__title">Memória</h1>`
-    + `<p class="ui-page-header__description">Tudo que o Brain sabe sobre o seu mundo, em um lugar só.</p></div>`
-    + `<div class="ui-page-header__actions"><a class="brain-search-link" href="#">Buscar em tudo</a></div></header>`
+    + `<div class="ui-page-header__text"><h1 class="ui-page-header__title">Memória</h1></div></header>`
+    + `<a class="brain-search" href="#"><svg aria-hidden="true" width="18" height="18"></svg>Buscar em tudo</a>`
     + strip
+    + `<section aria-labelledby="brain-holds-heading" class="brain-holds"><h2 id="brain-holds-heading">O que o Brain guarda</h2>`
+    + `<ul class="brain-domains">${panels.join("")}</ul></section>`
     + `<section aria-labelledby="brain-areas-heading" class="brain-areas"><h2 id="brain-areas-heading">Áreas da vida</h2>`
     + `<ul class="brain-area-list"><li><a class="brain-area" href="#"><span class="brain-area-name">Saúde</span><span class="brain-area-count">12 registros</span></a></li>`
-    + `<li><a class="brain-area" href="#"><span class="brain-area-name">Terapia</span><span class="brain-area-kind">Saúde</span></a></li>`
+    + `<li><a class="brain-area" href="#"><span class="brain-area-name">Terapia</span><span class="brain-area-kind">Saúde</span><span class="brain-area-count">200+ registros</span></a></li>`
     + `<li><a class="brain-area" href="#"><span class="brain-area-name">Viagens</span></a></li></ul>`
     + `<p class="brain-areas-foot"><a class="brain-areas-all" href="#">Ver todas as áreas</a></p></section>`
     + `<section aria-labelledby="brain-ideas-heading" class="brain-areas brain-ideas"><h2 id="brain-ideas-heading">Ideias</h2>`
     + `<ul class="brain-ideas-list"><li><a href="#">E se a horta fosse no telhado?</a><span class="brain-idea-date">3 de nov.</span></li></ul></section>`
-    + `<section class="brain-holds"><h2>O que o Brain guarda</h2>`
-    + `<ul class="brain-domains">${panels.join("")}</ul></section></div>`;
+    + `<div class="brain-page-foot"><div class="entity-edit entity-create"><button class="entity-edit-open" type="button">Nova organização</button></div></div></div>`;
 }
 
 /**
@@ -1583,9 +1580,14 @@ test.describe("the entity workspace reads as one template", () => {
 
 /** Mirrors the conflict block in `src/app/[locale]/app/memories/[memoryId]/page.tsx`. */
 function memoryConflict() {
+  // Editorial calmo (ADR-180): the memory's sentence at reading size, one line
+  // saying whether it is in use, the conflict, then the facts as rows, the two
+  // verbs, the origin, and the changes and the deletion quiet at the foot.
   return `<div class="content-page entity-detail memory-detail">`
-    + `<header class="entity-hero"><div><p class="eyebrow">PREFERÊNCIA</p>`
-    + `<h1 class="memory-content-heading">Prefere reuniões pela manhã.</h1></div></header>`
+    + `<a class="back-link" href="#">Memórias</a>`
+    + `<header class="entity-hero memory-hero"><div><p class="eyebrow">PREFERÊNCIA</p>`
+    + `<h1 class="memory-content-heading">Prefere reuniões pela manhã.</h1>`
+    + `<p class="memory-retrieval-line" data-memory-state="archived">Arquivada: não é mais usada nas respostas.</p></div></header>`
     + `<section class="memory-conflict" data-memory-conflict="true" role="note">`
     + `<h2>Informações que não podem estar certas ao mesmo tempo</h2>`
     + `<dl class="conflict-dates">`
@@ -1595,7 +1597,51 @@ function memoryConflict() {
     + `<p>As duas datas foram preservadas exatamente como estavam. Escolher uma delas por conta própria`
     + ` seria inventar o que você quis dizer.</p>`
     + `<p>Abra a memória e remova a data de término para desfazer a contradição.</p>`
-    + `</section></div>`;
+    + `</section>`
+    + `<section aria-labelledby="memory-facts-heading" class="memory-section"><h2 id="memory-facts-heading">Detalhes</h2>`
+    + `<dl class="memory-facts">`
+    + `<div><dt>Pessoa</dt><dd><a href="#">Marina Duarte</a></dd></div>`
+    + `<div><dt>Vale desde</dt><dd>12 de agosto de 2026, 09:00</dd></div>`
+    + `<div><dt>Vale até</dt><dd>3 de março de 2026, 09:00</dd></div>`
+    + `<div><dt>Registrada em</dt><dd>1 de agosto de 2026, 10:00</dd></div></dl>`
+    + `<div class="entity-edit memory-controls"><button class="entity-edit-open" type="button">Editar</button>`
+    + `<form class="memory-lifecycle"><button class="memory-lifecycle-button" type="submit">Reativar</button>`
+    + `<small class="memory-lifecycle-hint">Arquivar encerra a validade e tira a memória das respostas. Nada é apagado.</small></form></div></section>`
+    + `<section aria-labelledby="memory-origin-heading" class="memory-section memory-origin"><h2 id="memory-origin-heading">Origem</h2>`
+    + `<figure class="memory-origin-source"><blockquote>Prefiro reunião de manhã, antes das dez.</blockquote>`
+    + `<figcaption>1 de agosto de 2026, 09:55</figcaption></figure>`
+    + `<p class="provenance-note" data-provenance="sourced"><span class="provenance-label">Origem</span>`
+    + `<a aria-label="Abrir o registro de origem da memória 1" href="#">De um registro seu</a></p></section>`
+    + `<section class="entity-changes" id="changes"><details class="entity-changes-disclosure">`
+    + `<summary><h2>O que mudou recentemente</h2></summary><p class="section-explainer">Vem do registro de alterações.</p></details></section>`
+    + `<section class="entity-danger-zone"><button class="button button-danger" type="button">Excluir esta memória</button></section>`
+    + `</div>`;
+}
+
+/**
+ * Mirrors the rows of `src/app/[locale]/app/memories/page.tsx`: a segment
+ * heading over its memories, each a sentence that is the link, over one caption
+ * line; and the mental-model account collapsed at the foot.
+ */
+function memoryList() {
+  const row = (text: string, foot: string) => `<li class="memory-row"><a class="memory-row-title" href="#">${text}</a>`
+    + `<div class="memory-row-foot">${foot}</div></li>`;
+  const sourced = `<p class="provenance-note" data-provenance="sourced"><span class="provenance-label">Origem</span>`
+    + `<a aria-label="Abrir o registro de origem da memória 1" href="#">De um registro seu</a></p>`;
+  const unsourced = `<p class="provenance-note" data-provenance="unsourced"><span class="provenance-label">Origem</span><span>Origem não registrada</span></p>`;
+  return `<div class="content-page"><header class="ui-page-header ui-page-header--compact list-page-header">`
+    + `<div class="ui-page-header__text"><h1 class="ui-page-header__title">Memórias</h1></div></header>`
+    + `<div aria-label="Memórias por segmento" class="memory-segments" role="group">`
+    + `<section aria-labelledby="memory-segment-health" class="memory-segment">`
+    + `<h2 class="memory-segment-title" id="memory-segment-health">Saúde<span class="memory-segment-count">2</span></h2>`
+    + `<ul class="memory-list">`
+    + row("Tenho alergia a dipirona; qualquer receita deve evitar esse princípio ativo, inclusive em associações.",
+      `<span class="memory-row-important">Importante</span><span>Restrição</span>${sourced}`)
+    + row("Usava o plano de saúde antigo até trocar de emprego.",
+      `<span class="memory-state memory-state-archived">Arquivada</span><span>Fato</span><span class="memory-related-hint">Pessoa</span>${unsourced}`)
+    + `</ul></section></div>`
+    + `<details class="memory-explainer"><summary>O que é uma memória?</summary>`
+    + `<p>Uma memória é um fato ou preferência sua que permanece verdadeiro ao longo do tempo.</p></details></div>`;
 }
 
 test.describe("a memory in conflict says so on its own page", () => {
@@ -1639,6 +1685,101 @@ test.describe("a memory in conflict says so on its own page", () => {
     test(`axe is clean on the conflict block in ${theme}`, async ({ page }) => {
       await page.setViewportSize({ width: 1440, height: 900 });
       await render(page, memoryConflict(), { reducedMotion: true, theme });
+      expect(await axeViolations(page)).toEqual([]);
+    });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Memória, recomposed (ADR-180): rows, not cards — and still a phone page.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The three Memória surfaces the editorial recomposition rebuilt. Each is
+ * measured at the two phone widths the owner's device and the reflow floor
+ * give: nothing wider than the screen, and nothing a thumb must hit under 44px.
+ *
+ * A closed `<details>` hides its content, so only what is on screen at rest is
+ * measured — which is the state the page opens in.
+ */
+const MEMORIA_SURFACES = [
+  { name: "the overview", body: () => brainSurface() },
+  { name: "the memories list", body: () => memoryList() },
+  { name: "a memory's page", body: () => memoryConflict() },
+] as const;
+
+test.describe("Memória is an index of rows on a phone", () => {
+  for (const surface of MEMORIA_SURFACES) {
+    for (const width of [390, 320] as const) {
+      test(`${surface.name} fits ${width} CSS px, with full touch targets`, async ({ page }) => {
+        await page.setViewportSize({ width, height: 844 });
+        await render(page, surface.body());
+
+        const overflow = await page.evaluate(() =>
+          document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        expect(overflow, "the page scrolls sideways").toBeLessThanOrEqual(1);
+
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll<HTMLElement>("a, button, summary")]
+            .filter((node) => node.getClientRects().length > 0)
+            .map((node) => ({ text: (node.textContent ?? "").trim().slice(0, 24), height: Math.round(node.getBoundingClientRect().height) }))
+            .filter((target) => target.height < 44));
+        expect(small, "targets under 44px").toEqual([]);
+      });
+    }
+  }
+
+  test("a domain's whole row opens it, and the recent labels do not take the click", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await render(page, brainSurface());
+    const reach = await page.evaluate(() => {
+      const row = document.querySelector<HTMLElement>(".brain-domain")!;
+      const link = row.querySelector<HTMLElement>("h3 a")!;
+      const recent = row.querySelector<HTMLElement>(".brain-recent")!.getBoundingClientRect();
+      // What a tap in the middle of the context line actually lands on.
+      const hit = document.elementFromPoint(recent.left + 20, recent.top + recent.height / 2);
+      return { landsOnLink: hit === link, oneLine: recent.height < 30 };
+    });
+    expect(reach.landsOnLink).toBe(true);
+    // The long label is clipped to the row's one line rather than growing it.
+    expect(reach.oneLine).toBe(true);
+  });
+
+  test("a memory's row opens it, while its source link keeps its own destination", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await render(page, memoryList());
+    const reach = await page.evaluate(() => {
+      const row = document.querySelector<HTMLElement>(".memory-row")!;
+      const title = row.querySelector<HTMLElement>(".memory-row-title")!;
+      const foot = row.querySelector<HTMLElement>(".memory-row-foot")!.getBoundingClientRect();
+      const source = row.querySelector<HTMLElement>(".provenance-note a")!;
+      const sourceBox = source.getBoundingClientRect();
+      return {
+        captionLandsOnTitle: document.elementFromPoint(foot.left + 4, foot.top + foot.height / 2) === title,
+        sourceLandsOnSource: document.elementFromPoint(sourceBox.left + sourceBox.width / 2, sourceBox.top + sourceBox.height / 2) === source,
+      };
+    });
+    expect(reach).toEqual({ captionLandsOnTitle: true, sourceLandsOnSource: true });
+  });
+
+  test("the mental-model account and the changes are closed at rest, and open from the keyboard", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await render(page, memoryList());
+    const explainer = page.locator("details.memory-explainer");
+    await expect(explainer).not.toHaveAttribute("open", "");
+    await explainer.locator("summary").focus();
+    await page.keyboard.press("Enter");
+    await expect(explainer).toHaveAttribute("open", "");
+    await expect(explainer.locator("p")).toBeVisible();
+
+    await render(page, memoryConflict());
+    await expect(page.locator("details.entity-changes-disclosure")).not.toHaveAttribute("open", "");
+  });
+
+  for (const theme of ["light", "dark"] as const) {
+    test(`axe is clean on the memories list in ${theme}`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await render(page, memoryList(), { reducedMotion: true, theme });
       expect(await axeViolations(page)).toEqual([]);
     });
   }

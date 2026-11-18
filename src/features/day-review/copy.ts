@@ -16,9 +16,9 @@ import type { DayReviewActionKind, DayReviewSource } from "./contracts";
 export type DayReviewLocale = "pt-BR" | "en";
 
 export type DayReviewCopy = {
-  readonly eyebrow: (tab: ReviewTab) => string;
+  /** The name of `/app/reviews` itself, above the tab strip. */
+  readonly pageTitle: string;
   readonly title: (scope: "day" | "next_day", tab: ReviewTab) => string;
-  readonly description: (scope: "day" | "next_day", tab: ReviewTab) => string;
   /** `2M-REVIEW-007`. The promise, restated on this surface, in both locales. */
   readonly nothingScheduled: string;
   readonly scopeLabel: string;
@@ -77,7 +77,6 @@ export type DayReviewCopy = {
   readonly tabs: Readonly<Record<ReviewTab, string>>;
   /** Part B's heading, naming the kind of review it lists. */
   readonly historyHeading: (tab: ReviewTab) => string;
-  readonly historyLead: (tab: ReviewTab) => string;
   readonly historyEmptyTitle: (tab: ReviewTab) => string;
   readonly historyEmptyDescription: (tab: ReviewTab) => string;
   /** The generate controls, above the current period's reviews. */
@@ -119,18 +118,11 @@ const PT_IN: Record<ReviewTab, string> = { day: "neste dia", week: "nesta semana
 const PT_THIS: Record<ReviewTab, string> = { day: "este dia", week: "esta semana", month: "este mês" };
 
 const PT_BR: DayReviewCopy = {
-  eyebrow: (tab) => (tab === "day" ? "FECHAMENTO DO DIA" : tab === "week" ? "FECHAMENTO DA SEMANA" : "FECHAMENTO DO MÊS"),
+  pageTitle: "Revisões",
   title: (scope, tab) => {
     if (tab === "week") return "Esta semana";
     if (tab === "month") return "Este mês";
     return scope === "day" ? "Hoje" : "Amanhã";
-  },
-  description: (scope, tab) => {
-    if (tab === "week") return "O que esta semana realmente conteve, montado a partir dos seus próprios registros.";
-    if (tab === "month") return "O que este mês realmente conteve, montado a partir dos seus próprios registros.";
-    return scope === "day"
-      ? "O que este dia realmente conteve, montado a partir dos seus próprios registros."
-      : "O que já está comprometido e o que você pretende para amanhã.";
   },
   nothingScheduled: "Nada é executado por horário configurado; esta revisão só existe quando você a abre.",
   scopeLabel: "Dia da revisão",
@@ -184,11 +176,6 @@ const PT_BR: DayReviewCopy = {
   tabsLabel: "Período",
   tabs: { day: "Dia", week: "Semana", month: "Mês" },
   historyHeading: (tab) => (tab === "day" ? "Dias anteriores" : tab === "week" ? "Semanas anteriores" : "Meses anteriores"),
-  historyLead: (tab) => (tab === "day"
-    ? "Revisões diárias que você já gerou."
-    : tab === "week"
-      ? "Revisões e planejamentos semanais que você já gerou."
-      : "Revisões mensais que você já gerou."),
   historyEmptyTitle: (tab) => (tab === "day" ? "Nenhum dia anterior" : tab === "week" ? "Nenhuma semana anterior" : "Nenhum mês anterior"),
   historyEmptyDescription: () => "Cada revisão que você gerar aparece aqui depois que o período passa.",
   generateLead: "Cada botão pede ao Brain uma síntese escrita deste período. Nada roda sozinho — e gerar uma revisão não altera nada.",
@@ -208,18 +195,11 @@ const EN_IN: Record<ReviewTab, string> = { day: "on this day", week: "this week"
 const EN_THIS: Record<ReviewTab, string> = { day: "this day", week: "this week", month: "this month" };
 
 const EN: DayReviewCopy = {
-  eyebrow: (tab) => (tab === "day" ? "CLOSING THE DAY" : tab === "week" ? "CLOSING THE WEEK" : "CLOSING THE MONTH"),
+  pageTitle: "Reviews",
   title: (scope, tab) => {
     if (tab === "week") return "This week";
     if (tab === "month") return "This month";
     return scope === "day" ? "Today" : "Tomorrow";
-  },
-  description: (scope, tab) => {
-    if (tab === "week") return "What this week actually contained, composed from your own records.";
-    if (tab === "month") return "What this month actually contained, composed from your own records.";
-    return scope === "day"
-      ? "What this day actually contained, composed from your own records."
-      : "What is already committed and what you intend for tomorrow.";
   },
   nothingScheduled: "Nothing runs from a configured schedule; this review exists only when you open it.",
   scopeLabel: "Review day",
@@ -273,11 +253,6 @@ const EN: DayReviewCopy = {
   tabsLabel: "Period",
   tabs: { day: "Day", week: "Week", month: "Month" },
   historyHeading: (tab) => (tab === "day" ? "Previous days" : tab === "week" ? "Previous weeks" : "Previous months"),
-  historyLead: (tab) => (tab === "day"
-    ? "Daily reviews you have already generated."
-    : tab === "week"
-      ? "Weekly reviews and plans you have already generated."
-      : "Monthly reviews you have already generated."),
   historyEmptyTitle: (tab) => (tab === "day" ? "No previous day" : tab === "week" ? "No previous week" : "No previous month"),
   historyEmptyDescription: () => "Every review you generate appears here once its period has passed.",
   generateLead: "Each button asks Brain to write up this period. Nothing runs on its own, and generating a review changes nothing.",
