@@ -525,8 +525,15 @@ function conversationResumed() {
  * the difference it exists to protect.
  */
 function conversationSources() {
+  // Editorial calmo: the sources and the reach are behind closed disclosures in
+  // the product. Rendered **open** here, for the reason the explanation panel
+  // below is: axe cannot scan what is not in the accessibility tree.
+  const reach = `<details class="conversation-sources-where" open><summary>Onde procurei</summary>`
+    + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
+    + `</details>`;
   const evidenced = `<div class="conversation-sources" data-evidence="evidenced">`
-    + `<strong class="conversation-sources-title sr-only">O que eu usei</strong>`
+    + `<details class="conversation-sources-used" open><summary>`
+    + `<span class="conversation-sources-title sr-only">O que eu usei: </span>2 fontes</summary>`
     + `<ul class="conversation-sources-list"><li data-support="direct_record">`
     + `<a class="conversation-source-chip" href="#">`
     + `<span class="conversation-source-support sr-only">Você escreveu isto: </span>`
@@ -537,13 +544,13 @@ function conversationSources() {
     + `<span class="conversation-source-chip" data-unavailable="">`
     + `<span class="conversation-source-support sr-only">O que eu guardo como verdadeiro: </span>`
     + `<span class="conversation-source-type">Memória · Isto não está mais disponível para você</span></span>`
-    + `</li></ul>`
-    + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
+    + `</li></ul></details>`
+    + reach
     + `</div>`;
   const insufficient = `<div class="conversation-sources" data-evidence="insufficient">`
     + `<p class="conversation-sources-insufficient">Não encontrei nada seu sobre isso.`
     + ` O que respondi acima não vem dos seus registros nem das suas memórias.</p>`
-    + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias — só nesses dois lugares.</p>`
+    + reach
     + `</div>`;
   return `<section aria-label="Fontes da resposta">`
     + `<div class="message-sources">${evidenced}</div>`
@@ -1365,18 +1372,27 @@ function CHAT_TRANSCRIPT() {
   const message = (role: "user" | "assistant", body: string, id: string) =>
     `<article class="chat-message ${role}" data-role="${role}" id="${id}">`
     + `<p class="chat-message-meta"><span class="chat-message-speaker">${role === "user" ? "Você" : "Brain"}</span>`
-    + `<time datetime="2026-08-15T12:00:00.000Z">15 de ago., 09:00</time></p>`
-    + `<p class="chat-message-body">${body}</p>`
+    + `<time datetime="2026-08-15T12:00:00.000Z">09:00</time></p>`
+    + `<div class="chat-message-body"><p>${body}</p></div>`
+    // Editorial calmo: the sources and the model are filed behind closed
+    // disclosures under the answer (`source-list.tsx`, and the thread's own
+    // `chat-message-model`).
     + (role === "assistant"
-      ? `<div class="message-sources"><strong>O que eu usei</strong>`
-        + `<a href="/pt-BR/app/inbox/e1">Você escreveu isto em 12 de agosto</a></div>`
-        + `<small>gpt-5-mini</small>`
+      ? `<div class="message-sources"><div class="conversation-sources" data-evidence="evidenced">`
+        + `<details class="conversation-sources-used"><summary>1 fonte</summary>`
+        + `<ul class="conversation-sources-list"><li data-support="direct_record">`
+        + `<a class="conversation-source-chip" href="/pt-BR/app/inbox/e1">Registro · 12 de ago. de 2026</a></li></ul></details>`
+        + `<details class="conversation-sources-where"><summary>Onde procurei</summary>`
+        + `<p class="conversation-sources-reach">Procurei nos seus registros e nas suas memórias.</p>`
+        + `<p class="chat-message-model">Modelo: gpt-5-mini</p></details>`
+        + `</div></div>`
       : "")
     + `</article>`;
   return `<div class="content-page chat-thread">`
     + `<a class="back-link" href="#">Conversas</a>`
     + `<header><p class="eyebrow">BRAIN COM FONTES</p><h1>Contrato da Aurora</h1></header>`
     + `<div class="message-stream">`
+    + `<p class="chat-day"><time datetime="2026-08-15T12:00:00.000Z">15 de ago. de 2026</time></p>`
     + message("user", "O que a Marina disse sobre o contrato da Aurora?", "message-1")
     + message("assistant", "Você registrou em 12 de agosto que ela pediu a cláusula de rescisão revisada.", "message-2")
     + `</div></div>`;
@@ -1454,7 +1470,11 @@ test.describe("Conversar reads as a transcript, not as a chat log", () => {
 
     const assistant = page.locator('.chat-message[data-role="assistant"]');
     await expect(assistant.locator(".message-sources a")).toHaveAttribute("href", "/pt-BR/app/inbox/e1");
-    await expect(assistant.locator("small")).toHaveText("gpt-5-mini");
+    // Editorial calmo: the model is bookkeeping, filed behind "Onde procurei"
+    // rather than drawn under every answer — still in the document.
+    await expect(assistant.locator(".conversation-sources-where .chat-message-model")).toHaveText("Modelo: gpt-5-mini");
+    await expect(assistant.locator(".conversation-sources-where")).not.toHaveAttribute("open", "");
+    await expect(assistant.locator(".chat-message-model")).toBeHidden();
     // A user turn cites nothing, because it asserted nothing.
     await expect(page.locator('.chat-message[data-role="user"] .message-sources')).toHaveCount(0);
   });
@@ -1464,6 +1484,9 @@ test.describe("Conversar reads as a transcript, not as a chat log", () => {
     await render(page, CHAT_TRANSCRIPT());
 
     await expect(page.locator(".chat-message time")).toHaveCount(2);
+    // Editorial calmo: the day is said once, above the first turn of it.
+    await expect(page.locator(".message-stream > .chat-day time")).toHaveCount(1);
+    await expect(page.locator(".message-stream > .chat-day")).toBeVisible();
   });
 
   test("reflows at 320 CSS px with no horizontal scroll", async ({ page }) => {

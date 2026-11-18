@@ -79,6 +79,61 @@ describe("2K-SRC-001/003: every rendered source names what it is and links to it
   });
 });
 
+describe("Editorial calmo: the block is one quiet line of closed disclosures", () => {
+  it("files the sources behind a closed line that says how many there are", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource, { ...entrySource, key: "entry:2" }]} />,
+    );
+    const used = container.querySelector("details.conversation-sources-used");
+    expect(used).not.toBeNull();
+    expect(used).not.toHaveAttribute("open");
+    expect(used?.querySelector("summary")?.textContent).toBe(`${copy.title}: ${copy.sourcesSummary(2)}`);
+    // Each source is a row of that list, and the row is the link.
+    expect(used?.querySelectorAll(".conversation-sources-list > li > a")).toHaveLength(2);
+  });
+
+  it("says one source in the singular, in both locales", () => {
+    expect(copy.sourcesSummary(1)).toBe("1 fonte");
+    expect(getConversationSourcesCopy("en").sourcesSummary(1)).toBe("1 source");
+    expect(getConversationSourcesCopy("en").sourcesSummary(3)).toBe("3 sources");
+  });
+
+  it("files the reach sentence, and what the host adds, behind a closed line of its own", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={evidenced} locale="pt-BR" sources={[entrySource]}>
+        <p>Modelo: gpt-5-mini</p>
+      </SourceList>,
+    );
+    const where = container.querySelector("details.conversation-sources-where");
+    expect(where).not.toHaveAttribute("open");
+    expect(where?.querySelector("summary")?.textContent).toBe(copy.reachSummary);
+    expect(where?.textContent).toContain(copy.reach);
+    expect(where?.textContent).toContain("Modelo: gpt-5-mini");
+  });
+
+  it("draws no sources line when retrieval found something and the answer cited none", () => {
+    const { container } = render(
+      <SourceList timeZone={OWNER_TIME_ZONE} citations={{ ...evidenced, sources: [] }} locale="pt-BR" sources={[]} />,
+    );
+    expect(container.querySelector(".conversation-sources-used")).toBeNull();
+    expect(container.querySelector(".conversation-sources-where")).not.toBeNull();
+  });
+
+  it("keeps the honest \"I had nothing\" in the open, never behind a disclosure", () => {
+    const { container } = render(
+      <SourceList
+        timeZone={OWNER_TIME_ZONE}
+        citations={{ evidence: "no_qualifying_evidence", reach: ["entry", "memory"], sources: [], explanation: null, legacy: false }}
+        locale="pt-BR"
+        sources={[]}
+      />,
+    );
+    const sentence = container.querySelector(".conversation-sources-insufficient");
+    expect(sentence?.textContent).toBe(copy.insufficient);
+    expect(sentence?.closest("details")).toBeNull();
+  });
+});
+
 describe("2K-SRC-004: freshness renders, and is absent rather than fabricated", () => {
   it("renders the date the source is from, as a machine-readable instant", () => {
     const { container } = render(

@@ -157,6 +157,7 @@ test.describe("BYOK Settings credential journey", () => {
         await expect(byok.getByText(text.costs)).toBeVisible();
 
         // ---- no reveal control, no prefill ----------------------------
+        await openKeyRow(byok);
         const field = byok.getByLabel(text.fieldLabel);
         await expect(field).toHaveAttribute("type", "password");
         await expect(field).toHaveValue("");
@@ -197,6 +198,7 @@ test.describe("BYOK Settings credential journey", () => {
 
         // ---- an invalid candidate preserves the active credential -----
         await page.reload();
+        await openKeyRow(panel(page));
         await panel(page).getByLabel(text.fieldLabel).fill("sk-proj-thiskeyisnotrealatall000000");
         await panel(page).getByRole("button", { name: text.rotate }).click();
         await expect(panel(page).getByRole("status")).toHaveText(text.invalidKey, {
@@ -212,6 +214,7 @@ test.describe("BYOK Settings credential journey", () => {
 
         // ---- successful replacement -----------------------------------
         await page.reload();
+        await openKeyRow(panel(page));
         await panel(page).getByLabel(text.fieldLabel).fill(keyB!);
         await panel(page).getByRole("button", { name: text.rotate }).click();
         await expect(panel(page).getByRole("status")).toHaveText(text.rotated, {
@@ -243,6 +246,7 @@ test.describe("BYOK Settings credential journey", () => {
 
         // ---- reconfiguration restores it ------------------------------
         await page.reload();
+        await openKeyRow(panel(page));
         await panel(page).getByLabel(text.fieldLabel).fill(keyA!);
         await panel(page).getByRole("button", { name: text.save }).click();
         await expect(panel(page).getByRole("status")).toHaveText(text.saved, {
@@ -252,6 +256,7 @@ test.describe("BYOK Settings credential journey", () => {
 
         // ---- keyboard reachability and responsive layout --------------
         await page.reload();
+        await openKeyRow(panel(page));
         const keyInput = panel(page).getByLabel(text.fieldLabel);
         await keyInput.focus();
         await expect(keyInput).toBeFocused();
@@ -270,3 +275,12 @@ test.describe("BYOK Settings credential journey", () => {
     });
   }
 });
+
+/**
+ * Editorial calmo (ADR-180): with a working key, the key form waits behind the
+ * key's row ("Alterar"). Without one the row arrives open, so this is a no-op.
+ */
+async function openKeyRow(scope: { locator(selector: string): import("@playwright/test").Locator }): Promise<void> {
+  const closed = scope.locator("details.byok-key:not([open]) > summary");
+  if ((await closed.count()) > 0) await closed.click();
+}

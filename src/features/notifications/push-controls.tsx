@@ -51,6 +51,9 @@ import {
   type NotificationFrequency,
   type NotificationType,
 } from "./consent-contract";
+import { getSettingsCopy } from "@/features/settings/copy";
+import { SettingFact } from "@/features/settings/setting-fact";
+
 import { getNotificationSettingsCopy } from "./copy";
 import {
   reconcileDeviceDelivery,
@@ -126,6 +129,17 @@ export function PushControls(props: PushControlsProps) {
   const [quietEnd, setQuietEnd] = useState(props.quietEnd);
   const [dailyCap, setDailyCap] = useState(props.dailyCap);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Which control the notice answers, so it is drawn beside that control. */
+  const [noticeFor, setNoticeFor] = useState<"consent" | "preferences">("consent");
+  /** What the closed preferences row states: the values last known to be stored. */
+  const [saved, setSaved] = useState({
+    types: props.enabledTypes,
+    frequency: props.frequency,
+    quietStart: props.quietStart,
+    quietEnd: props.quietEnd,
+    dailyCap: props.dailyCap,
+  });
+  const settingsCopy = getSettingsCopy(props.locale);
   const [pending, startTransition] = useTransition();
   const [device, setDevice] = useState<DeviceDeliveryFacts>(unreadDeviceFacts);
 
@@ -168,6 +182,7 @@ export function PushControls(props: PushControlsProps) {
 
   async function enable() {
     setNotice(null);
+    setNoticeFor("consent");
     if (!pushIsAvailable()) {
       // Reported so the state is recorded rather than inferred from silence,
       // and so `denied` and `unsupported` stay the distinguishable pair
@@ -211,6 +226,7 @@ export function PushControls(props: PushControlsProps) {
       setState(result.state);
       setTypes(notificationTypes);
       setFrequency("immediate");
+      setSaved((previous) => ({ ...previous, types: notificationTypes, frequency: "immediate" }));
       /*
        * Both facts are now known rather than guessed: permission was `granted`
        * above or this line is unreachable, and a subscription exists because
@@ -225,6 +241,7 @@ export function PushControls(props: PushControlsProps) {
 
   async function disable() {
     setNotice(null);
+    setNoticeFor("consent");
     // The browser subscription goes first, then the server record. In this
     // order a failure leaves the user MORE protected rather than less: an
     // unsubscribed browser with a stale server row receives nothing, while the
@@ -247,6 +264,7 @@ export function PushControls(props: PushControlsProps) {
 
   async function savePreferences() {
     setNotice(null);
+    const draft = { types, frequency, quietStart, quietEnd, dailyCap };
     const result = await updateNotificationPreferences({
       enabledTypes: types,
       frequency,
@@ -254,6 +272,8 @@ export function PushControls(props: PushControlsProps) {
       quietEnd,
       dailyCap,
     }, props.locale);
+    if (result.ok) setSaved(draft);
+    setNoticeFor("preferences");
     setNotice(result.ok ? copy.saved : copy.saveFailed);
   }
 
@@ -315,15 +335,35 @@ export function PushControls(props: PushControlsProps) {
         assertive live region would interrupt a screen-reader user mid-sentence
         for something that is not an emergency. `2M-ACCESS-004`.
       */}
-      {notice === null ? null : <p className="push-notice" role="status">{notice}</p>}
+      {notice === null || noticeFor === "preferences" ? null : <p className="push-notice" role="status">{notice}</p>}
 
       {/*
         The preference controls are rendered only under a granted consent.
         Under any other state they would be controls whose value nothing reads
         -- `R-24` again -- because the delivery decision refuses before it ever
         consults a type or a frequency.
+
+        Editorial calmo (ADR-180): one row that says what is set — which
+        alerts, how often, the quiet period, the cap — and opens the same four
+        groups and the same one save underneath. They are one editor because
+        `updateNotificationPreferences` writes all five values in one call.
+        The summary is the SAVED state's until a save succeeds, so a row
+        closed over an unsaved draft never claims the draft is in force.
       */}
       {state !== "granted" ? null : (
+        <SettingFact
+          className="push-preferences-fact"
+          closeVerb={settingsCopy.close}
+          label={settingsCopy.rows.pushPreferences}
+          value={settingsCopy.rows.pushSummary({
+            types: notificationTypes.filter((type) => saved.types.includes(type)).map((type) => copy.types[type]),
+            frequency: copy.frequencies[saved.frequency],
+            quietStart: saved.quietStart,
+            quietEnd: saved.quietEnd,
+            cap: saved.dailyCap,
+          })}
+          verb={settingsCopy.change}
+        >
         <div className="push-preferences">
           {/*
             Four cards, and the grouping is the only thing that changed. The
@@ -419,7 +459,10 @@ export function PushControls(props: PushControlsProps) {
               {copy.savePreferences}
             </button>
           </div>
+          {/* The save's outcome, beside the save — not above a row that may be scrolled away. */}
+          {notice !== null && noticeFor === "preferences" ? <p className="push-notice" role="status">{notice}</p> : null}
         </div>
+        </SettingFact>
       )}
     </div>
   );

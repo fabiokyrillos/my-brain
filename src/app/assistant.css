@@ -13,31 +13,46 @@
   margin: 0 0 28px;
 }
 
+/*
+ * One calm field (Editorial calmo, ADR-180).
+ *
+ * It was a raised card — a strong border, a drop shadow, a box three lines
+ * tall with a resize handle. It is one line now, on a hairline box with no
+ * shadow, and it grows with what is written (`field-sizing`, where the browser
+ * has it; elsewhere it scrolls inside its own line). The border darkens and the
+ * focus ring appears when the field is being written in.
+ */
 .assistant-composer-form {
   position: relative;
-  border: 1px solid var(--border-strong);
+  border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--background-surface);
-  box-shadow: var(--elevation-2);
   overflow: hidden;
+}
+
+.assistant-composer-form:focus-within {
+  border-color: var(--border-strong);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 
 .assistant-composer-row {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  padding: 6px 14px 12px 20px;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-4);
 }
 
 .assistant-composer-row > textarea {
   flex: 1 1 auto;
   display: block;
   width: 100%;
-  min-height: 84px;
+  min-height: var(--touch-target);
   max-height: 40vh;
   border: 0;
-  resize: vertical;
+  resize: none;
+  field-sizing: content;
   padding: 10px 0;
   background: transparent;
   color: var(--text-primary);
@@ -191,12 +206,10 @@
   .assistant-composer-row {
     flex-wrap: nowrap;
     align-items: flex-end;
-    padding: 6px 10px 10px 16px;
   }
 
   .assistant-composer-row > textarea {
     flex-basis: auto;
-    min-height: 60px;
   }
 
 
@@ -250,4 +263,4 @@
  * typeface between typing it and reading it, which is the seam this direction
  * spends its whole type scale removing.
  */
-.assistant-composer-row > textarea { font: var(--type-reading-sm) }
+.assistant-composer-row > textarea { font: var(--type-reading); line-height: 1.4 }

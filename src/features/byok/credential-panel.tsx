@@ -1,9 +1,11 @@
 "use client";
 
-import { Inbox, KeyRound, LoaderCircle, ShieldCheck, ShieldAlert, Trash2 } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import { formatInstant } from "@/lib/time/instant-format";
 import { useActionState, useEffect, useRef, useState } from "react";
 
+import { getSettingsCopy } from "@/features/settings/copy";
+import { SettingFact } from "@/features/settings/setting-fact";
 import type { Locale } from "@/lib/preferences";
 
 import type { ByokActionState } from "./actions";
@@ -63,6 +65,7 @@ export function CredentialPanel({
   timeZone: string;
 }) {
   const copy = getByokCopy(locale);
+  const settingsCopy = getSettingsCopy(locale);
   const [saveState, save, savePending] = useActionState(saveAction, idle);
   const [removeState, remove, removePending] = useActionState(removeAction, idle);
   const [pendingState, interpretPending, interpretPendingBusy] = useActionState(
@@ -126,101 +129,133 @@ export function CredentialPanel({
   const statusLabel = statusLabels[credential.status];
 
   return (
-    <section className="settings-section byok-panel" aria-labelledby="byok-heading">
-      <div className="settings-section-heading">
-        <span>
-          <KeyRound size={16} aria-hidden />
-        </span>
-        <div>
-          <h2 id="byok-heading">{copy.settings.title}</h2>
-          <p>{copy.settings.intro}</p>
+    /*
+      Editorial calmo (ADR-180): the key is a fact with its state beside it and
+      its editor underneath, not a card that always shows an empty password
+      field.
+
+      - What the page asks of the owner comes first: entries waiting for a key
+        to be interpreted, when there are any.
+      - The key row states the three answers it always stated (state, keyed
+        fingerprint, validity) and opens the SAME form — same fields, same
+        hidden witness, same action. It arrives open when there is no working
+        key, because then entering one is the page's whole point.
+      - Removing the key is the last line, in the risk tone, behind the same
+        confirmation.
+    */
+    <section className="byok-panel" aria-labelledby="byok-heading">
+      <h2 className="settings-group-title" id="byok-heading">{copy.settings.title}</h2>
+      <p className="settings-group-note">{copy.settings.intro}</p>
+
+      <div className="settings-rows byok-body">
+      {showPendingEntries ? (
+        <div className="byok-pending" aria-labelledby="byok-pending-heading">
+          <div className="byok-pending-copy">
+            <h3 id="byok-pending-heading">{copy.pendingEntries.title}</h3>
+            <p className="byok-pending-count">
+              {pending.atLeast ? `${pending.count}+` : pending.count}
+            </p>
+            <p>{copy.pendingEntries.description}</p>
+          </div>
+          <form action={interpretPending}>
+            <input type="hidden" name="locale" value={locale} />
+            <button className="setting-verb byok-pending-submit" type="submit" disabled={interpretPendingBusy}>
+              {interpretPendingBusy ? (
+                <LoaderCircle size={16} className="spin" aria-hidden />
+              ) : null}
+              {copy.pendingEntries.button}
+            </button>
+          </form>
+          {pendingState.status !== "idle" ? (
+            <p role="status" data-state={pendingState.status} className="byok-feedback">
+              {pendingState.message}
+            </p>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <div className="byok-body">
+      <SettingFact
+        className="byok-key"
+        closeVerb={settingsCopy.close}
+        label={settingsCopy.groups.key}
+        open={credential.status !== "active"}
+        value={
+          /*
+            Three separate answers. Metadata only: the fingerprint is a keyed
+            digest, never a slice of the key, and it is still the ONLY `<code>`
+            in this panel — `byok-settings-journey` matches it by element.
+          */
+          <span className="byok-state" data-status={credential.status}>
+            <span className="byok-badge" data-status={credential.status}>
+              <strong>{statusLabel}</strong>
+            </span>
+            {credential.fingerprint ? (
+              <span className="byok-identifier">
+                <code>{credential.fingerprint}</code>
+              </span>
+            ) : null}
+            {credential.validatedAt ? (
+              <span className="byok-validated">
+                {copy.settings.validatedAt}{" "}
+                <time dateTime={credential.validatedAt}>
+                  {formatInstant(credential.validatedAt, "day", locale, timeZone)}
+                </time>
+              </span>
+            ) : null}
+          </span>
+        }
+        verb={settingsCopy.change}
+      >
+        <form action={save} className="byok-form" onSubmit={() => setLastAction("save")}>
+          <input type="hidden" name="locale" value={locale} />
+          {/* The staleness witness. Present only when a row exists, which is what
+              makes this a rotation rather than a first save. */}
+          {credential.observedUpdatedAt ? (
+            <input type="hidden" name="observedUpdatedAt" value={credential.observedUpdatedAt} />
+          ) : null}
+
+          <label htmlFor="byok-api-key">{copy.settings.fieldLabel}</label>
+          <input
+            ref={keyField}
+            id="byok-api-key"
+            name="apiKey"
+            // `password`, with no toggle. The absence of a reveal control is the
+            // requirement, not a default that a later "usability improvement"
+            // may quietly reverse.
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            required
+            // Never prefilled. See the header.
+            placeholder="sk-…"
+            aria-describedby="byok-key-hint"
+          />
+          <p id="byok-key-hint" className="field-hint byok-hint">
+            {copy.settings.fieldHint} {copy.settings.neverShown}
+          </p>
+
+          <button className="byok-submit" type="submit" disabled={savePending}>
+            {savePending ? <LoaderCircle size={16} className="spin" aria-hidden /> : null}
+            {credential.configured ? copy.settings.rotate : copy.settings.save}
+          </button>
+        </form>
+      </SettingFact>
+
       {/*
-        Three separate answers, on three separate lines — the polish pass
-        between slices 2O.6 and 2O.7, and the only reason it is a `<div>` of
-        three children rather than one `<p>` of three inline ones.
-
-        The state, the fingerprint and the validity were siblings inside a
-        single paragraph with **no rule anywhere in the stylesheets**, so the
-        browser laid them out as running text: "Configurada" ran straight into
-        the keyed digest beside it and the validation date trailed off the end
-        with no hierarchy at all. Nothing about what is rendered changed — same
-        three facts, same source, same absence handling.
+        The outcome, directly under the row it reports on — outside the editor,
+        so it is still on screen when a first save closes the row. Which state
+        it renders and when is unchanged: `lastAction` still decides, for the
+        reason the header gives.
       */}
-      <div className="byok-state" data-status={credential.status}>
-        <span className="byok-badge" data-status={credential.status}>
-          {credential.status === "active" ? (
-            <ShieldCheck size={16} aria-hidden />
-          ) : (
-            <ShieldAlert size={16} aria-hidden />
-          )}
-          <strong>{statusLabel}</strong>
-        </span>
-        {/* Metadata only: the fingerprint is a keyed digest, never a slice of
-            the key, and it is the most identifying thing shown anywhere. It is
-            still the ONLY `<code>` in this panel — `byok-settings-journey`
-            matches it by element and a second one would break that. */}
-        {credential.fingerprint ? (
-          <p className="byok-identifier">
-            <code>{credential.fingerprint}</code>
-          </p>
-        ) : null}
-        {credential.validatedAt ? (
-          <p className="byok-validated">
-            {copy.settings.validatedAt}{" "}
-            <time dateTime={credential.validatedAt}>
-              {formatInstant(credential.validatedAt, "day", locale, timeZone)}
-            </time>
-          </p>
-        ) : null}
-      </div>
-
-      <p className="byok-honesty">{copy.settings.honesty}</p>
-
-      <form action={save} className="byok-form" onSubmit={() => setLastAction("save")}>
-        <input type="hidden" name="locale" value={locale} />
-        {/* The staleness witness. Present only when a row exists, which is what
-            makes this a rotation rather than a first save. */}
-        {credential.observedUpdatedAt ? (
-          <input type="hidden" name="observedUpdatedAt" value={credential.observedUpdatedAt} />
-        ) : null}
-
-        <label htmlFor="byok-api-key">{copy.settings.fieldLabel}</label>
-        <input
-          ref={keyField}
-          id="byok-api-key"
-          name="apiKey"
-          // `password`, with no toggle. The absence of a reveal control is the
-          // requirement, not a default that a later "usability improvement"
-          // may quietly reverse.
-          type="password"
-          autoComplete="off"
-          spellCheck={false}
-          required
-          // Never prefilled. See the header.
-          placeholder="sk-…"
-          aria-describedby="byok-key-hint"
-        />
-        <p id="byok-key-hint" className="field-hint byok-hint">
-          {copy.settings.fieldHint} {copy.settings.neverShown}
+      {state.status !== "idle" ? (
+        <p role="status" data-state={state.status} className="byok-feedback">
+          {state.message}
         </p>
-
-        <button className="byok-submit" type="submit" disabled={savePending}>
-          {savePending ? <LoaderCircle size={16} className="spin" aria-hidden /> : null}
-          {credential.configured ? copy.settings.rotate : copy.settings.save}
-        </button>
-      </form>
+      ) : null}
 
       {/*
-        The destructive action, separated from the primary one by a rule rather
-        than by nothing. It was previously a bare `<button className="danger">`
-        — and `.danger` on its own has no rule in any stylesheet, only
-        `.reminder-button.danger` and `.reminder-panel.danger` do — so it
-        rendered as an unstyled browser button with a loose trash glyph beside
-        the text. Same form, same action, same confirmation.
+        The destructive action: last, quiet, in the risk tone. Same form, same
+        action, same confirmation.
       */}
       {credential.status !== "absent" && credential.status !== "removed" ? (
         <div className="byok-danger">
@@ -243,57 +278,21 @@ export function CredentialPanel({
         >
           <input type="hidden" name="locale" value={locale} />
           <button type="submit" className="danger byok-destructive" disabled={removePending}>
-            {removePending ? (
-              <LoaderCircle size={16} className="spin" aria-hidden />
-            ) : (
-              <Trash2 size={16} aria-hidden />
-            )}
+            {removePending ? <LoaderCircle size={16} className="spin" aria-hidden /> : null}
             {copy.settings.remove}
           </button>
         </form>
         </div>
       ) : null}
+      </div>
 
       {/*
-        The outcome, moved to sit directly under the two actions it reports on
-        rather than below the pending-entries card. Which state it renders and
-        when is unchanged — `lastAction` still decides, for the reason the
-        header gives.
+        `BYOK-COPY`: who can decrypt, and that removal is immediate. On the
+        page, not inside the row's editor — a disclosure a reader only meets
+        after deciding to type a key in is not a disclosure.
       */}
-      {state.status !== "idle" ? (
-        <p role="status" data-state={state.status} className="byok-feedback">
-          {state.message}
-        </p>
-      ) : null}
-
-      {showPendingEntries ? (
-        <div className="byok-pending" aria-labelledby="byok-pending-heading">
-          <h3 id="byok-pending-heading">
-            <Inbox size={16} aria-hidden /> {copy.pendingEntries.title}
-          </h3>
-          <p>{copy.pendingEntries.description}</p>
-          <p className="byok-pending-count">
-            {pending.atLeast ? `${pending.count}+` : pending.count}
-          </p>
-          <form action={interpretPending}>
-            <input type="hidden" name="locale" value={locale} />
-            <button className="byok-pending-submit" type="submit" disabled={interpretPendingBusy}>
-              {interpretPendingBusy ? (
-                <LoaderCircle size={16} className="spin" aria-hidden />
-              ) : null}
-              {copy.pendingEntries.button}
-            </button>
-          </form>
-          {pendingState.status !== "idle" ? (
-            <p role="status" data-state={pendingState.status} className="byok-feedback">
-              {pendingState.message}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
+      <p className="byok-honesty">{copy.settings.honesty}</p>
       <p className="byok-costs-note">{copy.settings.costsNote}</p>
-      </div>
     </section>
   );
 }

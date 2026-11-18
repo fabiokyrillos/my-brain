@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-18 — Conversar and Ajustes, recomposed (ADR-180, ADR-187)
+
+- **Conversar** (`chat/page.tsx`, `chat/[conversationId]/page.tsx`, `chat-frame.tsx`, new `chat/prose.tsx`, `source-list.tsx`, `chat.css`, `conversation-cards.css`, `assistant.css`): a conversation reads as correspondence — the day once as a heading, the question with an ink rule and its hour, the answer as prose (paragraphs and lists from the text's own lines), and one closed line under it: sources, *Onde procurei*, *Como cheguei aqui*. A turn's outcome (proposal, failure, command result) is drawn in the thread, not under the field. The list of conversations is rows with one caption; the field is one line that grows.
+- **Ajustes** (new `settings/setting-fact.tsx`, `settings-form.tsx`, `credential-panel.tsx`, `automation-section.tsx`, `push-controls.tsx`, `privacy-section.tsx`, `consent-section.tsx`, `install-section.tsx`, `settings-extended.css`): the index is rows that say each group's current state; a setting is a row with its value, changed on the row or opened in place. *O que ele faz sozinho* is six rows instead of six open forms; the key is a row that opens its unchanged form; privacy leads with what people come for, and deleting the account has one door, last.
+- Agenda: an empty month no longer prints the *Dias com itens neste mês* heading over the empty line. The Conversar screenshot masks `.chat-menu-when`.
+- Fixed in passing: the thread scrolled sideways by 34px at 320px; suggestion and source chips were 36px tall.
+- `RECORDED_UNSTYLED` stays 24. No Server Action, route handler, RPC, query, prompt or migration changed. Record: `docs/reports/editorial-calmo/CONVERSAR-E-AJUSTES.md`.
+
 ## 2026-11-18 — Avisos, Histórico and Agenda, recomposed (ADR-180, ADR-186)
 
 - **Avisos** (`notifications/page.tsx`, `notification-history-row.tsx`, `notification-bulk-bar.tsx`, `settings-extended.css`): the page opens with the count of unread notices and *Marcar todos como lidos* as a text verb; an unread row is the notice's subject in the reading face, one caption and its primary verb; read notices fold under *Já lidos* when something is unread and more than three are read. The standing bulk bar is gone; `NotificationBulkBar` is now a provider with `NotificationBulkVerb` and `NotificationBulkOutcome`.

@@ -643,7 +643,9 @@ export function CalendarView({
           </div>
 
           <div className="calendar-month-list">
-            <h2>{copy.month.listHeading}</h2>
+            {monthDaysWithItems.length === 0 ? null : (
+              <h2>{copy.month.listHeading}</h2>
+            )}
             {monthDaysWithItems.length === 0 ? (
               <UniversalStateLine
                 className="calendar-empty"

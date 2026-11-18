@@ -345,93 +345,135 @@
  * The three states are toned apart so the difference survives a glance.
  */
 
+/*
+ * Editorial calmo (ADR-180): one quiet line under the answer.
+ *
+ * The block is a row of closed lines — "3 fontes", "Onde procurei", "Como
+ * cheguei aqui" — each a native disclosure. An open one takes the row, so what
+ * it holds reads at the full measure. The sources were a stack of chips drawn
+ * open under every answer, with the reach sentence repeated beneath them.
+ */
 .conversation-sources {
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.conversation-sources-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--tone-archived-fg);
-}
-
-/* Life Brain E.7 (ADR-177): the sources are chips under the answer — type and
-   date, wrapping onto a second line rather than scrolling sideways. */
-.conversation-sources-list {
-  display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 0;
-  padding: 0;
+  align-items: flex-start;
+  column-gap: var(--space-5);
+}
+
+.conversation-sources-used,
+.conversation-sources-where,
+.conversation-sources > details { min-width: 0 }
+.conversation-sources > details[open] { flex: 1 1 100% }
+
+.conversation-sources > details > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  cursor: pointer;
   list-style: none;
 }
 
+.conversation-sources > details > summary::-webkit-details-marker { display: none }
+
+/* The disclosure's mark, drawn: down when closed, up when open. */
+.conversation-sources > details > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.conversation-sources > details[open] > summary::after { margin-top: 3px; transform: rotate(-135deg) }
+.conversation-sources > details > summary:hover { color: var(--text-primary) }
+
+.conversation-sources > details > summary:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.conversation-sources-title {
+  font: var(--type-caption);
+}
+
+/* The sources, opened: rows between hairlines, and the row is the link. */
+.conversation-sources-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  border-top: 1px solid var(--border-divider);
+  list-style: none;
+}
+
+.conversation-sources-list > li { border-bottom: 1px solid var(--border-divider) }
+
 .conversation-source-chip {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  min-height: 36px;
-  padding: 6px 14px;
-  border: 1px solid var(--border-default);
-  border-radius: 999px;
-  background: var(--background-surface);
-  color: var(--text-secondary);
-  font: var(--type-label);
-  text-decoration: none;
-}
-
-a.conversation-source-chip:hover {
-  border-color: var(--border-strong);
+  min-height: var(--touch-target);
+  padding: var(--space-2) 0;
   color: var(--text-primary);
+  font: var(--type-body);
+  text-decoration: none;
+  /* The unavailable sentence is long: it wraps rather than widening the page. */
+  overflow-wrap: anywhere;
 }
 
-/* An inference is not something the owner wrote: drawn dashed, read aloud by its support kind. */
-.conversation-sources-list > li[data-support="inference"] .conversation-source-chip {
-  border-style: dashed;
-}
-
-.conversation-source-type,
-.conversation-source-freshness {
-  white-space: nowrap;
-}
-
-.conversation-source-chip[data-unavailable] {
+a.conversation-source-chip::after {
+  content: "›";
+  margin-inline-start: auto;
+  padding-inline-start: var(--space-3);
   color: var(--text-muted);
-  background: transparent;
 }
 
-/* The honest "I had nothing". Attention rather than risk: finding nothing is a
-   true outcome, not a failure. */
-.conversation-sources[data-evidence="insufficient"] {
-  padding: 10px 12px;
-  border: 1px solid var(--tone-attention-line);
-  border-radius: var(--radius-md);
-  background: var(--tone-attention-bg);
+a.conversation-source-chip:hover .conversation-source-type { text-decoration: underline }
+
+/* An inference is not something the owner wrote: a dashed rule, read aloud by its support kind. */
+.conversation-sources-list > li[data-support="inference"] { border-bottom-style: dashed }
+
+.conversation-source-freshness {
+  /* `pre`, not `nowrap`: the separator's leading space is the first thing in a flex item. */
+  white-space: pre;
+  color: var(--text-secondary);
 }
 
+.conversation-source-chip[data-unavailable] { color: var(--text-muted) }
+
+/*
+ * The honest "I had nothing". Attention rather than risk: finding nothing is a
+ * true outcome, not a failure. Said in amber and in words, on an amber rule —
+ * so it never reads as an evidenced answer — and no longer a box.
+ */
 .conversation-sources-insufficient {
-  margin: 0;
-  font-size: 0.875rem;
-  line-height: 1.5;
+  flex: 1 1 100%;
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--tone-attention-line);
   color: var(--tone-attention-fg);
+  font: var(--type-caption);
+  line-height: 1.5;
 }
 
 /* A row written before the product recorded where it looked. It says less. */
 .conversation-sources[data-evidence="unknown"] .conversation-sources-legacy {
-  margin: 0;
-  font-size: 0.8125rem;
+  margin: var(--space-2) 0 0;
+  color: var(--text-secondary);
+  font: var(--type-caption);
   font-style: italic;
-  color: var(--tone-archived-fg);
 }
 
 .conversation-sources-reach {
-  margin: 0;
-  font-size: 0.8125rem;
-  line-height: 1.45;
-  color: var(--tone-archived-fg);
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font: var(--type-caption);
+  line-height: 1.5;
 }
 
 /*
@@ -442,23 +484,24 @@ a.conversation-source-chip:hover {
  * reason as every other control here: the lane measures from paint.
  */
 
-.conversation-explanation {
-  border-top: 1px solid var(--tone-archived-line);
-  padding-top: 10px;
-}
+/*
+ * Inside the source block its summary is one of the quiet lines above. The
+ * minimum is restated on the panel itself, so the control is a full target
+ * wherever the panel is drawn: the lane measures from paint.
+ */
+.conversation-explanation { min-width: 0 }
 
 .conversation-explanation > summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  min-height: 44px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: var(--tone-information-fg);
+  min-height: var(--touch-target);
+  color: var(--text-secondary);
+  font: var(--type-caption);
   cursor: pointer;
 }
 
 .conversation-explanation > summary:focus-visible {
-  outline: 2px solid var(--tone-information-fg);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
@@ -511,27 +554,32 @@ a.conversation-source-chip:hover {
  * stacking two paddings would make a 60px row out of a 44px target.
  */
 
+/*
+ * Editorial calmo (ADR-180): a heading over a hairline, then rows.
+ *
+ * They were three tinted boxes. Each is now a row between hairlines, set in the
+ * reading face because it is a question in the owner's own voice, and the row
+ * is the control: tapping it puts the question in the field.
+ */
 .conversation-suggestions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   text-align: left;
 }
 
 .conversation-suggestions-label {
   margin: 0;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font: var(--type-section);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--tone-archived-fg);
 }
 
 .conversation-suggestions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -539,12 +587,13 @@ a.conversation-source-chip:hover {
 
 .conversation-suggestions-list > li {
   display: flex;
+  border-bottom: 1px solid var(--border-divider);
   /* Owner content. A long name must not push the row off a narrow viewport. */
   overflow-wrap: anywhere;
 }
 
 /*
- * The chip fills the row, so a thumb landing anywhere on it lands on the
+ * The control fills the row, so a thumb landing anywhere on it lands on the
  * control rather than beside it.
  *
  * `white-space: normal` is the load-bearing line. `.ui-button` is `nowrap`,
@@ -553,33 +602,38 @@ a.conversation-source-chip:hover {
  * at 320, which `life-brain-b7-conversation.spec.ts` caught at both viewports.
  * Overridden here rather than in the primitive — every other button in the
  * product is a label and should keep refusing to wrap.
+ *
+ * `min-height` is stated: the primitive's small size is 36px, and a row a thumb
+ * is meant to hit is 44.
  */
 .conversation-suggestions-list > li > .ui-button {
   width: 100%;
   height: auto;
-  padding: var(--space-2) var(--space-3);
+  min-height: var(--touch-target);
+  padding: var(--space-3) 0;
   justify-content: flex-start;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: var(--type-reading);
+  line-height: 1.4;
   text-align: left;
   white-space: normal;
   /* Owner content inside the sentence: a long name must not widen the row. */
   overflow-wrap: anywhere;
-  font-weight: 500;
-  border-color: var(--tone-suggestion-line);
-  background: var(--tone-suggestion-bg);
-  color: var(--tone-suggestion-fg);
 }
+
+.conversation-suggestions-list > li > .ui-button:hover { background: transparent; text-decoration: underline }
 
 /* The degraded row: no composer is listening, so there is no control to draw
    and the suggestion is what it always was — a sentence to read. */
 .conversation-suggestion-text {
   display: block;
   width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--tone-suggestion-line);
-  border-radius: var(--radius-md);
-  background: var(--tone-suggestion-bg);
-  color: var(--tone-suggestion-fg);
-  font-size: 0.875rem;
+  padding: var(--space-3) 0;
+  color: var(--text-secondary);
+  font: var(--type-reading);
   line-height: 1.4;
 }
 

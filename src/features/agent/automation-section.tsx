@@ -1,3 +1,5 @@
+import { getSettingsCopy } from "@/features/settings/copy";
+import { SettingFact } from "@/features/settings/setting-fact";
 import type { Locale } from "@/lib/preferences";
 
 import type { AutomationPolicyChange } from "./automation-data";
@@ -59,6 +61,7 @@ function CategoryRow({
   saveAction: (previous: AutomationActionState, formData: FormData) => Promise<AutomationActionState>;
 }) {
   const copy = getAutomationCopy(locale);
+  const settings = getSettingsCopy(locale);
   const category = copy.categories[decision.category];
   const shortfall = calibrationShortfall(decision);
   const automatic = permitsAutomaticWrite(decision);
@@ -67,15 +70,31 @@ function CategoryRow({
 
   return (
     <li className="automation-row">
-      <div className="automation-row-heading">
-        <h3 id={headingId}>{category.name}</h3>
-        <p
-          className={automatic ? "automation-state automation-state-active" : "automation-state"}
-          data-reason={decision.reason}
-        >
-          {copy.reasons[decision.reason]}
-        </p>
-      </div>
+      {/*
+        Editorial calmo (ADR-180, after ADR-185's list of facts): a category is
+        one row — its name, and the reason the database gave as its current
+        state — and "Alterar" opens the risk, the evidence and the policy
+        control underneath. Six open cards put six selects and six "Salvar
+        política" buttons on a page whose honest content is six short
+        sentences. Nothing inside the row changed, and it stays mounted while
+        closed, so an outcome is still there when the row is reopened.
+      */}
+      <SettingFact
+        closeVerb={settings.close}
+        group="automation-category"
+        heading="h3"
+        label={category.name}
+        labelId={headingId}
+        value={
+          <span
+            className={automatic ? "automation-state automation-state-active" : "automation-state"}
+            data-reason={decision.reason}
+          >
+            {copy.reasons[decision.reason]}
+          </span>
+        }
+        verb={settings.change}
+      >
       <p className="automation-risk">{category.risk}</p>
 
       <div className="automation-evidence" id={evidenceId}>
@@ -193,6 +212,7 @@ function CategoryRow({
         saveLabel={copy.save}
         saveAction={saveAction}
       />
+      </SettingFact>
     </li>
   );
 }
@@ -217,7 +237,11 @@ export function AutomationSection({
   return (
     <section className="automation-section" aria-labelledby="automation-title">
       <h2 id="automation-title">{copy.title}</h2>
-      <p>{copy.intro}</p>
+      {/*
+        The posture is the page's one lead sentence: it is the answer to "is
+        anything acting alone?", which is what a reader opens this group to
+        learn. The rule and the signed contract follow, closed.
+      */}
       {!anyAutomatic ? <p className="automation-posture">{copy.posture}</p> : null}
       {/*
         The signed contract, said once.
@@ -228,7 +252,11 @@ export function AutomationSection({
         same breath that signing a minimum enabled nothing, because the sentence
         that only said "these are signed" would read as an activation.
       */}
-      <p className="automation-thresholds">{copy.thresholdsSigned}</p>
+      <details className="settings-how">
+        <summary>{getSettingsCopy(locale).rows.autonomyHow}</summary>
+        <p className="automation-intro">{copy.intro}</p>
+        <p className="automation-thresholds">{copy.thresholdsSigned}</p>
+      </details>
 
       <ul className="automation-list" aria-label={copy.listLabel}>
         {decisions.map((decision) => (
@@ -241,8 +269,13 @@ export function AutomationSection({
         ))}
       </ul>
 
-      <div className="automation-history">
-        <p className="automation-history-label">{copy.historyLabel}</p>
+      {/*
+        The record of changes. Open while one of them can still be taken back —
+        the undo must be on screen the moment the owner changes a policy — and
+        a closed line once it is only bookkeeping.
+      */}
+      <details className="settings-how automation-history" open={history.some((change) => change.undoable)}>
+        <summary className="automation-history-label">{copy.historyLabel}</summary>
         {history.length > 0 ? (
           <ul className="automation-history-list">
             {history.map((change) => (
@@ -264,7 +297,7 @@ export function AutomationSection({
             ))}
           </ul>
         ) : null}
-      </div>
+      </details>
     </section>
   );
 }

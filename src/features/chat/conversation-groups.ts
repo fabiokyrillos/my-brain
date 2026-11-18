@@ -1,4 +1,5 @@
 import type { Locale } from "@/lib/preferences";
+import { formatInstant } from "@/lib/time/instant-format";
 import {
   addLocalDays,
   compareLocalDates,
@@ -10,7 +11,12 @@ import {
 import type { ChatSurfaceCopy } from "./surface-copy";
 
 export type ConversationRow = Readonly<{ id: string; title: string; updated_at: string }>;
-export type ConversationLink = Readonly<{ id: string; title: string }>;
+/**
+ * `when` is the row's one caption (Editorial calmo): the hour for a
+ * conversation of today, the day for any other, in the owner's zone. Absent
+ * for a row found by the search past the menu, which reads titles only.
+ */
+export type ConversationLink = Readonly<{ id: string; title: string; when?: Readonly<{ at: string; label: string }> }>;
 export type ConversationGroup = Readonly<{ key: string; label: string; items: readonly ConversationLink[] }>;
 
 /** How many conversations the menu holds. Older ones are reached by the menu's server search (ADR-177). */
@@ -57,9 +63,14 @@ export function groupConversations(
 
   const groups: { key: string; label: string; items: ConversationLink[] }[] = [];
   const place = (key: string, label: string, row: ConversationRow) => {
+    // `null` for a time that cannot be read: the row is kept and says nothing about when.
+    const stamp = formatInstant(row.updated_at, key === "today" ? "time" : "day", locale, zone);
+    const item: ConversationLink = stamp === null
+      ? { id: row.id, title: row.title }
+      : { id: row.id, title: row.title, when: { at: row.updated_at, label: stamp } };
     const existing = groups.find((group) => group.key === key);
-    if (existing) existing.items.push({ id: row.id, title: row.title });
-    else groups.push({ key, label, items: [{ id: row.id, title: row.title }] });
+    if (existing) existing.items.push(item);
+    else groups.push({ key, label, items: [item] });
   };
 
   for (const row of rows) {

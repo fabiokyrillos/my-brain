@@ -1,10 +1,13 @@
 /**
- * Life Brain E.1 (ADR-169) — the one line under each group on the phone's list
- * of groups: what the group is set to *now*, so the list answers "how is this
+ * Life Brain E.1 (ADR-169) — the one line under each group on the list of
+ * groups: what the group is set to *now*, so the list answers "how is this
  * configured?" without opening anything.
  *
- * Pure and holding every word, so a test can read it with no database;
- * `summary-loader.ts` starts the three reads together.
+ * Pure, so a test can read it with no database; `summary-loader.ts` starts the
+ * three reads together. The words are `copy.ts`'s (`summaries`, `profiles`,
+ * `language`) since the Editorial calmo pass (ADR-180), which also added the
+ * cost-and-quality profile to the AI line — from the same `values` read, no
+ * new query.
  *
  * Appearance and Privacy have no stored value to summarise here — the theme is
  * per browser (`2O-PREF-013`) and privacy is actions, not settings — so their
@@ -17,10 +20,11 @@ import type { SettingsFormValues } from "@/features/profile/settings-contracts";
 import { getTimeZoneOptions } from "@/features/profile/timezones";
 import type { Locale } from "@/lib/preferences";
 
+import { getSettingsCopy } from "./copy";
 import type { SettingsSection } from "./sections";
 
 export type SettingsSummaryInput = Readonly<{
-  values: Pick<SettingsFormValues, "agentName" | "timezone" | "quietStart" | "quietEnd" | "maxFollowupsPerDay">;
+  values: Pick<SettingsFormValues, "agentName" | "timezone" | "quietStart" | "quietEnd" | "maxFollowupsPerDay" | "aiProfile">;
   automation: readonly Pick<AutomationCategoryDecision, "state" | "eligible">[];
   credential: CredentialStatus;
 }>;
@@ -39,27 +43,19 @@ function actingAlone(automation: SettingsSummaryInput["automation"]): number {
 }
 
 export function settingsSummaries(locale: Locale, input: SettingsSummaryInput): SettingsSummaries {
-  const pt = locale === "pt-BR";
+  const copy = getSettingsCopy(locale);
   const { values } = input;
   const acting = actingAlone(input.automation);
-  const credential = {
-    active: pt ? "Chave funcionando" : "Key working",
-    invalid: pt ? "A chave parou de funcionar" : "The key stopped working",
-    removed: pt ? "Sem chave" : "No key",
-    absent: pt ? "Sem chave" : "No key",
-  }[input.credential];
+  const credential = copy.summaries.credential[input.credential];
+  // The profile decides nothing without a working key, so it is only named beside one.
+  const ai = input.credential === "active" ? `${credential} · ${copy.profiles[values.aiProfile]}` : credential;
 
   return {
-    general: [values.agentName, zoneName(locale, values.timezone), pt ? "Português" : "English"].join(" · "),
-    day: pt
-      ? `Silêncio ${values.quietStart}–${values.quietEnd} · até ${values.maxFollowupsPerDay} por dia`
-      : `Quiet ${values.quietStart}–${values.quietEnd} · up to ${values.maxFollowupsPerDay} a day`,
-    autonomy:
-      acting === 0
-        ? pt ? "Só sugere, em tudo" : "Only suggests, everywhere"
-        : pt ? `Age sozinho em ${acting} ${acting === 1 ? "categoria" : "categorias"}` : `Acts alone in ${acting} ${acting === 1 ? "category" : "categories"}`,
-    ai: credential,
-    appearance: pt ? "Tema e instalar como app" : "Theme and installing as an app",
-    privacy: pt ? "Baixar uma cópia, sessões, apagar a conta" : "Take a copy, sessions, delete the account",
+    general: [values.agentName, zoneName(locale, values.timezone), copy.language.name].join(" · "),
+    day: copy.summaries.day(values.quietStart, values.quietEnd, values.maxFollowupsPerDay),
+    autonomy: acting === 0 ? copy.summaries.autonomyNone : copy.summaries.autonomySome(acting),
+    ai,
+    appearance: copy.summaries.appearance,
+    privacy: copy.summaries.privacy,
   };
 }

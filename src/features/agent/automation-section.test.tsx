@@ -221,6 +221,51 @@ describe("the control and its reversal", () => {
   });
 });
 
+describe("a category is a row that opens its policy in place (Editorial calmo, ADR-180)", () => {
+  it("states each category's current reason on the closed row, and keeps its control off screen", () => {
+    renderSection(allSix);
+    const rows = document.querySelectorAll(".automation-row > details.setting-fact");
+    expect(rows).toHaveLength(AUTOMATION_CATEGORIES.length);
+    const tasks = rows[0] as HTMLDetailsElement;
+    const summary = tasks.querySelector("summary")!;
+    expect(within(summary).getByRole("heading", { level: 3, name: "Tarefas" })).toBeInTheDocument();
+    expect(summary.querySelector("[data-reason]")).toHaveTextContent("Configurada para apenas sugerir.");
+    expect(summary.querySelector('[data-when="closed"]')).toHaveTextContent("Alterar");
+
+    const select = tasks.querySelector("select")!;
+    expect(select).not.toBeVisible();
+    tasks.open = true;
+    expect(select).toBeVisible();
+    // The same form as before the recomposition: one select and one save, in the row.
+    expect(within(tasks).getByRole("button", { name: "Salvar política" })).toBeVisible();
+  });
+
+  it("opens one category at a time", () => {
+    renderSection(allSix);
+    const names = [...document.querySelectorAll(".automation-row > details")].map((row) => row.getAttribute("name"));
+    expect(new Set(names).size).toBe(1);
+    expect(names[0]).toBeTruthy();
+  });
+
+  it("keeps the record of changes open only while one of them can be undone", () => {
+    const change: AutomationPolicyChange = {
+      undoId: "undo-1",
+      category: "task",
+      from: "suggest_only",
+      to: "disabled",
+      changedAt: "2026-08-18T12:00:00.000Z",
+      undoable: true,
+    };
+    const { unmount } = renderSection(allSix, [change]);
+    expect((document.querySelector(".automation-history") as HTMLDetailsElement).open).toBe(true);
+    expect(screen.getByRole("button", { name: "Desfazer" })).toBeVisible();
+    unmount();
+
+    renderSection(allSix, [{ ...change, undoable: false }]);
+    expect((document.querySelector(".automation-history") as HTMLDetailsElement).open).toBe(false);
+  });
+});
+
 describe("both locales", () => {
   it("renders English without a single Portuguese string leaking through", () => {
     render(

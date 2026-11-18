@@ -202,7 +202,14 @@ export function ChatFrame({
               <h2 className="chat-menu-group-title" id={`${menuId}-${group.key}`}>{group.label}</h2>
               <ul>
                 {group.items.map((item) => (
-                  <li key={item.id}>
+                  /*
+                    Editorial calmo: a row between hairlines — the title in the
+                    reading face (it is the owner's own question), one caption
+                    saying when. The row is the link: the link's box is
+                    stretched over the whole row by the stylesheet, and the
+                    caption stays outside its name.
+                  */
+                  <li className="chat-menu-row" key={item.id}>
                     <Link
                       aria-current={item.id === activeId ? "page" : undefined}
                       href={`/${locale}/app/chat/${item.id}`}
@@ -210,6 +217,7 @@ export function ChatFrame({
                     >
                       {item.title}
                     </Link>
+                    {item.when ? <time className="chat-menu-when" dateTime={item.when.at}>{item.when.label}</time> : null}
                   </li>
                 ))}
               </ul>

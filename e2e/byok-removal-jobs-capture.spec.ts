@@ -75,6 +75,7 @@ function panel(page: Page) {
 
 async function saveCredential(page: Page, key: string) {
   await page.goto("/en/app/settings");
+  await openKeyRow(panel(page));
   await panel(page).getByLabel("API key").fill(key);
   await panel(page).getByRole("button", { name: /^(Save key|Replace key)$/ }).click();
   await expect(panel(page).getByRole("status")).toHaveText(/validated\.$/, { timeout: 60_000 });
@@ -357,3 +358,12 @@ test.describe("BYOK removal, queued jobs and capture lifecycle", () => {
     }
   });
 });
+
+/**
+ * Editorial calmo (ADR-180): with a working key, the key form waits behind the
+ * key's row ("Alterar"). Without one the row arrives open, so this is a no-op.
+ */
+async function openKeyRow(scope: { locator(selector: string): import("@playwright/test").Locator }): Promise<void> {
+  const closed = scope.locator("details.byok-key:not([open]) > summary");
+  if ((await closed.count()) > 0) await closed.click();
+}

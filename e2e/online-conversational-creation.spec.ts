@@ -113,6 +113,7 @@ test.describe("conversational creation (2G.2)", () => {
       if (locale === "pt-BR") {
         // Life Brain E.1: the credential panel lives in "AI and costs".
         await page.goto("/en/app/settings/ai");
+        await openKeyRow(page);
         await page.getByLabel("API key").fill(productKey!);
         await page.getByRole("button", { name: /save/i }).click();
         await expect(page.getByText(/configured|active/i).first()).toBeVisible({ timeout: 60_000 });
@@ -174,3 +175,12 @@ test.describe("conversational creation (2G.2)", () => {
     await expect(page.getByText(text.refuseSentence)).toHaveCount(0);
   });
 });
+
+/**
+ * Editorial calmo (ADR-180): with a working key, the key form waits behind the
+ * key's row ("Alterar"). Without one the row arrives open, so this is a no-op.
+ */
+async function openKeyRow(scope: { locator(selector: string): import("@playwright/test").Locator }): Promise<void> {
+  const closed = scope.locator("details.byok-key:not([open]) > summary");
+  if ((await closed.count()) > 0) await closed.click();
+}

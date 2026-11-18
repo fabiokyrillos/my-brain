@@ -71,7 +71,8 @@ const SURFACES: readonly Surface[] = [
   // day in the owner's zone, so a baseline drawn in the morning would fail every
   // afternoon run for a reason that is not the product.
   { name: "hoje", path: "/pt-BR/app", mask: [".today-hero .eyebrow", ".today-hero h1"] },
-  { name: "conversar", path: "/pt-BR/app/chat", mask: [] },
+  // A conversation's row says when it was last used: an hour today, a date after.
+  { name: "conversar", path: "/pt-BR/app/chat", mask: [".chat-menu-when"] },
   // `/app/tasks` redirects here. Under `app/loading.tsx` that redirect lands
   // client-side after the shell streams, so asserting the old path raced it.
   { name: "tarefas", path: "/pt-BR/app/work?view=all&page=1", mask: [] },

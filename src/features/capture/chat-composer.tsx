@@ -22,6 +22,7 @@ import { ArrowUp } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useId, useRef } from "react";
 import { useActionState } from "react";
+import { createPortal } from "react-dom";
 
 import { IconButton } from "@/components/ui";
 
@@ -36,7 +37,7 @@ import {
 
 import { idleAssistantComposerState, type AssistantComposerState } from "@/features/assistant/composer-state";
 import { getAssistantCopy } from "@/features/assistant/copy";
-import { StreamedDraft, useSharedChatStream } from "@/features/chat/chat-stream-context";
+import { StreamedDraft, useChatOutcomeTarget, useSharedChatStream } from "@/features/chat/chat-stream-context";
 import { shouldStreamChatTurn } from "@/features/chat/streaming-choice";
 import { useChatStream } from "@/features/chat/use-chat-stream";
 
@@ -155,6 +156,14 @@ export function ChatComposer({
   const shared = useSharedChatStream();
   const own = useChatStream({ locale, conversationId });
   const stream = shared ?? own;
+  /*
+    Editorial calmo: on the Conversar surface a turn's outcome — a proposal, a
+    command's preview, a failure — is drawn in the thread, where answers are
+    read, not under this field. Same elements, same state, same forms; only the
+    place they are mounted changes. Elsewhere there is no target and they stay
+    below the field.
+  */
+  const outcomeTarget = useChatOutcomeTarget();
   const pending = actionPending || stream.streaming;
   const streamFailure = stream.failure;
   const form = useRef<HTMLFormElement | null>(null);
@@ -284,72 +293,8 @@ export function ChatComposer({
     form.current?.requestSubmit();
   }
 
-  return (
-    <section className="assistant-composer">
-      {/*
-        One polite live region for the whole surface, which is why
-        `TaskCommandResult` below is asked to stay silent: a turn can resolve on
-        a route the command state knows nothing about, and two regions would
-        announce every command outcome twice.
-      */}
-      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
-        {pending ? copy.pendingAnnouncement : state.announcement}
-      </div>
-
-      {shared !== null || stream.draft === null ? null : (
-        <StreamedDraft agentName={agentName} draft={stream.draft} locale={locale} />
-      )}
-
-      <form action={formAction} className="assistant-composer-form" onSubmit={onSubmit} ref={form}>
-        <input name="intent" type="hidden" value="ask" />
-        <input name="locale" type="hidden" value={locale} />
-        {conversationId === undefined ? null : (
-          <input name="conversationId" type="hidden" value={conversationId} />
-        )}
-        {/* The name stays for assistive technology; visually the placeholder carries it. */}
-        <label className="sr-only" htmlFor={fieldId}>{copy.inputLabel(agentName)}</label>
-        <div className="assistant-composer-row">
-          <textarea
-            aria-describedby={hintId}
-            defaultValue={initial}
-            disabled={pending}
-            id={fieldId}
-            key={
-              streamFailure !== null
-                ? `stream-failed:${streamFailure.seq}`
-                : restored !== null
-                ? `restored:${restored.length}:${state.route}`
-                : seeded !== null
-                  ? `seeded:${seeded.length}`
-                  : "empty"
-            }
-            maxLength={12000}
-            name="composerText"
-            onKeyDown={onKeyDown}
-            placeholder={copy.inputPlaceholder}
-            ref={field}
-            required
-            rows={2}
-          />
-          {transcribeAction ? (
-            <VoiceComposer locale={locale} onTranscript={insertTranscript} transcribeAction={transcribeAction} />
-          ) : null}
-          {/*
-            Life Brain A.1: a 44px primary icon button in place of the
-            full-width "Enviar" block. Its accessible name follows the state so
-            "Pensando…" is announced and the control stays findable by name.
-          */}
-          <IconButton
-            aria-label={pending ? copy.pending : copy.submit}
-            icon={<ArrowUp />}
-            loading={pending}
-            type="submit"
-            variant="primary"
-          />
-        </div>
-        <p className="assistant-composer-hint" id={hintId}>{copy.submitHint}</p>
-      </form>
-
+  const outcome = (
+    <>
       {streamFailure === null ? null : (
         <div
           aria-label={copy.resultRegionLabel(agentName)}
@@ -435,6 +380,76 @@ export function ChatComposer({
         silent
         state={state.command}
       />
+    </>
+  );
+
+  return (
+    <section className="assistant-composer">
+      {/*
+        One polite live region for the whole surface, which is why
+        `TaskCommandResult` below is asked to stay silent: a turn can resolve on
+        a route the command state knows nothing about, and two regions would
+        announce every command outcome twice.
+      */}
+      <div aria-atomic="true" aria-busy={pending} aria-live="polite" className="sr-only" role="status">
+        {pending ? copy.pendingAnnouncement : state.announcement}
+      </div>
+
+      {shared !== null || stream.draft === null ? null : (
+        <StreamedDraft agentName={agentName} draft={stream.draft} locale={locale} />
+      )}
+
+      <form action={formAction} className="assistant-composer-form" onSubmit={onSubmit} ref={form}>
+        <input name="intent" type="hidden" value="ask" />
+        <input name="locale" type="hidden" value={locale} />
+        {conversationId === undefined ? null : (
+          <input name="conversationId" type="hidden" value={conversationId} />
+        )}
+        {/* The name stays for assistive technology; visually the placeholder carries it. */}
+        <label className="sr-only" htmlFor={fieldId}>{copy.inputLabel(agentName)}</label>
+        <div className="assistant-composer-row">
+          <textarea
+            aria-describedby={hintId}
+            defaultValue={initial}
+            disabled={pending}
+            id={fieldId}
+            key={
+              streamFailure !== null
+                ? `stream-failed:${streamFailure.seq}`
+                : restored !== null
+                ? `restored:${restored.length}:${state.route}`
+                : seeded !== null
+                  ? `seeded:${seeded.length}`
+                  : "empty"
+            }
+            maxLength={12000}
+            name="composerText"
+            onKeyDown={onKeyDown}
+            placeholder={copy.inputPlaceholder}
+            ref={field}
+            required
+            rows={1}
+          />
+          {transcribeAction ? (
+            <VoiceComposer locale={locale} onTranscript={insertTranscript} transcribeAction={transcribeAction} />
+          ) : null}
+          {/*
+            Life Brain A.1: a 44px primary icon button in place of the
+            full-width "Enviar" block. Its accessible name follows the state so
+            "Pensando…" is announced and the control stays findable by name.
+          */}
+          <IconButton
+            aria-label={pending ? copy.pending : copy.submit}
+            icon={<ArrowUp />}
+            loading={pending}
+            type="submit"
+            variant="primary"
+          />
+        </div>
+        <p className="assistant-composer-hint" id={hintId}>{copy.submitHint}</p>
+      </form>
+
+      {outcomeTarget === null ? outcome : createPortal(outcome, outcomeTarget)}
     </section>
   );
 }

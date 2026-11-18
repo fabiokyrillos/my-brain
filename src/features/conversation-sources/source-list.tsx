@@ -15,13 +15,16 @@
  * 4. **Reach** — records and memories, and nothing else. The limit is stated
  *    rather than hidden.
  *
- * ## Chips, not cards (Life Brain E.7, ADR-177)
+ * ## One quiet line, closed (Editorial calmo, ADR-180; chips since ADR-177)
  *
- * Each source is a chip under the answer — its type and its date, "Registro ·
- * 5 nov." — that opens the source, as in the approved Conversar mockup. The
- * answer above already says what the source says; the chip says where it came
+ * Under the answer the block is a row of closed disclosures: how many sources
+ * the answer stands on, and where it looked. Opened, each source is a row —
+ * its type and its date, "Registro · 5 nov." — that opens the source. The
+ * answer above already says what the source says; the row says where it came
  * from and takes the owner there. The support kind is read to assistive
- * technology inside the chip's name, and an inference is drawn differently.
+ * technology inside the row's name, and an inference is drawn differently.
+ * (`conversation-source-chip` is still the row's class name: three lanes
+ * address it.) The honest "I found nothing" is never behind a disclosure.
  *
  * A chip carries **no content** — no snippet — so this component still holds no
  * sensitivity logic of its own (`sensitivity-boundary.test.ts`): there is
@@ -30,6 +33,7 @@
  */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 import {
   CONTINUITY_HANDLE_VERSION,
@@ -90,6 +94,7 @@ function openHref(
 }
 
 export function SourceList({
+  children,
   citations,
   continuity = null,
   locale,
@@ -97,6 +102,8 @@ export function SourceList({
   sources,
   timeZone,
 }: {
+  /** Bookkeeping the host files behind "where I looked" — never content. */
+  children?: ReactNode;
   citations: ParsedCitations;
   /** Present in a thread, absent wherever a source list has no position. */
   continuity?: { conversationId: string; messageId: string } | null;
@@ -145,9 +152,17 @@ export function SourceList({
     >
       {insufficient ? (
         <p className="conversation-sources-insufficient">{where.insufficient}</p>
-      ) : (
-        <>
-          <strong className="conversation-sources-title sr-only">{copy.title}</strong>
+      ) : sources.length === 0 ? null : (
+        /*
+          Editorial calmo: one quiet line under the answer, closed. It says how
+          many sources the answer stands on; opened, each is a row that leads to
+          its record. They were a stack of chips, drawn open under every answer.
+        */
+        <details className="conversation-sources-used">
+          <summary>
+            <span className="conversation-sources-title sr-only">{copy.title}: </span>
+            {copy.sourcesSummary(sources.length)}
+          </summary>
           <ul className="conversation-sources-list">
             {sources.map((source) => {
               const href = openHref(source.card, continuity);
@@ -179,17 +194,26 @@ export function SourceList({
               );
             })}
           </ul>
-        </>
+        </details>
       )}
 
       {/*
-        `2K-SRC-006`. Shown on both branches — an answer with nothing to cite
+        `2K-SRC-006`. Present on both branches — an answer with nothing to cite
         still owes the user the shape of where it looked, and that is the
         sentence that turns "I found nothing" from a shrug into information.
         Withheld only for a legacy row, which never recorded a reach.
+
+        Editorial calmo: it is the same sentence under every answer, so it sits
+        behind its own closed line ("Onde procurei") instead of being drawn
+        each time. `children` is what else the thread files there — the model
+        that answered.
       */}
       {citations.legacy ? null : (
-        <p className="conversation-sources-reach">{where.reach}</p>
+        <details className="conversation-sources-where">
+          <summary>{copy.reachSummary}</summary>
+          <p className="conversation-sources-reach">{where.reach}</p>
+          {children}
+        </details>
       )}
 
       {/*

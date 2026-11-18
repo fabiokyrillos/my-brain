@@ -2829,7 +2829,14 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 
 ## ADR-186 — On a phone the Agenda is a list of days, and the planner's explanations fold
 
-- **Date:** 2026-11-18. **Status:** accepted on the branch; three points await the owner's eye (below).
+- **Date:** 2026-11-18. **Status:** accepted; the owner approved all three points on 2026-11-18.
 - **Context:** Life Brain D.1 gave the phone a seven-column week table on the owner's request ("como no Google Calendar") and put the planner's meaning sentence first on his feedback ("não sei o que é planejado"). At 390px the table's cells held 11px hyphenated fragments, and the planner opened with two paragraphs and three capacity sentences before any task.
 - **Decision:** (1) Under 768px the week is a seven-day strip (links into each day, a dot where there is something, today marked) over the same stream of days the list uses; the table is unchanged from 768px. (2) A calendar row prints one kind word (Prazo, Intenção, Lembrete, Evento, Revisão, Data sugerida); the commitment word stays for assistive technology only. (3) The planner says what it asks in one line under the day; the meaning, capacity and pool sentences sit in one closed disclosure at the foot, which opens by itself when the day is overloaded.
 - **Consequences:** this reverses two things the owner asked for by name. The tests keyed to `2M-ACCESS-005`, `2M-PLAN-004/-006/-007` and D.1 were rewritten from "visible" to "present, visible once opened". If he wants the grid or the sentence back, each is a small change: the table is still rendered and hidden by CSS, and the sentence is still in the copy module.
+
+## ADR-187 — An answer's sources, reach and model are one closed line under it
+
+- **Date:** 2026-11-18. **Status:** accepted; the owner approved it on 2026-11-18.
+- **Context:** every answer in Conversar printed its sources as a stack of chips, the sentence saying where the search reached, and the model id. On a phone that was more chrome than answer, and the thread read as a log rather than as something written to the owner.
+- **Decision:** under an answer there is one line of closed disclosures: *N fontes* (rows, each the link), *Onde procurei* (the reach sentence and the model) and *Como cheguei aqui* (the explanation panel, unchanged, which by its own guard never names the model). The statement that nothing of the owner's was found is not a disclosure: it is always printed. Per-turn dates collapse into one day heading; a question keeps its hour.
+- **Consequences:** provenance is one tap further away than it was, in a product whose promise is grounded answers. The count stays visible so its presence is never in doubt. An answer with no source block shows no model at all. Restoring visible sources is opening one `<details>` by default.

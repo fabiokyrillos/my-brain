@@ -83,6 +83,7 @@ async function storeCredentialThroughSettings(page: Page, user: Disposable, key:
 
   await page.goto("/en/app/settings");
   const panel = page.locator("section.byok-panel");
+  await openKeyRow(panel);
   await panel.getByLabel("API key").fill(key);
   await panel.getByRole("button", { name: /^(Save key|Replace key)$/ }).click();
   await expect(panel.getByRole("status")).toHaveText(/validated\.$/, { timeout: 60_000 });
@@ -327,7 +328,10 @@ test.describe("BYOK two-user isolation, rotation and lifecycle", () => {
       expect(witnessOne).toBe(witnessTwo);
       expect(witnessOne).toBe(before?.updated_at);
 
+      await openKeyRow(tabOne.locator("section.byok-panel"));
+
       await tabOne.locator("section.byok-panel").getByLabel("API key").fill(keyB!);
+      await openKeyRow(tabTwo.locator("section.byok-panel"));
       await tabTwo.locator("section.byok-panel").getByLabel("API key").fill(keyB!);
 
       await Promise.all([
@@ -386,3 +390,12 @@ test.describe("BYOK two-user isolation, rotation and lifecycle", () => {
     }
   });
 });
+
+/**
+ * Editorial calmo (ADR-180): with a working key, the key form waits behind the
+ * key's row ("Alterar"). Without one the row arrives open, so this is a no-op.
+ */
+async function openKeyRow(scope: { locator(selector: string): import("@playwright/test").Locator }): Promise<void> {
+  const closed = scope.locator("details.byok-key:not([open]) > summary");
+  if ((await closed.count()) > 0) await closed.click();
+}

@@ -135,6 +135,8 @@ test.describe("automation by category is visible, refused, and reversible", () =
     const memories = page.getByRole("form", { name: "Memórias" });
     await expect(memories.getByLabel("Política")).toHaveValue("suggest_only");
 
+    // Editorial calmo (ADR-180): a category is a row; "Alterar" opens its policy in place.
+    await page.locator(".automation-row", { has: memories }).locator("summary").click();
     await memories.getByLabel("Política").selectOption("disabled");
     await memories.getByRole("button", { name: "Salvar política" }).click();
 
@@ -195,6 +197,7 @@ test.describe("automation by category is visible, refused, and reversible", () =
     expect(overflow).toBeLessThanOrEqual(1);
 
     // Every control still reaches the 44px target on a phone.
+    await page.locator(".automation-row", { has: page.getByRole("form", { name: "Tarefas" }) }).locator("summary").click();
     const save = page.getByRole("form", { name: "Tarefas" }).getByRole("button", { name: "Salvar política" });
     const box = await save.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);

@@ -51,12 +51,19 @@ export function OnboardingRestore({
   const copy = getOnboardingCopy(locale);
 
   return (
+    /*
+      Editorial calmo (ADR-180): one row — what it is, what it is set to, and
+      its one verb — instead of a card with a paragraph and a button. Same
+      form, same named submit button, same action.
+    */
     <section className="onboarding-restore" aria-labelledby="onboarding-restore-title">
-      <h2 id="onboarding-restore-title">{copy.restore.title}</h2>
-      <p>{copy.restore.body}</p>
-      <form action={restoreAction}>
+      <form action={restoreAction} className="settings-row">
         <input type="hidden" name="locale" value={locale} />
-        <button type="submit" name="restoreOnboarding" className="onboarding-restore-action">
+        <span className="settings-row-copy">
+          <h2 className="settings-row-label" id="onboarding-restore-title">{copy.restore.title}</h2>
+          <small>{copy.restore.body}</small>
+        </span>
+        <button type="submit" name="restoreOnboarding" className="setting-verb onboarding-restore-action">
           {copy.restore.action}
         </button>
       </form>

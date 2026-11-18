@@ -106,9 +106,17 @@ export function ConsentSection({
         gives that producer its first consumer; the permission *request* flow
         stays with `2O-NOTIFY` in slice 2O.6, which is a different problem.
       */}
-      <h3>{copy.consent.optionalHeading}</h3>
-      <p className="data-ai-intro">{copy.consent.optionalLead}</p>
-      <ConsentRevocation locale={locale} state={pushConsent} />
+      <div className="settings-rows">
+        <div className="settings-row privacy-row">
+          <div className="settings-row-copy">
+            <h3 className="settings-row-label">{copy.consent.optionalHeading}</h3>
+            <small>{copy.consent.optionalLead}</small>
+          </div>
+          <div className="privacy-revocation">
+            <ConsentRevocation locale={locale} state={pushConsent} />
+          </div>
+        </div>
+      </div>
     </section>
   );
 }

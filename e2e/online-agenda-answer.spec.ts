@@ -133,6 +133,9 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       await expect(answer.locator(".chat-message-body")).toContainText(`15:00 · ${TASK_TITLE} · ${text.deadlineLane} · ${text.joinedReminder}`);
       await expect(answer.locator(".chat-message-body")).not.toContainText(`14:00 · ${TASK_TITLE}`);
       // Where it looked, said for the agenda — not "records and memories only".
+      // Editorial calmo: the sentence is behind its own closed line.
+      await expect(answer.getByText(text.reach)).toBeHidden();
+      await answer.locator(".conversation-sources-where > summary").click();
       await expect(answer.getByText(text.reach)).toBeVisible();
       // The task is a navigable source, carrying no title in the card, and
       // since Life Brain B.2 (ADR-147) so is its reminder, on the reminder page
@@ -140,7 +143,7 @@ test.describe("Life Brain B.1 — the agenda answers without a model", () => {
       await expect(answer.locator(`a[href^="/${locale}/app/work/"]`)).toHaveCount(1);
       await expect(answer.locator(`a[href^="/${locale}/app/reminders/"]`)).toHaveCount(1);
       // No model answered, so no model id is printed under the message.
-      await expect(answer.locator("xpath=./small")).toHaveCount(0);
+      await expect(answer.locator(".chat-message-model")).toHaveCount(0);
 
       if (evidence) {
         mkdirSync(evidence, { recursive: true });

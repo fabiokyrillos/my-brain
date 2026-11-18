@@ -151,6 +151,91 @@ describe("a new conversation becomes the conversation without being entered", ()
   });
 });
 
+describe("a turn's outcome is read in the thread, not under the field (Editorial calmo)", () => {
+  const remembered: AssistantComposerState = {
+    ...idleAssistantComposerState,
+    route: "memory_intent",
+    notice: { heading: "Isso parece algo para guardar como memória", detail: "Ainda não salvei nada.", nextStep: null },
+    echo: "Lembre que prefiro reuniões pela manhã",
+    announcement: "Isso parece algo para guardar como memória.",
+  };
+
+  it("draws a turn that was not a streamed answer where the thread mounts it, and focuses it", async () => {
+    const action = vi.fn(async (): Promise<AssistantComposerState> => remembered);
+    render(
+      <ChatStreamProvider locale="pt-BR">
+        <div data-testid="thread"><ChatDraftSlot agentName="Brain" locale="pt-BR" /></div>
+        <div data-testid="dock">
+          <ChatComposer action={action} agentName="Brain" locale="pt-BR" memoryAction={memoryAction()} memoryUndoAction={memoryAction()} />
+        </div>
+      </ChatStreamProvider>,
+    );
+    // Between turns the thread's element is there and empty.
+    expect(screen.getByTestId("thread").querySelector("[data-chat-outcome]")?.childElementCount).toBe(0);
+
+    await userEvent.type(screen.getByRole("textbox"), "Lembre que prefiro reuniões pela manhã");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    const outcome = await within(screen.getByTestId("thread")).findByRole("region", { name: "Resposta do Brain" });
+    expect(within(outcome).getByText("Isso parece algo para guardar como memória")).toBeTruthy();
+    expect(within(outcome).getByText("Lembre que prefiro reuniões pela manhã")).toBeTruthy();
+    expect(screen.getByTestId("dock").querySelector(".assistant-composer-notice")).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(outcome));
+    // The field stays where it is: one field, in the dock.
+    expect(within(screen.getByTestId("dock")).getAllByRole("textbox")).toHaveLength(1);
+  });
+
+  it("keeps the outcome under the field where no thread has mounted a place for it", async () => {
+    const action = vi.fn(async (): Promise<AssistantComposerState> => remembered);
+    render(
+      <div data-testid="dock">
+        <ChatComposer action={action} agentName="Brain" locale="pt-BR" memoryAction={memoryAction()} memoryUndoAction={memoryAction()} />
+      </div>,
+    );
+    await userEvent.type(screen.getByRole("textbox"), "Lembre que prefiro reuniões pela manhã");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    expect(await within(screen.getByTestId("dock")).findByRole("region", { name: "Resposta do Brain" })).toBeTruthy();
+  });
+
+  it("sets a streamed answer as prose: paragraphs and a list, never markup", async () => {
+    const stream = controlledStream();
+    fetchMock.mockResolvedValue(stream.response);
+    render(
+      <ChatStreamProvider conversationId={conversationId} locale="pt-BR">
+        <div data-testid="thread"><ChatDraftSlot agentName="Brain" locale="pt-BR" /></div>
+        <ChatComposer
+          action={vi.fn(async () => idleAssistantComposerState)}
+          agentName="Brain"
+          conversationId={conversationId}
+          locale="pt-BR"
+          memoryAction={memoryAction()}
+          memoryUndoAction={memoryAction()}
+        />
+      </ChatStreamProvider>,
+    );
+    await userEvent.type(screen.getByRole("textbox"), "O que falta?");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+    await act(async () => {
+      stream.send({ type: "conversation", conversationId });
+      stream.send({ type: "delta", text: "Faltam duas coisas:\n\n1. Revisar\n2. <b>Enviar</b>" });
+    });
+    const answer = await waitFor(() => {
+      const found = screen.getByTestId("thread").querySelector('[data-draft-role="assistant"] .chat-message-body');
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    expect(answer.querySelector("p")?.textContent).toBe("Faltam duas coisas:");
+    expect([...answer.querySelectorAll("ol > li")].map((item) => item.textContent)).toEqual(["Revisar", "<b>Enviar</b>"]);
+    expect(answer.querySelector("b")).toBeNull();
+    await act(async () => {
+      stream.send({ type: "done", conversationId, href: `/pt-BR/app/chat/${conversationId}` });
+      stream.end();
+    });
+  });
+});
+
 const groups: readonly ConversationGroup[] = [
   { key: "today", label: "Hoje", items: [{ id: conversationId, title: "Quando fui ao médico?" }, { id: "a", title: "O que tenho essa semana?" }] },
   { key: "week", label: "Últimos 7 dias", items: [{ id: "b", title: "Viagem a Lisboa" }] },
@@ -232,6 +317,34 @@ describe("the other conversations are behind the menu", () => {
     expect(within(older).getAllByRole("link").map((link) => link.textContent)).toEqual(["Lisboa em 2024"]);
     expect(within(older).getByRole("link").getAttribute("href")).toBe("/pt-BR/app/chat/old-1");
     expect(screen.getByRole("region", { name: "Últimos 7 dias" })).toBeTruthy();
+  });
+
+  it("draws each conversation as one row: the link is its title, with one caption saying when", async () => {
+    setWidth(true);
+    render(
+      <ChatFrame
+        activeId={null}
+        groups={[{ key: "today", label: "Hoje", items: [
+          { id: "a", title: "O que tenho essa semana?", when: { at: "2026-11-16T12:05:00Z", label: "09:05" } },
+          { id: "b", title: "Sem data" },
+        ] }]}
+        limited={null}
+        locale="pt-BR"
+        title="Brain"
+      >
+        <p>thread</p>
+      </ChatFrame>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Mostrar conversas" }));
+    const rows = within(screen.getByRole("region", { name: "Hoje" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(2);
+    // The caption is in the row and outside the link's name.
+    expect(within(rows[0]!).getByRole("link", { name: "O que tenho essa semana?" }).getAttribute("href")).toBe("/pt-BR/app/chat/a");
+    const stamp = rows[0]!.querySelector("time");
+    expect(stamp?.textContent).toBe("09:05");
+    expect(stamp?.getAttribute("datetime")).toBe("2026-11-16T12:05:00Z");
+    // A row with no readable time claims none.
+    expect(rows[1]!.querySelector("time")).toBeNull();
   });
 
   it("names the screen with its title and offers a new conversation", () => {
