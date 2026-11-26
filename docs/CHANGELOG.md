@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-25 — LB-M5 and Conversar turn finishing land on `main` (ADR-191 to ADR-194)
+
+- #394 (LB-M5) had been closed unmerged when its base, #393's branch, was deleted on merge; its commit and the three Conversar commits are rebased onto `main` after #396–#410 and land together.
+- Renumbered: LB-M5 ADR-180 → ADR-191, and ADR-181/182/183 → ADR-192/193/194, in the decisions, the docs, code comments and tests. `main` uses ADR-180 for Editorial calmo and ADR-184–190 for its slices. ADR-191 records the renumbering.
+- Rebase: the composer's hidden `streamAnswer` field goes into the recomposed form of `chat-composer.tsx`; the failure mark's `failed` prop goes on the `ThreadMessage` inside #410's day grouping; the `data-turn="failed"` rule is kept and the two user-row rules #410 removed stay removed.
+- `process-jobs/entry.ts`: the comment on `link_entry_life_area` no longer says it gives health and finance a default sensitivity (comment only).
+- One migration, `202611160110`, applied to the hosted project after the merge.
+
 ## 2026-11-18 — Conversar: the question on the right, the answer on the left, sources as cards (ADR-189)
 
 - The owner's turn is right-aligned in a quiet filled shape with its hour under it; the answer is on the left under a *B · Brain* label (new `chat/agent-speaker.tsx`), in the reading face at 19px. The streamed draft and the thinking indicator carry the same label.

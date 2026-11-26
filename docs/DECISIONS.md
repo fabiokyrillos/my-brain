@@ -2865,6 +2865,7 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 ## ADR-191 — LB-M5: the database stops setting a sensitivity
 
 - **Date:** 2026-11-16
+- **Numbering:** written as ADR-180 on its branch, and its three successors as ADR-181 to ADR-183. `main` had meanwhile given ADR-180 to Editorial calmo and ADR-184 to ADR-190 to that work, so at the merge (2026-11-25) they became ADR-191 to ADR-194. Entries written earlier that cite the old numbers for these keep their wording.
 - **Status:** Accepted. Owner's authorization of 2026-11-16, given for the optional follow-up ADR-178 Decision 4 left, and for applying it to the hosted project after the merge. It is the seventh Life Brain migration, `202611160110`. The owner declined the `unaccent` search at the same time (ADR-179 stands).
 
 - **Context.** After ADR-178 every level renders, searches and reaches the chat alike, but the database still held two writers of `entries.sensitivity`. `link_entry_life_area` stamped a newly linked health or finance entry `private`. `set_entry_sensitivity` had lost its only caller, the record page's form, in E.8.
