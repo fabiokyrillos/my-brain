@@ -1,5 +1,11 @@
 # Technical Changelog
 
+## 2026-11-26 — LB-M5 applied to the hosted project; `process-jobs` v37
+
+- `202611160110` applied with `supabase db push --linked`: hosted parity 110 = 110. Read back: `set_entry_sensitivity` absent, `link_entry_life_area` without the `private` stamp, `security definer`, empty `search_path`, `execute` for `service_role` only. The security advisors name neither function.
+- `process-jobs` deployed as v37 (`verify_jwt = false`, from `config.toml`); the only change since v36 is the area link's comment.
+- The generated types match the committed file except for the known overload rendering of the retention functions (Phase 2Q deployment report).
+
 ## 2026-11-25 — LB-M5 and Conversar turn finishing land on `main` (ADR-191 to ADR-194)
 
 - #394 (LB-M5) had been closed unmerged when its base, #393's branch, was deleted on merge; its commit and the three Conversar commits are rebased onto `main` after #396–#410 and land together.
