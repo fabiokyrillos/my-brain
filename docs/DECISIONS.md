@@ -2861,3 +2861,55 @@ The surface shows **up to three**. If fewer honestly qualify, it shows fewer —
 - **Context:** with sources drawn as cards in sight (ADR-189), a task or reminder card read "Tarefa · 10 de nov." — the date it was created, not which task it is. ADR-146 had read tasks content-free so that no title needed masking and no second sensitivity derivation existed. Since ADR-178 the conversation surface shows every level, and `chat/structured-sources.ts` (ADR-147) already reads the same titles, states and times, deriving each row's level from its source entry, before they reach the prompt.
 - **Decision:** `resolve-sources.ts` reads `tasks` as `id,title,status,due_at,planned_at,source_entry_id,created_at` and `reminders` as `id,title,status,remind_at,entry_id,created_at`, owner-scoped. The title is the card's snippet. Its level is derived from the source entry by `deriveTaskSensitivity` — the function Tarefas uses — with one owner-scoped read of `entries` (`id,sensitivity`), failing closed when that entry cannot be read; a row with no source entry carries the least protective level, as Tarefas shows it. A task's card says its deadline, a passed deadline (in the accent), its planned day or that it is done; a reminder's card says its day and hour. Nothing time-related is printed beside a masked title.
 - **Consequences:** the card says what the answer is about. Reclassifying a source entry masks the card on the next render, as for an entry or a memory. `phase-2q-foundation.test.ts` now asserts the new columns and the derived level instead of the content-free read; `resolve-sources.test.ts` covers the level, the fail-closed read and every time state. No migration, no RPC.
+
+## ADR-191 — LB-M5: the database stops setting a sensitivity
+
+- **Date:** 2026-11-16
+- **Numbering:** written as ADR-180 on its branch, and its three successors as ADR-181 to ADR-183. `main` had meanwhile given ADR-180 to Editorial calmo and ADR-184 to ADR-190 to that work, so at the merge (2026-11-25) they became ADR-191 to ADR-194. Entries written earlier that cite the old numbers for these keep their wording.
+- **Status:** Accepted. Owner's authorization of 2026-11-16, given for the optional follow-up ADR-178 Decision 4 left, and for applying it to the hosted project after the merge. It is the seventh Life Brain migration, `202611160110`. The owner declined the `unaccent` search at the same time (ADR-179 stands).
+
+- **Context.** After ADR-178 every level renders, searches and reaches the chat alike, but the database still held two writers of `entries.sensitivity`. `link_entry_life_area` stamped a newly linked health or finance entry `private`. `set_entry_sensitivity` had lost its only caller, the record page's form, in E.8.
+
+- **Decision 1 — The area link sets no level.** `link_entry_life_area` is recreated with the same signature, checks, grants and audit shape, minus the stamp. The audit row still carries the level before and after, and the two are now always equal. The worker deployed today calls it unchanged.
+- **Decision 2 — The override is dropped.** `set_entry_sensitivity(uuid, text)` is removed, so `authenticated` loses one definer function. Its `entry_sensitivity_set` audit rows already written stay readable in Histórico.
+- **Decision 3 — No row is rewritten.** An entry already `private` stays so: since ADR-178 the value changes nothing the owner sees, and rewriting history to say it did would be an automatic action with nothing to show for it. The column, its CHECK and the TypeScript contract stay (ADR-178 Decision 3).
+- **Decision 4 — A correction to ADR-178 Decision 4.** It said "two suggestion RPCs still skip `highly_sensitive` rows". No SQL function does: the skip was the TypeScript derivation's `readable` (`conversation-cards/suggestions.ts`), which E.8 already made admit every level. Nothing about it is in this migration.
+
+- **Consequences.** Nothing in the database writes a sensitivity. Left open: the deployed worker's comment in `process-jobs/entry.ts` still says the link gives health and finance their default level. Correcting it is a worker change and a deploy, so it waits for the next one.
+
+## ADR-192 — A failed answer stream records the bill the provider reported
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16 ("pode fazer também") for the three Conversar items left open by ADR-175. No migration.
+
+- **Context.** ADR-175 recorded a streamed answer's cost when the response completed or was truncated (`incomplete`), and left one hole: "a stream aborted by the provider leaves its partial cost unrecorded". The Responses API reports usage only on a terminal response, and `failed` is terminal too; it may carry `usage`. The provider threw a plain `Error` on it, so a paid call left no ledger row.
+
+- **Decision 1 — The bill travels with the failure.** On `response.failed` with usage, `streamAnswerFromKnowledge` throws `BilledAnswerStreamFailure` (`lib/ai/answer-stream.ts`) holding the normalized usage and model. `runChatTurn` records it as the `chat` operation, against the conversation, before rethrowing; the turn then fails as before.
+- **Decision 2 — No bill, no row.** A `failed` response without usage, an `error` event and a stream that drops before any terminal response carry no usage. They still throw a plain `Error` and record nothing: an estimated row would be an invention in an append-only ledger.
+
+- **Consequences.** Every provider response that reports a cost is in the ledger, whichever way it ended. Left open, by design: a transport drop with no terminal event stays unrecorded, because the provider told us nothing.
+## ADR-193 — A sentence tried as a command first streams its answer too
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16 for the three Conversar items left open by ADR-175. No migration.
+
+- **Context.** ADR-175 streamed only a turn the pure router sends straight to the answer (`knowledge`). A statement such as "Algo sobre o Jaime e a proposta" is `command_first`: it goes through `runAssistantTurn`, the command parse declines it (`not_a_task_command`), and the action answered it inside `sendChatMessage`, all at once.
+
+- **Decision 1 — The action hands the answer back.** The composer posts `streamAnswer=1`. When the command path declines the sentence and it is not a relato, `runAssistantTurn` returns the new route `stream_answer` with the question in `echo`, and answers nothing. Without the flag, or with any other value, it answers in the action as before.
+- **Decision 2 — The composer streams it.** On `stream_answer` the composer sends the echo through the chat route, once per state, exactly like a plain question. The route re-authenticates, re-validates and runs the pipeline `sendChatMessage` runs, so the flag chooses a transport, never an authority.
+- **Decision 3 — Nothing else is handed over.** A command (preview, confirmation, refusal), a relato and every other route stay in the action.
+
+- **Consequences.** Every turn that ends in a grounded answer shows it as it is written. The command parse is still one model call before the answer, and still billed as before. Left open: none from ADR-175's list for this path.
+## ADR-194 — A turn that fails after its question is saved leaves a failure mark in the thread
+
+- **Date:** 2026-11-17
+- **Status:** Accepted. Owner's authorization of 2026-11-16. Reverses ADR-173 Decision 3. No migration.
+
+- **Context.** ADR-173 Decision 3 left a failed turn "recognisable only by age": the failure path recorded an `error_events` row and wrote no assistant row, so the thread's last message stayed the question. A reload showed "pensando" for three minutes and then "ficou sem resposta", although the turn had already failed and its sentence existed. The reason given was that `conversation_messages` has no field to mark a failure.
+
+- **Decision 1 — The mark lives in `citations`.** Each message's metadata is already the `citations` jsonb. `chat/failed-turn.ts` defines a strict mark, `{ v, turn: "failed", failure, reference }`, holding only the failure class and the `error_events` correlation id. It never holds a provider string or a fragment of the half-written answer. `parseCitations` reads it as no citations, so a failure draws no source block.
+- **Decision 2 — Every failure after the question.** In `runChatTurn`, once the question row is saved, the BYOK gate, the rate-limit refusal, an agenda failure and the pipeline's catch all go through `failAfterQuestion`: one assistant row with the sentence the owner is shown, `model: null`, and the mark. Both transports share it. Refusals before the question is saved (validation, session, conversation not found) write nothing, as before.
+- **Decision 3 — Never after an answer.** If the answer row was written and a later write (the conversation timestamp, the audit) fails, no mark is written. The answer stands, and the failure is still recorded and shown in the composer. The insert is best effort: if it fails too, the turn fails as it did before.
+- **Decision 4 — Not something the assistant said.** The history sent to the model drops marks, and so does the "has this conversation an earlier turn" test of `LB-B-008`. The thread renders a mark as an assistant message with `data-turn="failed"`, set in a quieter colour.
+
+- **Consequences.** A failed turn says so in the thread at once, on every device and after a reload. "Pensando" now covers only a turn in flight, or one whose process died before it could write. A mark takes one of the `CHAT_HISTORY_TURNS` slots the history read returns before it is filtered out.

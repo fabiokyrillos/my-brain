@@ -664,8 +664,9 @@ export async function processEntryJob(
      * belongs to is persisted. Non-blocking for the same reason the embedding
      * is: an area that cannot be linked never destroys an interpretation. The
      * RPC links the CURRENT interpretation, so a reprocessed entry is linked
-     * on its new reading, and it gives health and finance their default
-     * sensitivity unless the owner already chose one.
+     * on its new reading. Since LB-M5 (ADR-191) it sets no sensitivity: an
+     * entry about health or finance keeps the level it already has, like any
+     * other area.
      */
     const area = lifeAreaToLink(extracted.extraction.lifeArea);
     if (area !== null) {

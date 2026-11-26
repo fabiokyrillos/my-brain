@@ -4,7 +4,8 @@
  *
  * `sendChatMessage` inserts the question into `conversation_messages` BEFORE it
  * calls the model, and the answer only after. So a thread whose last message is
- * the owner's is a turn in flight — or one that failed and wrote no answer. Age
+ * the owner's is a turn in flight — or, since ADR-194 writes a failure mark for
+ * every failure it can catch, one whose process died before it could. Age
  * tells the two apart: inside `PENDING_TURN_WINDOW_MS` the page says the
  * assistant is thinking and refreshes itself until the answer lands; past it,
  * the page says the question went unanswered, so it never spins forever.

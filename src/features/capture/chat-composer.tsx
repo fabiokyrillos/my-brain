@@ -218,6 +218,20 @@ export function ChatComposer({
   }, [streamFailure]);
 
   /**
+   * ADR-193. A sentence tried as a command first went through the action, and
+   * the command path declined it: the action handed the question back as
+   * `stream_answer` instead of answering it, so it is streamed from here like a
+   * plain question. Once per state — the ref keeps a re-render from asking the
+   * same question twice.
+   */
+  const handedOver = useRef<typeof state | null>(null);
+  useEffect(() => {
+    if (state.route !== "stream_answer" || state.echo === null || handedOver.current === state) return;
+    handedOver.current = state;
+    void stream.send(state.echo);
+  }, [state, stream]);
+
+  /**
    * ADR-175. Before the action runs: a plain question is taken off the action
    * and streamed instead. `preventDefault` is what stops React running the form
    * action; the field is emptied by hand because no form reset follows.
@@ -402,6 +416,8 @@ export function ChatComposer({
       <form action={formAction} className="assistant-composer-form" onSubmit={onSubmit} ref={form}>
         <input name="intent" type="hidden" value="ask" />
         <input name="locale" type="hidden" value={locale} />
+        {/* ADR-193: this composer streams, so a command-first answer is handed back to it. */}
+        <input name="streamAnswer" type="hidden" value="1" />
         {conversationId === undefined ? null : (
           <input name="conversationId" type="hidden" value={conversationId} />
         )}

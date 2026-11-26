@@ -75,8 +75,10 @@ type ChatStub = {
   /** The validity windows `memoriesInForce` will read back for the matched ids. */
   memoryRows?: { id: string; valid_from: string | null; valid_until: string | null }[];
   memoryLookupFails?: boolean;
+  /** ADR-194: the audit row after an answer fails to save. */
+  auditFails?: boolean;
   /** Earlier turns of an existing conversation (B.0), newest first as the query returns them. */
-  history?: { role: string; content: string }[];
+  history?: { role: string; content: string; citations?: unknown }[];
   /** Life Brain B.2: what the title match over tasks and reminders returns, and their sources' levels. */
   structured?: {
     tasks?: Record<string, unknown>[];
@@ -100,10 +102,13 @@ function chain(result: { data: unknown; error: unknown }) {
 
 let insertedAssistantMessage: Record<string, unknown> | null = null;
 let insertedAudit: Record<string, unknown> | null = null;
+/** Every assistant row, in order — an answer and a failure mark are both assistant rows (ADR-194). */
+let assistantRows: Record<string, unknown>[] = [];
 
 function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
   insertedAssistantMessage = null;
   insertedAudit = null;
+  assistantRows = [];
 
   const from = vi.fn((table: string) => {
     if (table === "account_lifecycle") {
@@ -126,7 +131,10 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
           eq: () => ({ order: () => ({ limit: async () => ({ data: options.history ?? [], error: null }) }) }),
         }),
         insert: async (payload: Record<string, unknown>) => {
-          if (payload.role === "assistant") insertedAssistantMessage = payload;
+          if (payload.role === "assistant") {
+            insertedAssistantMessage = payload;
+            assistantRows.push(payload);
+          }
           return { data: null, error: null };
         },
       };
@@ -140,7 +148,7 @@ function stubSupabase(options: { user: { id: string } | null } & ChatStub) {
       return {
         insert: async (payload: Record<string, unknown>) => {
           insertedAudit = payload;
-          return { data: null, error: null };
+          return options.auditFails ? { data: null, error: { message: "audit unavailable" } } : { data: null, error: null };
         },
       };
     }
@@ -257,6 +265,49 @@ describe("2H-RATE-001: the AI ceiling refuses before any provider call", () => {
     expect(result.status).toBe("error");
     expect(result.message).toContain("Ritmo de uso da IA atingido");
     expect(getAIProvider).not.toHaveBeenCalled();
+    // ADR-194: the refusal is the thread's reply, so a reload does not show "pensando".
+    expect(insertedAssistantMessage).toMatchObject({ content: result.message, citations: { turn: "failed", failure: "quota", reference: null } });
+  });
+});
+
+describe("ADR-194: a failed turn leaves a mark, and only when no answer was saved", () => {
+  it("leaves no mark when the answer was saved and only the audit after it failed", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({
+        user: { id: userId },
+        citedSourceIds: [],
+        matches: [{ source_type: "entry", source_id: "33333333-3333-4333-8333-333333333333", content: "Ana", similarity: 0.9, occurred_at: "2026-11-01T10:00:00Z" }],
+        auditFails: true,
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    vi.mocked(getAIProvider).mockReturnValue(stubProvider([]) as unknown as ReturnType<typeof getAIProvider>);
+
+    const result = await sendChatMessage(idleState, form());
+
+    expect(result.status).toBe("error");
+    expect(assistantRows).toHaveLength(1);
+    expect(assistantRows[0]!.citations).not.toMatchObject({ turn: "failed" });
+  });
+
+  it("does not count an earlier failure mark as an earlier turn (LB-B-008)", async () => {
+    vi.mocked(createClient).mockResolvedValue(
+      stubSupabase({
+        user: { id: userId },
+        citedSourceIds: [],
+        matches: [],
+        // The conversation's only earlier row is a failure mark: excluded, it
+        // leaves no earlier turn, so zero sources get the fixed answer.
+        history: [
+          { role: "assistant", content: "Não foi possível responder agora.", citations: { v: "2026-11-17.1", turn: "failed", failure: "provider", reference: null } },
+        ],
+      }) as unknown as Awaited<ReturnType<typeof createClient>>,
+    );
+    vi.mocked(getAIProvider).mockReturnValue(stubProvider([]) as unknown as ReturnType<typeof getAIProvider>);
+
+    await expect(sendChatMessage(idleState, form({ conversationId }))).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(insertedAudit).toMatchObject({ after_state: { route: "no_evidence" } });
+    expect(recordAIUsage).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ operation: "chat" }));
   });
 });
 
@@ -551,7 +602,9 @@ describe("Life Brain B.1: an agenda question is answered without a model (LB-B-0
     const result = await sendChatMessage(idleState, form({ question: "O que tenho amanhã?" }));
 
     expect(result.status).toBe("error");
-    expect(insertedAssistantMessage).toBeNull();
+    // ADR-194: the failure is left in the thread as a mark, never as an empty day.
+    expect(assistantRows).toHaveLength(1);
+    expect(insertedAssistantMessage).toMatchObject({ role: "assistant", content: result.message, model: null, citations: { turn: "failed", failure: result.failure } });
     expect(getAIProvider).not.toHaveBeenCalled();
   });
 

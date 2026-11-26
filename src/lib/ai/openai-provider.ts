@@ -2,7 +2,7 @@ import "server-only";
 
 import OpenAI from "openai";
 import { zodTextFormat } from "openai/helpers/zod";
-import { createAnswerFieldExtractor } from "./answer-stream";
+import { BilledAnswerStreamFailure, createAnswerFieldExtractor } from "./answer-stream";
 import { chatAnswerSchema } from "./chat-schema";
 import { knowledgePrompt } from "./knowledge-prompt";
 import { entryExtractionSchema } from "./extraction-schema";
@@ -401,7 +401,15 @@ export class OpenAIProvider implements AIProvider {
         if (piece) options.onAnswerDelta(piece);
       } else if (event.type === "response.completed" || event.type === "response.incomplete") {
         final = event.response;
-      } else if (event.type === "response.failed" || event.type === "error") {
+      } else if (event.type === "response.failed") {
+        // ADR-192: a failed response is terminal too, and may report what it
+        // billed. When it does, the bill travels with the failure so the
+        // pipeline can record it; when it does not, there is nothing to record.
+        if (event.response.usage) {
+          throw new BilledAnswerStreamFailure({ ...normalizeResponseUsage(event.response), model: event.response.model ?? this.model });
+        }
+        throw new Error("OpenAI reported a failed answer stream");
+      } else if (event.type === "error") {
         throw new Error("OpenAI reported a failed answer stream");
       }
     }

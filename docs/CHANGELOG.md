@@ -1,5 +1,13 @@
 # Technical Changelog
 
+## 2026-11-25 — LB-M5 and Conversar turn finishing land on `main` (ADR-191 to ADR-194)
+
+- #394 (LB-M5) had been closed unmerged when its base, #393's branch, was deleted on merge; its commit and the three Conversar commits are rebased onto `main` after #396–#410 and land together.
+- Renumbered: LB-M5 ADR-180 → ADR-191, and ADR-181/182/183 → ADR-192/193/194, in the decisions, the docs, code comments and tests. `main` uses ADR-180 for Editorial calmo and ADR-184–190 for its slices. ADR-191 records the renumbering.
+- Rebase: the composer's hidden `streamAnswer` field goes into the recomposed form of `chat-composer.tsx`; the failure mark's `failed` prop goes on the `ThreadMessage` inside #410's day grouping; the `data-turn="failed"` rule is kept and the two user-row rules #410 removed stay removed.
+- `process-jobs/entry.ts`: the comment on `link_entry_life_area` no longer says it gives health and finance a default sensitivity (comment only).
+- One migration, `202611160110`, applied to the hosted project after the merge.
+
 ## 2026-11-18 — Conversar: the question on the right, the answer on the left, sources as cards (ADR-189)
 
 - The owner's turn is right-aligned in a quiet filled shape with its hour under it; the answer is on the left under a *B · Brain* label (new `chat/agent-speaker.tsx`), in the reading face at 19px. The streamed draft and the thinking indicator carry the same label.
@@ -110,6 +118,36 @@
 - `shell/home-view.tsx`: a section's link sits in its heading, before the rows; the greeting is one line; the lead attention item is a `NeedsAttentionItemRow`, not a proposal card.
 - `app/operations.css`: one block scoped to `.home-dashboard` — sections without panels, hairline rows, titles that break and lists that shrink (the sideways scroll on a phone), notice controls on shared lines, a capture field that rests at one line, "Ir para" as one quiet row.
 - Tests: every attention item is one linking row; the section link precedes the rows; the greeting is one line. Design in `docs/initiatives/editorial-calmo/DESIGN.md`, evidence in `docs/reports/editorial-calmo/HOJE.md`. No migration. The screenshot lane's Hoje baselines are not redrawn yet.
+
+## 2026-11-17 — A failed turn leaves a failure mark in the thread (ADR-194)
+
+- New `chat/failed-turn.ts`: the strict mark `{ v, turn: "failed", failure, reference }`, `buildFailedTurnEnvelope`, `isFailedTurn`.
+- `chat/chat-turn.ts`: after the question row, every failure (BYOK gate, rate limit, agenda, the pipeline's catch) writes one assistant row with the shown sentence and the mark, never after an answer row; the history read drops marks.
+- `/app/chat/[id]`: a mark renders with `data-turn="failed"`; `chat.css` sets it quieter.
+- Tests: `failed-turn.test.ts`; `stream-route.test.ts` (abort, validation and billed failures leave one mark; marks never reach the history); `actions.test.ts` (agenda and rate-limit failures leave a mark; no mark after a saved answer; a mark is not an earlier turn). No migration.
+
+## 2026-11-17 — A sentence tried as a command first streams its answer (ADR-193)
+
+- `assistant/composer-state.ts`: new route `stream_answer`.
+- `assistant/actions.ts`: on the command fallthrough (not a relato), `streamAnswer=1` returns `stream_answer` with the question in `echo` instead of answering in the action.
+- `capture/chat-composer.tsx`: posts `streamAnswer=1` and streams a handed-back question once per state.
+- Tests: `actions.test.ts` (handed back only on the fallthrough and only on "1"; commands, relatos and refusals never), `chat-composer-stream.test.tsx` (the action, then the stream). No migration.
+
+## 2026-11-17 — A failed answer stream records the bill the provider reported (ADR-192)
+
+- `lib/ai/answer-stream.ts`: `BilledAnswerStreamFailure`, a failure holding the usage and model.
+- `openai-provider.ts`: `response.failed` with usage throws it; without usage, and on an `error` event, a plain `Error` as before.
+- `chat/chat-turn.ts`: the turn records that bill as `chat` before rethrowing; the success path uses the same `recordChatUsage`.
+- Tests: `chat-stream-contract.test.ts` (billed and unbilled failures), `stream-route.test.ts` (the bill recorded, nothing persisted). No migration.
+
+## 2026-11-16 — LB-M5: the database stops setting a sensitivity (ADR-191)
+
+- **One migration, `202611160110_life_brain_lb_od7_retire_level_writers.sql`** (the seventh Life Brain migration, authorized by the owner on 2026-11-16).
+- `link_entry_life_area` is recreated without the `private` stamp for health and finance. Signature, checks, grants and audit shape are unchanged; the audit's level before and after are now always equal.
+- `set_entry_sensitivity` is dropped and removed from `database.types.ts`. No row is changed.
+- pgTAP `life_brain_m1_life_areas.sql` follows: health stays `normal`, the override is absent, and the link's audit records the level unchanged (`plan(28)`).
+- Guards: the chain head is `202611160110` (110 migrations), LB-M5 is attributed by name in the 2N/2O/2P budgets and listed in the post-2H retention correction. The migration's name avoids "sensitiv", which 2N's notes-posture guard reserves. B.8's old "not applied" lines are marked superseded.
+- `DATABASE.md`, `SECURITY.md`; ADR-191 also corrects ADR-178 Decision 4 (the `highly_sensitive` suggestion skip was TypeScript, not SQL).
 
 ## 2026-11-16 — Docs: Life Brain status after track E
 

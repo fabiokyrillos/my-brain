@@ -1,4 +1,5 @@
 import { AgentSpeaker } from "@/features/chat/agent-speaker";
+import { isFailedTurn } from "@/features/chat/failed-turn";
 import { pendingTurn } from "@/features/chat/pending-turn";
 import { PendingTurnIndicator } from "@/features/chat/pending-turn-indicator";
 import { ChatFrame } from "@/features/chat/chat-frame";
@@ -43,6 +44,7 @@ function ThreadMessage({
   content,
   conversationId,
   createdAt,
+  failed,
   locale,
   messageId,
   model,
@@ -64,6 +66,8 @@ function ThreadMessage({
    * source it cites can never be dated differently.
    */
   createdAt: string;
+  /** ADR-194: this assistant row is a failure mark, not an answer. */
+  failed: boolean;
   locale: Locale;
   messageId: string;
   model: string | null;
@@ -109,7 +113,7 @@ function ThreadMessage({
   const asked = role === "user";
   const stamp = <time dateTime={createdAt}>{formatInstant(createdAt, "time", locale, timeZone)}</time>;
   return (
-    <article className={`chat-message ${role}`} data-role={role} id={messageAnchorId(messageId)}>
+    <article className={`chat-message ${role}`} data-role={role} data-turn={failed ? "failed" : undefined} id={messageAnchorId(messageId)}>
       <p className="chat-message-meta">
         {asked ? <span className="chat-message-speaker">{copy.speakerYou}</span> : <AgentSpeaker agentName={agentName} />}
         {asked ? null : stamp}
@@ -239,6 +243,7 @@ export default async function ConversationPage({
               content={message.content}
               conversationId={conversationId}
               createdAt={message.created_at}
+              failed={message.role === "assistant" && isFailedTurn(message.citations)}
               locale={locale}
               messageId={message.id}
               model={message.model}

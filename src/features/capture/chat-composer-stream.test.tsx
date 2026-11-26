@@ -175,3 +175,43 @@ describe("every other turn keeps the action", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("a sentence tried as a command first (ADR-193)", () => {
+  it("tells the action it can stream, then streams the answer the action handed back", async () => {
+    const stream = controlledStream();
+    fetchMock.mockResolvedValue(stream.response);
+    const action = renderComposer(
+      vi.fn<AssistantComposerAction>(async () => ({
+        ...idleAssistantComposerState,
+        route: "stream_answer",
+        echo: "Algo sobre o Jaime e a proposta",
+      })),
+    );
+
+    await userEvent.type(screen.getByRole("textbox"), "Algo sobre o Jaime e a proposta");
+    await userEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() => expect(action).toHaveBeenCalledTimes(1));
+    const submitted = action.mock.calls[0]![1];
+    expect(submitted.get("streamAnswer")).toBe("1");
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const [, init] = fetchMock.mock.calls[0]!;
+    expect(JSON.parse((init as RequestInit).body as string)).toMatchObject({
+      question: "Algo sobre o Jaime e a proposta",
+      conversationId,
+    });
+
+    await act(async () => {
+      stream.send({ type: "conversation", conversationId });
+      stream.send({ type: "delta", text: "O Jaime pediu a proposta." });
+    });
+    expect(await screen.findByText("O Jaime pediu a proposta.")).toBeTruthy();
+    await act(async () => {
+      stream.send({ type: "done", conversationId, href: `/pt-BR/app/chat/${conversationId}` });
+      stream.end();
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

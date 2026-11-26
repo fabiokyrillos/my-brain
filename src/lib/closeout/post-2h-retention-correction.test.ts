@@ -254,6 +254,9 @@ describe("POST-2H-CORRECTION: the guard has something to read", () => {
       // holds nothing that needs a retention window; the row goes with the
       // account by cascade.
       "202611090109_life_brain_b8_model_suggestions.sql",
+      // Life Brain LB-M5 (ADR-191): replaces one function and drops another;
+      // it creates no table and writes no row, so nothing needs a retention window.
+      "202611160110_life_brain_lb_od7_retire_level_writers.sql",
     ]);
   });
 });

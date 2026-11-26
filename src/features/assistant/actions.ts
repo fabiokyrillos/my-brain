@@ -321,6 +321,17 @@ export async function runAssistantTurn(
     if (looksLikeRelato(text)) {
       return captureFromChat(text, locale, { heading: copy.relatoHeading, detail: copy.relatoDetail, nextStep: null });
     }
+    /*
+      ADR-193. A composer that can stream says so, and then the answer is
+      handed back to it as `stream_answer` instead of being answered here: it
+      streams the question through the chat route, which re-authenticates and
+      runs the pipeline `sendChatMessage` runs. Only this one fallthrough is
+      handed over — a command, a relato and every refusal stay above — and only
+      on the exact value "1", so no other form value changes the transport.
+    */
+    if (formData.get("streamAnswer") === "1") {
+      return { ...idleAssistantComposerState, route: "stream_answer", echo: text };
+    }
     return answerFromKnowledge(text, locale, conversationId);
   }
   return {
